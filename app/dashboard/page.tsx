@@ -44,7 +44,6 @@ export default function Dashboard() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<string>('')
   
-  // TRADE FINDER STATE
   const [tradeFinderScreenshots, setTradeFinderScreenshots] = useState({
     oneHour: null as string | null,
     fifteenMin: null as string | null,
@@ -53,7 +52,6 @@ export default function Dashboard() {
   const [isAnalyzingTrade, setIsAnalyzingTrade] = useState(false)
   const [tradeRecommendation, setTradeRecommendation] = useState<any>(null)
   
-  // CALCULATIONS
   const totalIncome = transactions.filter(t => t.type === "income").reduce((sum, t) => {
     const amount = parseFloat(t.amount || 0)
     const multiplier = t.frequency === 'weekly' ? 52/12 : t.frequency === 'fortnightly' ? 26/12 : t.frequency === 'yearly' ? 1/12 : 1
@@ -87,7 +85,6 @@ export default function Dashboard() {
     }, 0)
   
   const netPL = totalPL - monthlyCosts
-  // FUNCTIONS
   const addGoal = () => {
     if (!newGoal.name || !newGoal.target) return
     setGoals([...goals, { ...newGoal, id: Date.now() }])
@@ -194,7 +191,6 @@ export default function Dashboard() {
     }
   }
   
-  // TRADE FINDER FUNCTIONS
   const handleTradeFinderUpload = (timeframe: 'oneHour' | 'fifteenMin' | 'fiveMin', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -236,69 +232,27 @@ export default function Dashboard() {
         }).then(r => r.json())
       ])
       
-      const combinedAnalysis = `You are a professional forex trader analyzing 3 timeframes for confluence.
-
-1H CHART ANALYSIS: ${analyses[0].analysis || 'Error'}
-
-15M CHART ANALYSIS: ${analyses[1].analysis || 'Error'}
-
-5M CHART ANALYSIS: ${analyses[2].analysis || 'Error'}
-
-Based on this multi-timeframe analysis, provide a trade recommendation with MINIMUM 1:2 risk:reward ratio.
-
-Format EXACTLY as follows:
-TRADE: YES or NO
-PAIR: [currency pair]
-DIRECTION: LONG or SHORT
-ENTRY: [entry price]
-STOP_LOSS: [stop loss price]
-TAKE_PROFIT: [take profit price]
-RISK_PIPS: [risk in pips]
-REWARD_PIPS: [reward in pips]
-RISK_REWARD: 1:[ratio]
-CONFIDENCE: LOW, MEDIUM, or HIGH
-REASONING:
-- [Key reason 1]
-- [Key reason 2]
-- [Key reason 3]
-
-CRITICAL: If risk:reward is less than 1:2, set TRADE: NO and explain why.`
-
-      const finalResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      const finalResponse = await fetch('/api/analyze-screenshot', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': 'dummy-key-will-use-server'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 2000,
-          messages: [{
-            role: 'user',
-            content: combinedAnalysis
-          }]
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          analyses: analyses.map(a => a.analysis || a.error || 'Analysis failed')
         })
       })
       
+      const finalData = await finalResponse.json()
+      
       if (!finalResponse.ok) {
-        const finalResponse2 = await fetch('/api/analyze-trade-setup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            analyses: analyses.map(a => a.analysis)
-          })
-        })
-        const finalData2 = await finalResponse2.json()
-        const recommendation = parseTradeRecommendation(finalData2.recommendation || finalData2.error || 'Analysis failed')
-        setTradeRecommendation(recommendation)
-      } else {
-        const finalData = await finalResponse.json()
-        const recommendation = parseTradeRecommendation(finalData.content?.[0]?.text || 'Analysis failed')
-        setTradeRecommendation(recommendation)
+        setTradeRecommendation({ error: finalData.error || 'Analysis failed' })
+        return
       }
       
+      const recommendation = parseTradeRecommendation(finalData.recommendation || finalData.error || 'Analysis failed')
+      setTradeRecommendation(recommendation)
+      
     } catch (error) {
-      setTradeRecommendation({ error: 'Error analyzing trade setup' })
+      console.error('Trade analysis error:', error)
+      setTradeRecommendation({ error: 'Error analyzing trade setup. Please try again.' })
     } finally {
       setIsAnalyzingTrade(false)
     }
@@ -352,7 +306,7 @@ CRITICAL: If risk:reward is less than 1:2, set TRADE: NO and explain why.`
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #eef2ff, #fce7f3)' }}>
-    <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
+  <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: '0 0 8px 0' }}>✨ Premium Finance Pro</h1>
           <p style={{ opacity: '0.9', margin: '0 0 24px 0' }}>
@@ -428,7 +382,7 @@ CRITICAL: If risk:reward is less than 1:2, set TRADE: NO and explain why.`
             {financeTab === 'position' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '32px', marginBottom: '32px' }}>📊 Current Position</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmin(250px, 1fr))', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
                   <div style={{ padding: '24px', background: '#f0fdf4', borderRadius: '12px', border: '2px solid #10b981' }}>
                     <h3 style={{ fontSize: '16px', color: '#64748b' }}>💰 Monthly Income</h3>
                     <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#10b981' }}>${totalIncome.toFixed(2)}</p>
@@ -512,7 +466,7 @@ CRITICAL: If risk:reward is less than 1:2, set TRADE: NO and explain why.`
               </div>
             )}
           </>
-        )}  
+        )}
        {mainTab === 'trading' && (
           <>
             {tradingTab === 'trading-goals' && (
