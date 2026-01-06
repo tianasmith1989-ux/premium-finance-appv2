@@ -44,7 +44,16 @@ export default function Dashboard() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<string>('')
   
-  // UPDATED CALCULATIONS WITH FREQUENCY CONVERSION
+  // TRADE FINDER STATE
+  const [tradeFinderScreenshots, setTradeFinderScreenshots] = useState({
+    oneHour: null as string | null,
+    fifteenMin: null as string | null,
+    fiveMin: null as string | null
+  })
+  const [isAnalyzingTrade, setIsAnalyzingTrade] = useState(false)
+  const [tradeRecommendation, setTradeRecommendation] = useState<any>(null)
+  
+  // CALCULATIONS
   const totalIncome = transactions.filter(t => t.type === "income").reduce((sum, t) => {
     const amount = parseFloat(t.amount || 0)
     const multiplier = t.frequency === 'weekly' ? 52/12 : t.frequency === 'fortnightly' ? 26/12 : t.frequency === 'yearly' ? 1/12 : 1
@@ -78,6 +87,7 @@ export default function Dashboard() {
     }, 0)
   
   const netPL = totalPL - monthlyCosts
+  // FUNCTIONS
   const addGoal = () => {
     if (!newGoal.name || !newGoal.target) return
     setGoals([...goals, { ...newGoal, id: Date.now() }])
@@ -184,6 +194,140 @@ export default function Dashboard() {
     }
   }
   
+  // TRADE FINDER FUNCTIONS
+  const handleTradeFinderUpload = (timeframe: 'oneHour' | 'fifteenMin' | 'fiveMin', e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setTradeFinderScreenshots({
+        ...tradeFinderScreenshots,
+        [timeframe]: reader.result as string
+      })
+    }
+    reader.readAsDataURL(file)
+  }
+  
+  const analyzeTradeSetup = async () => {
+    if (!tradeFinderScreenshots.oneHour || !tradeFinderScreenshots.fifteenMin || !tradeFinderScreenshots.fiveMin) {
+      alert('Please upload all 3 screenshots (1H, 15M, 5M)')
+      return
+    }
+    
+    setIsAnalyzingTrade(true)
+    setTradeRecommendation(null)
+    
+    try {
+      const analyses = await Promise.all([
+        fetch('/api/analyze-screenshot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: tradeFinderScreenshots.oneHour })
+        }).then(r => r.json()),
+        fetch('/api/analyze-screenshot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: tradeFinderScreenshots.fifteenMin })
+        }).then(r => r.json()),
+        fetch('/api/analyze-screenshot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: tradeFinderScreenshots.fiveMin })
+        }).then(r => r.json())
+      ])
+      
+      const combinedAnalysis = `You are a professional forex trader analyzing 3 timeframes for confluence.
+
+1H CHART ANALYSIS: ${analyses[0].analysis || 'Error'}
+
+15M CHART ANALYSIS: ${analyses[1].analysis || 'Error'}
+
+5M CHART ANALYSIS: ${analyses[2].analysis || 'Error'}
+
+Based on this multi-timeframe analysis, provide a trade recommendation with MINIMUM 1:2 risk:reward ratio.
+
+Format EXACTLY as follows:
+TRADE: YES or NO
+PAIR: [currency pair]
+DIRECTION: LONG or SHORT
+ENTRY: [entry price]
+STOP_LOSS: [stop loss price]
+TAKE_PROFIT: [take profit price]
+RISK_PIPS: [risk in pips]
+REWARD_PIPS: [reward in pips]
+RISK_REWARD: 1:[ratio]
+CONFIDENCE: LOW, MEDIUM, or HIGH
+REASONING:
+- [Key reason 1]
+- [Key reason 2]
+- [Key reason 3]
+
+CRITICAL: If risk:reward is less than 1:2, set TRADE: NO and explain why.`
+
+      const finalResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'dummy-key-will-use-server'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 2000,
+          messages: [{
+            role: 'user',
+            content: combinedAnalysis
+          }]
+        })
+      })
+      
+      if (!finalResponse.ok) {
+        const finalResponse2 = await fetch('/api/analyze-trade-setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            analyses: analyses.map(a => a.analysis)
+          })
+        })
+        const finalData2 = await finalResponse2.json()
+        const recommendation = parseTradeRecommendation(finalData2.recommendation || finalData2.error || 'Analysis failed')
+        setTradeRecommendation(recommendation)
+      } else {
+        const finalData = await finalResponse.json()
+        const recommendation = parseTradeRecommendation(finalData.content?.[0]?.text || 'Analysis failed')
+        setTradeRecommendation(recommendation)
+      }
+      
+    } catch (error) {
+      setTradeRecommendation({ error: 'Error analyzing trade setup' })
+    } finally {
+      setIsAnalyzingTrade(false)
+    }
+  }
+  
+  const parseTradeRecommendation = (text: string) => {
+    const rec: any = { raw: text }
+    const lines = text.split('\n')
+    
+    lines.forEach((line, idx) => {
+      const cleanLine = line.trim()
+      if (cleanLine.startsWith('TRADE:')) rec.shouldTrade = cleanLine.includes('YES')
+      if (cleanLine.startsWith('PAIR:')) rec.pair = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('DIRECTION:')) rec.direction = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('ENTRY:')) rec.entry = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('STOP_LOSS:')) rec.stopLoss = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('TAKE_PROFIT:')) rec.takeProfit = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('RISK_PIPS:')) rec.riskPips = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('REWARD_PIPS:')) rec.rewardPips = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('RISK_REWARD:')) rec.riskReward = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('CONFIDENCE:')) rec.confidence = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('REASONING:')) {
+        rec.reasoning = lines.slice(idx + 1).filter(l => l.trim()).join('\n')
+      }
+    })
+    
+    return rec
+  }
+  
   const getDaysInMonth = () => {
     const today = new Date()
     const year = today.getFullYear()
@@ -201,7 +345,6 @@ export default function Dashboard() {
     })
   }
   
-  // Helper to convert amount to monthly
   const convertToMonthly = (amount: number, frequency: string) => {
     const multiplier = frequency === 'weekly' ? 52/12 : frequency === 'fortnightly' ? 26/12 : frequency === 'yearly' ? 1/12 : 1
     return amount * multiplier
@@ -209,7 +352,7 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #eef2ff, #fce7f3)' }}>
-     <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
+    <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: '0 0 8px 0' }}>✨ Premium Finance Pro</h1>
           <p style={{ opacity: '0.9', margin: '0 0 24px 0' }}>
@@ -230,7 +373,7 @@ export default function Dashboard() {
               </>
             ) : (
               <>
-                {[{ id: "trading-goals", label: "🎯 Trading Goals" }, { id: "performance", label: "📊 Performance" }, { id: "trading-path", label: "🗺️ Path" }, { id: "journal", label: "📈 Journal" }, { id: "costs", label: "💸 Costs" }].map(tab => (
+                {[{ id: "trading-goals", label: "🎯 Goals" }, { id: "performance", label: "📊 Performance" }, { id: "trading-path", label: "🗺️ Path" }, { id: "finder", label: "🔮 Trade Finder" }, { id: "journal", label: "📈 Journal" }, { id: "costs", label: "💸 Costs" }].map(tab => (
                   <button key={tab.id} onClick={() => setTradingTab(tab.id)} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '500', background: tradingTab === tab.id ? "white" : "rgba(255,255,255,0.1)", color: tradingTab === tab.id ? "#4f46e5" : "white" }}>{tab.label}</button>
                 ))}
               </>
@@ -285,7 +428,7 @@ export default function Dashboard() {
             {financeTab === 'position' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '32px', marginBottom: '32px' }}>📊 Current Position</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmin(250px, 1fr))', gap: '16px' }}>
                   <div style={{ padding: '24px', background: '#f0fdf4', borderRadius: '12px', border: '2px solid #10b981' }}>
                     <h3 style={{ fontSize: '16px', color: '#64748b' }}>💰 Monthly Income</h3>
                     <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#10b981' }}>${totalIncome.toFixed(2)}</p>
@@ -369,7 +512,7 @@ export default function Dashboard() {
               </div>
             )}
           </>
-        )} 
+        )}  
        {mainTab === 'trading' && (
           <>
             {tradingTab === 'trading-goals' && (
@@ -425,6 +568,97 @@ export default function Dashboard() {
               </div>
             )}
             
+            {tradingTab === 'finder' && (
+              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>🔮 Trade Finder (Multi-Timeframe Analysis)</h2>
+                <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '18px' }}>
+                  Upload 3 screenshots for confluence analysis. Minimum 1:2 risk:reward ratio required.
+                </p>
+                
+                <div style={{ marginBottom: '32px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+                    <div style={{ padding: '24px', background: '#fef3c7', borderRadius: '12px', border: '2px solid #f59e0b' }}>
+                      <h3 style={{ fontSize: '20px', marginBottom: '12px', color: '#92400e' }}>📊 1H Chart (Trend)</h3>
+                      <input type="file" accept="image/*" onChange={(e) => handleTradeFinderUpload('oneHour', e)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', marginBottom: '12px' }} />
+                      {tradeFinderScreenshots.oneHour && <img src={tradeFinderScreenshots.oneHour} alt="1H" style={{ width: '100%', borderRadius: '8px', border: '2px solid #f59e0b' }} />}
+                    </div>
+                    
+                    <div style={{ padding: '24px', background: '#dbeafe', borderRadius: '12px', border: '2px solid #3b82f6' }}>
+                      <h3 style={{ fontSize: '20px', marginBottom: '12px', color: '#1e40af' }}>📊 15M Chart (Setup)</h3>
+                      <input type="file" accept="image/*" onChange={(e) => handleTradeFinderUpload('fifteenMin', e)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', marginBottom: '12px' }} />
+                      {tradeFinderScreenshots.fifteenMin && <img src={tradeFinderScreenshots.fifteenMin} alt="15M" style={{ width: '100%', borderRadius: '8px', border: '2px solid #3b82f6' }} />}
+                    </div>
+                    
+                    <div style={{ padding: '24px', background: '#f0fdf4', borderRadius: '12px', border: '2px solid #10b981' }}>
+                      <h3 style={{ fontSize: '20px', marginBottom: '12px', color: '#065f46' }}>📊 5M Chart (Confirmation)</h3>
+                      <input type="file" accept="image/*" onChange={(e) => handleTradeFinderUpload('fiveMin', e)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', marginBottom: '12px' }} />
+                      {tradeFinderScreenshots.fiveMin && <img src={tradeFinderScreenshots.fiveMin} alt="5M" style={{ width: '100%', borderRadius: '8px', border: '2px solid #10b981' }} />}
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                  <button
+                    onClick={analyzeTradeSetup}
+                    disabled={!tradeFinderScreenshots.oneHour || !tradeFinderScreenshots.fifteenMin || !tradeFinderScreenshots.fiveMin || isAnalyzingTrade}
+                    style={{
+                      padding: '16px 48px',
+                      background: (!tradeFinderScreenshots.oneHour || !tradeFinderScreenshots.fifteenMin || !tradeFinderScreenshots.fiveMin || isAnalyzingTrade) ? '#94a3b8' : 'linear-gradient(to right, #7c3aed, #6d28d9)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      cursor: (!tradeFinderScreenshots.oneHour || !tradeFinderScreenshots.fifteenMin || !tradeFinderScreenshots.fiveMin || isAnalyzingTrade) ? 'not-allowed' : 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '20px'
+                    }}
+                  >
+                    {isAnalyzingTrade ? '🔄 Analyzing All Timeframes...' : '🔮 Analyze Trade Setup'}
+                  </button>
+                </div>
+                
+                {tradeRecommendation && (
+                  <div style={{ padding: '32px', background: tradeRecommendation.shouldTrade ? 'linear-gradient(to right, #f0fdf4, #dcfce7)' : 'linear-gradient(to right, #fef2f2, #fee2e2)', borderRadius: '16px', border: `3px solid ${tradeRecommendation.shouldTrade ? '#10b981' : '#ef4444'}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                      <div style={{ fontSize: '64px' }}>{tradeRecommendation.shouldTrade ? '✅' : '❌'}</div>
+                      <div>
+                        <h3 style={{ fontSize: '32px', fontWeight: 'bold', color: tradeRecommendation.shouldTrade ? '#065f46' : '#991b1b', margin: 0 }}>
+                          {tradeRecommendation.shouldTrade ? 'TRADE RECOMMENDATION' : 'NO TRADE'}
+                        </h3>
+                        {tradeRecommendation.confidence && (
+                          <p style={{ fontSize: '18px', color: '#64748b', margin: '4px 0 0 0' }}>
+                            Confidence: <strong>{tradeRecommendation.confidence}</strong>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {tradeRecommendation.shouldTrade ? (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                          {tradeRecommendation.pair && <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}><div style={{ fontSize: '14px', color: '#64748b' }}>Pair</div><div style={{ fontSize: '24px', fontWeight: 'bold' }}>{tradeRecommendation.pair}</div></div>}
+                          {tradeRecommendation.direction && <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}><div style={{ fontSize: '14px', color: '#64748b' }}>Direction</div><div style={{ fontSize: '24px', fontWeight: 'bold', color: tradeRecommendation.direction === 'LONG' ? '#10b981' : '#ef4444' }}>{tradeRecommendation.direction}</div></div>}
+                          {tradeRecommendation.entry && <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}><div style={{ fontSize: '14px', color: '#64748b' }}>Entry</div><div style={{ fontSize: '24px', fontWeight: 'bold' }}>{tradeRecommendation.entry}</div></div>}
+                          {tradeRecommendation.stopLoss && <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}><div style={{ fontSize: '14px', color: '#64748b' }}>Stop Loss</div><div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>{tradeRecommendation.stopLoss}</div></div>}
+                          {tradeRecommendation.takeProfit && <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}><div style={{ fontSize: '14px', color: '#64748b' }}>Take Profit</div><div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>{tradeRecommendation.takeProfit}</div></div>}
+                          {tradeRecommendation.riskReward && <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}><div style={{ fontSize: '14px', color: '#64748b' }}>Risk:Reward</div><div style={{ fontSize: '24px', fontWeight: 'bold', color: '#7c3aed' }}>1:{tradeRecommendation.riskReward}</div></div>}
+                        </div>
+                        
+                        {tradeRecommendation.reasoning && (
+                          <div style={{ padding: '20px', background: 'white', borderRadius: '12px' }}>
+                            <h4 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '12px' }}>📋 Analysis:</h4>
+                            <pre style={{ whiteSpace: 'pre-wrap', fontSize: '14px', lineHeight: '1.8', margin: 0, fontFamily: 'inherit' }}>{tradeRecommendation.reasoning}</pre>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ padding: '20px', background: 'white', borderRadius: '12px' }}>
+                        <pre style={{ whiteSpace: 'pre-wrap', fontSize: '16px', lineHeight: '1.8' }}>{tradeRecommendation.raw || tradeRecommendation.error || 'Risk:Reward ratio does not meet 1:2 minimum requirement.'}</pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )} 
             {tradingTab === 'journal' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>📈 Trade Journal with AI</h2>
@@ -489,4 +723,4 @@ export default function Dashboard() {
       </div>
     </div>
   )
-} 
+}
