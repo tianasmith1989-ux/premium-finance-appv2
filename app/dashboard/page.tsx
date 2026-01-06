@@ -9,7 +9,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("goals")
   
   // Goals
-  const [goals, setGoals] = useState([])
+  const [goals, setGoals] = useState<any[]>([])
   const [newGoal, setNewGoal] = useState({
     name: '', target: '', saved: '', deadline: ''
   })
