@@ -14,6 +14,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
     }
 
+    // Detect image type from base64 string
+    let mediaType = 'image/jpeg'
+    if (image.startsWith('data:image/png')) {
+      mediaType = 'image/png'
+    } else if (image.startsWith('data:image/jpg') || image.startsWith('data:image/jpeg')) {
+      mediaType = 'image/jpeg'
+    } else if (image.startsWith('data:image/webp')) {
+      mediaType = 'image/webp'
+    } else if (image.startsWith('data:image/gif')) {
+      mediaType = 'image/gif'
+    }
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -30,13 +42,10 @@ export async function POST(request: NextRequest) {
             {
               type: 'image',
               source: {
-                source: {
-  type: 'base64',
-  media_type: image.startsWith('data:image/png') ? 'image/png' : 
-              image.startsWith('data:image/jpg') ? 'image/jpeg' :
-              image.startsWith('data:image/jpeg') ? 'image/jpeg' : 'image/png',
-  data: image.split(',')[1]
-}
+                type: 'base64',
+                media_type: mediaType,
+                data: image.split(',')[1]
+              }
             },
             {
               type: 'text',
@@ -60,7 +69,10 @@ Be specific and concise. Format as a list.`
     const data = await response.json()
     
     if (!response.ok) {
-      return NextResponse.json({ error: data.error?.message || 'Analysis failed' }, { status: response.status })
+      console.error('Anthropic API error:', data)
+      return NextResponse.json({ 
+        error: data.error?.message || 'Analysis failed' 
+      }, { status: response.status })
     }
     
     const analysis = data.content?.[0]?.text || 'Could not analyze screenshot'
@@ -68,6 +80,8 @@ Be specific and concise. Format as a list.`
     
   } catch (error) {
     console.error('Analysis error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Internal server error' 
+    }, { status: 500 })
   }
 }
