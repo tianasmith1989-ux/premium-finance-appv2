@@ -11,7 +11,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("dashboard")
   
   // Data
-  const [transactions, setTransactions] = useState([])
+  const [transactions, setTransactions] = useState<any[]>([])
   const [budgets] = useState({
     "Housing": 2000,
     "Transportation": 500,
