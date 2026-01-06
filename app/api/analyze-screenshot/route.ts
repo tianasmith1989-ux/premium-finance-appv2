@@ -30,10 +30,13 @@ export async function POST(request: NextRequest) {
             {
               type: 'image',
               source: {
-                type: 'base64',
-                media_type: 'image/jpeg',
-                data: image.split(',')[1]
-              }
+                source: {
+  type: 'base64',
+  media_type: image.startsWith('data:image/png') ? 'image/png' : 
+              image.startsWith('data:image/jpg') ? 'image/jpeg' :
+              image.startsWith('data:image/jpeg') ? 'image/jpeg' : 'image/png',
+  data: image.split(',')[1]
+}
             },
             {
               type: 'text',
