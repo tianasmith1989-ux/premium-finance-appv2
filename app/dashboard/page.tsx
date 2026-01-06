@@ -17,7 +17,7 @@ export default function Dashboard() {
   
   const [transactions, setTransactions] = useState<any[]>([])
   const [newTransaction, setNewTransaction] = useState({
-    name: '', amount: '', type: 'expense', date: new Date().toISOString().split('T')[0]
+    name: '', amount: '', type: 'expense', date: new Date().toISOString().split('T')[0], frequency: 'monthly'
   })
   
   const [tradingGoals, setTradingGoals] = useState<any[]>([])
@@ -44,8 +44,19 @@ export default function Dashboard() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<string>('')
   
-  const totalIncome = transactions.filter(t => t.type === "income").reduce((sum, t) => sum + parseFloat(t.amount || 0), 0)
-  const totalExpenses = transactions.filter(t => t.type === "expense").reduce((sum, t) => sum + parseFloat(t.amount || 0), 0)
+  // UPDATED CALCULATIONS WITH FREQUENCY CONVERSION
+  const totalIncome = transactions.filter(t => t.type === "income").reduce((sum, t) => {
+    const amount = parseFloat(t.amount || 0)
+    const multiplier = t.frequency === 'weekly' ? 52/12 : t.frequency === 'fortnightly' ? 26/12 : t.frequency === 'yearly' ? 1/12 : 1
+    return sum + (amount * multiplier)
+  }, 0)
+  
+  const totalExpenses = transactions.filter(t => t.type === "expense").reduce((sum, t) => {
+    const amount = parseFloat(t.amount || 0)
+    const multiplier = t.frequency === 'weekly' ? 52/12 : t.frequency === 'fortnightly' ? 26/12 : t.frequency === 'yearly' ? 1/12 : 1
+    return sum + (amount * multiplier)
+  }, 0)
+  
   const monthlySurplus = totalIncome - totalExpenses
   const totalGoalsTarget = goals.reduce((sum, g) => sum + parseFloat(g.target || 0), 0)
   const totalGoalsSaved = goals.reduce((sum, g) => sum + parseFloat(g.saved || 0), 0)
@@ -82,7 +93,7 @@ export default function Dashboard() {
   const addTransaction = () => {
     if (!newTransaction.name || !newTransaction.amount) return
     setTransactions([...transactions, { ...newTransaction, id: Date.now() }])
-    setNewTransaction({ name: '', amount: '', type: 'expense', date: new Date().toISOString().split('T')[0] })
+    setNewTransaction({ name: '', amount: '', type: 'expense', date: new Date().toISOString().split('T')[0], frequency: 'monthly' })
   }
   
   const addTrade = () => {
@@ -189,6 +200,12 @@ export default function Dashboard() {
       return tDate.getDate() === day && tDate.getMonth() === month && tDate.getFullYear() === year
     })
   }
+  
+  // Helper to convert amount to monthly
+  const convertToMonthly = (amount: number, frequency: string) => {
+    const multiplier = frequency === 'weekly' ? 52/12 : frequency === 'fortnightly' ? 26/12 : frequency === 'yearly' ? 1/12 : 1
+    return amount * multiplier
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #eef2ff, #fce7f3)' }}>
@@ -270,15 +287,15 @@ export default function Dashboard() {
                 <h2 style={{ fontSize: '32px', marginBottom: '32px' }}>📊 Current Position</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
                   <div style={{ padding: '24px', background: '#f0fdf4', borderRadius: '12px', border: '2px solid #10b981' }}>
-                    <h3 style={{ fontSize: '16px', color: '#64748b' }}>💰 Income</h3>
+                    <h3 style={{ fontSize: '16px', color: '#64748b' }}>💰 Monthly Income</h3>
                     <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#10b981' }}>${totalIncome.toFixed(2)}</p>
                   </div>
                   <div style={{ padding: '24px', background: '#fef2f2', borderRadius: '12px', border: '2px solid #ef4444' }}>
-                    <h3 style={{ fontSize: '16px', color: '#64748b' }}>💸 Expenses</h3>
+                    <h3 style={{ fontSize: '16px', color: '#64748b' }}>💸 Monthly Expenses</h3>
                     <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#ef4444' }}>${totalExpenses.toFixed(2)}</p>
                   </div>
                   <div style={{ padding: '24px', background: '#f0f9ff', borderRadius: '12px', border: '2px solid #3b82f6' }}>
-                    <h3 style={{ fontSize: '16px', color: '#64748b' }}>📈 Surplus</h3>
+                    <h3 style={{ fontSize: '16px', color: '#64748b' }}>📈 Monthly Surplus</h3>
                     <p style={{ fontSize: '32px', fontWeight: 'bold', color: monthlySurplus >= 0 ? '#10b981' : '#ef4444' }}>${monthlySurplus.toFixed(2)}</p>
                   </div>
                 </div>
@@ -306,29 +323,54 @@ export default function Dashboard() {
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>💰 Transactions</h2>
                 <div style={{ marginBottom: '32px', padding: '24px', background: '#f8fafc', borderRadius: '12px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
                     <input type="text" placeholder="Name" value={newTransaction.name} onChange={(e) => setNewTransaction({...newTransaction, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                     <input type="number" placeholder="Amount" value={newTransaction.amount} onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <select value={newTransaction.type} onChange={(e) => setNewTransaction({...newTransaction, type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}><option value="income">Income</option><option value="expense">Expense</option></select>
+                    <select value={newTransaction.frequency} onChange={(e) => setNewTransaction({...newTransaction, frequency: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <option value="weekly">Weekly</option>
+                      <option value="fortnightly">Fortnightly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                    <select value={newTransaction.type} onChange={(e) => setNewTransaction({...newTransaction, type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <option value="income">Income</option>
+                      <option value="expense">Expense</option>
+                    </select>
                     <input type="date" value={newTransaction.date} onChange={(e) => setNewTransaction({...newTransaction, date: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                     <button onClick={addTransaction} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add</button>
                   </div>
                 </div>
                 {transactions.length === 0 ? <p style={{ color: '#64748b', textAlign: 'center', padding: '32px' }}>No transactions yet</p> : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {transactions.map(t => (
-                      <div key={t.id} style={{ padding: '16px', background: t.type === 'income' ? '#f0fdf4' : '#fef2f2', borderRadius: '12px', display: 'flex', justifyContent: 'space-between' }}>
-                        <div><div style={{ fontWeight: '600' }}>{t.name}</div><div style={{ fontSize: '14px', color: '#64748b' }}>{new Date(t.date).toLocaleDateString()}</div></div>
-                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: t.type === 'income' ? '#10b981' : '#ef4444' }}>{t.type === 'income' ? '+' : '-'}${parseFloat(t.amount).toFixed(2)}</div>
-                      </div>
-                    ))}
+                    {transactions.map(t => {
+                      const amount = parseFloat(t.amount)
+                      const monthlyAmount = convertToMonthly(amount, t.frequency || 'monthly')
+                      return (
+                        <div key={t.id} style={{ padding: '16px', background: t.type === 'income' ? '#f0fdf4' : '#fef2f2', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                          <div>
+                            <div style={{ fontWeight: '600', fontSize: '18px' }}>{t.name}</div>
+                            <div style={{ fontSize: '14px', color: '#64748b' }}>
+                              ${amount.toFixed(2)}/{t.frequency || 'monthly'} • {new Date(t.date).toLocaleDateString()}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: t.type === 'income' ? '#10b981' : '#ef4444' }}>
+                              {t.type === 'income' ? '+' : '-'}${amount.toFixed(2)}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#64748b' }}>
+                              ≈ ${monthlyAmount.toFixed(2)}/month
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
             )}
           </>
-        )}
-      {mainTab === 'trading' && (
+        )} 
+       {mainTab === 'trading' && (
           <>
             {tradingTab === 'trading-goals' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
@@ -447,4 +489,4 @@ export default function Dashboard() {
       </div>
     </div>
   )
-}  
+} 
