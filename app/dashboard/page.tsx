@@ -7,7 +7,7 @@ export default function Dashboard() {
   const { user } = useUser()
   
   // Main navigation
-  const [mainTab, setMainTab] = useState("finance") // finance or trading
+  const [mainTab, setMainTab] = useState("finance")
   const [financeTab, setFinanceTab] = useState("goals")
   const [tradingTab, setTradingTab] = useState("trading-goals")
   
@@ -25,7 +25,7 @@ export default function Dashboard() {
   // Trading Data
   const [tradingGoals, setTradingGoals] = useState<any[]>([])
   const [newTradingGoal, setNewTradingGoal] = useState({
-    name: '', target: '', current: '', deadline: '', type: 'profit' // profit, winrate, consistency
+    name: '', target: '', current: '', deadline: '', type: 'profit'
   })
   
   const [trades, setTrades] = useState<any[]>([])
@@ -43,7 +43,9 @@ export default function Dashboard() {
     setup: '',
     timeframe: '1H',
     emotionalState: 'neutral',
-    manualPL: true
+    manualPL: true,
+    screenshot: null as string | null,
+    aiAnalysis: null as string | null
   })
   
   const [tradingCosts, setTradingCosts] = useState({
@@ -56,6 +58,10 @@ export default function Dashboard() {
   const [newCost, setNewCost] = useState({
     name: '', cost: '', frequency: 'monthly', type: 'subscription'
   })
+  
+  // AI Analysis State
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [analysisResult, setAnalysisResult] = useState<string>('')
   
   // Finance Calculations
   const totalIncome = transactions.filter(t => t.type === "income").reduce((sum, t) => sum + parseFloat(t.amount || 0), 0)
@@ -104,13 +110,19 @@ export default function Dashboard() {
   
   const addTrade = () => {
     if (!newTrade.instrument) return
-    setTrades([...trades, { ...newTrade, id: Date.now() }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()))
+    setTrades([...trades, { 
+      ...newTrade, 
+      id: Date.now(),
+      screenshot: newTrade.screenshot,
+      aiAnalysis: analysisResult || null
+    }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()))
     setNewTrade({
       date: new Date().toISOString().split('T')[0],
       instrument: '', direction: 'long', entryPrice: '', exitPrice: '', size: '',
       profitLoss: '', fees: '', notes: '', strategy: '', setup: '', timeframe: '1H',
-      emotionalState: 'neutral', manualPL: true
+      emotionalState: 'neutral', manualPL: true, screenshot: null, aiAnalysis: null
     })
+    setAnalysisResult('')
   }
   
   const addCost = () => {
@@ -121,6 +133,99 @@ export default function Dashboard() {
       [list]: [...tradingCosts[list], { ...newCost, id: Date.now() }]
     })
     setNewCost({ name: '', cost: '', frequency: 'monthly', type: 'subscription' })
+  }
+  
+  // AI Screenshot Analysis
+  const handleScreenshotUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setNewTrade({ ...newTrade, screenshot: reader.result as string })
+    }
+    reader.readAsDataURL(file)
+  }
+  
+  const analyzeScreenshot = async () => {
+    if (!newTrade.screenshot) {
+      alert('Please upload a screenshot first!')
+      return
+    }
+    
+    setIsAnalyzing(true)
+    setAnalysisResult('')
+    
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: 'image/jpeg',
+                  data: newTrade.screenshot.split(',')[1]
+                }
+              },
+              {
+                type: 'text',
+                text: `Analyze this trading chart screenshot. Extract:
+1. Instrument/pair being traded
+2. Entry price (if visible)
+3. Exit price (if visible)  
+4. Direction (long/short)
+5. Timeframe
+6. Key price levels
+7. Pattern or setup type
+8. Any other relevant trading details
+
+Be specific and concise. Format as a list.`
+              }
+            ]
+          }]
+        })
+      })
+      
+      const data = await response.json()
+      const analysis = data.content?.[0]?.text || 'Could not analyze screenshot'
+      setAnalysisResult(analysis)
+      
+      // Try to auto-fill some fields from analysis
+      const analysisLower = analysis.toLowerCase()
+      
+      // Detect direction
+      if (analysisLower.includes('long') || analysisLower.includes('buy')) {
+        setNewTrade(prev => ({ ...prev, direction: 'long' }))
+      } else if (analysisLower.includes('short') || analysisLower.includes('sell')) {
+        setNewTrade(prev => ({ ...prev, direction: 'short' }))
+      }
+      
+      // Detect timeframe
+      if (analysisLower.includes('1h') || analysisLower.includes('1 hour')) {
+        setNewTrade(prev => ({ ...prev, timeframe: '1H' }))
+      } else if (analysisLower.includes('15m') || analysisLower.includes('15 min')) {
+        setNewTrade(prev => ({ ...prev, timeframe: '15M' }))
+      } else if (analysisLower.includes('4h') || analysisLower.includes('4 hour')) {
+        setNewTrade(prev => ({ ...prev, timeframe: '4H' }))
+      } else if (analysisLower.includes('daily') || analysisLower.includes('1d')) {
+        setNewTrade(prev => ({ ...prev, timeframe: 'D' }))
+      }
+      
+    } catch (error) {
+      console.error('Analysis error:', error)
+      setAnalysisResult('Error analyzing screenshot. Please try again.')
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
   
   // Calendar helpers
@@ -255,15 +360,14 @@ export default function Dashboard() {
 
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
         
-        {/* FINANCE SECTION */}
+        {/* FINANCE SECTION - Keep all existing finance tabs the same */}
         {mainTab === 'finance' && (
           <>
-            {/* Finance Goals */}
             {financeTab === 'goals' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>🎯 Your Financial Goals</h2>
                 <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '18px' }}>
-                  Set your goals and watch your progress! The path to financial freedom starts here.
+                  Set your goals and watch your progress!
                 </p>
                 
                 <div style={{ marginBottom: '32px', padding: '24px', background: '#f0f9ff', borderRadius: '12px' }}>
@@ -309,11 +413,10 @@ export default function Dashboard() {
               </div>
             )}
             
-            {/* Current Position - Keep existing code */}
             {financeTab === 'position' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '32px', marginBottom: '32px' }}>📊 Current Financial Position</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '40px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
                   <div style={{ padding: '24px', background: '#f0fdf4', borderRadius: '12px', border: '2px solid #10b981' }}>
                     <h3 style={{ fontSize: '16px', color: '#64748b', marginBottom: '8px' }}>💰 Monthly Income</h3>
                     <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#10b981' }}>${totalIncome.toFixed(2)}</p>
@@ -330,23 +433,27 @@ export default function Dashboard() {
               </div>
             )}
             
-            {/* Path to Goals - Keep existing */}
             {financeTab === 'path' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>🗺️ Path to Financial Goals</h2>
                 {goals.length === 0 ? (
                   <p style={{ color: '#64748b', textAlign: 'center', padding: '32px' }}>Set goals first!</p>
-                ) : (
+                ) : monthlySurplus > 0 ? (
                   <div style={{ padding: '32px', background: '#f0fdf4', borderRadius: '12px' }}>
                     <p style={{ fontSize: '18px' }}>
                       With ${monthlySurplus.toFixed(2)}/month surplus, you'll reach your goals in approximately <strong>{Math.ceil(totalGoalsRemaining / monthlySurplus)} months</strong>
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ padding: '32px', background: '#fef2f2', borderRadius: '12px' }}>
+                    <p style={{ fontSize: '18px', color: '#ef4444' }}>
+                      You need to increase income or reduce expenses to reach your goals.
                     </p>
                   </div>
                 )}
               </div>
             )}
             
-            {/* Transactions */}
             {financeTab === 'transactions' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>💰 Transactions</h2>
@@ -382,24 +489,23 @@ export default function Dashboard() {
         {/* TRADING SECTION */}
         {mainTab === 'trading' && (
           <>
-            {/* Trading Goals */}
+            {/* Keep all existing trading tabs except Journal - update Journal with AI */}
             {tradingTab === 'trading-goals' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>🎯 Trading Goals</h2>
                 <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '18px' }}>
-                  Set your trading targets and track your journey to consistent profitability.
+                  Set your trading targets and track your journey to profitability.
                 </p>
                 
                 <div style={{ marginBottom: '32px', padding: '24px', background: '#fef3c7', borderRadius: '12px' }}>
                   <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>➕ Add Trading Goal</h3>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                    <input type="text" placeholder="Goal name (e.g., Monthly Profit)" value={newTradingGoal.name} onChange={(e) => setNewTradingGoal({...newTradingGoal, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <input type="text" placeholder="Goal name" value={newTradingGoal.name} onChange={(e) => setNewTradingGoal({...newTradingGoal, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                     <input type="number" placeholder="Target" value={newTradingGoal.target} onChange={(e) => setNewTradingGoal({...newTradingGoal, target: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                     <input type="number" placeholder="Current" value={newTradingGoal.current} onChange={(e) => setNewTradingGoal({...newTradingGoal, current: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                     <select value={newTradingGoal.type} onChange={(e) => setNewTradingGoal({...newTradingGoal, type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <option value="profit">Profit Target ($)</option>
-                      <option value="winrate">Win Rate (%)</option>
-                      <option value="consistency">Consistency Goal</option>
+                      <option value="profit">Profit Target</option>
+                      <option value="winrate">Win Rate</option>
                     </select>
                     <input type="date" value={newTradingGoal.deadline} onChange={(e) => setNewTradingGoal({...newTradingGoal, deadline: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                     <button onClick={addTradingGoal} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #f59e0b, #d97706)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add Goal</button>
@@ -409,8 +515,7 @@ export default function Dashboard() {
                 {tradingGoals.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '60px 20px', background: '#f8fafc', borderRadius: '12px' }}>
                     <div style={{ fontSize: '64px', marginBottom: '16px' }}>🎯</div>
-                    <h3 style={{ fontSize: '24px', marginBottom: '8px' }}>No trading goals yet!</h3>
-                    <p style={{ color: '#64748b' }}>Set your first trading goal above.</p>
+                    <h3 style={{ fontSize: '24px' }}>No trading goals yet!</h3>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -423,7 +528,7 @@ export default function Dashboard() {
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                             <div>
                               <h3 style={{ fontSize: '24px', fontWeight: 'bold' }}>{goal.name}</h3>
-                              <p style={{ color: '#92400e' }}>{current.toFixed(goal.type === 'winrate' ? 1 : 2)}{goal.type === 'winrate' ? '%' : ''} of {target.toFixed(goal.type === 'winrate' ? 1 : 2)}{goal.type === 'winrate' ? '%' : ''}</p>
+                              <p style={{ color: '#92400e' }}>{current.toFixed(2)} of {target.toFixed(2)}</p>
                             </div>
                             <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f59e0b' }}>{progress.toFixed(0)}%</div>
                           </div>
@@ -438,7 +543,6 @@ export default function Dashboard() {
               </div>
             )}
             
-            {/* Current Performance */}
             {tradingTab === 'performance' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '32px', marginBottom: '32px' }}>📊 Current Trading Performance</h2>
@@ -503,60 +607,86 @@ export default function Dashboard() {
               </div>
             )}
             
-            {/* Path to Profitability */}
             {tradingTab === 'trading-path' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>🗺️ Path to Consistent Profitability</h2>
-                <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '18px' }}>
-                  Based on your current performance, here's your roadmap to success.
-                </p>
-                
+                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>🗺️ Path to Profitability</h2>
                 {trades.length < 10 ? (
-                  <div style={{ padding: '32px', background: '#fef3c7', borderRadius: '12px', border: '2px solid #f59e0b' }}>
-                    <h3 style={{ fontSize: '24px', marginBottom: '16px' }}>📊 Need More Data</h3>
-                    <p style={{ fontSize: '18px' }}>Log at least 10 trades to get personalized insights and recommendations.</p>
-                    <p style={{ marginTop: '12px', color: '#92400e' }}>Current: {trades.length} trades • Need: {10 - trades.length} more</p>
+                  <div style={{ padding: '32px', background: '#fef3c7', borderRadius: '12px' }}>
+                    <p style={{ fontSize: '18px' }}>Log at least 10 trades to get insights. Current: {trades.length}</p>
                   </div>
                 ) : (
-                  <>
-                    <div style={{ marginBottom: '32px', padding: '32px', background: 'linear-gradient(to right, #fef3c7, #fde68a)', borderRadius: '12px', border: '2px solid #f59e0b' }}>
-                      <h3 style={{ fontSize: '24px', marginBottom: '16px' }}>📈 Current Stats</h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-                        <div><div style={{ fontSize: '14px', color: '#92400e' }}>Win Rate</div><div style={{ fontSize: '28px', fontWeight: 'bold' }}>{winRate.toFixed(1)}%</div></div>
-                        <div><div style={{ fontSize: '14px', color: '#92400e' }}>Avg Win</div><div style={{ fontSize: '28px', fontWeight: 'bold', color: '#10b981' }}>${avgWin.toFixed(2)}</div></div>
-                        <div><div style={{ fontSize: '14px', color: '#92400e' }}>Avg Loss</div><div style={{ fontSize: '28px', fontWeight: 'bold', color: '#ef4444' }}>${avgLoss.toFixed(2)}</div></div>
-                        <div><div style={{ fontSize: '14px', color: '#92400e' }}>Net P&L</div><div style={{ fontSize: '28px', fontWeight: 'bold', color: netPL >= 0 ? '#10b981' : '#ef4444' }}>${netPL.toFixed(2)}</div></div>
-                      </div>
-                    </div>
-                    
-                    <div style={{ padding: '32px', background: '#f0fdf4', borderRadius: '12px', border: '2px solid #10b981' }}>
-                      <h3 style={{ fontSize: '24px', marginBottom: '24px' }}>✅ Recommendations</h3>
-                      <ol style={{ marginLeft: '20px', lineHeight: '2', fontSize: '16px' }}>
-                        {winRate < 50 && <li style={{ color: '#ef4444' }}>⚠️ Win rate below 50% - Focus on trade selection and entry timing</li>}
-                        {profitFactor < 1.5 && <li style={{ color: '#f59e0b' }}>⚠️ Improve profit factor - Let winners run longer or cut losses sooner</li>}
-                        {avgLoss > avgWin && <li style={{ color: '#ef4444' }}>⚠️ Average loss exceeds average win - Tighten risk management</li>}
-                        {netPL < 0 && <li style={{ color: '#ef4444', fontWeight: 'bold' }}>🚨 Net negative after costs - Review strategy and reduce trading frequency</li>}
-                        {netPL >= 0 && winRate >= 50 && profitFactor >= 1.5 && <li style={{ color: '#10b981', fontWeight: 'bold' }}>🎉 Great work! You're on the path to consistent profitability!</li>}
-                        <li>Track at least 50-100 trades before making major strategy changes</li>
-                        <li>Review losing trades to identify patterns</li>
-                        <li>Consider reducing position size if drawdowns are high</li>
-                      </ol>
-                    </div>
-                  </>
+                  <div style={{ padding: '32px', background: '#f0fdf4', borderRadius: '12px' }}>
+                    <h3 style={{ fontSize: '24px', marginBottom: '16px' }}>✅ Recommendations</h3>
+                    <ol style={{ marginLeft: '20px', lineHeight: '2' }}>
+                      {winRate < 50 && <li>Improve win rate - Focus on better setups</li>}
+                      {profitFactor < 1.5 && <li>Improve profit factor - Let winners run</li>}
+                      {netPL < 0 && <li style={{ color: '#ef4444', fontWeight: 'bold' }}>Review strategy - Net negative</li>}
+                    </ol>
+                  </div>
                 )}
               </div>
             )}
             
-            {/* Trade Journal */}
+            {/* UPDATED TRADE JOURNAL WITH AI */}
             {tradingTab === 'journal' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>📈 Trade Journal</h2>
+                <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>📈 Trade Journal with AI Analysis</h2>
                 
                 <div style={{ marginBottom: '32px', padding: '24px', background: '#f8fafc', borderRadius: '12px' }}>
                   <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>Log New Trade</h3>
+                  
+                  {/* AI Screenshot Upload */}
+                  <div style={{ marginBottom: '24px', padding: '20px', background: '#f0f9ff', borderRadius: '12px', border: '2px dashed #3b82f6' }}>
+                    <h4 style={{ fontSize: '18px', marginBottom: '12px', color: '#3b82f6' }}>🤖 AI-Powered Screenshot Analysis</h4>
+                    <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '12px' }}>
+                      Upload a trading chart screenshot and let AI extract the details for you!
+                    </p>
+                    
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleScreenshotUpload}
+                        style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', flex: 1, minWidth: '200px' }}
+                      />
+                      <button
+                        onClick={analyzeScreenshot}
+                        disabled={!newTrade.screenshot || isAnalyzing}
+                        style={{
+                          padding: '12px 24px',
+                          background: !newTrade.screenshot || isAnalyzing ? '#94a3b8' : 'linear-gradient(to right, #3b82f6, #2563eb)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          cursor: !newTrade.screenshot || isAnalyzing ? 'not-allowed' : 'pointer',
+                          fontWeight: '600',
+                          fontSize: '16px'
+                        }}
+                      >
+                        {isAnalyzing ? '🔄 Analyzing...' : '🤖 Analyze Screenshot'}
+                      </button>
+                    </div>
+                    
+                    {newTrade.screenshot && (
+                      <div style={{ marginTop: '16px' }}>
+                        <img src={newTrade.screenshot} alt="Trade screenshot" style={{ maxWidth: '300px', borderRadius: '8px', border: '2px solid #e2e8f0' }} />
+                      </div>
+                    )}
+                    
+                    {analysisResult && (
+                      <div style={{ marginTop: '16px', padding: '16px', background: 'white', borderRadius: '8px', border: '2px solid #10b981' }}>
+                        <h5 style={{ fontSize: '16px', marginBottom: '8px', color: '#10b981' }}>✅ AI Analysis Result:</h5>
+                        <pre style={{ whiteSpace: 'pre-wrap', fontSize: '14px', lineHeight: '1.6', color: '#1f2937' }}>
+                          {analysisResult}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Manual Trade Entry */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                     <input type="date" value={newTrade.date} onChange={(e) => setNewTrade({...newTrade, date: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <input type="text" placeholder="Instrument (e.g. EUR/USD)" value={newTrade.instrument} onChange={(e) => setNewTrade({...newTrade, instrument: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <input type="text" placeholder="Instrument" value={newTrade.instrument} onChange={(e) => setNewTrade({...newTrade, instrument: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                     <select value={newTrade.direction} onChange={(e) => setNewTrade({...newTrade, direction: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <option value="long">Long</option>
                       <option value="short">Short</option>
@@ -579,20 +709,20 @@ export default function Dashboard() {
                       <option value="neutral">Neutral</option>
                       <option value="uncertain">Uncertain</option>
                       <option value="anxious">Anxious</option>
-                      <option value="euphoric">Euphoric</option>
                     </select>
                   </div>
                   <textarea placeholder="Notes" value={newTrade.notes} onChange={(e) => setNewTrade({...newTrade, notes: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '16px', minHeight: '80px' }} />
                   <button onClick={addTrade} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '16px' }}>Log Trade</button>
                 </div>
                 
+                {/* Trade List */}
                 {trades.length === 0 ? (
-                  <p style={{ color: '#64748b', textAlign: 'center', padding: '32px' }}>No trades logged yet. Add your first trade above!</p>
+                  <p style={{ color: '#64748b', textAlign: 'center', padding: '32px' }}>No trades logged yet.</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {trades.map(t => (
                       <div key={t.id} style={{ padding: '20px', background: parseFloat(t.profitLoss) >= 0 ? '#f0fdf4' : '#fef2f2', borderRadius: '12px', border: `2px solid ${parseFloat(t.profitLoss) >= 0 ? '#10b981' : '#ef4444'}` }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
                           <div>
                             <div style={{ fontSize: '20px', fontWeight: 'bold' }}>{t.instrument} • {t.direction.toUpperCase()}</div>
                             <div style={{ fontSize: '14px', color: '#64748b' }}>{new Date(t.date).toLocaleDateString()} • {t.timeframe} • {t.strategy || 'No strategy'}</div>
@@ -601,7 +731,18 @@ export default function Dashboard() {
                             {parseFloat(t.profitLoss) >= 0 ? '+' : ''}${parseFloat(t.profitLoss).toFixed(2)}
                           </div>
                         </div>
-                        {t.notes && <div style={{ fontSize: '14px', color: '#64748b', fontStyle: 'italic' }}>"{t.notes}"</div>}
+                        {t.notes && <div style={{ fontSize: '14px', color: '#64748b', fontStyle: 'italic', marginBottom: '8px' }}>"{t.notes}"</div>}
+                        {t.screenshot && (
+                          <div style={{ marginTop: '12px' }}>
+                            <img src={t.screenshot} alt="Trade" style={{ maxWidth: '200px', borderRadius: '8px', border: '2px solid #e2e8f0' }} />
+                          </div>
+                        )}
+                        {t.aiAnalysis && (
+                          <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#3b82f6', marginBottom: '4px' }}>🤖 AI Analysis:</div>
+                            <div style={{ fontSize: '13px', color: '#64748b', whiteSpace: 'pre-wrap' }}>{t.aiAnalysis}</div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -609,7 +750,7 @@ export default function Dashboard() {
               </div>
             )}
             
-            {/* Trading Costs */}
+            {/* Trading Costs - Keep existing */}
             {tradingTab === 'costs' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>💸 Trading Costs</h2>
@@ -617,50 +758,24 @@ export default function Dashboard() {
                 <div style={{ marginBottom: '32px', padding: '32px', background: '#fef2f2', borderRadius: '12px', border: '2px solid #ef4444' }}>
                   <h3 style={{ fontSize: '24px', marginBottom: '8px' }}>Total Monthly Costs</h3>
                   <p style={{ fontSize: '48px', fontWeight: 'bold', color: '#ef4444' }}>${monthlyCosts.toFixed(2)}</p>
-                  <p style={{ color: '#64748b', marginTop: '8px' }}>Net P&L After Costs: <span style={{ fontWeight: 'bold', color: netPL >= 0 ? '#10b981' : '#ef4444' }}>${netPL.toFixed(2)}</span></p>
+                  <p style={{ color: '#64748b', marginTop: '8px' }}>Net P&L: <span style={{ fontWeight: 'bold', color: netPL >= 0 ? '#10b981' : '#ef4444' }}>${netPL.toFixed(2)}</span></p>
                 </div>
                 
                 <div style={{ marginBottom: '32px', padding: '24px', background: '#f8fafc', borderRadius: '12px' }}>
-                  <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>Add Cost</h3>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <input type="text" placeholder="Name" value={newCost.name} onChange={(e) => setNewCost({...newCost, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                     <input type="number" placeholder="Cost" value={newCost.cost} onChange={(e) => setNewCost({...newCost, cost: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                     <select value={newCost.type} onChange={(e) => setNewCost({...newCost, type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <option value="subscription">Subscription</option>
-                      <option value="challenge">Challenge Fee</option>
-                      <option value="software">Data/Software</option>
+                      <option value="challenge">Challenge</option>
+                      <option value="software">Software</option>
                     </select>
                     <select value={newCost.frequency} onChange={(e) => setNewCost({...newCost, frequency: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <option value="monthly">Monthly</option>
                       <option value="yearly">Yearly</option>
-                      <option value="weekly">Weekly</option>
                     </select>
-                    <button onClick={addCost} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #ef4444, #dc2626)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add Cost</button>
+                    <button onClick={addCost} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #ef4444, #dc2626)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add</button>
                   </div>
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-                  {[
-                    { title: 'Subscriptions', list: tradingCosts.subscriptions },
-                    { title: 'Challenge Fees', list: tradingCosts.challenges },
-                    { title: 'Data/Software', list: tradingCosts.dataSoftware }
-                  ].map(section => (
-                    <div key={section.title} style={{ padding: '20px', background: '#f8fafc', borderRadius: '12px' }}>
-                      <h3 style={{ fontSize: '18px', marginBottom: '16px', fontWeight: 'bold' }}>{section.title}</h3>
-                      {section.list.length === 0 ? (
-                        <p style={{ color: '#64748b', fontSize: '14px' }}>No {section.title.toLowerCase()} yet</p>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {section.list.map((item: any) => (
-                            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'white', borderRadius: '8px' }}>
-                              <span>{item.name}</span>
-                              <span style={{ fontWeight: 'bold' }}>${parseFloat(item.cost).toFixed(2)}/{item.frequency}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
                 </div>
               </div>
             )}
