@@ -588,7 +588,122 @@ export default function Dashboard() {
     const lines = text.split('\n')
     
     lines.forEach((line, idx) => {
-      const cleanLine = line.trim
+      const cleanLine = line.trim()
+      if (cleanLine.startsWith('TRADE:')) rec.shouldTrade = cleanLine.includes('YES')
+      if (cleanLine.startsWith('PAIR:')) rec.pair = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('DIRECTION:')) rec.direction = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('ENTRY:')) rec.entry = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('STOP_LOSS:')) rec.stopLoss = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('TAKE_PROFIT:')) rec.takeProfit = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('RISK_PIPS:')) rec.riskPips = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('REWARD_PIPS:')) rec.rewardPips = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('RISK_REWARD:')) rec.riskReward = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('CONFIDENCE:')) rec.confidence = cleanLine.split(':')[1]?.trim()
+      if (cleanLine.startsWith('REASONING:')) {
+        rec.reasoning = lines.slice(idx + 1).filter(l => l.trim()).join('\n')
+      }
+    })
+    
+    return rec
+  }
+  
+  const askBudgetCoach = async (question?: string) => {
+    const userQuestion = question || chatInput
+    if (!userQuestion.trim()) return
+    
+    const newUserMessage = { role: 'user' as const, content: userQuestion }
+    setChatMessages([...chatMessages, newUserMessage])
+    setChatInput('')
+    setIsAskingCoach(true)
+    
+    try {
+      const financialContext = `
+USER FINANCIAL DATA:
+- Monthly Income: $${totalIncome.toFixed(2)}
+- Monthly Expenses: $${totalExpenses.toFixed(2)}
+- Monthly Surplus: $${monthlySurplus.toFixed(2)}
+- Total Goals Target: $${totalGoalsTarget.toFixed(2)}
+- Total Saved Towards Goals: $${totalGoalsSaved.toFixed(2)}
+- Remaining to Save: $${totalGoalsRemaining.toFixed(2)}
+- Total Debt: $${totalDebt.toFixed(2)}
+- Net Worth: $${netWorth.toFixed(2)}
+
+GOALS:
+${goals.map(g => `- ${g.name}: $${g.saved || 0} / $${g.target} (${g.deadline ? 'deadline: ' + g.deadline : 'no deadline'})`).join('\n') || 'No goals set yet'}
+
+DEBTS:
+${debts.map(d => `- ${d.name}: $${d.balance} @ ${d.interestRate}% APR (min payment: $${d.minPayment})`).join('\n') || 'No debts tracked'}
+
+INCOME SOURCES:
+${transactions.filter(t => t.type === 'income').map(t => `- ${t.name}: $${t.amount}/${t.frequency || 'monthly'}`).join('\n') || 'No income tracked yet'}
+
+EXPENSES:
+${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amount}/${t.frequency || 'monthly'}`).join('\n') || 'No expenses tracked yet'}`
+
+      const response = await fetch('/api/budget-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          question: userQuestion,
+          financialContext
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        setChatMessages([...chatMessages, newUserMessage, { 
+          role: 'assistant', 
+          content: 'Sorry, I encountered an error. Please try again.' 
+        }])
+        return
+      }
+      
+      const aiResponse = data.advice || 'I apologize, but I could not generate a response.'
+      setChatMessages([...chatMessages, newUserMessage, { role: 'assistant', content: aiResponse }])
+      
+    } catch (error) {
+      setChatMessages([...chatMessages, newUserMessage, { 
+        role: 'assistant', 
+        content: 'Sorry, something went wrong. Please try again.' 
+      }])
+    } finally {
+      setIsAskingCoach(false)
+    }
+  }
+  
+  const getDaysInMonth = () => {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = today.getMonth()
+    const firstDay = new Date(year, month, 1).getDay()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    return { firstDay, daysInMonth, month, year }
+  }
+  
+  const getTradesForDay = (day: number) => {
+    const { month, year } = getDaysInMonth()
+    return trades.filter(t => {
+      const tDate = new Date(t.date)
+      return tDate.getDate() === day && tDate.getMonth() === month && tDate.getFullYear() === year
+    })
+  }
+  
+  const getCalendarItemsForDay = (day: number) => {
+    const { month, year } = getDaysInMonth()
+    return calendarItems.filter(item => {
+      const itemDate = new Date(item.dueDate)
+      return itemDate.getDate() === day && itemDate.getMonth() === month && itemDate.getFullYear() === year
+    })
+  }
+  
+  const convertToMonthly = (amount: number, frequency: string) => {
+    const multiplier = frequency === 'weekly' ? 52/12 : frequency === 'fortnightly' ? 26/12 : frequency === 'yearly' ? 1/12 : 1
+    return amount * multiplier
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #eef2ff, #fce7f3)' }}>
       <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: '0 0 8px 0' }}>✨ Premium Finance Pro</h1>
