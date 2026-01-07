@@ -52,6 +52,11 @@ export default function Dashboard() {
   const [isAnalyzingTrade, setIsAnalyzingTrade] = useState(false)
   const [tradeRecommendation, setTradeRecommendation] = useState<any>(null)
   
+  // AI BUDGET COACH STATE
+  const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
+  const [chatInput, setChatInput] = useState('')
+  const [isAskingCoach, setIsAskingCoach] = useState(false)
+  
   const totalIncome = transactions.filter(t => t.type === "income").reduce((sum, t) => {
     const amount = parseFloat(t.amount || 0)
     const multiplier = t.frequency === 'weekly' ? 52/12 : t.frequency === 'fortnightly' ? 26/12 : t.frequency === 'yearly' ? 1/12 : 1
@@ -282,6 +287,70 @@ export default function Dashboard() {
     return rec
   }
   
+  // AI BUDGET COACH FUNCTION
+  const askBudgetCoach = async (question?: string) => {
+    const userQuestion = question || chatInput
+    if (!userQuestion.trim()) return
+    
+    const newUserMessage = { role: 'user' as const, content: userQuestion }
+    setChatMessages([...chatMessages, newUserMessage])
+    setChatInput('')
+    setIsAskingCoach(true)
+    
+    try {
+      const financialContext = `
+USER FINANCIAL DATA:
+- Monthly Income: $${totalIncome.toFixed(2)}
+- Monthly Expenses: $${totalExpenses.toFixed(2)}
+- Monthly Surplus: $${monthlySurplus.toFixed(2)}
+- Total Goals Target: $${totalGoalsTarget.toFixed(2)}
+- Total Saved Towards Goals: $${totalGoalsSaved.toFixed(2)}
+- Remaining to Save: $${totalGoalsRemaining.toFixed(2)}
+
+GOALS:
+${goals.map(g => `- ${g.name}: $${g.saved || 0} / $${g.target} (${g.deadline ? 'deadline: ' + g.deadline : 'no deadline'})`).join('\n') || 'No goals set yet'}
+
+INCOME SOURCES:
+${transactions.filter(t => t.type === 'income').map(t => `- ${t.name}: $${t.amount}/${t.frequency || 'monthly'}`).join('\n') || 'No income tracked yet'}
+
+EXPENSES:
+${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amount}/${t.frequency || 'monthly'}`).join('\n') || 'No expenses tracked yet'}
+
+You are a professional financial advisor. Based on the user's actual financial data above, provide specific, actionable advice. Use their real numbers in your response. Be encouraging but honest.
+
+User's question: ${userQuestion}`
+
+      const response = await fetch('/api/analyze-screenshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          analyses: [financialContext]
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        setChatMessages([...chatMessages, newUserMessage, { 
+          role: 'assistant', 
+          content: 'Sorry, I encountered an error. Please try again.' 
+        }])
+        return
+      }
+      
+      const aiResponse = data.recommendation || data.analysis || 'I apologize, but I could not generate a response.'
+      setChatMessages([...chatMessages, newUserMessage, { role: 'assistant', content: aiResponse }])
+      
+    } catch (error) {
+      setChatMessages([...chatMessages, newUserMessage, { 
+        role: 'assistant', 
+        content: 'Sorry, something went wrong. Please try again.' 
+      }])
+    } finally {
+      setIsAskingCoach(false)
+    }
+  }
+  
   const getDaysInMonth = () => {
     const today = new Date()
     const year = today.getFullYear()
@@ -306,7 +375,7 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #eef2ff, #fce7f3)' }}>
-  <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
+      <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: '0 0 8px 0' }}>✨ Premium Finance Pro</h1>
           <p style={{ opacity: '0.9', margin: '0 0 24px 0' }}>
@@ -321,7 +390,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {mainTab === 'finance' ? (
               <>
-                {[{ id: "goals", label: "🎯 My Goals" }, { id: "position", label: "📊 Current Position" }, { id: "path", label: "🗺️ Path to Goals" }, { id: "transactions", label: "💰 Transactions" }].map(tab => (
+                {[{ id: "goals", label: "🎯 My Goals" }, { id: "position", label: "📊 Current Position" }, { id: "path", label: "🗺️ Path to Goals" }, { id: "coach", label: "💬 AI Coach" }, { id: "transactions", label: "💰 Transactions" }].map(tab => (
                   <button key={tab.id} onClick={() => setFinanceTab(tab.id)} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '500', background: financeTab === tab.id ? "white" : "rgba(255,255,255,0.1)", color: financeTab === tab.id ? "#4f46e5" : "white" }}>{tab.label}</button>
                 ))}
               </>
@@ -416,6 +485,118 @@ export default function Dashboard() {
               </div>
             )}
             
+            {financeTab === 'coach' && (
+              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
+                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>💬 AI Budget Coach</h2>
+                <p style={{ color: '#64748b', marginBottom: '24px' }}>Ask me anything about your finances! I have access to all your data and can give personalized advice.</p>
+                
+                {chatMessages.length === 0 && (
+                  <div style={{ marginBottom: '24px' }}>
+                    <h3 style={{ fontSize: '18px', marginBottom: '16px', color: '#64748b' }}>💡 Try asking:</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '12px' }}>
+                      {[
+                        "How can I save $500 more per month?",
+                        "Why am I not reaching my goals?",
+                        "What expenses should I cut first?",
+                        "How long until I reach my goals?",
+                        "Am I spending too much on anything?",
+                        "Give me a personalized savings plan"
+                      ].map(q => (
+                        <button
+                          key={q}
+                          onClick={() => askBudgetCoach(q)}
+                          style={{
+                            padding: '16px',
+                            background: 'linear-gradient(to right, #f0f9ff, #e0f2fe)',
+                            border: '2px solid #3b82f6',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            color: '#1e40af'
+                          }}
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div style={{ flex: 1, overflowY: 'auto', marginBottom: '24px', padding: '20px', background: '#f8fafc', borderRadius: '12px', minHeight: '300px' }}>
+                  {chatMessages.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
+                      <div style={{ fontSize: '64px', marginBottom: '16px' }}>🤖</div>
+                      <p style={{ fontSize: '18px' }}>Ready to help you achieve your financial goals!</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {chatMessages.map((msg, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                          <div style={{
+                            maxWidth: '80%',
+                            padding: '16px',
+                            borderRadius: '12px',
+                            background: msg.role === 'user' ? 'linear-gradient(to right, #4f46e5, #7c3aed)' : 'white',
+                            color: msg.role === 'user' ? 'white' : '#1e293b',
+                            border: msg.role === 'assistant' ? '2px solid #e2e8f0' : 'none'
+                          }}>
+                            <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px', opacity: 0.7 }}>
+                              {msg.role === 'user' ? 'You' : '🤖 AI Coach'}
+                            </div>
+                            <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{msg.content}</div>
+                          </div>
+                        </div>
+                      ))}
+                      {isAskingCoach && (
+                        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                          <div style={{ padding: '16px', borderRadius: '12px', background: 'white', border: '2px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px', opacity: 0.7 }}>🤖 AI Coach</div>
+                            <div>Thinking...</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && !isAskingCoach && askBudgetCoach()}
+                    placeholder="Ask about your finances..."
+                    disabled={isAskingCoach}
+                    style={{
+                      flex: 1,
+                      padding: '16px',
+                      borderRadius: '12px',
+                      border: '2px solid #e2e8f0',
+                      fontSize: '16px'
+                    }}
+                  />
+                  <button
+                    onClick={() => askBudgetCoach()}
+                    disabled={!chatInput.trim() || isAskingCoach}
+                    style={{
+                      padding: '16px 32px',
+                      background: !chatInput.trim() || isAskingCoach ? '#94a3b8' : 'linear-gradient(to right, #4f46e5, #7c3aed)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      cursor: !chatInput.trim() || isAskingCoach ? 'not-allowed' : 'pointer',
+                      fontWeight: '600',
+                      fontSize: '16px'
+                    }}
+                  >
+                    {isAskingCoach ? '...' : 'Send'}
+                  </button>
+                </div>
+              </div>
+            )}
+            
             {financeTab === 'transactions' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>💰 Transactions</h2>
@@ -467,7 +648,7 @@ export default function Dashboard() {
             )}
           </>
         )}
-       {mainTab === 'trading' && (
+        {mainTab === 'trading' && (
           <>
             {tradingTab === 'trading-goals' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
@@ -612,7 +793,7 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
-            )} 
+            )}
             {tradingTab === 'journal' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>📈 Trade Journal with AI</h2>
