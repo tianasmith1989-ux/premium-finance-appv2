@@ -320,12 +320,10 @@ You are a professional financial advisor. Based on the user's actual financial d
 
 User's question: ${userQuestion}`
 
-      const response = await fetch('/api/analyze-screenshot', {
+      const response = await fetch('/api/budget-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          analyses: [financialContext]
-        })
+        body: JSON.stringify({ question: userQuestion, financialContext })
       })
       
       const data = await response.json()
@@ -337,8 +335,8 @@ User's question: ${userQuestion}`
         }])
         return
       }
-      
-      const aiResponse = data.recommendation || data.analysis || 'I apologize, but I could not generate a response.'
+
+      const aiResponse = data.advice || 'I apologize, but I could not generate a response.'
       setChatMessages([...chatMessages, newUserMessage, { role: 'assistant', content: aiResponse }])
       
     } catch (error) {
