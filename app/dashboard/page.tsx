@@ -20,6 +20,25 @@ export default function Dashboard() {
     name: '', amount: '', type: 'expense', date: new Date().toISOString().split('T')[0], frequency: 'monthly'
   })
   
+  // DEBT PAYOFF STATE
+  const [debts, setDebts] = useState<any[]>([])
+  const [newDebt, setNewDebt] = useState({
+    name: '', balance: '', interestRate: '', minPayment: '', type: 'credit_card'
+  })
+  const [extraPayment, setExtraPayment] = useState('')
+  const [payoffMethod, setPayoffMethod] = useState<'snowball' | 'avalanche'>('avalanche')
+  
+  // NET WORTH STATE
+  const [assets, setAssets] = useState<any[]>([])
+  const [newAsset, setNewAsset] = useState({
+    name: '', value: '', type: 'savings', date: new Date().toISOString().split('T')[0]
+  })
+  const [liabilities, setLiabilities] = useState<any[]>([])
+  const [newLiability, setNewLiability] = useState({
+    name: '', value: '', type: 'loan', date: new Date().toISOString().split('T')[0]
+  })
+  const [netWorthHistory, setNetWorthHistory] = useState<any[]>([])
+  
   const [tradingGoals, setTradingGoals] = useState<any[]>([])
   const [newTradingGoal, setNewTradingGoal] = useState({
     name: '', target: '', current: '', deadline: '', type: 'profit'
@@ -52,11 +71,11 @@ export default function Dashboard() {
   const [isAnalyzingTrade, setIsAnalyzingTrade] = useState(false)
   const [tradeRecommendation, setTradeRecommendation] = useState<any>(null)
   
-  // AI BUDGET COACH STATE
   const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
   const [chatInput, setChatInput] = useState('')
   const [isAskingCoach, setIsAskingCoach] = useState(false)
   
+  // CALCULATIONS
   const totalIncome = transactions.filter(t => t.type === "income").reduce((sum, t) => {
     const amount = parseFloat(t.amount || 0)
     const multiplier = t.frequency === 'weekly' ? 52/12 : t.frequency === 'fortnightly' ? 26/12 : t.frequency === 'yearly' ? 1/12 : 1
@@ -74,6 +93,15 @@ export default function Dashboard() {
   const totalGoalsSaved = goals.reduce((sum, g) => sum + parseFloat(g.saved || 0), 0)
   const totalGoalsRemaining = totalGoalsTarget - totalGoalsSaved
   
+  // DEBT CALCULATIONS
+  const totalDebt = debts.reduce((sum, d) => sum + parseFloat(d.balance || 0), 0)
+  const totalMinPayments = debts.reduce((sum, d) => sum + parseFloat(d.minPayment || 0), 0)
+  
+  // NET WORTH CALCULATIONS
+  const totalAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || 0), 0)
+  const totalLiabilities = liabilities.reduce((sum, l) => sum + parseFloat(l.value || 0), 0)
+  const netWorth = totalAssets - totalLiabilities
+  
   const totalPL = trades.reduce((sum, t) => sum + parseFloat(t.profitLoss || 0), 0)
   const winners = trades.filter(t => parseFloat(t.profitLoss || 0) > 0)
   const losers = trades.filter(t => parseFloat(t.profitLoss || 0) < 0)
@@ -90,6 +118,7 @@ export default function Dashboard() {
     }, 0)
   
   const netPL = totalPL - monthlyCosts
+  // BASIC FUNCTIONS
   const addGoal = () => {
     if (!newGoal.name || !newGoal.target) return
     setGoals([...goals, { ...newGoal, id: Date.now() }])
@@ -133,6 +162,126 @@ export default function Dashboard() {
       [list]: [...tradingCosts[list], { ...newCost, id: Date.now() }]
     })
     setNewCost({ name: '', cost: '', frequency: 'monthly', type: 'subscription' })
+  }
+  
+  // DEBT FUNCTIONS
+  const addDebt = () => {
+    if (!newDebt.name || !newDebt.balance) return
+    setDebts([...debts, { ...newDebt, id: Date.now() }])
+    setNewDebt({ name: '', balance: '', interestRate: '', minPayment: '', type: 'credit_card' })
+  }
+  
+  const calculateDebtPayoff = () => {
+    const extra = parseFloat(extraPayment || '0')
+    const sortedDebts = [...debts].sort((a, b) => {
+      if (payoffMethod === 'snowball') {
+        return parseFloat(a.balance) - parseFloat(b.balance)
+      } else {
+        return parseFloat(b.interestRate) - parseFloat(a.interestRate)
+      }
+    })
+    
+    let remainingDebts = sortedDebts.map(d => ({
+      ...d,
+      remainingBalance: parseFloat(d.balance),
+      monthsPaid: 0
+    }))
+    
+    let totalInterestPaid = 0
+    let monthsToPayoff = 0
+    let availableExtra = extra
+    
+    while (remainingDebts.some(d => d.remainingBalance > 0)) {
+      monthsToPayoff++
+      if (monthsToPayoff > 600) break // Safety limit
+      
+      remainingDebts.forEach((debt, idx) => {
+        if (debt.remainingBalance <= 0) return
+        
+        const monthlyInterest = (debt.remainingBalance * parseFloat(debt.interestRate) / 100) / 12
+        totalInterestPaid += monthlyInterest
+        
+        const minPayment = parseFloat(debt.minPayment)
+        const extraForThis = idx === 0 ? availableExtra : 0
+        const totalPayment = minPayment + extraForThis
+        
+        debt.remainingBalance = Math.max(0, debt.remainingBalance + monthlyInterest - totalPayment)
+        
+        if (debt.remainingBalance === 0) {
+          availableExtra += minPayment
+        }
+      })
+    }
+    
+    return { monthsToPayoff, totalInterestPaid, payoffOrder: sortedDebts }
+  }
+  
+  // NET WORTH FUNCTIONS
+  const addAsset = () => {
+    if (!newAsset.name || !newAsset.value) return
+    setAssets([...assets, { ...newAsset, id: Date.now() }])
+    setNewAsset({ name: '', value: '', type: 'savings', date: new Date().toISOString().split('T')[0] })
+    updateNetWorthHistory()
+  }
+  
+  const addLiability = () => {
+    if (!newLiability.name || !newLiability.value) return
+    setLiabilities([...liabilities, { ...newLiability, id: Date.now() }])
+    setNewLiability({ name: '', value: '', type: 'loan', date: new Date().toISOString().split('T')[0] })
+    updateNetWorthHistory()
+  }
+  
+  const updateNetWorthHistory = () => {
+    const today = new Date().toISOString().split('T')[0]
+    const currentAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || 0), 0)
+    const currentLiabilities = liabilities.reduce((sum, l) => sum + parseFloat(l.value || 0), 0)
+    const currentNetWorth = currentAssets - currentLiabilities
+    
+    const existingEntry = netWorthHistory.find(h => h.date === today)
+    if (existingEntry) {
+      setNetWorthHistory(netWorthHistory.map(h => 
+        h.date === today ? { ...h, value: currentNetWorth } : h
+      ))
+    } else {
+      setNetWorthHistory([...netWorthHistory, { date: today, value: currentNetWorth }].sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      ))
+    }
+  }
+  
+  // SAVINGS PLAN CALCULATOR
+  const calculateSavingsPlan = (goal: any) => {
+    const target = parseFloat(goal.target || 0)
+    const saved = parseFloat(goal.saved || 0)
+    const remaining = target - saved
+    
+    if (!goal.deadline || remaining <= 0) return null
+    
+    const today = new Date()
+    const deadline = new Date(goal.deadline)
+    const monthsRemaining = Math.max(1, Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24 * 30)))
+    
+    const monthlyNeeded = remaining / monthsRemaining
+    
+    // Calculate based on pay frequency
+    const incomeTransactions = transactions.filter(t => t.type === 'income')
+    const primaryIncome = incomeTransactions[0]
+    const frequency = primaryIncome?.frequency || 'monthly'
+    
+    let paymentsPerMonth = 1
+    if (frequency === 'weekly') paymentsPerMonth = 52/12
+    if (frequency === 'fortnightly') paymentsPerMonth = 26/12
+    
+    const perPaycheck = monthlyNeeded / paymentsPerMonth
+    
+    return {
+      monthlyNeeded,
+      perPaycheck,
+      paymentsPerMonth,
+      frequency,
+      monthsRemaining,
+      remaining
+    }
   }
   
   const handleScreenshotUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -287,7 +436,6 @@ export default function Dashboard() {
     return rec
   }
   
-  // AI BUDGET COACH FUNCTION
   const askBudgetCoach = async (question?: string) => {
     const userQuestion = question || chatInput
     if (!userQuestion.trim()) return
@@ -306,24 +454,28 @@ USER FINANCIAL DATA:
 - Total Goals Target: $${totalGoalsTarget.toFixed(2)}
 - Total Saved Towards Goals: $${totalGoalsSaved.toFixed(2)}
 - Remaining to Save: $${totalGoalsRemaining.toFixed(2)}
+- Total Debt: $${totalDebt.toFixed(2)}
+- Net Worth: $${netWorth.toFixed(2)}
 
 GOALS:
 ${goals.map(g => `- ${g.name}: $${g.saved || 0} / $${g.target} (${g.deadline ? 'deadline: ' + g.deadline : 'no deadline'})`).join('\n') || 'No goals set yet'}
+
+DEBTS:
+${debts.map(d => `- ${d.name}: $${d.balance} @ ${d.interestRate}% APR (min payment: $${d.minPayment})`).join('\n') || 'No debts tracked'}
 
 INCOME SOURCES:
 ${transactions.filter(t => t.type === 'income').map(t => `- ${t.name}: $${t.amount}/${t.frequency || 'monthly'}`).join('\n') || 'No income tracked yet'}
 
 EXPENSES:
-${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amount}/${t.frequency || 'monthly'}`).join('\n') || 'No expenses tracked yet'}
-
-You are a professional financial advisor. Based on the user's actual financial data above, provide specific, actionable advice. Use their real numbers in your response. Be encouraging but honest.
-
-User's question: ${userQuestion}`
+${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amount}/${t.frequency || 'monthly'}`).join('\n') || 'No expenses tracked yet'}`
 
       const response = await fetch('/api/budget-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: userQuestion, financialContext })
+        body: JSON.stringify({ 
+          question: userQuestion,
+          financialContext
+        })
       })
       
       const data = await response.json()
@@ -335,7 +487,7 @@ User's question: ${userQuestion}`
         }])
         return
       }
-
+      
       const aiResponse = data.advice || 'I apologize, but I could not generate a response.'
       setChatMessages([...chatMessages, newUserMessage, { role: 'assistant', content: aiResponse }])
       
@@ -388,7 +540,16 @@ User's question: ${userQuestion}`
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {mainTab === 'finance' ? (
               <>
-                {[{ id: "goals", label: "🎯 My Goals" }, { id: "position", label: "📊 Current Position" }, { id: "path", label: "🗺️ Path to Goals" }, { id: "coach", label: "💬 AI Coach" }, { id: "transactions", label: "💰 Transactions" }].map(tab => (
+                {[
+                  { id: "goals", label: "🎯 Goals" }, 
+                  { id: "position", label: "📊 Position" }, 
+                  { id: "path", label: "🗺️ Path" }, 
+                  { id: "savings", label: "💵 Savings Plans" }, 
+                  { id: "debt", label: "💳 Debt Payoff" }, 
+                  { id: "networth", label: "📈 Net Worth" }, 
+                  { id: "coach", label: "💬 AI Coach" }, 
+                  { id: "transactions", label: "💰 Transactions" }
+                ].map(tab => (
                   <button key={tab.id} onClick={() => setFinanceTab(tab.id)} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '500', background: financeTab === tab.id ? "white" : "rgba(255,255,255,0.1)", color: financeTab === tab.id ? "#4f46e5" : "white" }}>{tab.label}</button>
                 ))}
               </>
@@ -462,6 +623,10 @@ User's question: ${userQuestion}`
                     <h3 style={{ fontSize: '16px', color: '#64748b' }}>📈 Monthly Surplus</h3>
                     <p style={{ fontSize: '32px', fontWeight: 'bold', color: monthlySurplus >= 0 ? '#10b981' : '#ef4444' }}>${monthlySurplus.toFixed(2)}</p>
                   </div>
+                  <div style={{ padding: '24px', background: '#fef3c7', borderRadius: '12px', border: '2px solid #f59e0b' }}>
+                    <h3 style={{ fontSize: '16px', color: '#64748b' }}>💎 Net Worth</h3>
+                    <p style={{ fontSize: '32px', fontWeight: 'bold', color: netWorth >= 0 ? '#10b981' : '#ef4444' }}>${netWorth.toFixed(2)}</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -482,7 +647,307 @@ User's question: ${userQuestion}`
                 )}
               </div>
             )}
+            {financeTab === 'savings' && (
+              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>💵 Automatic Savings Plans</h2>
+                <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '18px' }}>
+                  See exactly how much to save per paycheck to hit your goals on time!
+                </p>
+                
+                {goals.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '60px', background: '#f8fafc', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '64px', marginBottom: '16px' }}>💵</div>
+                    <h3 style={{ fontSize: '24px', marginBottom: '8px' }}>No goals yet!</h3>
+                    <p style={{ color: '#64748b' }}>Add goals in the "Goals" tab to see your savings plan</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    {goals.map(goal => {
+                      const plan = calculateSavingsPlan(goal)
+                      if (!plan) return null
+                      
+                      return (
+                        <div key={goal.id} style={{ padding: '32px', background: 'linear-gradient(to right, #ecfdf5, #d1fae5)', borderRadius: '16px', border: '3px solid #10b981' }}>
+                          <div style={{ marginBottom: '24px' }}>
+                            <h3 style={{ fontSize: '28px', fontWeight: 'bold', color: '#065f46', marginBottom: '8px' }}>{goal.name}</h3>
+                            <p style={{ fontSize: '18px', color: '#64748b' }}>
+                              ${parseFloat(goal.saved || 0).toLocaleString()} / ${parseFloat(goal.target).toLocaleString()} saved
+                            </p>
+                          </div>
+                          
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                            <div style={{ padding: '20px', background: 'white', borderRadius: '12px' }}>
+                              <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>💰 Per Paycheck</div>
+                              <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#10b981' }}>${plan.perPaycheck.toFixed(2)}</div>
+                              <div style={{ fontSize: '12px', color: '#64748b' }}>Every {plan.frequency}</div>
+                            </div>
+                            
+                            <div style={{ padding: '20px', background: 'white', borderRadius: '12px' }}>
+                              <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>📅 Per Month</div>
+                              <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#3b82f6' }}>${plan.monthlyNeeded.toFixed(2)}</div>
+                              <div style={{ fontSize: '12px', color: '#64748b' }}>{plan.paymentsPerMonth.toFixed(1)} payments/month</div>
+                            </div>
+                            
+                            <div style={{ padding: '20px', background: 'white', borderRadius: '12px' }}>
+                              <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>⏰ Time Left</div>
+                              <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f59e0b' }}>{plan.monthsRemaining}</div>
+                              <div style={{ fontSize: '12px', color: '#64748b' }}>months until deadline</div>
+                            </div>
+                            
+                            <div style={{ padding: '20px', background: 'white', borderRadius: '12px' }}>
+                              <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>🎯 Remaining</div>
+                              <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#7c3aed' }}>${plan.remaining.toFixed(2)}</div>
+                              <div style={{ fontSize: '12px', color: '#64748b' }}>left to save</div>
+                            </div>
+                          </div>
+                          
+                          {monthlySurplus >= plan.monthlyNeeded ? (
+                            <div style={{ padding: '16px', background: '#f0fdf4', border: '2px solid #10b981', borderRadius: '12px' }}>
+                              <p style={{ color: '#065f46', fontWeight: '600', fontSize: '16px' }}>
+                                ✅ You can afford this! Your surplus (${monthlySurplus.toFixed(2)}/month) covers the required ${plan.monthlyNeeded.toFixed(2)}/month
+                              </p>
+                            </div>
+                          ) : (
+                            <div style={{ padding: '16px', background: '#fef2f2', border: '2px solid #ef4444', borderRadius: '12px' }}>
+                              <p style={{ color: '#991b1b', fontWeight: '600', fontSize: '16px' }}>
+                                ⚠️ You need ${(plan.monthlyNeeded - monthlySurplus).toFixed(2)}/month more to reach this goal on time
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
             
+            {financeTab === 'debt' && (
+              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>💳 Debt Payoff Calculator</h2>
+                <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '18px' }}>
+                  Create a strategic plan to eliminate your debt faster and save on interest!
+                </p>
+                
+                <div style={{ marginBottom: '32px', padding: '24px', background: '#fef2f2', borderRadius: '12px' }}>
+                  <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>Add a Debt</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                    <input type="text" placeholder="Debt name" value={newDebt.name} onChange={(e) => setNewDebt({...newDebt, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <input type="number" placeholder="Balance" value={newDebt.balance} onChange={(e) => setNewDebt({...newDebt, balance: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <input type="number" placeholder="Interest Rate %" value={newDebt.interestRate} onChange={(e) => setNewDebt({...newDebt, interestRate: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <input type="number" placeholder="Min Payment" value={newDebt.minPayment} onChange={(e) => setNewDebt({...newDebt, minPayment: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <select value={newDebt.type} onChange={(e) => setNewDebt({...newDebt, type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <option value="credit_card">Credit Card</option>
+                      <option value="personal_loan">Personal Loan</option>
+                      <option value="student_loan">Student Loan</option>
+                      <option value="car_loan">Car Loan</option>
+                      <option value="other">Other</option>
+                    </select>
+                    <button onClick={addDebt} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #ef4444, #dc2626)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add Debt</button>
+                  </div>
+                </div>
+                
+                {debts.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '60px', background: '#f8fafc', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '64px', marginBottom: '16px' }}>💳</div>
+                    <h3 style={{ fontSize: '24px' }}>No debts tracked</h3>
+                    <p style={{ color: '#64748b' }}>Add your debts above to see your payoff plan</p>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ marginBottom: '32px', padding: '32px', background: 'linear-gradient(to right, #fef2f2, #fee2e2)', borderRadius: '12px', border: '3px solid #ef4444' }}>
+                      <h3 style={{ fontSize: '24px', marginBottom: '16px' }}>📊 Debt Summary</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                        <div>
+                          <div style={{ fontSize: '14px', color: '#64748b' }}>Total Debt</div>
+                          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#ef4444' }}>${totalDebt.toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '14px', color: '#64748b' }}>Total Min Payments</div>
+                          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f59e0b' }}>${totalMinPayments.toFixed(2)}/mo</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '14px', color: '#64748b' }}>Number of Debts</div>
+                          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#3b82f6' }}>{debts.length}</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div style={{ marginBottom: '32px', padding: '24px', background: '#f0f9ff', borderRadius: '12px' }}>
+                      <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>⚡ Accelerate Payoff</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Extra Monthly Payment</label>
+                          <input 
+                            type="number" 
+                            placeholder="0.00" 
+                            value={extraPayment} 
+                            onChange={(e) => setExtraPayment(e.target.value)} 
+                            style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%' }} 
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Payoff Method</label>
+                          <select value={payoffMethod} onChange={(e) => setPayoffMethod(e.target.value as 'snowball' | 'avalanche')} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%' }}>
+                            <option value="avalanche">Avalanche (Highest Interest First)</option>
+                            <option value="snowball">Snowball (Smallest Balance First)</option>
+                          </select>
+                        </div>
+                      </div>
+                      
+                      {parseFloat(extraPayment || '0') > 0 && (() => {
+                        const result = calculateDebtPayoff()
+                        return (
+                          <div style={{ marginTop: '24px', padding: '20px', background: 'white', borderRadius: '12px', border: '2px solid #10b981' }}>
+                            <h4 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: '#065f46' }}>✅ Payoff Plan Results</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                              <div>
+                                <div style={{ fontSize: '14px', color: '#64748b' }}>Debt-Free In</div>
+                                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#10b981' }}>{result.monthsToPayoff} months</div>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '14px', color: '#64748b' }}>Total Interest Paid</div>
+                                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#ef4444' }}>${result.totalInterestPaid.toFixed(2)}</div>
+                              </div>
+                            </div>
+                            <div style={{ marginTop: '16px' }}>
+                              <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Payoff Order ({payoffMethod === 'avalanche' ? 'Highest Interest First' : 'Smallest Balance First'}):</div>
+                              <ol style={{ marginLeft: '20px', lineHeight: '2' }}>
+                                {result.payoffOrder.map((d: any, idx: number) => (
+                                  <li key={idx}>{d.name} - ${d.balance} @ {d.interestRate}%</li>
+                                ))}
+                              </ol>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <h3 style={{ fontSize: '20px', marginBottom: '8px' }}>Your Debts</h3>
+                      {debts.map(debt => (
+                        <div key={debt.id} style={{ padding: '20px', background: '#fef2f2', borderRadius: '12px', border: '2px solid #ef4444' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
+                            <div>
+                              <h4 style={{ fontSize: '20px', fontWeight: 'bold' }}>{debt.name}</h4>
+                              <p style={{ fontSize: '14px', color: '#64748b' }}>{debt.type.replace('_', ' ')}</p>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#ef4444' }}>${parseFloat(debt.balance).toFixed(2)}</div>
+                              <div style={{ fontSize: '14px', color: '#64748b' }}>{debt.interestRate}% APR</div>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '14px', color: '#64748b' }}>
+                            Min Payment: <span style={{ fontWeight: '600', color: '#1e293b' }}>${parseFloat(debt.minPayment).toFixed(2)}/month</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            
+            {financeTab === 'networth' && (
+              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>📈 Net Worth Tracker</h2>
+                <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '18px' }}>
+                  Track your total assets minus liabilities to see your true financial position.
+                </p>
+                
+                <div style={{ marginBottom: '32px', padding: '32px', background: netWorth >= 0 ? 'linear-gradient(to right, #f0fdf4, #dcfce7)' : 'linear-gradient(to right, #fef2f2, #fee2e2)', borderRadius: '16px', border: `3px solid ${netWorth >= 0 ? '#10b981' : '#ef4444'}` }}>
+                  <h3 style={{ fontSize: '20px', color: '#64748b', marginBottom: '8px' }}>Your Net Worth</h3>
+                  <div style={{ fontSize: '56px', fontWeight: 'bold', color: netWorth >= 0 ? '#10b981' : '#ef4444', marginBottom: '16px' }}>
+                    ${netWorth.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <div>
+                      <div style={{ fontSize: '14px', color: '#64748b' }}>Total Assets</div>
+                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>${totalAssets.toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', color: '#64748b' }}>Total Liabilities</div>
+                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>${totalLiabilities.toFixed(2)}</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+                  <div style={{ padding: '24px', background: '#f0fdf4', borderRadius: '12px' }}>
+                    <h3 style={{ fontSize: '20px', marginBottom: '16px', color: '#065f46' }}>➕ Add Asset</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <input type="text" placeholder="Asset name" value={newAsset.name} onChange={(e) => setNewAsset({...newAsset, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                      <input type="number" placeholder="Value" value={newAsset.value} onChange={(e) => setNewAsset({...newAsset, value: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                      <select value={newAsset.type} onChange={(e) => setNewAsset({...newAsset, type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <option value="savings">Savings Account</option>
+                        <option value="checking">Checking Account</option>
+                        <option value="investment">Investment</option>
+                        <option value="property">Property</option>
+                        <option value="vehicle">Vehicle</option>
+                        <option value="other">Other</option>
+                      </select>
+                      <button onClick={addAsset} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add Asset</button>
+                    </div>
+                  </div>
+                  
+                  <div style={{ padding: '24px', background: '#fef2f2', borderRadius: '12px' }}>
+                    <h3 style={{ fontSize: '20px', marginBottom: '16px', color: '#991b1b' }}>➖ Add Liability</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <input type="text" placeholder="Liability name" value={newLiability.name} onChange={(e) => setNewLiability({...newLiability, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                      <input type="number" placeholder="Amount owed" value={newLiability.value} onChange={(e) => setNewLiability({...newLiability, value: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                      <select value={newLiability.type} onChange={(e) => setNewLiability({...newLiability, type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <option value="loan">Loan</option>
+                        <option value="mortgage">Mortgage</option>
+                        <option value="credit_card">Credit Card</option>
+                        <option value="student_loan">Student Loan</option>
+                        <option value="other">Other</option>
+                      </select>
+                      <button onClick={addLiability} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #ef4444, #dc2626)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add Liability</button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>💰 Assets</h3>
+                    {assets.length === 0 ? (
+                      <p style={{ color: '#64748b', padding: '32px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px' }}>No assets tracked</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {assets.map(asset => (
+                          <div key={asset.id} style={{ padding: '16px', background: '#f0fdf4', borderRadius: '12px', border: '2px solid #10b981', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontWeight: '600', fontSize: '16px' }}>{asset.name}</div>
+                              <div style={{ fontSize: '14px', color: '#64748b' }}>{asset.type.replace('_', ' ')}</div>
+                            </div>
+                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>${parseFloat(asset.value).toFixed(2)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>💳 Liabilities</h3>
+                    {liabilities.length === 0 ? (
+                      <p style={{ color: '#64748b', padding: '32px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px' }}>No liabilities tracked</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {liabilities.map(liability => (
+                          <div key={liability.id} style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '2px solid #ef4444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontWeight: '600', fontSize: '16px' }}>{liability.name}</div>
+                              <div style={{ fontSize: '14px', color: '#64748b' }}>{liability.type.replace('_', ' ')}</div>
+                            </div>
+                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>${parseFloat(liability.value).toFixed(2)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             {financeTab === 'coach' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
                 <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>💬 AI Budget Coach</h2>
@@ -494,7 +959,7 @@ User's question: ${userQuestion}`
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '12px' }}>
                       {[
                         "How can I save $500 more per month?",
-                        "Why am I not reaching my goals?",
+                        "Should I pay off debt or save first?",
                         "What expenses should I cut first?",
                         "How long until I reach my goals?",
                         "Am I spending too much on anything?",
@@ -792,6 +1257,7 @@ User's question: ${userQuestion}`
                 )}
               </div>
             )}
+            
             {tradingTab === 'journal' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>📈 Trade Journal with AI</h2>
