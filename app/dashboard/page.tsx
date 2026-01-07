@@ -1,13 +1,13 @@
 'use client'
 
 import { useUser } from '@clerk/nextjs'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function Dashboard() {
   const { user } = useUser()
   
   const [mainTab, setMainTab] = useState("finance")
-  const [financeTab, setFinanceTab] = useState("goals")
+  const [financeTab, setFinanceTab] = useState("dashboard")
   const [tradingTab, setTradingTab] = useState("trading-goals")
   
   const [goals, setGoals] = useState<any[]>([])
@@ -18,6 +18,12 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState<any[]>([])
   const [newTransaction, setNewTransaction] = useState({
     name: '', amount: '', type: 'expense', date: new Date().toISOString().split('T')[0], frequency: 'monthly'
+  })
+  
+  // BILLS & REMINDERS STATE
+  const [bills, setBills] = useState<any[]>([])
+  const [newBill, setNewBill] = useState({
+    name: '', amount: '', dueDate: '', frequency: 'monthly', isPaid: false
   })
   
   // DEBT PAYOFF STATE
@@ -75,6 +81,53 @@ export default function Dashboard() {
   const [chatInput, setChatInput] = useState('')
   const [isAskingCoach, setIsAskingCoach] = useState(false)
   
+  // PUSH NOTIFICATIONS
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
+  
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      setNotificationsEnabled(true)
+    }
+  }, [])
+  
+  const enableNotifications = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        setNotificationsEnabled(true)
+        new Notification('✅ Notifications Enabled!', {
+          body: "You'll get reminders for upcoming bills",
+          icon: '/icon.png'
+        })
+      }
+    }
+  }
+  
+  // Check for upcoming bills and send notifications
+  useEffect(() => {
+    if (!notificationsEnabled) return
+    
+    const checkBills = () => {
+      const today = new Date()
+      const threeDaysFromNow = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)
+      
+      bills.forEach(bill => {
+        if (bill.isPaid) return
+        const dueDate = new Date(bill.dueDate)
+        if (dueDate >= today && dueDate <= threeDaysFromNow) {
+          new Notification(`💰 Bill Due Soon: ${bill.name}`, {
+            body: `$${bill.amount} due on ${dueDate.toLocaleDateString()}`,
+            icon: '/icon.png'
+          })
+        }
+      })
+    }
+    
+    checkBills()
+    const interval = setInterval(checkBills, 24 * 60 * 60 * 1000) // Check daily
+    return () => clearInterval(interval)
+  }, [bills, notificationsEnabled])
+  
   // CALCULATIONS
   const totalIncome = transactions.filter(t => t.type === "income").reduce((sum, t) => {
     const amount = parseFloat(t.amount || 0)
@@ -93,11 +146,9 @@ export default function Dashboard() {
   const totalGoalsSaved = goals.reduce((sum, g) => sum + parseFloat(g.saved || 0), 0)
   const totalGoalsRemaining = totalGoalsTarget - totalGoalsSaved
   
-  // DEBT CALCULATIONS
   const totalDebt = debts.reduce((sum, d) => sum + parseFloat(d.balance || 0), 0)
   const totalMinPayments = debts.reduce((sum, d) => sum + parseFloat(d.minPayment || 0), 0)
   
-  // NET WORTH CALCULATIONS
   const totalAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || 0), 0)
   const totalLiabilities = liabilities.reduce((sum, l) => sum + parseFloat(l.value || 0), 0)
   const netWorth = totalAssets - totalLiabilities
@@ -118,23 +169,49 @@ export default function Dashboard() {
     }, 0)
   
   const netPL = totalPL - monthlyCosts
-  // BASIC FUNCTIONS
+  // ADD FUNCTIONS
   const addGoal = () => {
     if (!newGoal.name || !newGoal.target) return
     setGoals([...goals, { ...newGoal, id: Date.now() }])
     setNewGoal({ name: '', target: '', saved: '', deadline: '' })
   }
   
-  const addTradingGoal = () => {
-    if (!newTradingGoal.name || !newTradingGoal.target) return
-    setTradingGoals([...tradingGoals, { ...newTradingGoal, id: Date.now() }])
-    setNewTradingGoal({ name: '', target: '', current: '', deadline: '', type: 'profit' })
-  }
-  
   const addTransaction = () => {
     if (!newTransaction.name || !newTransaction.amount) return
     setTransactions([...transactions, { ...newTransaction, id: Date.now() }])
     setNewTransaction({ name: '', amount: '', type: 'expense', date: new Date().toISOString().split('T')[0], frequency: 'monthly' })
+  }
+  
+  const addBill = () => {
+    if (!newBill.name || !newBill.amount || !newBill.dueDate) return
+    setBills([...bills, { ...newBill, id: Date.now() }].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()))
+    setNewBill({ name: '', amount: '', dueDate: '', frequency: 'monthly', isPaid: false })
+  }
+  
+  const addDebt = () => {
+    if (!newDebt.name || !newDebt.balance) return
+    setDebts([...debts, { ...newDebt, id: Date.now() }])
+    setNewDebt({ name: '', balance: '', interestRate: '', minPayment: '', type: 'credit_card' })
+  }
+  
+  const addAsset = () => {
+    if (!newAsset.name || !newAsset.value) return
+    setAssets([...assets, { ...newAsset, id: Date.now() }])
+    setNewAsset({ name: '', value: '', type: 'savings', date: new Date().toISOString().split('T')[0] })
+    updateNetWorthHistory()
+  }
+  
+  const addLiability = () => {
+    if (!newLiability.name || !newLiability.value) return
+    setLiabilities([...liabilities, { ...newLiability, id: Date.now() }])
+    setNewLiability({ name: '', value: '', type: 'loan', date: new Date().toISOString().split('T')[0] })
+    updateNetWorthHistory()
+  }
+  
+  const addTradingGoal = () => {
+    if (!newTradingGoal.name || !newTradingGoal.target) return
+    setTradingGoals([...tradingGoals, { ...newTradingGoal, id: Date.now() }])
+    setNewTradingGoal({ name: '', target: '', current: '', deadline: '', type: 'profit' })
   }
   
   const addTrade = () => {
@@ -164,11 +241,86 @@ export default function Dashboard() {
     setNewCost({ name: '', cost: '', frequency: 'monthly', type: 'subscription' })
   }
   
-  // DEBT FUNCTIONS
-  const addDebt = () => {
-    if (!newDebt.name || !newDebt.balance) return
-    setDebts([...debts, { ...newDebt, id: Date.now() }])
-    setNewDebt({ name: '', balance: '', interestRate: '', minPayment: '', type: 'credit_card' })
+  // DELETE FUNCTIONS
+  const deleteGoal = (id: number) => {
+    setGoals(goals.filter(g => g.id !== id))
+  }
+  
+  const deleteTransaction = (id: number) => {
+    setTransactions(transactions.filter(t => t.id !== id))
+  }
+  
+  const deleteBill = (id: number) => {
+    setBills(bills.filter(b => b.id !== id))
+  }
+  
+  const deleteDebt = (id: number) => {
+    setDebts(debts.filter(d => d.id !== id))
+  }
+  
+  const deleteAsset = (id: number) => {
+    setAssets(assets.filter(a => a.id !== id))
+    updateNetWorthHistory()
+  }
+  
+  const deleteLiability = (id: number) => {
+    setLiabilities(liabilities.filter(l => l.id !== id))
+    updateNetWorthHistory()
+  }
+  
+  const toggleBillPaid = (id: number) => {
+    setBills(bills.map(b => b.id === id ? { ...b, isPaid: !b.isPaid } : b))
+  }
+  
+  const updateNetWorthHistory = () => {
+    const today = new Date().toISOString().split('T')[0]
+    const currentAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || 0), 0)
+    const currentLiabilities = liabilities.reduce((sum, l) => sum + parseFloat(l.value || 0), 0)
+    const currentNetWorth = currentAssets - currentLiabilities
+    
+    const existingEntry = netWorthHistory.find(h => h.date === today)
+    if (existingEntry) {
+      setNetWorthHistory(netWorthHistory.map(h => 
+        h.date === today ? { ...h, value: currentNetWorth } : h
+      ))
+    } else {
+      setNetWorthHistory([...netWorthHistory, { date: today, value: currentNetWorth }].sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      ))
+    }
+  }
+  
+  const calculateSavingsPlan = (goal: any) => {
+    const target = parseFloat(goal.target || 0)
+    const saved = parseFloat(goal.saved || 0)
+    const remaining = target - saved
+    
+    if (!goal.deadline || remaining <= 0) return null
+    
+    const today = new Date()
+    const deadline = new Date(goal.deadline)
+    const monthsRemaining = Math.max(1, Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24 * 30)))
+    
+    const monthlyNeeded = remaining / monthsRemaining
+    
+    const incomeTransactions = transactions.filter(t => t.type === 'income')
+    const primaryIncome = incomeTransactions[0]
+    const frequency = primaryIncome?.frequency || 'monthly'
+    
+    let paymentsPerMonth = 1
+    if (frequency === 'weekly') paymentsPerMonth = 52/12
+    if (frequency === 'fortnightly') paymentsPerMonth = 26/12
+    
+    const perPaycheck = monthlyNeeded / paymentsPerMonth
+    
+    return {
+      monthlyNeeded,
+      perPaycheck,
+      paymentsPerMonth,
+      frequency,
+      monthsRemaining,
+      remaining
+    }
   }
   
   const calculateDebtPayoff = () => {
@@ -193,7 +345,7 @@ export default function Dashboard() {
     
     while (remainingDebts.some(d => d.remainingBalance > 0)) {
       monthsToPayoff++
-      if (monthsToPayoff > 600) break // Safety limit
+      if (monthsToPayoff > 600) break
       
       remainingDebts.forEach((debt, idx) => {
         if (debt.remainingBalance <= 0) return
@@ -214,74 +366,6 @@ export default function Dashboard() {
     }
     
     return { monthsToPayoff, totalInterestPaid, payoffOrder: sortedDebts }
-  }
-  
-  // NET WORTH FUNCTIONS
-  const addAsset = () => {
-    if (!newAsset.name || !newAsset.value) return
-    setAssets([...assets, { ...newAsset, id: Date.now() }])
-    setNewAsset({ name: '', value: '', type: 'savings', date: new Date().toISOString().split('T')[0] })
-    updateNetWorthHistory()
-  }
-  
-  const addLiability = () => {
-    if (!newLiability.name || !newLiability.value) return
-    setLiabilities([...liabilities, { ...newLiability, id: Date.now() }])
-    setNewLiability({ name: '', value: '', type: 'loan', date: new Date().toISOString().split('T')[0] })
-    updateNetWorthHistory()
-  }
-  
-  const updateNetWorthHistory = () => {
-    const today = new Date().toISOString().split('T')[0]
-    const currentAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || 0), 0)
-    const currentLiabilities = liabilities.reduce((sum, l) => sum + parseFloat(l.value || 0), 0)
-    const currentNetWorth = currentAssets - currentLiabilities
-    
-    const existingEntry = netWorthHistory.find(h => h.date === today)
-    if (existingEntry) {
-      setNetWorthHistory(netWorthHistory.map(h => 
-        h.date === today ? { ...h, value: currentNetWorth } : h
-      ))
-    } else {
-      setNetWorthHistory([...netWorthHistory, { date: today, value: currentNetWorth }].sort((a, b) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-      ))
-    }
-  }
-  
-  // SAVINGS PLAN CALCULATOR
-  const calculateSavingsPlan = (goal: any) => {
-    const target = parseFloat(goal.target || 0)
-    const saved = parseFloat(goal.saved || 0)
-    const remaining = target - saved
-    
-    if (!goal.deadline || remaining <= 0) return null
-    
-    const today = new Date()
-    const deadline = new Date(goal.deadline)
-    const monthsRemaining = Math.max(1, Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24 * 30)))
-    
-    const monthlyNeeded = remaining / monthsRemaining
-    
-    // Calculate based on pay frequency
-    const incomeTransactions = transactions.filter(t => t.type === 'income')
-    const primaryIncome = incomeTransactions[0]
-    const frequency = primaryIncome?.frequency || 'monthly'
-    
-    let paymentsPerMonth = 1
-    if (frequency === 'weekly') paymentsPerMonth = 52/12
-    if (frequency === 'fortnightly') paymentsPerMonth = 26/12
-    
-    const perPaycheck = monthlyNeeded / paymentsPerMonth
-    
-    return {
-      monthlyNeeded,
-      perPaycheck,
-      paymentsPerMonth,
-      frequency,
-      monthsRemaining,
-      remaining
-    }
   }
   
   const handleScreenshotUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -518,6 +602,14 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
     })
   }
   
+  const getBillsForDay = (day: number) => {
+    const { month, year } = getDaysInMonth()
+    return bills.filter(b => {
+      const bDate = new Date(b.dueDate)
+      return bDate.getDate() === day && bDate.getMonth() === month && bDate.getFullYear() === year
+    })
+  }
+  
   const convertToMonthly = (amount: number, frequency: string) => {
     const multiplier = frequency === 'weekly' ? 52/12 : frequency === 'fortnightly' ? 26/12 : frequency === 'yearly' ? 1/12 : 1
     return amount * multiplier
@@ -525,7 +617,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #eef2ff, #fce7f3)' }}>
-      <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
+    <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: '0 0 8px 0' }}>✨ Premium Finance Pro</h1>
           <p style={{ opacity: '0.9', margin: '0 0 24px 0' }}>
@@ -541,14 +633,8 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
             {mainTab === 'finance' ? (
               <>
                 {[
-                  { id: "goals", label: "🎯 Goals" }, 
-                  { id: "position", label: "📊 Position" }, 
-                  { id: "path", label: "🗺️ Path" }, 
-                  { id: "savings", label: "💵 Savings Plans" }, 
-                  { id: "debt", label: "💳 Debt Payoff" }, 
-                  { id: "networth", label: "📈 Net Worth" }, 
-                  { id: "coach", label: "💬 AI Coach" }, 
-                  { id: "transactions", label: "💰 Transactions" }
+                  { id: "dashboard", label: "📊 Dashboard" }, 
+                  { id: "coach", label: "💬 AI Coach" }
                 ].map(tab => (
                   <button key={tab.id} onClick={() => setFinanceTab(tab.id)} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '500', background: financeTab === tab.id ? "white" : "rgba(255,255,255,0.1)", color: financeTab === tab.id ? "#4f46e5" : "white" }}>{tab.label}</button>
                 ))}
@@ -567,385 +653,342 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
         {mainTab === 'finance' && (
           <>
-            {financeTab === 'goals' && (
-              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>🎯 Your Financial Goals</h2>
-                <div style={{ marginBottom: '32px', padding: '24px', background: '#f0f9ff', borderRadius: '12px' }}>
+            {financeTab === 'dashboard' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                
+                {/* CURRENT POSITION */}
+                <div style={{ background: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                  <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>📊 Current Position</h2>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                    <input type="text" placeholder="Goal name" value={newGoal.name} onChange={(e) => setNewGoal({...newGoal, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <input type="number" placeholder="Target" value={newGoal.target} onChange={(e) => setNewGoal({...newGoal, target: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <input type="number" placeholder="Saved" value={newGoal.saved} onChange={(e) => setNewGoal({...newGoal, saved: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <input type="date" value={newGoal.deadline} onChange={(e) => setNewGoal({...newGoal, deadline: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <button onClick={addGoal} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add Goal</button>
-                  </div>
-                </div>
-                {goals.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '60px', background: '#f8fafc', borderRadius: '12px' }}>
-                    <div style={{ fontSize: '64px', marginBottom: '16px' }}>🎯</div>
-                    <h3 style={{ fontSize: '24px' }}>No goals yet!</h3>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    {goals.map(goal => {
-                      const target = parseFloat(goal.target || 0)
-                      const saved = parseFloat(goal.saved || 0)
-                      const progress = target > 0 ? (saved / target) * 100 : 0
-                      return (
-                        <div key={goal.id} style={{ padding: '24px', background: 'linear-gradient(to right, #f0f9ff, #e0f2fe)', borderRadius: '12px', border: '2px solid #3b82f6' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                            <div><h3 style={{ fontSize: '24px', fontWeight: 'bold' }}>{goal.name}</h3><p style={{ color: '#64748b' }}>${saved.toLocaleString()} of ${target.toLocaleString()}</p></div>
-                            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#3b82f6' }}>{progress.toFixed(0)}%</div>
-                          </div>
-                          <div style={{ width: '100%', height: '24px', background: '#e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-                            <div style={{ width: `${Math.min(progress, 100)}%`, height: '100%', background: 'linear-gradient(to right, #3b82f6, #2563eb)' }} />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-            
-            {financeTab === 'position' && (
-              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontSize: '32px', marginBottom: '32px' }}>📊 Current Position</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
-                  <div style={{ padding: '24px', background: '#f0fdf4', borderRadius: '12px', border: '2px solid #10b981' }}>
-                    <h3 style={{ fontSize: '16px', color: '#64748b' }}>💰 Monthly Income</h3>
-                    <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#10b981' }}>${totalIncome.toFixed(2)}</p>
-                  </div>
-                  <div style={{ padding: '24px', background: '#fef2f2', borderRadius: '12px', border: '2px solid #ef4444' }}>
-                    <h3 style={{ fontSize: '16px', color: '#64748b' }}>💸 Monthly Expenses</h3>
-                    <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#ef4444' }}>${totalExpenses.toFixed(2)}</p>
-                  </div>
-                  <div style={{ padding: '24px', background: '#f0f9ff', borderRadius: '12px', border: '2px solid #3b82f6' }}>
-                    <h3 style={{ fontSize: '16px', color: '#64748b' }}>📈 Monthly Surplus</h3>
-                    <p style={{ fontSize: '32px', fontWeight: 'bold', color: monthlySurplus >= 0 ? '#10b981' : '#ef4444' }}>${monthlySurplus.toFixed(2)}</p>
-                  </div>
-                  <div style={{ padding: '24px', background: '#fef3c7', borderRadius: '12px', border: '2px solid #f59e0b' }}>
-                    <h3 style={{ fontSize: '16px', color: '#64748b' }}>💎 Net Worth</h3>
-                    <p style={{ fontSize: '32px', fontWeight: 'bold', color: netWorth >= 0 ? '#10b981' : '#ef4444' }}>${netWorth.toFixed(2)}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {financeTab === 'path' && (
-              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>🗺️ Path to Goals</h2>
-                {goals.length === 0 ? (
-                  <p style={{ color: '#64748b', textAlign: 'center', padding: '32px' }}>Set goals first!</p>
-                ) : monthlySurplus > 0 ? (
-                  <div style={{ padding: '32px', background: '#f0fdf4', borderRadius: '12px' }}>
-                    <p style={{ fontSize: '18px' }}>With ${monthlySurplus.toFixed(2)}/month, reach goals in <strong>{Math.ceil(totalGoalsRemaining / monthlySurplus)} months</strong></p>
-                  </div>
-                ) : (
-                  <div style={{ padding: '32px', background: '#fef2f2', borderRadius: '12px' }}>
-                    <p style={{ color: '#ef4444' }}>Increase income or reduce expenses</p>
-                  </div>
-                )}
-              </div>
-            )}
-            {financeTab === 'savings' && (
-              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>💵 Automatic Savings Plans</h2>
-                <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '18px' }}>
-                  See exactly how much to save per paycheck to hit your goals on time!
-                </p>
-                
-                {goals.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '60px', background: '#f8fafc', borderRadius: '12px' }}>
-                    <div style={{ fontSize: '64px', marginBottom: '16px' }}>💵</div>
-                    <h3 style={{ fontSize: '24px', marginBottom: '8px' }}>No goals yet!</h3>
-                    <p style={{ color: '#64748b' }}>Add goals in the "Goals" tab to see your savings plan</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                    {goals.map(goal => {
-                      const plan = calculateSavingsPlan(goal)
-                      if (!plan) return null
-                      
-                      return (
-                        <div key={goal.id} style={{ padding: '32px', background: 'linear-gradient(to right, #ecfdf5, #d1fae5)', borderRadius: '16px', border: '3px solid #10b981' }}>
-                          <div style={{ marginBottom: '24px' }}>
-                            <h3 style={{ fontSize: '28px', fontWeight: 'bold', color: '#065f46', marginBottom: '8px' }}>{goal.name}</h3>
-                            <p style={{ fontSize: '18px', color: '#64748b' }}>
-                              ${parseFloat(goal.saved || 0).toLocaleString()} / ${parseFloat(goal.target).toLocaleString()} saved
-                            </p>
-                          </div>
-                          
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-                            <div style={{ padding: '20px', background: 'white', borderRadius: '12px' }}>
-                              <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>💰 Per Paycheck</div>
-                              <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#10b981' }}>${plan.perPaycheck.toFixed(2)}</div>
-                              <div style={{ fontSize: '12px', color: '#64748b' }}>Every {plan.frequency}</div>
-                            </div>
-                            
-                            <div style={{ padding: '20px', background: 'white', borderRadius: '12px' }}>
-                              <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>📅 Per Month</div>
-                              <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#3b82f6' }}>${plan.monthlyNeeded.toFixed(2)}</div>
-                              <div style={{ fontSize: '12px', color: '#64748b' }}>{plan.paymentsPerMonth.toFixed(1)} payments/month</div>
-                            </div>
-                            
-                            <div style={{ padding: '20px', background: 'white', borderRadius: '12px' }}>
-                              <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>⏰ Time Left</div>
-                              <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f59e0b' }}>{plan.monthsRemaining}</div>
-                              <div style={{ fontSize: '12px', color: '#64748b' }}>months until deadline</div>
-                            </div>
-                            
-                            <div style={{ padding: '20px', background: 'white', borderRadius: '12px' }}>
-                              <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>🎯 Remaining</div>
-                              <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#7c3aed' }}>${plan.remaining.toFixed(2)}</div>
-                              <div style={{ fontSize: '12px', color: '#64748b' }}>left to save</div>
-                            </div>
-                          </div>
-                          
-                          {monthlySurplus >= plan.monthlyNeeded ? (
-                            <div style={{ padding: '16px', background: '#f0fdf4', border: '2px solid #10b981', borderRadius: '12px' }}>
-                              <p style={{ color: '#065f46', fontWeight: '600', fontSize: '16px' }}>
-                                ✅ You can afford this! Your surplus (${monthlySurplus.toFixed(2)}/month) covers the required ${plan.monthlyNeeded.toFixed(2)}/month
-                              </p>
-                            </div>
-                          ) : (
-                            <div style={{ padding: '16px', background: '#fef2f2', border: '2px solid #ef4444', borderRadius: '12px' }}>
-                              <p style={{ color: '#991b1b', fontWeight: '600', fontSize: '16px' }}>
-                                ⚠️ You need ${(plan.monthlyNeeded - monthlySurplus).toFixed(2)}/month more to reach this goal on time
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-            
-            {financeTab === 'debt' && (
-              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>💳 Debt Payoff Calculator</h2>
-                <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '18px' }}>
-                  Create a strategic plan to eliminate your debt faster and save on interest!
-                </p>
-                
-                <div style={{ marginBottom: '32px', padding: '24px', background: '#fef2f2', borderRadius: '12px' }}>
-                  <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>Add a Debt</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-                    <input type="text" placeholder="Debt name" value={newDebt.name} onChange={(e) => setNewDebt({...newDebt, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <input type="number" placeholder="Balance" value={newDebt.balance} onChange={(e) => setNewDebt({...newDebt, balance: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <input type="number" placeholder="Interest Rate %" value={newDebt.interestRate} onChange={(e) => setNewDebt({...newDebt, interestRate: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <input type="number" placeholder="Min Payment" value={newDebt.minPayment} onChange={(e) => setNewDebt({...newDebt, minPayment: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <select value={newDebt.type} onChange={(e) => setNewDebt({...newDebt, type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <option value="credit_card">Credit Card</option>
-                      <option value="personal_loan">Personal Loan</option>
-                      <option value="student_loan">Student Loan</option>
-                      <option value="car_loan">Car Loan</option>
-                      <option value="other">Other</option>
-                    </select>
-                    <button onClick={addDebt} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #ef4444, #dc2626)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add Debt</button>
-                  </div>
-                </div>
-                
-                {debts.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '60px', background: '#f8fafc', borderRadius: '12px' }}>
-                    <div style={{ fontSize: '64px', marginBottom: '16px' }}>💳</div>
-                    <h3 style={{ fontSize: '24px' }}>No debts tracked</h3>
-                    <p style={{ color: '#64748b' }}>Add your debts above to see your payoff plan</p>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ marginBottom: '32px', padding: '32px', background: 'linear-gradient(to right, #fef2f2, #fee2e2)', borderRadius: '12px', border: '3px solid #ef4444' }}>
-                      <h3 style={{ fontSize: '24px', marginBottom: '16px' }}>📊 Debt Summary</h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                        <div>
-                          <div style={{ fontSize: '14px', color: '#64748b' }}>Total Debt</div>
-                          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#ef4444' }}>${totalDebt.toFixed(2)}</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '14px', color: '#64748b' }}>Total Min Payments</div>
-                          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f59e0b' }}>${totalMinPayments.toFixed(2)}/mo</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '14px', color: '#64748b' }}>Number of Debts</div>
-                          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#3b82f6' }}>{debts.length}</div>
-                        </div>
-                      </div>
+                    <div style={{ padding: '20px', background: '#f0fdf4', borderRadius: '12px', border: '2px solid #10b981' }}>
+                      <h3 style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>💰 Monthly Income</h3>
+                      <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#10b981', margin: 0 }}>${totalIncome.toFixed(2)}</p>
                     </div>
-                    
-                    <div style={{ marginBottom: '32px', padding: '24px', background: '#f0f9ff', borderRadius: '12px' }}>
-                      <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>⚡ Accelerate Payoff</h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Extra Monthly Payment</label>
-                          <input 
-                            type="number" 
-                            placeholder="0.00" 
-                            value={extraPayment} 
-                            onChange={(e) => setExtraPayment(e.target.value)} 
-                            style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%' }} 
-                          />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>Payoff Method</label>
-                          <select value={payoffMethod} onChange={(e) => setPayoffMethod(e.target.value as 'snowball' | 'avalanche')} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%' }}>
-                            <option value="avalanche">Avalanche (Highest Interest First)</option>
-                            <option value="snowball">Snowball (Smallest Balance First)</option>
-                          </select>
-                        </div>
-                      </div>
-                      
-                      {parseFloat(extraPayment || '0') > 0 && (() => {
-                        const result = calculateDebtPayoff()
+                    <div style={{ padding: '20px', background: '#fef2f2', borderRadius: '12px', border: '2px solid #ef4444' }}>
+                      <h3 style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>💸 Monthly Expenses</h3>
+                      <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#ef4444', margin: 0 }}>${totalExpenses.toFixed(2)}</p>
+                    </div>
+                    <div style={{ padding: '20px', background: '#f0f9ff', borderRadius: '12px', border: '2px solid #3b82f6' }}>
+                      <h3 style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>📈 Monthly Surplus</h3>
+                      <p style={{ fontSize: '28px', fontWeight: 'bold', color: monthlySurplus >= 0 ? '#10b981' : '#ef4444', margin: 0 }}>${monthlySurplus.toFixed(2)}</p>
+                    </div>
+                    <div style={{ padding: '20px', background: '#fef3c7', borderRadius: '12px', border: '2px solid #f59e0b' }}>
+                      <h3 style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>💎 Net Worth</h3>
+                      <p style={{ fontSize: '28px', fontWeight: 'bold', color: netWorth >= 0 ? '#10b981' : '#ef4444', margin: 0 }}>${netWorth.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* GOALS */}
+                <div style={{ background: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                  <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>🎯 Financial Goals</h2>
+                  <div style={{ marginBottom: '24px', padding: '20px', background: '#f0f9ff', borderRadius: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                      <input type="text" placeholder="Goal name" value={newGoal.name} onChange={(e) => setNewGoal({...newGoal, name: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
+                      <input type="number" placeholder="Target $" value={newGoal.target} onChange={(e) => setNewGoal({...newGoal, target: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
+                      <input type="number" placeholder="Saved $" value={newGoal.saved} onChange={(e) => setNewGoal({...newGoal, saved: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
+                      <input type="date" value={newGoal.deadline} onChange={(e) => setNewGoal({...newGoal, deadline: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
+                      <button onClick={addGoal} style={{ padding: '10px 20px', background: 'linear-gradient(to right, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>Add Goal</button>
+                    </div>
+                  </div>
+                  {goals.length === 0 ? (
+                    <p style={{ color: '#64748b', textAlign: 'center', padding: '24px' }}>No goals yet. Add one above!</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {goals.map(goal => {
+                        const target = parseFloat(goal.target || 0)
+                        const saved = parseFloat(goal.saved || 0)
+                        const progress = target > 0 ? (saved / target) * 100 : 0
                         return (
-                          <div style={{ marginTop: '24px', padding: '20px', background: 'white', borderRadius: '12px', border: '2px solid #10b981' }}>
-                            <h4 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: '#065f46' }}>✅ Payoff Plan Results</h4>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                          <div key={goal.id} style={{ padding: '20px', background: 'linear-gradient(to right, #f0f9ff, #e0f2fe)', borderRadius: '12px', border: '2px solid #3b82f6', position: 'relative' }}>
+                            <button onClick={() => deleteGoal(goal.id)} style={{ position: 'absolute', top: '12px', right: '12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>Delete</button>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', paddingRight: '80px' }}>
                               <div>
-                                <div style={{ fontSize: '14px', color: '#64748b' }}>Debt-Free In</div>
-                                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#10b981' }}>{result.monthsToPayoff} months</div>
+                                <h3 style={{ fontSize: '20px', fontWeight: 'bold', margin: '0 0 4px 0' }}>{goal.name}</h3>
+                                <p style={{ color: '#64748b', margin: 0, fontSize: '14px' }}>${saved.toLocaleString()} of ${target.toLocaleString()}</p>
                               </div>
-                              <div>
-                                <div style={{ fontSize: '14px', color: '#64748b' }}>Total Interest Paid</div>
-                                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#ef4444' }}>${result.totalInterestPaid.toFixed(2)}</div>
-                              </div>
+                              <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#3b82f6' }}>{progress.toFixed(0)}%</div>
                             </div>
-                            <div style={{ marginTop: '16px' }}>
-                              <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Payoff Order ({payoffMethod === 'avalanche' ? 'Highest Interest First' : 'Smallest Balance First'}):</div>
-                              <ol style={{ marginLeft: '20px', lineHeight: '2' }}>
-                                {result.payoffOrder.map((d: any, idx: number) => (
-                                  <li key={idx}>{d.name} - ${d.balance} @ {d.interestRate}%</li>
-                                ))}
-                              </ol>
+                            <div style={{ width: '100%', height: '20px', background: '#e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+                              <div style={{ width: `${Math.min(progress, 100)}%`, height: '100%', background: 'linear-gradient(to right, #3b82f6, #2563eb)', transition: 'width 0.3s' }} />
                             </div>
                           </div>
                         )
-                      })()}
+                      })}
                     </div>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      <h3 style={{ fontSize: '20px', marginBottom: '8px' }}>Your Debts</h3>
-                      {debts.map(debt => (
-                        <div key={debt.id} style={{ padding: '20px', background: '#fef2f2', borderRadius: '12px', border: '2px solid #ef4444' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
-                            <div>
-                              <h4 style={{ fontSize: '20px', fontWeight: 'bold' }}>{debt.name}</h4>
-                              <p style={{ fontSize: '14px', color: '#64748b' }}>{debt.type.replace('_', ' ')}</p>
+                  )}
+                </div>
+                
+                {/* TRANSACTIONS */}
+                <div style={{ background: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                  <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>💰 Income & Expenses</h2>
+                  <div style={{ marginBottom: '24px', padding: '20px', background: '#f8fafc', borderRadius: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+                      <input type="text" placeholder="Name" value={newTransaction.name} onChange={(e) => setNewTransaction({...newTransaction, name: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
+                      <input type="number" placeholder="Amount" value={newTransaction.amount} onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
+                      <select value={newTransaction.frequency} onChange={(e) => setNewTransaction({...newTransaction, frequency: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }}>
+                        <option value="weekly">Weekly</option>
+                        <option value="fortnightly">Fortnightly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
+                      </select>
+                      <select value={newTransaction.type} onChange={(e) => setNewTransaction({...newTransaction, type: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }}>
+                        <option value="income">Income</option>
+                        <option value="expense">Expense</option>
+                      </select>
+                      <button onClick={addTransaction} style={{ padding: '10px 20px', background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>Add</button>
+                    </div>
+                  </div>
+                  {transactions.length === 0 ? (
+                    <p style={{ color: '#64748b', textAlign: 'center', padding: '24px' }}>No transactions yet</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {transactions.map(t => {
+                        const amount = parseFloat(t.amount)
+                        const monthlyAmount = convertToMonthly(amount, t.frequency || 'monthly')
+                        return (
+                          <div key={t.id} style={{ padding: '16px', background: t.type === 'income' ? '#f0fdf4' : '#fef2f2', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', position: 'relative' }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: '600', fontSize: '16px' }}>{t.name}</div>
+                              <div style={{ fontSize: '13px', color: '#64748b' }}>
+                                ${amount.toFixed(2)}/{t.frequency || 'monthly'} ≈ ${monthlyAmount.toFixed(2)}/month
+                              </div>
                             </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#ef4444' }}>${parseFloat(debt.balance).toFixed(2)}</div>
-                              <div style={{ fontSize: '14px', color: '#64748b' }}>{debt.interestRate}% APR</div>
+                            <div style={{ fontSize: '20px', fontWeight: 'bold', color: t.type === 'income' ? '#10b981' : '#ef4444' }}>
+                              {t.type === 'income' ? '+' : '-'}${amount.toFixed(2)}
                             </div>
+                            <button onClick={() => deleteTransaction(t.id)} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>Delete</button>
                           </div>
-                          <div style={{ fontSize: '14px', color: '#64748b' }}>
-                            Min Payment: <span style={{ fontWeight: '600', color: '#1e293b' }}>${parseFloat(debt.minPayment).toFixed(2)}/month</span>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>  
+                {/* SAVINGS PLANS */}
+                {goals.length > 0 && (
+                  <div style={{ background: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                    <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>💵 Automatic Savings Plans</h2>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      {goals.map(goal => {
+                        const plan = calculateSavingsPlan(goal)
+                        if (!plan) return null
+                        
+                        return (
+                          <div key={goal.id} style={{ padding: '24px', background: 'linear-gradient(to right, #ecfdf5, #d1fae5)', borderRadius: '12px', border: '2px solid #10b981' }}>
+                            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#065f46', marginBottom: '16px' }}>{goal.name}</h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                              <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}>
+                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>💰 Per Paycheck</div>
+                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>${plan.perPaycheck.toFixed(2)}</div>
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>Every {plan.frequency}</div>
+                              </div>
+                              <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}>
+                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>📅 Per Month</div>
+                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#3b82f6' }}>${plan.monthlyNeeded.toFixed(2)}</div>
+                              </div>
+                              <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}>
+                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>⏰ Months Left</div>
+                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f59e0b' }}>{plan.monthsRemaining}</div>
+                              </div>
+                            </div>
+                            {monthlySurplus >= plan.monthlyNeeded ? (
+                              <div style={{ padding: '12px', background: '#f0fdf4', border: '2px solid #10b981', borderRadius: '8px', fontSize: '14px', color: '#065f46', fontWeight: '600' }}>
+                                ✅ Affordable! Your surplus covers this.
+                              </div>
+                            ) : (
+                              <div style={{ padding: '12px', background: '#fef2f2', border: '2px solid #ef4444', borderRadius: '8px', fontSize: '14px', color: '#991b1b', fontWeight: '600' }}>
+                                ⚠️ Need ${(plan.monthlyNeeded - monthlySurplus).toFixed(2)}/month more
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {/* DEBT PAYOFF */}
+                <div style={{ background: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                  <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>💳 Debt Payoff Calculator</h2>
+                  <div style={{ marginBottom: '24px', padding: '20px', background: '#fef2f2', borderRadius: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+                      <input type="text" placeholder="Debt name" value={newDebt.name} onChange={(e) => setNewDebt({...newDebt, name: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
+                      <input type="number" placeholder="Balance" value={newDebt.balance} onChange={(e) => setNewDebt({...newDebt, balance: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
+                      <input type="number" placeholder="Interest %" value={newDebt.interestRate} onChange={(e) => setNewDebt({...newDebt, interestRate: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
+                      <input type="number" placeholder="Min Payment" value={newDebt.minPayment} onChange={(e) => setNewDebt({...newDebt, minPayment: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
+                      <button onClick={addDebt} style={{ padding: '10px 20px', background: 'linear-gradient(to right, #ef4444, #dc2626)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>Add Debt</button>
+                    </div>
+                  </div>
+                  
+                  {debts.length > 0 && (
+                    <>
+                      <div style={{ marginBottom: '24px', padding: '20px', background: '#f0f9ff', borderRadius: '12px' }}>
+                        <h3 style={{ fontSize: '16px', marginBottom: '12px', fontWeight: '600' }}>⚡ Accelerate Payoff</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '600' }}>Extra Monthly Payment</label>
+                            <input 
+                              type="number" 
+                              placeholder="0.00" 
+                              value={extraPayment} 
+                              onChange={(e) => setExtraPayment(e.target.value)} 
+                              style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', fontSize: '14px' }} 
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '600' }}>Method</label>
+                            <select value={payoffMethod} onChange={(e) => setPayoffMethod(e.target.value as 'snowball' | 'avalanche')} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', fontSize: '14px' }}>
+                              <option value="avalanche">Avalanche (High Interest)</option>
+                              <option value="snowball">Snowball (Low Balance)</option>
+                            </select>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-            
-            {financeTab === 'networth' && (
-              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>📈 Net Worth Tracker</h2>
-                <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '18px' }}>
-                  Track your total assets minus liabilities to see your true financial position.
-                </p>
-                
-                <div style={{ marginBottom: '32px', padding: '32px', background: netWorth >= 0 ? 'linear-gradient(to right, #f0fdf4, #dcfce7)' : 'linear-gradient(to right, #fef2f2, #fee2e2)', borderRadius: '16px', border: `3px solid ${netWorth >= 0 ? '#10b981' : '#ef4444'}` }}>
-                  <h3 style={{ fontSize: '20px', color: '#64748b', marginBottom: '8px' }}>Your Net Worth</h3>
-                  <div style={{ fontSize: '56px', fontWeight: 'bold', color: netWorth >= 0 ? '#10b981' : '#ef4444', marginBottom: '16px' }}>
-                    ${netWorth.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                    <div>
-                      <div style={{ fontSize: '14px', color: '#64748b' }}>Total Assets</div>
-                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>${totalAssets.toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '14px', color: '#64748b' }}>Total Liabilities</div>
-                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>${totalLiabilities.toFixed(2)}</div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px', marginBottom: '32px' }}>
-                  <div style={{ padding: '24px', background: '#f0fdf4', borderRadius: '12px' }}>
-                    <h3 style={{ fontSize: '20px', marginBottom: '16px', color: '#065f46' }}>➕ Add Asset</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <input type="text" placeholder="Asset name" value={newAsset.name} onChange={(e) => setNewAsset({...newAsset, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                      <input type="number" placeholder="Value" value={newAsset.value} onChange={(e) => setNewAsset({...newAsset, value: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                      <select value={newAsset.type} onChange={(e) => setNewAsset({...newAsset, type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <option value="savings">Savings Account</option>
-                        <option value="checking">Checking Account</option>
-                        <option value="investment">Investment</option>
-                        <option value="property">Property</option>
-                        <option value="vehicle">Vehicle</option>
-                        <option value="other">Other</option>
-                      </select>
-                      <button onClick={addAsset} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add Asset</button>
-                    </div>
-                  </div>
-                  
-                  <div style={{ padding: '24px', background: '#fef2f2', borderRadius: '12px' }}>
-                    <h3 style={{ fontSize: '20px', marginBottom: '16px', color: '#991b1b' }}>➖ Add Liability</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <input type="text" placeholder="Liability name" value={newLiability.name} onChange={(e) => setNewLiability({...newLiability, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                      <input type="number" placeholder="Amount owed" value={newLiability.value} onChange={(e) => setNewLiability({...newLiability, value: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                      <select value={newLiability.type} onChange={(e) => setNewLiability({...newLiability, type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <option value="loan">Loan</option>
-                        <option value="mortgage">Mortgage</option>
-                        <option value="credit_card">Credit Card</option>
-                        <option value="student_loan">Student Loan</option>
-                        <option value="other">Other</option>
-                      </select>
-                      <button onClick={addLiability} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #ef4444, #dc2626)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add Liability</button>
-                    </div>
-                  </div>
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
-                  <div>
-                    <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>💰 Assets</h3>
-                    {assets.length === 0 ? (
-                      <p style={{ color: '#64748b', padding: '32px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px' }}>No assets tracked</p>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {assets.map(asset => (
-                          <div key={asset.id} style={{ padding: '16px', background: '#f0fdf4', borderRadius: '12px', border: '2px solid #10b981', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <div style={{ fontWeight: '600', fontSize: '16px' }}>{asset.name}</div>
-                              <div style={{ fontSize: '14px', color: '#64748b' }}>{asset.type.replace('_', ' ')}</div>
+                        
+                        {parseFloat(extraPayment || '0') > 0 && (() => {
+                          const result = calculateDebtPayoff()
+                          return (
+                            <div style={{ marginTop: '16px', padding: '16px', background: 'white', borderRadius: '8px', border: '2px solid #10b981' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+                                <div>
+                                  <div style={{ fontSize: '12px', color: '#64748b' }}>Debt-Free In</div>
+                                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>{result.monthsToPayoff} months</div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '12px', color: '#64748b' }}>Total Interest</div>
+                                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>${result.totalInterestPaid.toFixed(2)}</div>
+                                </div>
+                              </div>
                             </div>
-                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>${parseFloat(asset.value).toFixed(2)}</div>
+                          )
+                        })()}
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {debts.map(debt => (
+                          <div key={debt.id} style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '2px solid #ef4444', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', position: 'relative' }}>
+                            <div style={{ flex: 1 }}>
+                              <h4 style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 4px 0' }}>{debt.name}</h4>
+                              <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
+                                {debt.interestRate}% APR • Min: ${parseFloat(debt.minPayment).toFixed(2)}/mo
+                              </p>
+                            </div>
+                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>
+                              ${parseFloat(debt.balance).toFixed(2)}
+                            </div>
+                            <button onClick={() => deleteDebt(debt.id)} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>Delete</button>
                           </div>
                         ))}
                       </div>
+                    </>
+                  )}
+                  
+                  {debts.length === 0 && (
+                    <p style={{ color: '#64748b', textAlign: 'center', padding: '24px' }}>No debts tracked</p>
+                  )}
+                </div>
+                
+                {/* BILL CALENDAR */}
+                <div style={{ background: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                    <h2 style={{ fontSize: '28px', margin: 0 }}>📅 Bill Calendar & Reminders</h2>
+                    {!notificationsEnabled && (
+                      <button onClick={enableNotifications} style={{ padding: '10px 20px', background: 'linear-gradient(to right, #7c3aed, #6d28d9)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>
+                        🔔 Enable Notifications
+                      </button>
                     )}
                   </div>
                   
-                  <div>
-                    <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>💳 Liabilities</h3>
-                    {liabilities.length === 0 ? (
-                      <p style={{ color: '#64748b', padding: '32px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px' }}>No liabilities tracked</p>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {liabilities.map(liability => (
-                          <div key={liability.id} style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '2px solid #ef4444', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <div style={{ fontWeight: '600', fontSize: '16px' }}>{liability.name}</div>
-                              <div style={{ fontSize: '14px', color: '#64748b' }}>{liability.type.replace('_', ' ')}</div>
+                  <div style={{ marginBottom: '24px', padding: '20px', background: '#fef3c7', borderRadius: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+                      <input type="text" placeholder="Bill name" value={newBill.name} onChange={(e) => setNewBill({...newBill, name: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
+                      <input type="number" placeholder="Amount" value={newBill.amount} onChange={(e) => setNewBill({...newBill, amount: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
+                      <input type="date" value={newBill.dueDate} onChange={(e) => setNewBill({...newBill, dueDate: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
+                      <select value={newBill.frequency} onChange={(e) => setNewBill({...newBill, frequency: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }}>
+                        <option value="monthly">Monthly</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="yearly">Yearly</option>
+                      </select>
+                      <button onClick={addBill} style={{ padding: '10px 20px', background: 'linear-gradient(to right, #f59e0b, #d97706)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>Add Bill</button>
+                    </div>
+                  </div>
+                  
+                  {/* Upcoming Bills */}
+                  {bills.filter(b => !b.isPaid && new Date(b.dueDate) >= new Date()).length > 0 && (
+                    <div style={{ marginBottom: '24px', padding: '20px', background: '#fef2f2', borderRadius: '12px' }}>
+                      <h3 style={{ fontSize: '18px', marginBottom: '12px', fontWeight: '600' }}>🔔 Upcoming Bills</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {bills.filter(b => !b.isPaid && new Date(b.dueDate) >= new Date()).slice(0, 5).map(bill => {
+                          const daysUntil = Math.ceil((new Date(bill.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                          return (
+                            <div key={bill.id} style={{ padding: '12px', background: 'white', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: '600', fontSize: '15px' }}>{bill.name}</div>
+                                <div style={{ fontSize: '12px', color: '#64748b' }}>
+                                  Due {new Date(bill.dueDate).toLocaleDateString()} ({daysUntil} days)
+                                </div>
+                              </div>
+                              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ef4444' }}>
+                                ${parseFloat(bill.amount).toFixed(2)}
+                              </div>
+                              <button onClick={() => toggleBillPaid(bill.id)} style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                                Mark Paid
+                              </button>
+                              <button onClick={() => deleteBill(bill.id)} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                                Delete
+                              </button>
                             </div>
-                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>${parseFloat(liability.value).toFixed(2)}</div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
-                    )}
+                    </div>
+                  )}
+                  
+                  {/* Calendar */}
+                  <div>
+                    <h3 style={{ fontSize: '18px', marginBottom: '12px', fontWeight: '600' }}>📆 This Month</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', marginBottom: '6px' }}>
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => 
+                        <div key={d} style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', fontSize: '13px', color: '#64748b' }}>{d}</div>
+                      )}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+                      {(() => {
+                        const { firstDay, daysInMonth } = getDaysInMonth()
+                        const cells = []
+                        for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`} />)
+                        for (let d = 1; d <= daysInMonth; d++) {
+                          const dayBills = getBillsForDay(d)
+                          const hasUnpaid = dayBills.some(b => !b.isPaid)
+                          cells.push(
+                            <div key={d} style={{ 
+                              padding: '8px 4px', 
+                              border: '1px solid #e2e8f0', 
+                              borderRadius: '6px', 
+                              background: hasUnpaid ? '#fef2f2' : 'white',
+                              minHeight: '60px',
+                              fontSize: '13px'
+                            }}>
+                              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{d}</div>
+                              {dayBills.map(bill => (
+                                <div key={bill.id} style={{ 
+                                  fontSize: '10px', 
+                                  color: bill.isPaid ? '#10b981' : '#ef4444',
+                                  fontWeight: '600',
+                                  marginBottom: '2px',
+                                  textDecoration: bill.isPaid ? 'line-through' : 'none'
+                                }}>
+                                  {bill.isPaid ? '✓' : '💰'} ${parseFloat(bill.amount).toFixed(0)}
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        }
+                        return cells
+                      })()}
+                    </div>
                   </div>
                 </div>
+                
               </div>
             )}
             {financeTab === 'coach' && (
@@ -1059,58 +1102,9 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                 </div>
               </div>
             )}
-            
-            {financeTab === 'transactions' && (
-              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>💰 Transactions</h2>
-                <div style={{ marginBottom: '32px', padding: '24px', background: '#f8fafc', borderRadius: '12px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-                    <input type="text" placeholder="Name" value={newTransaction.name} onChange={(e) => setNewTransaction({...newTransaction, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <input type="number" placeholder="Amount" value={newTransaction.amount} onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <select value={newTransaction.frequency} onChange={(e) => setNewTransaction({...newTransaction, frequency: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <option value="weekly">Weekly</option>
-                      <option value="fortnightly">Fortnightly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
-                    <select value={newTransaction.type} onChange={(e) => setNewTransaction({...newTransaction, type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <option value="income">Income</option>
-                      <option value="expense">Expense</option>
-                    </select>
-                    <input type="date" value={newTransaction.date} onChange={(e) => setNewTransaction({...newTransaction, date: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <button onClick={addTransaction} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add</button>
-                  </div>
-                </div>
-                {transactions.length === 0 ? <p style={{ color: '#64748b', textAlign: 'center', padding: '32px' }}>No transactions yet</p> : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {transactions.map(t => {
-                      const amount = parseFloat(t.amount)
-                      const monthlyAmount = convertToMonthly(amount, t.frequency || 'monthly')
-                      return (
-                        <div key={t.id} style={{ padding: '16px', background: t.type === 'income' ? '#f0fdf4' : '#fef2f2', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                          <div>
-                            <div style={{ fontWeight: '600', fontSize: '18px' }}>{t.name}</div>
-                            <div style={{ fontSize: '14px', color: '#64748b' }}>
-                              ${amount.toFixed(2)}/{t.frequency || 'monthly'} • {new Date(t.date).toLocaleDateString()}
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '24px', fontWeight: 'bold', color: t.type === 'income' ? '#10b981' : '#ef4444' }}>
-                              {t.type === 'income' ? '+' : '-'}${amount.toFixed(2)}
-                            </div>
-                            <div style={{ fontSize: '12px', color: '#64748b' }}>
-                              ≈ ${monthlyAmount.toFixed(2)}/month
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
           </>
         )}
+        
         {mainTab === 'trading' && (
           <>
             {tradingTab === 'trading-goals' && (
@@ -1168,91 +1162,38 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
             
             {tradingTab === 'finder' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>🔮 Trade Finder (Multi-Timeframe Analysis)</h2>
-                <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '18px' }}>
-                  Upload 3 screenshots for confluence analysis. Minimum 1:2 risk:reward ratio required.
-                </p>
-                
+                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>🔮 Trade Finder</h2>
+                <p style={{ color: '#64748b', marginBottom: '32px' }}>Upload 3 screenshots for multi-timeframe analysis. Minimum 1:2 R:R required.</p>
                 <div style={{ marginBottom: '32px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
                     <div style={{ padding: '24px', background: '#fef3c7', borderRadius: '12px', border: '2px solid #f59e0b' }}>
-                      <h3 style={{ fontSize: '20px', marginBottom: '12px', color: '#92400e' }}>📊 1H Chart (Trend)</h3>
+                      <h3 style={{ fontSize: '20px', marginBottom: '12px' }}>📊 1H Chart</h3>
                       <input type="file" accept="image/*" onChange={(e) => handleTradeFinderUpload('oneHour', e)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', marginBottom: '12px' }} />
-                      {tradeFinderScreenshots.oneHour && <img src={tradeFinderScreenshots.oneHour} alt="1H" style={{ width: '100%', borderRadius: '8px', border: '2px solid #f59e0b' }} />}
+                      {tradeFinderScreenshots.oneHour && <img src={tradeFinderScreenshots.oneHour} alt="1H" style={{ width: '100%', borderRadius: '8px' }} />}
                     </div>
-                    
                     <div style={{ padding: '24px', background: '#dbeafe', borderRadius: '12px', border: '2px solid #3b82f6' }}>
-                      <h3 style={{ fontSize: '20px', marginBottom: '12px', color: '#1e40af' }}>📊 15M Chart (Setup)</h3>
+                      <h3 style={{ fontSize: '20px', marginBottom: '12px' }}>📊 15M Chart</h3>
                       <input type="file" accept="image/*" onChange={(e) => handleTradeFinderUpload('fifteenMin', e)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', marginBottom: '12px' }} />
-                      {tradeFinderScreenshots.fifteenMin && <img src={tradeFinderScreenshots.fifteenMin} alt="15M" style={{ width: '100%', borderRadius: '8px', border: '2px solid #3b82f6' }} />}
+                      {tradeFinderScreenshots.fifteenMin && <img src={tradeFinderScreenshots.fifteenMin} alt="15M" style={{ width: '100%', borderRadius: '8px' }} />}
                     </div>
-                    
                     <div style={{ padding: '24px', background: '#f0fdf4', borderRadius: '12px', border: '2px solid #10b981' }}>
-                      <h3 style={{ fontSize: '20px', marginBottom: '12px', color: '#065f46' }}>📊 5M Chart (Confirmation)</h3>
+                      <h3 style={{ fontSize: '20px', marginBottom: '12px' }}>📊 5M Chart</h3>
                       <input type="file" accept="image/*" onChange={(e) => handleTradeFinderUpload('fiveMin', e)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', marginBottom: '12px' }} />
-                      {tradeFinderScreenshots.fiveMin && <img src={tradeFinderScreenshots.fiveMin} alt="5M" style={{ width: '100%', borderRadius: '8px', border: '2px solid #10b981' }} />}
+                      {tradeFinderScreenshots.fiveMin && <img src={tradeFinderScreenshots.fiveMin} alt="5M" style={{ width: '100%', borderRadius: '8px' }} />}
                     </div>
                   </div>
                 </div>
-                
-                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-                  <button
-                    onClick={analyzeTradeSetup}
-                    disabled={!tradeFinderScreenshots.oneHour || !tradeFinderScreenshots.fifteenMin || !tradeFinderScreenshots.fiveMin || isAnalyzingTrade}
-                    style={{
-                      padding: '16px 48px',
-                      background: (!tradeFinderScreenshots.oneHour || !tradeFinderScreenshots.fifteenMin || !tradeFinderScreenshots.fiveMin || isAnalyzingTrade) ? '#94a3b8' : 'linear-gradient(to right, #7c3aed, #6d28d9)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '12px',
-                      cursor: (!tradeFinderScreenshots.oneHour || !tradeFinderScreenshots.fifteenMin || !tradeFinderScreenshots.fiveMin || isAnalyzingTrade) ? 'not-allowed' : 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '20px'
-                    }}
-                  >
-                    {isAnalyzingTrade ? '🔄 Analyzing All Timeframes...' : '🔮 Analyze Trade Setup'}
+                <div style={{ textAlign: 'center' }}>
+                  <button onClick={analyzeTradeSetup} disabled={!tradeFinderScreenshots.oneHour || !tradeFinderScreenshots.fifteenMin || !tradeFinderScreenshots.fiveMin || isAnalyzingTrade} style={{ padding: '16px 48px', background: (!tradeFinderScreenshots.oneHour || !tradeFinderScreenshots.fifteenMin || !tradeFinderScreenshots.fiveMin || isAnalyzingTrade) ? '#94a3b8' : 'linear-gradient(to right, #7c3aed, #6d28d9)', color: 'white', border: 'none', borderRadius: '12px', cursor: (!tradeFinderScreenshots.oneHour || !tradeFinderScreenshots.fifteenMin || !tradeFinderScreenshots.fiveMin || isAnalyzingTrade) ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '20px' }}>
+                    {isAnalyzingTrade ? '🔄 Analyzing...' : '🔮 Analyze Trade'}
                   </button>
                 </div>
-                
                 {tradeRecommendation && (
-                  <div style={{ padding: '32px', background: tradeRecommendation.shouldTrade ? 'linear-gradient(to right, #f0fdf4, #dcfce7)' : 'linear-gradient(to right, #fef2f2, #fee2e2)', borderRadius: '16px', border: `3px solid ${tradeRecommendation.shouldTrade ? '#10b981' : '#ef4444'}` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-                      <div style={{ fontSize: '64px' }}>{tradeRecommendation.shouldTrade ? '✅' : '❌'}</div>
-                      <div>
-                        <h3 style={{ fontSize: '32px', fontWeight: 'bold', color: tradeRecommendation.shouldTrade ? '#065f46' : '#991b1b', margin: 0 }}>
-                          {tradeRecommendation.shouldTrade ? 'TRADE RECOMMENDATION' : 'NO TRADE'}
-                        </h3>
-                        {tradeRecommendation.confidence && (
-                          <p style={{ fontSize: '18px', color: '#64748b', margin: '4px 0 0 0' }}>
-                            Confidence: <strong>{tradeRecommendation.confidence}</strong>
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {tradeRecommendation.shouldTrade ? (
-                      <>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-                          {tradeRecommendation.pair && <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}><div style={{ fontSize: '14px', color: '#64748b' }}>Pair</div><div style={{ fontSize: '24px', fontWeight: 'bold' }}>{tradeRecommendation.pair}</div></div>}
-                          {tradeRecommendation.direction && <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}><div style={{ fontSize: '14px', color: '#64748b' }}>Direction</div><div style={{ fontSize: '24px', fontWeight: 'bold', color: tradeRecommendation.direction === 'LONG' ? '#10b981' : '#ef4444' }}>{tradeRecommendation.direction}</div></div>}
-                          {tradeRecommendation.entry && <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}><div style={{ fontSize: '14px', color: '#64748b' }}>Entry</div><div style={{ fontSize: '24px', fontWeight: 'bold' }}>{tradeRecommendation.entry}</div></div>}
-                          {tradeRecommendation.stopLoss && <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}><div style={{ fontSize: '14px', color: '#64748b' }}>Stop Loss</div><div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>{tradeRecommendation.stopLoss}</div></div>}
-                          {tradeRecommendation.takeProfit && <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}><div style={{ fontSize: '14px', color: '#64748b' }}>Take Profit</div><div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>{tradeRecommendation.takeProfit}</div></div>}
-                          {tradeRecommendation.riskReward && <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}><div style={{ fontSize: '14px', color: '#64748b' }}>Risk:Reward</div><div style={{ fontSize: '24px', fontWeight: 'bold', color: '#7c3aed' }}>1:{tradeRecommendation.riskReward}</div></div>}
-                        </div>
-                        
-                        {tradeRecommendation.reasoning && (
-                          <div style={{ padding: '20px', background: 'white', borderRadius: '12px' }}>
-                            <h4 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '12px' }}>📋 Analysis:</h4>
-                            <pre style={{ whiteSpace: 'pre-wrap', fontSize: '14px', lineHeight: '1.8', margin: 0, fontFamily: 'inherit' }}>{tradeRecommendation.reasoning}</pre>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div style={{ padding: '20px', background: 'white', borderRadius: '12px' }}>
-                        <pre style={{ whiteSpace: 'pre-wrap', fontSize: '16px', lineHeight: '1.8' }}>{tradeRecommendation.raw || tradeRecommendation.error || 'Risk:Reward ratio does not meet 1:2 minimum requirement.'}</pre>
-                      </div>
-                    )}
+                  <div style={{ marginTop: '32px', padding: '32px', background: tradeRecommendation.shouldTrade ? '#f0fdf4' : '#fef2f2', borderRadius: '16px', border: `3px solid ${tradeRecommendation.shouldTrade ? '#10b981' : '#ef4444'}` }}>
+                    <h3 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '16px' }}>
+                      {tradeRecommendation.shouldTrade ? '✅ TRADE RECOMMENDATION' : '❌ NO TRADE'}
+                    </h3>
+                    <pre style={{ whiteSpace: 'pre-wrap', fontSize: '14px' }}>{tradeRecommendation.raw}</pre>
                   </div>
                 )}
               </div>
@@ -1260,41 +1201,28 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
             
             {tradingTab === 'journal' && (
               <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>📈 Trade Journal with AI</h2>
+                <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>📈 Trade Journal</h2>
                 <div style={{ marginBottom: '32px', padding: '24px', background: '#f8fafc', borderRadius: '12px' }}>
-                  <div style={{ marginBottom: '24px', padding: '20px', background: '#f0f9ff', borderRadius: '12px', border: '2px dashed #3b82f6' }}>
-                    <h4 style={{ fontSize: '18px', marginBottom: '12px', color: '#3b82f6' }}>🤖 AI Screenshot Analysis</h4>
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                      <input type="file" accept="image/*" onChange={handleScreenshotUpload} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', flex: 1, minWidth: '200px' }} />
-                      <button onClick={analyzeScreenshot} disabled={!newTrade.screenshot || isAnalyzing} style={{ padding: '12px 24px', background: !newTrade.screenshot || isAnalyzing ? '#94a3b8' : 'linear-gradient(to right, #3b82f6, #2563eb)', color: 'white', border: 'none', borderRadius: '8px', cursor: !newTrade.screenshot || isAnalyzing ? 'not-allowed' : 'pointer', fontWeight: '600' }}>{isAnalyzing ? '🔄 Analyzing...' : '🤖 Analyze'}</button>
-                    </div>
-                    {newTrade.screenshot && <div style={{ marginTop: '16px' }}><img src={newTrade.screenshot} alt="Chart" style={{ maxWidth: '300px', borderRadius: '8px', border: '2px solid #e2e8f0' }} /></div>}
-                    {analysisResult && <div style={{ marginTop: '16px', padding: '16px', background: 'white', borderRadius: '8px', border: '2px solid #10b981' }}><h5 style={{ color: '#10b981', marginBottom: '8px' }}>✅ AI Analysis:</h5><pre style={{ whiteSpace: 'pre-wrap', fontSize: '14px' }}>{analysisResult}</pre></div>}
+                  <div style={{ marginBottom: '16px' }}>
+                    <input type="file" accept="image/*" onChange={handleScreenshotUpload} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <button onClick={analyzeScreenshot} disabled={!newTrade.screenshot || isAnalyzing} style={{ padding: '12px 24px', background: !newTrade.screenshot || isAnalyzing ? '#94a3b8' : '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: !newTrade.screenshot || isAnalyzing ? 'not-allowed' : 'pointer', fontWeight: '600', marginLeft: '12px' }}>{isAnalyzing ? '🔄 Analyzing...' : '🤖 Analyze'}</button>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
-                    <input type="date" value={newTrade.date} onChange={(e) => setNewTrade({...newTrade, date: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <input type="text" placeholder="Instrument" value={newTrade.instrument} onChange={(e) => setNewTrade({...newTrade, instrument: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <select value={newTrade.direction} onChange={(e) => setNewTrade({...newTrade, direction: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}><option value="long">Long</option><option value="short">Short</option></select>
-                    <input type="number" step="0.01" placeholder="P&L" value={newTrade.profitLoss} onChange={(e) => setNewTrade({...newTrade, profitLoss: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                    <input type="date" value={newTrade.date} onChange={(e) => setNewTrade({...newTrade, date: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <input type="text" placeholder="Instrument" value={newTrade.instrument} onChange={(e) => setNewTrade({...newTrade, instrument: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <select value={newTrade.direction} onChange={(e) => setNewTrade({...newTrade, direction: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}><option value="long">Long</option><option value="short">Short</option></select>
+                    <input type="number" step="0.01" placeholder="P&L" value={newTrade.profitLoss} onChange={(e) => setNewTrade({...newTrade, profitLoss: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
-                    <input type="text" placeholder="Strategy" value={newTrade.strategy} onChange={(e) => setNewTrade({...newTrade, strategy: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <select value={newTrade.timeframe} onChange={(e) => setNewTrade({...newTrade, timeframe: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}><option value="1M">1M</option><option value="5M">5M</option><option value="15M">15M</option><option value="1H">1H</option><option value="4H">4H</option><option value="D">Daily</option></select>
-                  </div>
-                  <textarea placeholder="Notes" value={newTrade.notes} onChange={(e) => setNewTrade({...newTrade, notes: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '16px', minHeight: '80px' }} />
                   <button onClick={addTrade} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Log Trade</button>
                 </div>
-                {trades.length === 0 ? <p style={{ color: '#64748b', textAlign: 'center', padding: '32px' }}>No trades yet</p> : (
+                {trades.length === 0 ? <p style={{ textAlign: 'center', padding: '32px', color: '#64748b' }}>No trades yet</p> : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {trades.map(t => (
                       <div key={t.id} style={{ padding: '20px', background: parseFloat(t.profitLoss) >= 0 ? '#f0fdf4' : '#fef2f2', borderRadius: '12px', border: `2px solid ${parseFloat(t.profitLoss) >= 0 ? '#10b981' : '#ef4444'}` }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                          <div><div style={{ fontSize: '20px', fontWeight: 'bold' }}>{t.instrument} • {t.direction.toUpperCase()}</div><div style={{ fontSize: '14px', color: '#64748b' }}>{new Date(t.date).toLocaleDateString()}</div></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <div><div style={{ fontSize: '20px', fontWeight: 'bold' }}>{t.instrument}</div><div style={{ fontSize: '14px', color: '#64748b' }}>{new Date(t.date).toLocaleDateString()}</div></div>
                           <div style={{ fontSize: '28px', fontWeight: 'bold', color: parseFloat(t.profitLoss) >= 0 ? '#10b981' : '#ef4444' }}>{parseFloat(t.profitLoss) >= 0 ? '+' : ''}${parseFloat(t.profitLoss).toFixed(2)}</div>
                         </div>
-                        {t.notes && <div style={{ fontSize: '14px', color: '#64748b', fontStyle: 'italic', marginBottom: '8px' }}>"{t.notes}"</div>}
-                        {t.screenshot && <div style={{ marginTop: '12px' }}><img src={t.screenshot} alt="Trade" style={{ maxWidth: '200px', borderRadius: '8px' }} /></div>}
-                        {t.aiAnalysis && <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '8px' }}><div style={{ fontSize: '12px', fontWeight: 'bold', color: '#3b82f6' }}>🤖 AI:</div><div style={{ fontSize: '13px', color: '#64748b' }}>{t.aiAnalysis}</div></div>}
                       </div>
                     ))}
                   </div>
@@ -1310,8 +1238,6 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <input type="text" placeholder="Name" value={newCost.name} onChange={(e) => setNewCost({...newCost, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                     <input type="number" placeholder="Cost" value={newCost.cost} onChange={(e) => setNewCost({...newCost, cost: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                    <select value={newCost.type} onChange={(e) => setNewCost({...newCost, type: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}><option value="subscription">Subscription</option><option value="challenge">Challenge</option><option value="software">Software</option></select>
-                    <select value={newCost.frequency} onChange={(e) => setNewCost({...newCost, frequency: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select>
                     <button onClick={addCost} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #ef4444, #dc2626)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add</button>
                   </div>
                 </div>
