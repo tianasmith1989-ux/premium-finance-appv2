@@ -706,7 +706,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #eef2ff, #fce7f3)' }}>
-   <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
+    <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: '0 0 8px 0' }}>✨ Premium Finance Pro</h1>
           <p style={{ opacity: '0.9', margin: '0 0 24px 0' }}>
@@ -941,7 +941,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                       })}
                     </div>
                   )}
-                </div>
+                </div>  
                 {/* 4. DEBT PAYOFF CALCULATOR */}
                 <div style={{ background: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                   <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>💳 Debt Payoff Calculator</h2>
@@ -1150,211 +1150,261 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                 
               </div>
             )}
-            {/* 4. DEBT PAYOFF CALCULATOR */}
-                <div style={{ background: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                  <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>💳 Debt Payoff Calculator</h2>
-                  <div style={{ marginBottom: '24px', padding: '20px', background: '#fef2f2', borderRadius: '12px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
-                      <input type="text" placeholder="Debt name" value={newDebt.name} onChange={(e) => setNewDebt({...newDebt, name: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
-                      <input type="number" placeholder="Balance" value={newDebt.balance} onChange={(e) => setNewDebt({...newDebt, balance: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
-                      <input type="number" placeholder="Interest %" value={newDebt.interestRate} onChange={(e) => setNewDebt({...newDebt, interestRate: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
-                      <input type="number" placeholder="Min Payment" value={newDebt.minPayment} onChange={(e) => setNewDebt({...newDebt, minPayment: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
-                      <button onClick={addDebt} style={{ padding: '10px 20px', background: 'linear-gradient(to right, #ef4444, #dc2626)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>Add Debt</button>
-                    </div>
-                  </div>
-                  
-                  {debts.length > 0 && (
-                    <>
-                      <div style={{ marginBottom: '24px', padding: '20px', background: '#f0f9ff', borderRadius: '12px' }}>
-                        <h3 style={{ fontSize: '16px', marginBottom: '12px', fontWeight: '600' }}>⚡ Accelerate Payoff</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                          <div>
-                            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '600' }}>Extra Monthly Payment</label>
-                            <input 
-                              type="number" 
-                              placeholder="0.00" 
-                              value={extraPayment} 
-                              onChange={(e) => setExtraPayment(e.target.value)} 
-                              style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', fontSize: '14px' }} 
-                            />
-                          </div>
-                          <div>
-                            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '600' }}>Method</label>
-                            <select value={payoffMethod} onChange={(e) => setPayoffMethod(e.target.value as 'snowball' | 'avalanche')} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', fontSize: '14px' }}>
-                              <option value="avalanche">Avalanche (High Interest)</option>
-                              <option value="snowball">Snowball (Low Balance)</option>
-                            </select>
-                          </div>
-                        </div>
-                        
-                        {parseFloat(extraPayment || '0') > 0 && (() => {
-                          const result = calculateDebtPayoff()
-                          return (
-                            <div style={{ marginTop: '16px', padding: '16px', background: 'white', borderRadius: '8px', border: '2px solid #10b981' }}>
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
-                                <div>
-                                  <div style={{ fontSize: '12px', color: '#64748b' }}>Debt-Free In</div>
-                                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>{result.monthsToPayoff} months</div>
-                                </div>
-                                <div>
-                                  <div style={{ fontSize: '12px', color: '#64748b' }}>Total Interest</div>
-                                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>${result.totalInterestPaid.toFixed(2)}</div>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })()}
-                      </div>
-                      
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {debts.map(debt => {
-                          const onCalendar = calendarItems.some(item => item.sourceId === debt.id && item.type === 'debt')
-                          return (
-                            <div key={debt.id} style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '2px solid #ef4444', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                              <div style={{ flex: 1, minWidth: '200px' }}>
-                                <h4 style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 4px 0' }}>{debt.name}</h4>
-                                <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
-                                  {debt.interestRate}% APR • Min: ${parseFloat(debt.minPayment).toFixed(2)}/mo
-                                </p>
-                              </div>
-                              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>
-                                ${parseFloat(debt.balance).toFixed(2)}
-                              </div>
-                              <button 
-                                onClick={() => addDebtToCalendar(debt)} 
-                                disabled={onCalendar}
-                                style={{ 
-                                  background: onCalendar ? '#94a3b8' : '#7c3aed', 
-                                  color: 'white', 
-                                  border: 'none', 
-                                  borderRadius: '6px', 
-                                  padding: '6px 12px', 
-                                  cursor: onCalendar ? 'not-allowed' : 'pointer', 
-                                  fontSize: '12px', 
-                                  fontWeight: '600',
-                                  whiteSpace: 'nowrap'
-                                }}
-                              >
-                                {onCalendar ? '✓ On Calendar' : '📅 Add to Calendar'}
-                              </button>
-                              <button onClick={() => deleteDebt(debt.id)} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>Delete</button>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </>
-                  )}
-                  
-                  {debts.length === 0 && (
-                    <p style={{ color: '#64748b', textAlign: 'center', padding: '24px' }}>No debts tracked</p>
-                  )}
-                </div>
+            {financeTab === 'coach' && (
+              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
+                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>💬 AI Budget Coach</h2>
+                <p style={{ color: '#64748b', marginBottom: '24px' }}>Ask me anything about your finances! I have access to all your data and can give personalized advice.</p>
                 
-                {/* 5. FINANCIAL GOALS */}
-                <div style={{ background: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                  <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>🎯 Financial Goals</h2>
-                  <div style={{ marginBottom: '24px', padding: '20px', background: '#f0f9ff', borderRadius: '12px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-                      <input type="text" placeholder="Goal name" value={newGoal.name} onChange={(e) => setNewGoal({...newGoal, name: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
-                      <input type="number" placeholder="Target $" value={newGoal.target} onChange={(e) => setNewGoal({...newGoal, target: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
-                      <input type="number" placeholder="Saved $" value={newGoal.saved} onChange={(e) => setNewGoal({...newGoal, saved: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
-                      <input type="date" placeholder="Deadline" value={newGoal.deadline} onChange={(e) => setNewGoal({...newGoal, deadline: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }} />
-                      <button onClick={addGoal} style={{ padding: '10px 20px', background: 'linear-gradient(to right, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>Add Goal</button>
-                    </div>
-                  </div>
-                  {goals.length === 0 ? (
-                    <p style={{ color: '#64748b', textAlign: 'center', padding: '24px' }}>No goals yet. Add one above!</p>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {goals.map(goal => {
-                        const target = parseFloat(goal.target || 0)
-                        const saved = parseFloat(goal.saved || 0)
-                        const progress = target > 0 ? (saved / target) * 100 : 0
-                        const onCalendar = calendarItems.some(item => item.sourceId === goal.id && item.type === 'goal')
-                        return (
-                          <div key={goal.id} style={{ padding: '20px', background: 'linear-gradient(to right, #f0f9ff, #e0f2fe)', borderRadius: '12px', border: '2px solid #3b82f6' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                              <div style={{ flex: 1, minWidth: '200px' }}>
-                                <h3 style={{ fontSize: '20px', fontWeight: 'bold', margin: '0 0 4px 0' }}>{goal.name}</h3>
-                                <p style={{ color: '#64748b', margin: 0, fontSize: '14px' }}>
-                                  ${saved.toLocaleString()} of ${target.toLocaleString()} {goal.deadline && `• Due ${new Date(goal.deadline).toLocaleDateString()}`}
-                                </p>
-                              </div>
-                              <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#3b82f6' }}>{progress.toFixed(0)}%</div>
-                              <button 
-                                onClick={() => addGoalToCalendar(goal)} 
-                                disabled={!goal.deadline || onCalendar}
-                                style={{ 
-                                  background: onCalendar ? '#94a3b8' : !goal.deadline ? '#94a3b8' : '#7c3aed', 
-                                  color: 'white', 
-                                  border: 'none', 
-                                  borderRadius: '6px', 
-                                  padding: '6px 12px', 
-                                  cursor: onCalendar || !goal.deadline ? 'not-allowed' : 'pointer', 
-                                  fontSize: '12px', 
-                                  fontWeight: '600',
-                                  whiteSpace: 'nowrap'
-                                }}
-                              >
-                                {onCalendar ? '✓ On Calendar' : '📅 Add to Calendar'}
-                              </button>
-                              <button onClick={() => deleteGoal(goal.id)} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>Delete</button>
-                            </div>
-                            <div style={{ width: '100%', height: '20px', background: '#e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
-                              <div style={{ width: `${Math.min(progress, 100)}%`, height: '100%', background: 'linear-gradient(to right, #3b82f6, #2563eb)', transition: 'width 0.3s' }} />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-                
-                {/* 6. SAVINGS PLANS */}
-                {goals.length > 0 && (
-                  <div style={{ background: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                    <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>💵 Automatic Savings Plans</h2>
-                    <p style={{ color: '#64748b', marginBottom: '20px', fontSize: '16px' }}>
-                      See exactly how much to save per paycheck to hit your goals on time!
-                    </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                      {goals.map(goal => {
-                        const plan = calculateSavingsPlan(goal)
-                        if (!plan) return null
-                        
-                        return (
-                          <div key={goal.id} style={{ padding: '24px', background: 'linear-gradient(to right, #ecfdf5, #d1fae5)', borderRadius: '12px', border: '2px solid #10b981' }}>
-                            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#065f46', marginBottom: '16px' }}>{goal.name}</h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '16px' }}>
-                              <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}>
-                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>💰 Per Paycheck</div>
-                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>${plan.perPaycheck.toFixed(2)}</div>
-                                <div style={{ fontSize: '11px', color: '#64748b' }}>Every {plan.frequency}</div>
-                              </div>
-                              <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}>
-                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>📅 Per Month</div>
-                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#3b82f6' }}>${plan.monthlyNeeded.toFixed(2)}</div>
-                              </div>
-                              <div style={{ padding: '16px', background: 'white', borderRadius: '8px' }}>
-                                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>⏰ Months Left</div>
-                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f59e0b' }}>{plan.monthsRemaining}</div>
-                              </div>
-                            </div>
-                            {monthlySurplus >= plan.monthlyNeeded ? (
-                              <div style={{ padding: '12px', background: '#f0fdf4', border: '2px solid #10b981', borderRadius: '8px', fontSize: '14px', color: '#065f46', fontWeight: '600' }}>
-                                ✅ Affordable! Your surplus (${monthlySurplus.toFixed(2)}/mo) covers this.
-                              </div>
-                            ) : (
-                              <div style={{ padding: '12px', background: '#fef2f2', border: '2px solid #ef4444', borderRadius: '8px', fontSize: '14px', color: '#991b1b', fontWeight: '600' }}>
-                                ⚠️ Need ${(plan.monthlyNeeded - monthlySurplus).toFixed(2)}/month more
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
+                {chatMessages.length === 0 && (
+                  <div style={{ marginBottom: '24px' }}>
+                    <h3 style={{ fontSize: '18px', marginBottom: '16px', color: '#64748b' }}>💡 Try asking:</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '12px' }}>
+                      {[
+                        "How can I save $500 more per month?",
+                        "Should I pay off debt or save first?",
+                        "What expenses should I cut first?",
+                        "How long until I reach my goals?",
+                        "Am I spending too much on anything?",
+                        "Give me a personalized savings plan"
+                      ].map(q => (
+                        <button
+                          key={q}
+                          onClick={() => askBudgetCoach(q)}
+                          style={{
+                            padding: '16px',
+                            background: 'linear-gradient(to right, #f0f9ff, #e0f2fe)',
+                            border: '2px solid #3b82f6',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            color: '#1e40af'
+                          }}
+                        >
+                          {q}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
                 
+                <div style={{ flex: 1, overflowY: 'auto', marginBottom: '24px', padding: '20px', background: '#f8fafc', borderRadius: '12px', minHeight: '300px' }}>
+                  {chatMessages.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
+                      <div style={{ fontSize: '64px', marginBottom: '16px' }}>🤖</div>
+                      <p style={{ fontSize: '18px' }}>Ready to help you achieve your financial goals!</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {chatMessages.map((msg, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                          <div style={{
+                            maxWidth: '80%',
+                            padding: '16px',
+                            borderRadius: '12px',
+                            background: msg.role === 'user' ? 'linear-gradient(to right, #4f46e5, #7c3aed)' : 'white',
+                            color: msg.role === 'user' ? 'white' : '#1e293b',
+                            border: msg.role === 'assistant' ? '2px solid #e2e8f0' : 'none'
+                          }}>
+                            <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px', opacity: 0.7 }}>
+                              {msg.role === 'user' ? 'You' : '🤖 AI Coach'}
+                            </div>
+                            <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{msg.content}</div>
+                          </div>
+                        </div>
+                      ))}
+                      {isAskingCoach && (
+                        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                          <div style={{ padding: '16px', borderRadius: '12px', background: 'white', border: '2px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px', opacity: 0.7 }}>🤖 AI Coach</div>
+                            <div>Thinking...</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && !isAskingCoach && askBudgetCoach()}
+                    placeholder="Ask about your finances..."
+                    disabled={isAskingCoach}
+                    style={{
+                      flex: 1,
+                      padding: '16px',
+                      borderRadius: '12px',
+                      border: '2px solid #e2e8f0',
+                      fontSize: '16px'
+                    }}
+                  />
+                  <button
+                    onClick={() => askBudgetCoach()}
+                    disabled={!chatInput.trim() || isAskingCoach}
+                    style={{
+                      padding: '16px 32px',
+                      background: !chatInput.trim() || isAskingCoach ? '#94a3b8' : 'linear-gradient(to right, #4f46e5, #7c3aed)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      cursor: !chatInput.trim() || isAskingCoach ? 'not-allowed' : 'pointer',
+                      fontWeight: '600',
+                      fontSize: '16px'
+                    }}
+                  >
+                    {isAskingCoach ? '...' : 'Send'}
+                  </button>
+                </div>
               </div>
             )}
+          </>
+        )}
+        
+        {mainTab === 'trading' && (
+          <>
+            {tradingTab === 'trading-goals' && (
+              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>🎯 Trading Goals</h2>
+                <div style={{ marginBottom: '32px', padding: '24px', background: '#fef3c7', borderRadius: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <input type="text" placeholder="Goal" value={newTradingGoal.name} onChange={(e) => setNewTradingGoal({...newTradingGoal, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <input type="number" placeholder="Target" value={newTradingGoal.target} onChange={(e) => setNewTradingGoal({...newTradingGoal, target: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <input type="number" placeholder="Current" value={newTradingGoal.current} onChange={(e) => setNewTradingGoal({...newTradingGoal, current: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <input type="date" value={newTradingGoal.deadline} onChange={(e) => setNewTradingGoal({...newTradingGoal, deadline: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <button onClick={addTradingGoal} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #f59e0b, #d97706)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add</button>
+                  </div>
+                </div>
+                {tradingGoals.length === 0 ? <div style={{ textAlign: 'center', padding: '60px', background: '#f8fafc', borderRadius: '12px' }}><div style={{ fontSize: '64px' }}>🎯</div><h3>No goals yet</h3></div> : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {tradingGoals.map(g => { const progress = parseFloat(g.target) > 0 ? (parseFloat(g.current) / parseFloat(g.target)) * 100 : 0; return (
+                      <div key={g.id} style={{ padding: '24px', background: 'linear-gradient(to right, #fef3c7, #fde68a)', borderRadius: '12px', border: '2px solid #f59e0b' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}><div><h3 style={{ fontSize: '24px', fontWeight: 'bold' }}>{g.name}</h3></div><div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f59e0b' }}>{progress.toFixed(0)}%</div></div>
+                        <div style={{ width: '100%', height: '24px', background: '#e2e8f0', borderRadius: '12px', overflow: 'hidden' }}><div style={{ width: `${Math.min(progress, 100)}%`, height: '100%', background: 'linear-gradient(to right, #f59e0b, #d97706)' }} /></div>
+                      </div>
+                    )})}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {tradingTab === 'performance' && (
+              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <h2 style={{ fontSize: '32px', marginBottom: '32px' }}>📊 Performance</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '40px' }}>
+                  <div style={{ padding: '24px', background: totalPL >= 0 ? '#f0fdf4' : '#fef2f2', borderRadius: '12px', border: `2px solid ${totalPL >= 0 ? '#10b981' : '#ef4444'}` }}><h3>Total P&L</h3><p style={{ fontSize: '32px', fontWeight: 'bold', color: totalPL >= 0 ? '#10b981' : '#ef4444' }}>${totalPL.toFixed(2)}</p></div>
+                  <div style={{ padding: '24px', background: '#f0f9ff', borderRadius: '12px', border: '2px solid #3b82f6' }}><h3>Win Rate</h3><p style={{ fontSize: '32px', fontWeight: 'bold', color: '#3b82f6' }}>{winRate.toFixed(1)}%</p></div>
+                  <div style={{ padding: '24px', background: '#fef3c7', borderRadius: '12px', border: '2px solid #f59e0b' }}><h3>Profit Factor</h3><p style={{ fontSize: '32px', fontWeight: 'bold', color: '#f59e0b' }}>{profitFactor.toFixed(2)}</p></div>
+                  <div style={{ padding: '24px', background: '#f8fafc', borderRadius: '12px', border: '2px solid #64748b' }}><h3>Trades</h3><p style={{ fontSize: '32px', fontWeight: 'bold' }}>{trades.length}</p></div>
+                </div>
+                <h3 style={{ fontSize: '24px', marginBottom: '16px' }}>📅 Calendar</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', marginBottom: '8px' }}>
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', color: '#64748b' }}>{d}</div>)}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
+                  {(() => { const { firstDay, daysInMonth } = getDaysInMonth(); const cells = []; for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`} />); for (let d = 1; d <= daysInMonth; d++) { const dayPL = getTradesForDay(d).reduce((s, t) => s + parseFloat(t.profitLoss || 0), 0); cells.push(<div key={d} style={{ padding: '12px 8px', border: '1px solid #e2e8f0', borderRadius: '8px', background: dayPL > 0 ? '#f0fdf4' : dayPL < 0 ? '#fef2f2' : 'white', minHeight: '80px' }}><div style={{ fontWeight: 'bold' }}>{d}</div>{dayPL !== 0 && <div style={{ fontSize: '14px', fontWeight: 'bold', color: dayPL > 0 ? '#10b981' : '#ef4444' }}>{dayPL > 0 ? '+' : ''}${dayPL.toFixed(2)}</div>}</div>)} return cells })()}
+                </div>
+              </div>
+            )}
+            
+            {tradingTab === 'trading-path' && (
+              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>🗺️ Path to Profitability</h2>
+                {trades.length < 10 ? <div style={{ padding: '32px', background: '#fef3c7', borderRadius: '12px' }}><p>Log 10+ trades for insights. Current: {trades.length}</p></div> : (
+                  <div style={{ padding: '32px', background: '#f0fdf4', borderRadius: '12px' }}><h3>✅ Recommendations</h3><ol style={{ marginLeft: '20px', lineHeight: '2' }}>{winRate < 50 && <li>Improve win rate</li>}{profitFactor < 1.5 && <li>Improve profit factor</li>}{netPL < 0 && <li style={{ color: '#ef4444', fontWeight: 'bold' }}>Review strategy</li>}</ol></div>
+                )}
+              </div>
+            )}
+            
+            {tradingTab === 'finder' && (
+              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>🔮 Trade Finder</h2>
+                <p style={{ color: '#64748b', marginBottom: '32px' }}>Upload 3 screenshots for multi-timeframe analysis. Minimum 1:2 R:R required.</p>
+                <div style={{ marginBottom: '32px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+                    <div style={{ padding: '24px', background: '#fef3c7', borderRadius: '12px', border: '2px solid #f59e0b' }}>
+                      <h3 style={{ fontSize: '20px', marginBottom: '12px' }}>📊 1H Chart</h3>
+                      <input type="file" accept="image/*" onChange={(e) => handleTradeFinderUpload('oneHour', e)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', marginBottom: '12px' }} />
+                      {tradeFinderScreenshots.oneHour && <img src={tradeFinderScreenshots.oneHour} alt="1H" style={{ width: '100%', borderRadius: '8px' }} />}
+                    </div>
+                    <div style={{ padding: '24px', background: '#dbeafe', borderRadius: '12px', border: '2px solid #3b82f6' }}>
+                      <h3 style={{ fontSize: '20px', marginBottom: '12px' }}>📊 15M Chart</h3>
+                      <input type="file" accept="image/*" onChange={(e) => handleTradeFinderUpload('fifteenMin', e)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', marginBottom: '12px' }} />
+                      {tradeFinderScreenshots.fifteenMin && <img src={tradeFinderScreenshots.fifteenMin} alt="15M" style={{ width: '100%', borderRadius: '8px' }} />}
+                    </div>
+                    <div style={{ padding: '24px', background: '#f0fdf4', borderRadius: '12px', border: '2px solid #10b981' }}>
+                      <h3 style={{ fontSize: '20px', marginBottom: '12px' }}>📊 5M Chart</h3>
+                      <input type="file" accept="image/*" onChange={(e) => handleTradeFinderUpload('fiveMin', e)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', marginBottom: '12px' }} />
+                      {tradeFinderScreenshots.fiveMin && <img src={tradeFinderScreenshots.fiveMin} alt="5M" style={{ width: '100%', borderRadius: '8px' }} />}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <button onClick={analyzeTradeSetup} disabled={!tradeFinderScreenshots.oneHour || !tradeFinderScreenshots.fifteenMin || !tradeFinderScreenshots.fiveMin || isAnalyzingTrade} style={{ padding: '16px 48px', background: (!tradeFinderScreenshots.oneHour || !tradeFinderScreenshots.fifteenMin || !tradeFinderScreenshots.fiveMin || isAnalyzingTrade) ? '#94a3b8' : 'linear-gradient(to right, #7c3aed, #6d28d9)', color: 'white', border: 'none', borderRadius: '12px', cursor: (!tradeFinderScreenshots.oneHour || !tradeFinderScreenshots.fifteenMin || !tradeFinderScreenshots.fiveMin || isAnalyzingTrade) ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '20px' }}>
+                    {isAnalyzingTrade ? '🔄 Analyzing...' : '🔮 Analyze Trade'}
+                  </button>
+                </div>
+                {tradeRecommendation && (
+                  <div style={{ marginTop: '32px', padding: '32px', background: tradeRecommendation.shouldTrade ? '#f0fdf4' : '#fef2f2', borderRadius: '16px', border: `3px solid ${tradeRecommendation.shouldTrade ? '#10b981' : '#ef4444'}` }}>
+                    <h3 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '16px' }}>
+                      {tradeRecommendation.shouldTrade ? '✅ TRADE RECOMMENDATION' : '❌ NO TRADE'}
+                    </h3>
+                    <pre style={{ whiteSpace: 'pre-wrap', fontSize: '14px' }}>{tradeRecommendation.raw}</pre>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {tradingTab === 'journal' && (
+              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>📈 Trade Journal</h2>
+                <div style={{ marginBottom: '32px', padding: '24px', background: '#f8fafc', borderRadius: '12px' }}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <input type="file" accept="image/*" onChange={handleScreenshotUpload} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <button onClick={analyzeScreenshot} disabled={!newTrade.screenshot || isAnalyzing} style={{ padding: '12px 24px', background: !newTrade.screenshot || isAnalyzing ? '#94a3b8' : '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: !newTrade.screenshot || isAnalyzing ? 'not-allowed' : 'pointer', fontWeight: '600', marginLeft: '12px' }}>{isAnalyzing ? '🔄 Analyzing...' : '🤖 Analyze'}</button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                    <input type="date" value={newTrade.date} onChange={(e) => setNewTrade({...newTrade, date: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <input type="text" placeholder="Instrument" value={newTrade.instrument} onChange={(e) => setNewTrade({...newTrade, instrument: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <select value={newTrade.direction} onChange={(e) => setNewTrade({...newTrade, direction: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}><option value="long">Long</option><option value="short">Short</option></select>
+                    <input type="number" step="0.01" placeholder="P&L" value={newTrade.profitLoss} onChange={(e) => setNewTrade({...newTrade, profitLoss: e.target.value})} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                  </div>
+                  <button onClick={addTrade} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Log Trade</button>
+                </div>
+                {trades.length === 0 ? <p style={{ textAlign: 'center', padding: '32px', color: '#64748b' }}>No trades yet</p> : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {trades.map(t => (
+                      <div key={t.id} style={{ padding: '20px', background: parseFloat(t.profitLoss) >= 0 ? '#f0fdf4' : '#fef2f2', borderRadius: '12px', border: `2px solid ${parseFloat(t.profitLoss) >= 0 ? '#10b981' : '#ef4444'}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <div><div style={{ fontSize: '20px', fontWeight: 'bold' }}>{t.instrument}</div><div style={{ fontSize: '14px', color: '#64748b' }}>{new Date(t.date).toLocaleDateString()}</div></div>
+                          <div style={{ fontSize: '28px', fontWeight: 'bold', color: parseFloat(t.profitLoss) >= 0 ? '#10b981' : '#ef4444' }}>{parseFloat(t.profitLoss) >= 0 ? '+' : ''}${parseFloat(t.profitLoss).toFixed(2)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {tradingTab === 'costs' && (
+              <div style={{ background: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <h2 style={{ fontSize: '28px', marginBottom: '24px' }}>💸 Trading Costs</h2>
+                <div style={{ marginBottom: '32px', padding: '32px', background: '#fef2f2', borderRadius: '12px', border: '2px solid #ef4444' }}><h3>Total Monthly Costs</h3><p style={{ fontSize: '48px', fontWeight: 'bold', color: '#ef4444' }}>${monthlyCosts.toFixed(2)}</p><p>Net P&L: <span style={{ fontWeight: 'bold', color: netPL >= 0 ? '#10b981' : '#ef4444' }}>${netPL.toFixed(2)}</span></p></div>
+                <div style={{ marginBottom: '32px', padding: '24px', background: '#f8fafc', borderRadius: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <input type="text" placeholder="Name" value={newCost.name} onChange={(e) => setNewCost({...newCost, name: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <input type="number" placeholder="Cost" value={newCost.cost} onChange={(e) => setNewCost({...newCost, cost: e.target.value})} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                    <button onClick={addCost} style={{ padding: '12px 24px', background: 'linear-gradient(to right, #ef4444, #dc2626)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Add</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
