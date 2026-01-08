@@ -337,45 +337,56 @@ export default function Dashboard() {
       setCalendarItems(calendarItems.map(b => b.id === itemId ? { ...b, isPaid: !b.isPaid } : b))
     }
   }
-  
-  // ADD TO CALENDAR FUNCTIONS
   const addGoalToCalendar = (goal: any) => {
-    if (!goal.deadline) {
-      alert('⚠️ Goal needs a deadline to add to calendar')
-      return
-    }
-    
-    // Prompt for frequency
-    const frequency = prompt('How often should this goal payment appear?\n\n1 = Weekly\n2 = Fortnightly\n3 = Monthly\n\nEnter 1, 2, or 3:', '3')
-    let freq = 'monthly'
-    if (frequency === '1') freq = 'weekly'
-    else if (frequency === '2') freq = 'fortnightly'
-    
-    const userDate = prompt(`📅 When should the first "${goal.name}" payment appear?\n\nEnter date (YYYY-MM-DD):`, new Date().toISOString().split('T')[0])
-    if (!userDate) return
-    
-    const exists = calendarItems.find(item => item.sourceId === goal.id && item.type === 'goal')
-    if (exists) {
-      alert('⚠️ Goal already on calendar')
-      return
-    }
-    
-    // Calculate per-period amount based on savings plan
-    const plan = calculateSavingsPlan(goal)
-    const amount = plan ? (freq === 'weekly' ? plan.monthlyNeeded / (52/12) : freq === 'fortnightly' ? plan.monthlyNeeded / (26/12) : plan.monthlyNeeded) : 0
-    
-    setCalendarItems([...calendarItems, {
-      id: Date.now(),
-      sourceId: goal.id,
-      name: `🎯 ${goal.name} Savings`,
-      amount: amount.toFixed(2),
-      dueDate: userDate,
-      frequency: freq,
-      isPaid: false,
-      type: 'goal'
-    }].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()))
-    alert(`✅ Goal savings (${freq}) added to calendar!`)
+  if (!goal.deadline) {
+    alert('⚠️ Goal needs a deadline to add to calendar')
+    return
   }
+  
+  const exists = calendarItems.find(item => item.sourceId === goal.id && item.type === 'goal')
+  if (exists) {
+    alert('⚠️ Goal already on calendar')
+    return
+  }
+  
+  // Calculate savings plan first
+  const plan = calculateSavingsPlan(goal)
+  if (!plan) {
+    alert('⚠️ Could not calculate savings plan for this goal')
+    return
+  }
+  
+  // Prompt for frequency
+  const freqChoice = prompt(`How often do you want to save for "${goal.name}"?\n\n1 = Weekly ($${(plan.monthlyNeeded / (52/12)).toFixed(2)}/week)\n2 = Fortnightly ($${(plan.monthlyNeeded / (26/12)).toFixed(2)}/fortnight)\n3 = Monthly ($${plan.monthlyNeeded.toFixed(2)}/month)\n\nEnter 1, 2, or 3:`, '3')
+  
+  let freq = 'monthly'
+  let amount = plan.monthlyNeeded
+  
+  if (freqChoice === '1') {
+    freq = 'weekly'
+    amount = plan.monthlyNeeded / (52/12)
+  } else if (freqChoice === '2') {
+    freq = 'fortnightly'
+    amount = plan.monthlyNeeded / (26/12)
+  }
+  
+  const userDate = prompt(`📅 When should the first "${goal.name}" payment of $${amount.toFixed(2)} start?\n\nEnter date (YYYY-MM-DD):`, new Date().toISOString().split('T')[0])
+  if (!userDate) return
+  
+  setCalendarItems([...calendarItems, {
+    id: Date.now(),
+    sourceId: goal.id,
+    name: `🎯 ${goal.name} Savings`,
+    amount: amount.toFixed(2),
+    dueDate: userDate,
+    frequency: freq,
+    isPaid: false,
+    type: 'goal'
+  }].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()))
+  alert(`✅ Goal savings ($${amount.toFixed(2)}/${freq}) added to calendar!`)
+}
+ 
+ 
   
   const addTransactionToCalendar = (transaction: any) => {
     const exists = calendarItems.find(item => item.sourceId === transaction.id && item.type === transaction.type)
