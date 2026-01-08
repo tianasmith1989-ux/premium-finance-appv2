@@ -147,24 +147,23 @@ export default function Dashboard() {
     return sum + (amount * multiplier)
   }, 0)
   
-// Calculate committed calendar payments (recurring items only, not one-time or paid)
-// EXCLUDE income from commitments (income adds to surplus, not reduces it)
-const committedCalendarPayments = calendarItems
-  .filter(item => 
-    item.frequency && 
-    item.frequency !== 'once' && 
-    !item.isPaid && 
-    !item.isOverride &&
-    item.type !== 'income'  // ← THIS IS THE KEY FIX!
-  )
-  .reduce((sum, item) => {
-    const amount = parseFloat(item.amount || 0)
-    if (item.frequency === 'weekly') return sum + (amount * 52 / 12)
-    if (item.frequency === 'fortnightly') return sum + (amount * 26 / 12)
-    if (item.frequency === 'monthly') return sum + amount
-    if (item.frequency === 'yearly') return sum + (amount / 12)
-    return sum
-  }, 0)
+  // Calculate committed calendar payments (recurring items only, not one-time or paid, EXCLUDE income)
+  const committedCalendarPayments = calendarItems
+    .filter(item => 
+      item.frequency && 
+      item.frequency !== 'once' && 
+      !item.isPaid && 
+      !item.isOverride &&
+      item.type !== 'income'  // Income adds to surplus, doesn't reduce it
+    )
+    .reduce((sum, item) => {
+      const amount = parseFloat(item.amount || 0)
+      if (item.frequency === 'weekly') return sum + (amount * 52 / 12)
+      if (item.frequency === 'fortnightly') return sum + (amount * 26 / 12)
+      if (item.frequency === 'monthly') return sum + amount
+      if (item.frequency === 'yearly') return sum + (amount / 12)
+      return sum
+    }, 0)
   
   const monthlySurplus = totalIncome - totalExpenses - committedCalendarPayments
   const totalGoalsTarget = goals.reduce((sum, g) => sum + parseFloat(g.target || 0), 0)
@@ -243,7 +242,11 @@ const committedCalendarPayments = calendarItems
   
   const addDebt = () => {
     if (!newDebt.name || !newDebt.balance) return
-    setDebts([...debts, { ...newDebt, id: Date.now() }])
+    setDebts([...debts, { 
+      ...newDebt, 
+      id: Date.now(),
+      originalBalance: newDebt.balance // Store original for progress tracking
+    }])
     setNewDebt({ name: '', balance: '', interestRate: '', minPayment: '', type: 'credit_card', frequency: 'monthly' })
   }
   
@@ -344,56 +347,88 @@ const committedCalendarPayments = calendarItems
       setCalendarItems(calendarItems.map(b => b.id === itemId ? { ...b, isPaid: !b.isPaid } : b))
     }
   }
+  
+  // MARK GOAL PAYMENT AS PAID (updates saved amount + progress bar)
+  const markGoalPaymentPaid = (itemId: string | number, goalId: number, amount: number) => {
+    // Mark the calendar item as paid
+    toggleBillPaid(itemId)
+    
+    // Update the goal's saved amount
+    setGoals(goals.map(g => {
+      if (g.id === goalId) {
+        const currentSaved = parseFloat(g.saved || 0)
+        const newSaved = currentSaved + amount
+        return { ...g, saved: newSaved.toFixed(2) }
+      }
+      return g
+    }))
+  }
+  
+  // MARK DEBT PAYMENT AS PAID (updates balance + progress bar)
+  const markDebtPaymentPaid = (itemId: string | number, debtId: number, amount: number) => {
+    // Mark the calendar item as paid
+    toggleBillPaid(itemId)
+    
+    // Update the debt's balance
+    setDebts(debts.map(d => {
+      if (d.id === debtId) {
+        const currentBalance = parseFloat(d.balance || 0)
+        const newBalance = Math.max(0, currentBalance - amount)
+        return { ...d, balance: newBalance.toFixed(2) }
+      }
+      return d
+    }))
+  }
+  
+  // ADD TO CALENDAR FUNCTIONS
   const addGoalToCalendar = (goal: any) => {
-  if (!goal.deadline) {
-    alert('⚠️ Goal needs a deadline to add to calendar')
-    return
+    if (!goal.deadline) {
+      alert('⚠️ Goal needs a deadline to add to calendar')
+      return
+    }
+    
+    const exists = calendarItems.find(item => item.sourceId === goal.id && item.type === 'goal')
+    if (exists) {
+      alert('⚠️ Goal already on calendar')
+      return
+    }
+    
+    // Calculate savings plan first
+    const plan = calculateSavingsPlan(goal)
+    if (!plan) {
+      alert('⚠️ Could not calculate savings plan for this goal')
+      return
+    }
+    
+    // Prompt for frequency
+    const freqChoice = prompt(`How often do you want to save for "${goal.name}"?\n\n1 = Weekly ($${(plan.monthlyNeeded / (52/12)).toFixed(2)}/week)\n2 = Fortnightly ($${(plan.monthlyNeeded / (26/12)).toFixed(2)}/fortnight)\n3 = Monthly ($${plan.monthlyNeeded.toFixed(2)}/month)\n\nEnter 1, 2, or 3:`, '3')
+    
+    let freq = 'monthly'
+    let amount = plan.monthlyNeeded
+    
+    if (freqChoice === '1') {
+      freq = 'weekly'
+      amount = plan.monthlyNeeded / (52/12)
+    } else if (freqChoice === '2') {
+      freq = 'fortnightly'
+      amount = plan.monthlyNeeded / (26/12)
+    }
+    
+    const userDate = prompt(`📅 When should the first "${goal.name}" payment of $${amount.toFixed(2)} start?\n\nEnter date (YYYY-MM-DD):`, new Date().toISOString().split('T')[0])
+    if (!userDate) return
+    
+    setCalendarItems([...calendarItems, {
+      id: Date.now(),
+      sourceId: goal.id,
+      name: `🎯 ${goal.name} Savings`,
+      amount: amount.toFixed(2),
+      dueDate: userDate,
+      frequency: freq,
+      isPaid: false,
+      type: 'goal'
+    }].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()))
+    alert(`✅ Goal savings ($${amount.toFixed(2)}/${freq}) added to calendar!`)
   }
-  
-  const exists = calendarItems.find(item => item.sourceId === goal.id && item.type === 'goal')
-  if (exists) {
-    alert('⚠️ Goal already on calendar')
-    return
-  }
-  
-  // Calculate savings plan first
-  const plan = calculateSavingsPlan(goal)
-  if (!plan) {
-    alert('⚠️ Could not calculate savings plan for this goal')
-    return
-  }
-  
-  // Prompt for frequency
-  const freqChoice = prompt(`How often do you want to save for "${goal.name}"?\n\n1 = Weekly ($${(plan.monthlyNeeded / (52/12)).toFixed(2)}/week)\n2 = Fortnightly ($${(plan.monthlyNeeded / (26/12)).toFixed(2)}/fortnight)\n3 = Monthly ($${plan.monthlyNeeded.toFixed(2)}/month)\n\nEnter 1, 2, or 3:`, '3')
-  
-  let freq = 'monthly'
-  let amount = plan.monthlyNeeded
-  
-  if (freqChoice === '1') {
-    freq = 'weekly'
-    amount = plan.monthlyNeeded / (52/12)
-  } else if (freqChoice === '2') {
-    freq = 'fortnightly'
-    amount = plan.monthlyNeeded / (26/12)
-  }
-  
-  const userDate = prompt(`📅 When should the first "${goal.name}" payment of $${amount.toFixed(2)} start?\n\nEnter date (YYYY-MM-DD):`, new Date().toISOString().split('T')[0])
-  if (!userDate) return
-  
-  setCalendarItems([...calendarItems, {
-    id: Date.now(),
-    sourceId: goal.id,
-    name: `🎯 ${goal.name} Savings`,
-    amount: amount.toFixed(2),
-    dueDate: userDate,
-    frequency: freq,
-    isPaid: false,
-    type: 'goal'
-  }].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()))
-  alert(`✅ Goal savings ($${amount.toFixed(2)}/${freq}) added to calendar!`)
-}
- 
- 
   
   const addTransactionToCalendar = (transaction: any) => {
     const exists = calendarItems.find(item => item.sourceId === transaction.id && item.type === transaction.type)
@@ -847,9 +882,9 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
 
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
-  <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
+    <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: '0 0 8px 0' }}>✨ Premium Finance Pro</h1>
               <p style={{ opacity: '0.9', margin: 0 }}>
@@ -932,7 +967,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                     </div>
                   </div>
                 </div>
-                {/* 2. CALENDAR */}
+                {/* 2. CALENDAR WITH UPCOMING PAYMENTS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
                     <h2 style={{ fontSize: '28px', margin: 0, color: theme.text }}>📅 Calendar & Reminders</h2>
@@ -960,24 +995,38 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                     </div>
                   </div>
                   
+                  {/* UPCOMING SECTION - Shows ALL upcoming items including goals and debts */}
                   {calendarItems.filter(item => !item.isPaid && new Date(item.dueDate) >= new Date()).length > 0 && (
                     <div style={{ marginBottom: '24px', padding: '20px', background: darkMode ? '#7f1d1d' : '#fef2f2', borderRadius: '12px' }}>
                       <h3 style={{ fontSize: '18px', marginBottom: '12px', fontWeight: '600', color: theme.text }}>🔔 Upcoming (Next 30 Days)</h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {calendarItems.filter(item => !item.isPaid && new Date(item.dueDate) >= new Date()).slice(0, 5).map(item => {
+                        {calendarItems.filter(item => !item.isPaid && new Date(item.dueDate) >= new Date()).slice(0, 10).map(item => {
                           const daysUntil = Math.ceil((new Date(item.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                          const amount = parseFloat(item.amount)
+                          
                           return (
                             <div key={item.id} style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', border: `1px solid ${theme.border}` }}>
                               <div style={{ flex: 1, minWidth: '150px' }}>
                                 <div style={{ fontWeight: '600', fontSize: '15px', color: theme.text }}>{item.name}</div>
                                 <div style={{ fontSize: '12px', color: theme.textMuted }}>
-                                  Due {new Date(item.dueDate).toLocaleDateString()} ({daysUntil} days)
+                                  Due {new Date(item.dueDate).toLocaleDateString()} ({daysUntil} days) • {item.frequency}
                                 </div>
                               </div>
-                              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ef4444' }}>
-                                ${parseFloat(item.amount).toFixed(2)}
+                              <div style={{ fontSize: '18px', fontWeight: 'bold', color: item.type === 'income' ? '#10b981' : '#ef4444' }}>
+                                {item.type === 'income' ? '+' : ''}${amount.toFixed(2)}
                               </div>
-                              <button onClick={() => toggleBillPaid(item.id)} style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                              <button 
+                                onClick={() => {
+                                  if (item.type === 'goal' && item.sourceId) {
+                                    markGoalPaymentPaid(item.id, item.sourceId, amount)
+                                  } else if (item.type === 'debt' && item.sourceId) {
+                                    markDebtPaymentPaid(item.id, item.sourceId, amount)
+                                  } else {
+                                    toggleBillPaid(item.id)
+                                  }
+                                }} 
+                                style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
+                              >
                                 Mark Paid
                               </button>
                               <button onClick={() => deleteBill(item.id)} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
@@ -1104,8 +1153,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                     </div>
                   )}
                 </div>
-                
-                {/* 4. DEBT PAYOFF WITH FREQUENCY */}
+              {/* 4. DEBT PAYOFF WITH PROGRESS BARS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <h2 style={{ fontSize: '28px', marginBottom: '24px', color: theme.text }}>💳 Debt Payoff Calculator</h2>
                   <div style={{ marginBottom: '24px', padding: '20px', background: darkMode ? '#7f1d1d' : '#fef2f2', borderRadius: '12px' }}>
@@ -1173,35 +1221,58 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {debts.map(debt => {
                           const onCalendar = calendarItems.some(item => item.sourceId === debt.id && item.type === 'debt')
+                          
+                          // Calculate progress
+                          const originalBalance = debt.originalBalance ? parseFloat(debt.originalBalance) : parseFloat(debt.balance)
+                          const currentBalance = parseFloat(debt.balance)
+                          const paidOff = originalBalance - currentBalance
+                          const progress = originalBalance > 0 ? (paidOff / originalBalance) * 100 : 0
+                          
                           return (
-                            <div key={debt.id} style={{ padding: '16px', background: darkMode ? '#7f1d1d' : '#fef2f2', borderRadius: '12px', border: '2px solid #ef4444', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                              <div style={{ flex: 1, minWidth: '200px' }}>
-                                <h4 style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 4px 0', color: theme.text }}>{debt.name}</h4>
-                                <p style={{ fontSize: '13px', color: theme.textMuted, margin: 0 }}>
-                                  {debt.interestRate}% APR • ${parseFloat(debt.minPayment).toFixed(2)}/{debt.frequency}
-                                </p>
+                            <div key={debt.id} style={{ padding: '20px', background: darkMode ? '#7f1d1d' : '#fef2f2', borderRadius: '12px', border: '2px solid #ef4444' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                                <div style={{ flex: 1, minWidth: '200px' }}>
+                                  <h4 style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 4px 0', color: theme.text }}>{debt.name}</h4>
+                                  <p style={{ fontSize: '13px', color: theme.textMuted, margin: 0 }}>
+                                    {debt.interestRate}% APR • ${parseFloat(debt.minPayment).toFixed(2)}/{debt.frequency}
+                                  </p>
+                                </div>
+                                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>
+                                  ${currentBalance.toFixed(2)}
+                                </div>
+                                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981' }}>
+                                  {progress.toFixed(0)}% paid
+                                </div>
+                                <button 
+                                  onClick={() => addDebtToCalendar(debt)} 
+                                  disabled={onCalendar}
+                                  style={{ 
+                                    background: onCalendar ? '#94a3b8' : '#7c3aed', 
+                                    color: 'white', 
+                                    border: 'none', 
+                                    borderRadius: '6px', 
+                                    padding: '6px 12px', 
+                                    cursor: onCalendar ? 'not-allowed' : 'pointer', 
+                                    fontSize: '12px', 
+                                    fontWeight: '600',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  {onCalendar ? '✓ On Calendar' : '📅 Add to Calendar'}
+                                </button>
+                                <button onClick={() => deleteDebt(debt.id)} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>Delete</button>
                               </div>
-                              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>
-                                ${parseFloat(debt.balance).toFixed(2)}
+                              
+                              {/* PROGRESS BAR */}
+                              <div style={{ width: '100%', marginBottom: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: theme.textMuted, marginBottom: '4px' }}>
+                                  <span>Paid: ${paidOff.toFixed(2)}</span>
+                                  <span>Remaining: ${currentBalance.toFixed(2)}</span>
+                                </div>
+                                <div style={{ width: '100%', height: '20px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+                                  <div style={{ width: `${Math.min(progress, 100)}%`, height: '100%', background: 'linear-gradient(to right, #10b981, #059669)', transition: 'width 0.3s' }} />
+                                </div>
                               </div>
-                              <button 
-                                onClick={() => addDebtToCalendar(debt)} 
-                                disabled={onCalendar}
-                                style={{ 
-                                  background: onCalendar ? '#94a3b8' : '#7c3aed', 
-                                  color: 'white', 
-                                  border: 'none', 
-                                  borderRadius: '6px', 
-                                  padding: '6px 12px', 
-                                  cursor: onCalendar ? 'not-allowed' : 'pointer', 
-                                  fontSize: '12px', 
-                                  fontWeight: '600',
-                                  whiteSpace: 'nowrap'
-                                }}
-                              >
-                                {onCalendar ? '✓ On Calendar' : '📅 Add to Calendar'}
-                              </button>
-                              <button onClick={() => deleteDebt(debt.id)} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>Delete</button>
                             </div>
                           )
                         })}
@@ -1213,7 +1284,8 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                     <p style={{ color: theme.textMuted, textAlign: 'center', padding: '24px' }}>No debts tracked</p>
                   )}
                 </div>
-                {/* 5. FINANCIAL GOALS WITH FREQUENCY */}
+                
+                {/* 5. FINANCIAL GOALS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <h2 style={{ fontSize: '28px', marginBottom: '24px', color: theme.text }}>🎯 Financial Goals</h2>
                   <div style={{ marginBottom: '24px', padding: '20px', background: darkMode ? '#1e3a8a' : '#f0f9ff', borderRadius: '12px' }}>
@@ -1436,8 +1508,8 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
               </div>
             )}
           </>
-        )}
-        {mainTab === 'trading' && (
+        )}  
+      {mainTab === 'trading' && (
           <>
             {tradingTab === 'trading-goals' && (
               <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
@@ -1580,4 +1652,4 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
       </div>
     </div>
   )
-}
+}  
