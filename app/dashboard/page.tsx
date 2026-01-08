@@ -293,10 +293,31 @@ export default function Dashboard() {
     setLiabilities(liabilities.filter(l => l.id !== id))
     updateNetWorthHistory()
   }
-  
-  const toggleBillPaid = (id: number) => {
-    setCalendarItems(calendarItems.map(b => b.id === id ? { ...b, isPaid: !b.isPaid } : b))
+  const toggleBillPaid = (itemId: string | number) => {
+  // If it's a recurrence (has a hyphen), create a new "paid" entry
+  if (typeof itemId === 'string' && itemId.includes('-')) {
+    const [originalId, ...dateParts] = itemId.split('-')
+    const occurrenceDate = `${dateParts[0]}-${dateParts[1]}-${dateParts[2]}`
+    
+    // Find the original item
+    const originalItem = calendarItems.find(item => item.id.toString() === originalId)
+    if (originalItem) {
+      // Create a one-time paid entry for this specific occurrence
+      setCalendarItems([...calendarItems, {
+        ...originalItem,
+        id: Date.now(),
+        dueDate: occurrenceDate,
+        frequency: 'once',
+        isPaid: true,
+        isOverride: true // Mark this as an override of the recurring item
+      }])
+    }
+  } else {
+    // Regular one-time item
+    setCalendarItems(calendarItems.map(b => b.id === itemId ? { ...b, isPaid: !b.isPaid } : b))
   }
+}
+ 
   
   // ADD TO CALENDAR FUNCTIONS (WITH DATE PICKER)
   const addGoalToCalendar = (goal: any) => {
@@ -690,15 +711,62 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
       return tDate.getDate() === day && tDate.getMonth() === month && tDate.getFullYear() === year
     })
   }
-  
   const getCalendarItemsForDay = (day: number) => {
-    const { month, year } = getDaysInMonth()
-    return calendarItems.filter(item => {
-      const itemDate = new Date(item.dueDate)
-      return itemDate.getDate() === day && itemDate.getMonth() === month && itemDate.getFullYear() === year
-    })
-  }
+  const { month, year } = getDaysInMonth()
+  const items: any[] = []
   
+  calendarItems.forEach(item => {
+    const itemDate = new Date(item.dueDate)
+    const itemDay = itemDate.getDate()
+    const itemMonth = itemDate.getMonth()
+    const itemYear = itemDate.getFullYear()
+    
+    // Check if this exact date matches
+    if (itemDay === day && itemMonth === month && itemYear === year) {
+      items.push(item)
+      return
+    }
+    
+    // Check for recurring items
+    if (item.frequency && item.frequency !== 'once') {
+      const currentDate = new Date(year, month, day)
+      const startDate = new Date(item.dueDate)
+      
+      // Only show future/current occurrences
+      if (currentDate >= startDate) {
+        let shouldShow = false
+        
+        if (item.frequency === 'weekly') {
+          // Check if it's 7 days apart
+          const daysDiff = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+          shouldShow = daysDiff % 7 === 0
+        } else if (item.frequency === 'fortnightly') {
+          // Check if it's 14 days apart
+          const daysDiff = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+          shouldShow = daysDiff % 14 === 0
+        } else if (item.frequency === 'monthly') {
+          // Same day of each month
+          shouldShow = day === itemDay
+        } else if (item.frequency === 'yearly') {
+          // Same day and month each year
+          shouldShow = day === itemDay && month === itemMonth
+        }
+        
+        if (shouldShow) {
+          items.push({
+            ...item,
+            id: `${item.id}-${year}-${month}-${day}`, // Unique ID for each occurrence
+            isRecurrence: true,
+            occurrenceDate: currentDate.toISOString().split('T')[0]
+          })
+        }
+      }
+    }
+  })
+  
+  return items
+}
+ 
   const convertToMonthly = (amount: number, frequency: string) => {
     const multiplier = frequency === 'weekly' ? 52/12 : frequency === 'fortnightly' ? 26/12 : frequency === 'yearly' ? 1/12 : 1
     return amount * multiplier
