@@ -32,8 +32,8 @@ export default function Dashboard() {
   // DEBT PAYOFF STATE
   const [debts, setDebts] = useState<any[]>([])
   const [newDebt, setNewDebt] = useState({
-    name: '', balance: '', interestRate: '', minPayment: '', type: 'credit_card'
-  })
+  name: '', balance: '', interestRate: '', minPayment: '', type: 'credit_card', frequency: 'monthly'
+})
   const [extraPayment, setExtraPayment] = useState('')
   const [payoffMethod, setPayoffMethod] = useState<'snowball' | 'avalanche'>('avalanche')
   
@@ -144,7 +144,22 @@ export default function Dashboard() {
     return sum + (amount * multiplier)
   }, 0)
   
-  const monthlySurplus = totalIncome - totalExpenses
+  // Calculate committed calendar payments (recurring items only, not marked as paid)
+const committedCalendarPayments = calendarItems
+  .filter(item => item.frequency && item.frequency !== 'once' && !item.isPaid)
+  .reduce((sum, item) => {
+    const amount = parseFloat(item.amount || 0)
+    if (item.frequency === 'weekly') return sum + (amount * 52 / 12)
+    if (item.frequency === 'fortnightly') return sum + (amount * 26 / 12)
+    if (item.frequency === 'monthly') return sum + amount
+    if (item.frequency === 'yearly') return sum + (amount / 12)
+    return sum
+  }, 0)
+
+const monthlySurplus = totalIncome - totalExpenses - committedCalendarPayments
+const totalGoalsTarget = goals.reduce((sum, g) => sum + parseFloat(g.target || 0), 0)
+const totalGoalsSaved = goals.reduce((sum, g) => sum + parseFloat(g.saved || 0), 0)
+const totalGoalsRemaining = totalGoalsTarget - totalGoalsSaved
   const totalGoalsTarget = goals.reduce((sum, g) => sum + parseFloat(g.target || 0), 0)
   const totalGoalsSaved = goals.reduce((sum, g) => sum + parseFloat(g.saved || 0), 0)
   const totalGoalsRemaining = totalGoalsTarget - totalGoalsSaved
