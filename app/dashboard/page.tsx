@@ -147,17 +147,24 @@ export default function Dashboard() {
     return sum + (amount * multiplier)
   }, 0)
   
-  // Calculate committed calendar payments (recurring items only, not one-time or paid)
-  const committedCalendarPayments = calendarItems
-    .filter(item => item.frequency && item.frequency !== 'once' && !item.isPaid && !item.isOverride)
-    .reduce((sum, item) => {
-      const amount = parseFloat(item.amount || 0)
-      if (item.frequency === 'weekly') return sum + (amount * 52 / 12)
-      if (item.frequency === 'fortnightly') return sum + (amount * 26 / 12)
-      if (item.frequency === 'monthly') return sum + amount
-      if (item.frequency === 'yearly') return sum + (amount / 12)
-      return sum
-    }, 0)
+// Calculate committed calendar payments (recurring items only, not one-time or paid)
+// EXCLUDE income from commitments (income adds to surplus, not reduces it)
+const committedCalendarPayments = calendarItems
+  .filter(item => 
+    item.frequency && 
+    item.frequency !== 'once' && 
+    !item.isPaid && 
+    !item.isOverride &&
+    item.type !== 'income'  // ← THIS IS THE KEY FIX!
+  )
+  .reduce((sum, item) => {
+    const amount = parseFloat(item.amount || 0)
+    if (item.frequency === 'weekly') return sum + (amount * 52 / 12)
+    if (item.frequency === 'fortnightly') return sum + (amount * 26 / 12)
+    if (item.frequency === 'monthly') return sum + amount
+    if (item.frequency === 'yearly') return sum + (amount / 12)
+    return sum
+  }, 0)
   
   const monthlySurplus = totalIncome - totalExpenses - committedCalendarPayments
   const totalGoalsTarget = goals.reduce((sum, g) => sum + parseFloat(g.target || 0), 0)
