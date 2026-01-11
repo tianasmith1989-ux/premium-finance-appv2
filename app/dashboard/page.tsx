@@ -882,7 +882,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
 
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
-    <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
+   <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
@@ -967,7 +967,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                     </div>
                   </div>
                 </div>
-                {/* 2. CALENDAR WITH UPCOMING PAYMENTS */}
+               {/* 2. CALENDAR WITH UPCOMING PAYMENTS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
                     <h2 style={{ fontSize: '28px', margin: 0, color: theme.text }}>📅 Calendar & Reminders</h2>
@@ -1153,7 +1153,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                     </div>
                   )}
                 </div>
-              {/* 4. DEBT PAYOFF WITH PROGRESS BARS */}
+                {/* 4. DEBT PAYOFF WITH PROGRESS BARS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <h2 style={{ fontSize: '28px', marginBottom: '24px', color: theme.text }}>💳 Debt Payoff Calculator</h2>
                   <div style={{ marginBottom: '24px', padding: '20px', background: darkMode ? '#7f1d1d' : '#fef2f2', borderRadius: '12px' }}>
@@ -1508,8 +1508,8 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
               </div>
             )}
           </>
-        )}  
-      {mainTab === 'trading' && (
+        )}
+        {mainTab === 'trading' && (
           <>
             {tradingTab === 'trading-goals' && (
               <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
@@ -1652,4 +1652,4 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
       </div>
     </div>
   )
-}  
+}
