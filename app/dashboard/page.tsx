@@ -939,8 +939,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
           <>
             {financeTab === 'dashboard' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                
-                {/* 1. CURRENT POSITION */}
+      {/* 1. CURRENT POSITION */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <h2 style={{ fontSize: '28px', marginBottom: '24px', color: theme.text }}>📊 Current Position</h2>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
@@ -965,8 +964,41 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                       <h3 style={{ fontSize: '14px', color: theme.textMuted, marginBottom: '8px' }}>💎 Net Worth</h3>
                       <p style={{ fontSize: '28px', fontWeight: 'bold', color: netWorth >= 0 ? '#10b981' : '#ef4444', margin: 0 }}>${netWorth.toFixed(2)}</p>
                     </div>
+                    <div style={{ padding: '20px', background: darkMode ? '#1e3a8a' : '#f0f9ff', borderRadius: '12px', border: '2px solid #3b82f6' }}>
+                      <h3 style={{ fontSize: '14px', color: theme.textMuted, marginBottom: '8px' }}>📊 Last Month Surplus</h3>
+                      <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#3b82f6', margin: 0 }}>
+                        ${(() => {
+                          // Calculate last month's actual income/expenses
+                          const lastMonth = new Date()
+                          lastMonth.setMonth(lastMonth.getMonth() - 1)
+                          const lastMonthYear = lastMonth.getFullYear()
+                          const lastMonthNum = lastMonth.getMonth()
+                          
+                          // Get all calendar items that were marked paid in last month
+                          const lastMonthPaidItems = calendarItems.filter(item => {
+                            if (!item.isPaid || !item.isOverride) return false
+                            const itemDate = new Date(item.dueDate)
+                            return itemDate.getFullYear() === lastMonthYear && itemDate.getMonth() === lastMonthNum
+                          })
+                          
+                          const lastMonthIncome = lastMonthPaidItems
+                            .filter(i => i.type === 'income')
+                            .reduce((sum, i) => sum + parseFloat(i.amount || 0), 0)
+                          
+                          const lastMonthExpenses = lastMonthPaidItems
+                            .filter(i => i.type !== 'income')
+                            .reduce((sum, i) => sum + parseFloat(i.amount || 0), 0)
+                          
+                          const lastMonthSurplus = lastMonthIncome - lastMonthExpenses
+                          
+                          return lastMonthSurplus.toFixed(2)
+                        })()}
+                      </p>
+                      <p style={{ fontSize: '11px', color: theme.textMuted, margin: '4px 0 0 0' }}>Actual from paid items</p>
+                    </div>
                   </div>
-                </div>     
+                </div>          
+   
                {/* 2. CALENDAR WITH UPCOMING PAYMENTS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
@@ -1122,41 +1154,83 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                         <div key={d} style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', fontSize: '13px', color: theme.textMuted }}>{d}</div>
                       )}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
-                      {(() => {
-                        const { firstDay, daysInMonth } = getDaysInMonth()
-                        const cells = []
-                        for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`} />)
-                        for (let d = 1; d <= daysInMonth; d++) {
-                          const dayItems = getCalendarItemsForDay(d)
-                          const hasUnpaid = dayItems.some(item => !item.isPaid)
-                          cells.push(
-                            <div key={d} style={{ 
-                              padding: '8px 4px', 
-                              border: `1px solid ${theme.border}`, 
-                              borderRadius: '6px', 
-                              background: hasUnpaid ? (darkMode ? '#7f1d1d' : '#fef2f2') : theme.cardBg,
-                              minHeight: '70px',
-                              fontSize: '13px'
-                            }}>
-                              <div style={{ fontWeight: 'bold', marginBottom: '4px', color: theme.text }}>{d}</div>
-                              {dayItems.map(item => (
-                                <div key={item.id} style={{ 
-                                  fontSize: '10px', 
-                                  color: item.isPaid ? '#10b981' : item.type === 'goal' ? '#7c3aed' : item.type === 'income' ? '#10b981' : item.type === 'expense' ? '#ef4444' : '#f59e0b',
-                                  fontWeight: '600',
-                                  marginBottom: '2px',
-                                  textDecoration: item.isPaid ? 'line-through' : 'none'
-                                }}>
-                                  {item.isPaid ? '✓' : item.type === 'goal' ? '🎯' : item.type === 'income' ? '💰' : item.type === 'expense' ? '💸' : item.type === 'debt' ? '💳' : '💰'} ${parseFloat(item.amount).toFixed(0)}
-                                </div>
-                              ))}
-                            </div>
-                          )
-                        }
-                        return cells
-                      })()}
-                    </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+  {(() => {
+    const { firstDay, daysInMonth } = getDaysInMonth()
+    const cells = []
+    for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`} />)
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dayItems = getCalendarItemsForDay(d)
+      const hasUnpaid = dayItems.some(item => !item.isPaid)
+      cells.push(
+        <div key={d} style={{ 
+          padding: '8px 4px', 
+          border: `1px solid ${theme.border}`, 
+          borderRadius: '6px', 
+          background: hasUnpaid ? (darkMode ? '#7f1d1d' : '#fef2f2') : theme.cardBg,
+          minHeight: '70px',
+          fontSize: '13px'
+        }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '4px', color: theme.text }}>{d}</div>
+          {dayItems.map(item => (
+            <div 
+              key={item.id} 
+              onClick={() => {
+                if (item.isPaid) return // Already paid, do nothing
+                
+                const amount = parseFloat(item.amount)
+                
+                // For recurring items
+                if (item.isRecurrence) {
+                  const occurrenceId = item.id
+                  if (item.type === 'goal' && item.sourceId) {
+                    markGoalPaymentPaid(occurrenceId, item.sourceId, amount)
+                  } else if (item.type === 'debt' && item.sourceId) {
+                    markDebtPaymentPaid(occurrenceId, item.sourceId, amount)
+                  } else {
+                    toggleBillPaid(occurrenceId)
+                  }
+                } else {
+                  // For one-time items
+                  if (item.type === 'goal' && item.sourceId) {
+                    markGoalPaymentPaid(item.id, item.sourceId, amount)
+                  } else if (item.type === 'debt' && item.sourceId) {
+                    markDebtPaymentPaid(item.id, item.sourceId, amount)
+                  } else {
+                    toggleBillPaid(item.id)
+                  }
+                }
+              }}
+              style={{ 
+                fontSize: '10px', 
+                color: item.isPaid ? '#10b981' : item.type === 'goal' ? '#7c3aed' : item.type === 'income' ? '#10b981' : item.type === 'expense' ? '#ef4444' : item.type === 'debt' ? '#ef4444' : '#f59e0b',
+                fontWeight: '600',
+                marginBottom: '2px',
+                textDecoration: item.isPaid ? 'line-through' : 'none',
+                cursor: item.isPaid ? 'default' : 'pointer',
+                padding: '2px',
+                borderRadius: '3px',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                if (!item.isPaid) {
+                  e.currentTarget.style.background = darkMode ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+              }}
+              title={`Click to mark as paid: ${item.name}`}
+            >
+              {item.isPaid ? '✓' : item.type === 'goal' ? '🎯' : item.type === 'income' ? '💰' : item.type === 'expense' ? '💸' : item.type === 'debt' ? '💳' : '💰'} ${parseFloat(item.amount).toFixed(0)}
+            </div>
+          ))}
+        </div>
+      )
+    }
+    return cells
+  })()}
+</div>
                   </div>
                 </div>
                 
