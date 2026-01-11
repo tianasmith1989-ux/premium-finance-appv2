@@ -146,24 +146,25 @@ export default function Dashboard() {
     const multiplier = t.frequency === 'weekly' ? 52/12 : t.frequency === 'fortnightly' ? 26/12 : t.frequency === 'yearly' ? 1/12 : 1
     return sum + (amount * multiplier)
   }, 0)
+  
   // Calculate committed calendar payments (recurring items only, not one-time, EXCLUDE income)
-// Count original recurring items even if some individual occurrences are marked paid
-const committedCalendarPayments = calendarItems
-  .filter(item => 
-    item.frequency && 
-    item.frequency !== 'once' && 
-    !item.isOverride &&  // Exclude the "paid" override entries
-    item.type !== 'income'  // Income adds to surplus, doesn't reduce it
-  )
-  .reduce((sum, item) => {
-    const amount = parseFloat(item.amount || 0)
-    if (item.frequency === 'weekly') return sum + (amount * 52 / 12)
-    if (item.frequency === 'fortnightly') return sum + (amount * 26 / 12)
-    if (item.frequency === 'monthly') return sum + amount
-    if (item.frequency === 'yearly') return sum + (amount / 12)
-    return sum
-  }, 0)
-
+  // Count original recurring items even if some individual occurrences are marked paid
+  const committedCalendarPayments = calendarItems
+    .filter(item => 
+      item.frequency && 
+      item.frequency !== 'once' && 
+      !item.isOverride &&  // Exclude the "paid" override entries
+      item.type !== 'income'  // Income adds to surplus, doesn't reduce it
+    )
+    .reduce((sum, item) => {
+      const amount = parseFloat(item.amount || 0)
+      if (item.frequency === 'weekly') return sum + (amount * 52 / 12)
+      if (item.frequency === 'fortnightly') return sum + (amount * 26 / 12)
+      if (item.frequency === 'monthly') return sum + amount
+      if (item.frequency === 'yearly') return sum + (amount / 12)
+      return sum
+    }, 0)
+  
   const monthlySurplus = totalIncome - totalExpenses - committedCalendarPayments
   const totalGoalsTarget = goals.reduce((sum, g) => sum + parseFloat(g.target || 0), 0)
   const totalGoalsSaved = goals.reduce((sum, g) => sum + parseFloat(g.saved || 0), 0)
@@ -881,7 +882,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
 
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
-   <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
+ <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
@@ -965,7 +966,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                       <p style={{ fontSize: '28px', fontWeight: 'bold', color: netWorth >= 0 ? '#10b981' : '#ef4444', margin: 0 }}>${netWorth.toFixed(2)}</p>
                     </div>
                   </div>
-                </div>
+                </div>     
                {/* 2. CALENDAR WITH UPCOMING PAYMENTS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
@@ -994,49 +995,119 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                     </div>
                   </div>
                   
-                  {/* UPCOMING SECTION - Shows ALL upcoming items including goals and debts */}
-                  {calendarItems.filter(item => !item.isPaid && new Date(item.dueDate) >= new Date()).length > 0 && (
-                    <div style={{ marginBottom: '24px', padding: '20px', background: darkMode ? '#7f1d1d' : '#fef2f2', borderRadius: '12px' }}>
-                      <h3 style={{ fontSize: '18px', marginBottom: '12px', fontWeight: '600', color: theme.text }}>🔔 Upcoming (Next 30 Days)</h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {calendarItems.filter(item => !item.isPaid && new Date(item.dueDate) >= new Date()).slice(0, 10).map(item => {
-                          const daysUntil = Math.ceil((new Date(item.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-                          const amount = parseFloat(item.amount)
+                  {/* UPCOMING SECTION - Shows ALL recurring items for next 30 days */}
+                  {(() => {
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
+                    
+                    const upcomingItems: any[] = []
+                    
+                    calendarItems.forEach(item => {
+                      if (item.isOverride) return // Skip override entries
+                      
+                      const itemDate = new Date(item.dueDate)
+                      itemDate.setHours(0, 0, 0, 0)
+                      
+                      // For one-time items
+                      if (item.frequency === 'once') {
+                        if (!item.isPaid && itemDate >= today && itemDate <= thirtyDaysFromNow) {
+                          upcomingItems.push({
+                            ...item,
+                            displayDate: itemDate,
+                            occurrenceId: item.id
+                          })
+                        }
+                        return
+                      }
+                      
+                      // For recurring items, calculate all occurrences in next 30 days
+                      let currentDate = new Date(itemDate)
+                      
+                      while (currentDate <= thirtyDaysFromNow) {
+                        if (currentDate >= today) {
+                          const occurrenceKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`
                           
-                          return (
-                            <div key={item.id} style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', border: `1px solid ${theme.border}` }}>
-                              <div style={{ flex: 1, minWidth: '150px' }}>
-                                <div style={{ fontWeight: '600', fontSize: '15px', color: theme.text }}>{item.name}</div>
-                                <div style={{ fontSize: '12px', color: theme.textMuted }}>
-                                  Due {new Date(item.dueDate).toLocaleDateString()} ({daysUntil} days) • {item.frequency}
-                                </div>
-                              </div>
-                              <div style={{ fontSize: '18px', fontWeight: 'bold', color: item.type === 'income' ? '#10b981' : '#ef4444' }}>
-                                {item.type === 'income' ? '+' : ''}${amount.toFixed(2)}
-                              </div>
-                              <button 
-                                onClick={() => {
-                                  if (item.type === 'goal' && item.sourceId) {
-                                    markGoalPaymentPaid(item.id, item.sourceId, amount)
-                                  } else if (item.type === 'debt' && item.sourceId) {
-                                    markDebtPaymentPaid(item.id, item.sourceId, amount)
-                                  } else {
-                                    toggleBillPaid(item.id)
-                                  }
-                                }} 
-                                style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
-                              >
-                                Mark Paid
-                              </button>
-                              <button onClick={() => deleteBill(item.id)} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
-                                Delete
-                              </button>
-                            </div>
+                          // Check if this specific occurrence was marked paid
+                          const wasPaid = calendarItems.some(i => 
+                            i.isOverride && 
+                            i.sourceId === item.sourceId && 
+                            i.dueDate === occurrenceKey &&
+                            i.isPaid
                           )
-                        })}
+                          
+                          if (!wasPaid) {
+                            upcomingItems.push({
+                              ...item,
+                              displayDate: new Date(currentDate),
+                              occurrenceId: `${item.id}-${occurrenceKey}`,
+                              actualDueDate: occurrenceKey
+                            })
+                          }
+                        }
+                        
+                        // Move to next occurrence
+                        if (item.frequency === 'weekly') {
+                          currentDate = new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000)
+                        } else if (item.frequency === 'fortnightly') {
+                          currentDate = new Date(currentDate.getTime() + 14 * 24 * 60 * 60 * 1000)
+                        } else if (item.frequency === 'monthly') {
+                          currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, currentDate.getDate())
+                        } else if (item.frequency === 'yearly') {
+                          currentDate = new Date(currentDate.getFullYear() + 1, currentDate.getMonth(), currentDate.getDate())
+                        } else {
+                          break
+                        }
+                      }
+                    })
+                    
+                    // Sort by date
+                    upcomingItems.sort((a, b) => a.displayDate.getTime() - b.displayDate.getTime())
+                    
+                    return upcomingItems.length > 0 ? (
+                      <div style={{ marginBottom: '24px', padding: '20px', background: darkMode ? '#7f1d1d' : '#fef2f2', borderRadius: '12px' }}>
+                        <h3 style={{ fontSize: '18px', marginBottom: '12px', fontWeight: '600', color: theme.text }}>🔔 Upcoming (Next 30 Days)</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {upcomingItems.slice(0, 15).map((item, idx) => {
+                            const daysUntil = Math.ceil((item.displayDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                            const amount = parseFloat(item.amount)
+                            
+                            return (
+                              <div key={`${item.occurrenceId}-${idx}`} style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', border: `1px solid ${theme.border}` }}>
+                                <div style={{ flex: 1, minWidth: '150px' }}>
+                                  <div style={{ fontWeight: '600', fontSize: '15px', color: theme.text }}>{item.name}</div>
+                                  <div style={{ fontSize: '12px', color: theme.textMuted }}>
+                                    Due {item.displayDate.toLocaleDateString()} ({daysUntil} days) • {item.frequency}
+                                  </div>
+                                </div>
+                                <div style={{ fontSize: '18px', fontWeight: 'bold', color: item.type === 'income' ? '#10b981' : '#ef4444' }}>
+                                  {item.type === 'income' ? '+' : ''}${amount.toFixed(2)}
+                                </div>
+                                <button 
+                                  onClick={() => {
+                                    const dateToUse = item.actualDueDate || item.dueDate
+                                    if (item.type === 'goal' && item.sourceId) {
+                                      markGoalPaymentPaid(item.occurrenceId, item.sourceId, amount)
+                                    } else if (item.type === 'debt' && item.sourceId) {
+                                      markDebtPaymentPaid(item.occurrenceId, item.sourceId, amount)
+                                    } else {
+                                      toggleBillPaid(item.occurrenceId)
+                                    }
+                                  }} 
+                                  style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap' }}
+                                >
+                                  Mark Paid
+                                </button>
+                                <button onClick={() => deleteBill(item.id)} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                                  Delete
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ) : null
+                  })()}
                   
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
