@@ -146,25 +146,24 @@ export default function Dashboard() {
     const multiplier = t.frequency === 'weekly' ? 52/12 : t.frequency === 'fortnightly' ? 26/12 : t.frequency === 'yearly' ? 1/12 : 1
     return sum + (amount * multiplier)
   }, 0)
-  
-  // Calculate committed calendar payments (recurring items only, not one-time or paid, EXCLUDE income)
-  const committedCalendarPayments = calendarItems
-    .filter(item => 
-      item.frequency && 
-      item.frequency !== 'once' && 
-      !item.isPaid && 
-      !item.isOverride &&
-      item.type !== 'income'  // Income adds to surplus, doesn't reduce it
-    )
-    .reduce((sum, item) => {
-      const amount = parseFloat(item.amount || 0)
-      if (item.frequency === 'weekly') return sum + (amount * 52 / 12)
-      if (item.frequency === 'fortnightly') return sum + (amount * 26 / 12)
-      if (item.frequency === 'monthly') return sum + amount
-      if (item.frequency === 'yearly') return sum + (amount / 12)
-      return sum
-    }, 0)
-  
+  // Calculate committed calendar payments (recurring items only, not one-time, EXCLUDE income)
+// Count original recurring items even if some individual occurrences are marked paid
+const committedCalendarPayments = calendarItems
+  .filter(item => 
+    item.frequency && 
+    item.frequency !== 'once' && 
+    !item.isOverride &&  // Exclude the "paid" override entries
+    item.type !== 'income'  // Income adds to surplus, doesn't reduce it
+  )
+  .reduce((sum, item) => {
+    const amount = parseFloat(item.amount || 0)
+    if (item.frequency === 'weekly') return sum + (amount * 52 / 12)
+    if (item.frequency === 'fortnightly') return sum + (amount * 26 / 12)
+    if (item.frequency === 'monthly') return sum + amount
+    if (item.frequency === 'yearly') return sum + (amount / 12)
+    return sum
+  }, 0)
+
   const monthlySurplus = totalIncome - totalExpenses - committedCalendarPayments
   const totalGoalsTarget = goals.reduce((sum, g) => sum + parseFloat(g.target || 0), 0)
   const totalGoalsSaved = goals.reduce((sum, g) => sum + parseFloat(g.saved || 0), 0)
