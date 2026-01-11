@@ -327,6 +327,7 @@ export default function Dashboard() {
     updateNetWorthHistory()
   }
   
+  // FIXED: toggleBillPaid - stores sourceId so we can match specific dates
   const toggleBillPaid = (itemId: string | number) => {
     if (typeof itemId === 'string' && itemId.includes('-')) {
       const [originalId, ...dateParts] = itemId.split('-')
@@ -337,6 +338,7 @@ export default function Dashboard() {
         setCalendarItems([...calendarItems, {
           ...originalItem,
           id: Date.now(),
+          sourceId: originalItem.id, // CRITICAL: Store the original item ID here
           dueDate: occurrenceDate,
           frequency: 'once',
           isPaid: true,
@@ -882,7 +884,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
 
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
- <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
+   <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
@@ -939,7 +941,8 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
           <>
             {financeTab === 'dashboard' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* 1. CURRENT POSITION */}
+                
+                {/* 1. CURRENT POSITION */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <h2 style={{ fontSize: '28px', marginBottom: '24px', color: theme.text }}>📊 Current Position</h2>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
@@ -965,41 +968,15 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                       <p style={{ fontSize: '28px', fontWeight: 'bold', color: netWorth >= 0 ? '#10b981' : '#ef4444', margin: 0 }}>${netWorth.toFixed(2)}</p>
                     </div>
                     <div style={{ padding: '20px', background: darkMode ? '#1e3a8a' : '#f0f9ff', borderRadius: '12px', border: '2px solid #3b82f6' }}>
-                      <h3 style={{ fontSize: '14px', color: theme.textMuted, marginBottom: '8px' }}>📊 Last Month Surplus</h3>
-                      <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#3b82f6', margin: 0 }}>
-                        ${(() => {
-                          // Calculate last month's actual income/expenses
-                          const lastMonth = new Date()
-                          lastMonth.setMonth(lastMonth.getMonth() - 1)
-                          const lastMonthYear = lastMonth.getFullYear()
-                          const lastMonthNum = lastMonth.getMonth()
-                          
-                          // Get all calendar items that were marked paid in last month
-                          const lastMonthPaidItems = calendarItems.filter(item => {
-                            if (!item.isPaid || !item.isOverride) return false
-                            const itemDate = new Date(item.dueDate)
-                            return itemDate.getFullYear() === lastMonthYear && itemDate.getMonth() === lastMonthNum
-                          })
-                          
-                          const lastMonthIncome = lastMonthPaidItems
-                            .filter(i => i.type === 'income')
-                            .reduce((sum, i) => sum + parseFloat(i.amount || 0), 0)
-                          
-                          const lastMonthExpenses = lastMonthPaidItems
-                            .filter(i => i.type !== 'income')
-                            .reduce((sum, i) => sum + parseFloat(i.amount || 0), 0)
-                          
-                          const lastMonthSurplus = lastMonthIncome - lastMonthExpenses
-                          
-                          return lastMonthSurplus.toFixed(2)
-                        })()}
+                      <h3 style={{ fontSize: '14px', color: theme.textMuted, marginBottom: '8px' }}>📊 This Month Projected</h3>
+                      <p style={{ fontSize: '28px', fontWeight: 'bold', color: monthlySurplus >= 0 ? '#10b981' : '#ef4444', margin: 0 }}>
+                        ${monthlySurplus.toFixed(2)}
                       </p>
-                      <p style={{ fontSize: '11px', color: theme.textMuted, margin: '4px 0 0 0' }}>Actual from paid items</p>
+                      <p style={{ fontSize: '11px', color: theme.textMuted, margin: '4px 0 0 0' }}>Income - Expenses - Commitments</p>
                     </div>
                   </div>
-                </div>          
-   
-             {/* 2. CALENDAR WITH UPCOMING PAYMENTS */}
+                </div>
+                {/* 2. CALENDAR WITH UPCOMING PAYMENTS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
                     <h2 style={{ fontSize: '28px', margin: 0, color: theme.text }}>📅 Calendar & Reminders</h2>
@@ -1027,7 +1004,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                     </div>
                   </div>
                   
-                  {/* UPCOMING SECTION - Shows ALL recurring items for next 30 days */}
+                  {/* UPCOMING SECTION - Shows ALL recurring items for next 30 days with FIXED wasPaid check */}
                   {(() => {
                     const today = new Date()
                     today.setHours(0, 0, 0, 0)
@@ -1060,10 +1037,10 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                         if (currentDate >= today) {
                           const occurrenceKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`
                           
-                          // Check if this specific occurrence was marked paid
+                          // FIXED: Check if this EXACT date was marked paid (match against recurring item's ID)
                           const wasPaid = calendarItems.some(i => 
                             i.isOverride && 
-                            i.sourceId === item.sourceId && 
+                            i.sourceId === item.id && // Match against the recurring item's ID
                             i.dueDate === occurrenceKey &&
                             i.isPaid
                           )
@@ -1233,6 +1210,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                     </div>
                   </div>
                 </div>
+                
                 {/* 3. INCOME & EXPENSES */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <h2 style={{ fontSize: '28px', marginBottom: '24px', color: theme.text }}>💰 Income & Expenses</h2>
@@ -1296,7 +1274,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                     </div>
                   )}
                 </div>
-                {/* 4. DEBT PAYOFF WITH PROGRESS BARS */}
+               {/* 4. DEBT PAYOFF WITH PROGRESS BARS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <h2 style={{ fontSize: '28px', marginBottom: '24px', color: theme.text }}>💳 Debt Payoff Calculator</h2>
                   <div style={{ marginBottom: '24px', padding: '20px', background: darkMode ? '#7f1d1d' : '#fef2f2', borderRadius: '12px' }}>
@@ -1651,7 +1629,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
               </div>
             )}
           </>
-        )}
+        )} 
         {mainTab === 'trading' && (
           <>
             {tradingTab === 'trading-goals' && (
