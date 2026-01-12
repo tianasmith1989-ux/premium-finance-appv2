@@ -327,33 +327,47 @@ export default function Dashboard() {
     updateNetWorthHistory()
   }
   
-  // FIXED: toggleBillPaid - stores sourceId so we can match specific dates
-const toggleBillPaid = (itemId: string | number) => {
-  if (typeof itemId === 'string' && itemId.includes('-')) {
-    // Extract the base ID and the date from the occurrence ID
-    const parts = itemId.split('-')
-    const baseId = parseInt(parts[0]) // The original recurring item's ID
-    const occurrenceDate = `${parts[1]}-${parts[2]}-${parts[3]}` // YYYY-MM-DD
+  // FIXED: toggleBillPaid with DEBUG logging
+  const toggleBillPaid = (itemId: string | number) => {
+    console.log('🔵 toggleBillPaid called with:', itemId)
     
-    const originalItem = calendarItems.find(item => item.id === baseId && !item.isOverride)
-    if (originalItem) {
-      console.log('Marking paid:', { baseId, occurrenceDate, originalItem })
-      setCalendarItems([...calendarItems, {
-        ...originalItem,
-        id: Date.now(),
-        sourceId: baseId, // Store the BASE recurring item ID
-        dueDate: occurrenceDate,
-        frequency: 'once',
-        isPaid: true,
-        isOverride: true
-      }])
+    if (typeof itemId === 'string' && itemId.includes('-')) {
+      // Extract the base ID and the date from the occurrence ID
+      const parts = itemId.split('-')
+      console.log('Split parts:', parts)
+      
+      const baseId = parseInt(parts[0]) // The original recurring item's ID
+      const occurrenceDate = `${parts[1]}-${parts[2]}-${parts[3]}` // YYYY-MM-DD
+      
+      console.log('Parsed:', { baseId, occurrenceDate })
+      
+      const originalItem = calendarItems.find(item => item.id === baseId && !item.isOverride)
+      console.log('Found original item:', originalItem)
+      
+      if (originalItem) {
+        const newOverride = {
+          ...originalItem,
+          id: Date.now(),
+          sourceId: baseId, // Store the BASE recurring item ID
+          dueDate: occurrenceDate,
+          frequency: 'once',
+          isPaid: true,
+          isOverride: true
+        }
+        console.log('🟢 Creating override:', newOverride)
+        setCalendarItems([...calendarItems, newOverride])
+      } else {
+        console.log('🔴 ERROR: Could not find original item with baseId:', baseId)
+      }
+    } else {
+      console.log('Toggling one-time item:', itemId)
+      setCalendarItems(calendarItems.map(b => b.id === itemId ? { ...b, isPaid: !b.isPaid } : b))
     }
-  } else {
-    setCalendarItems(calendarItems.map(b => b.id === itemId ? { ...b, isPaid: !b.isPaid } : b))
   }
-}
+  
   // MARK GOAL PAYMENT AS PAID (updates saved amount + progress bar)
   const markGoalPaymentPaid = (itemId: string | number, goalId: number, amount: number) => {
+    console.log('🎯 markGoalPaymentPaid:', { itemId, goalId, amount })
     // Mark the calendar item as paid
     toggleBillPaid(itemId)
     
@@ -370,6 +384,7 @@ const toggleBillPaid = (itemId: string | number) => {
   
   // MARK DEBT PAYMENT AS PAID (updates balance + progress bar)
   const markDebtPaymentPaid = (itemId: string | number, debtId: number, amount: number) => {
+    console.log('💳 markDebtPaymentPaid:', { itemId, debtId, amount })
     // Mark the calendar item as paid
     toggleBillPaid(itemId)
     
@@ -830,14 +845,20 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
     })
   }
   
-  // FIXED: getCalendarItemsForDay - now checks for paid overrides
+  // FIXED: getCalendarItemsForDay with EXTENSIVE DEBUG LOGGING
   const getCalendarItemsForDay = (day: number) => {
     const { month, year } = getDaysInMonth()
     const items: any[] = []
     
+    console.log('🔍 === getCalendarItemsForDay DEBUG ===')
+    console.log('Looking for items on:', { day, month: month + 1, year })
+    console.log('Total calendar items:', calendarItems.length)
+    
     calendarItems.forEach(item => {
       // Skip override entries - they shouldn't appear in the calendar grid
-      if (item.isOverride) return
+      if (item.isOverride) {
+        return
+      }
       
       const itemDate = new Date(item.dueDate)
       const itemDay = itemDate.getDate()
@@ -873,26 +894,44 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
           if (shouldShow) {
             // Check if this specific occurrence was already marked paid
             const occurrenceKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-            const wasPaid = calendarItems.some(i => 
-              i.isOverride && 
-              i.sourceId === item.id && 
-              i.dueDate === occurrenceKey &&
-              i.isPaid
-            )
+            
+            console.log(`🔵 Recurring item "${item.name}" (ID: ${item.id}) should show on ${occurrenceKey}`)
+            
+            const wasPaid = calendarItems.some(i => {
+              const match = i.isOverride && 
+                i.sourceId === item.id && 
+                i.dueDate === occurrenceKey &&
+                i.isPaid
+              
+              if (i.isOverride && i.sourceId === item.id) {
+                console.log(`  Checking override: sourceId=${i.sourceId}, dueDate=${i.dueDate}, isPaid=${i.isPaid}, MATCHES=${match}`)
+              }
+              
+              return match
+            })
+            
+            console.log(`  Was paid? ${wasPaid}`)
             
             // Only show if this occurrence hasn't been marked paid
             if (!wasPaid) {
-              items.push({
+              const recurringItem = {
                 ...item,
                 id: `${item.id}-${occurrenceKey}`,
                 isRecurrence: true,
                 occurrenceDate: occurrenceKey
-              })
+              }
+              console.log(`  ✅ Adding to display`)
+              items.push(recurringItem)
+            } else {
+              console.log(`  ❌ NOT adding (already paid)`)
             }
           }
         }
       }
     })
+    
+    console.log(`📋 Final items for day ${day}:`, items.length)
+    console.log('🔍 === END DEBUG ===\n')
     
     return items
   }
@@ -904,7 +943,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
 
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
-   <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
+     <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
@@ -995,8 +1034,8 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                       <p style={{ fontSize: '11px', color: theme.textMuted, margin: '4px 0 0 0' }}>Income - Expenses - Commitments</p>
                     </div>
                   </div>
-                </div>
-               {/* 2. CALENDAR WITH UPCOMING PAYMENTS */}
+                </div> 
+                {/* 2. CALENDAR WITH UPCOMING PAYMENTS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
                     <h2 style={{ fontSize: '28px', margin: 0, color: theme.text }}>📅 Calendar & Reminders</h2>
@@ -1294,7 +1333,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                     </div>
                   )}
                 </div>
-                {/* 4. DEBT PAYOFF WITH PROGRESS BARS */}
+               {/* 4. DEBT PAYOFF WITH PROGRESS BARS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <h2 style={{ fontSize: '28px', marginBottom: '24px', color: theme.text }}>💳 Debt Payoff Calculator</h2>
                   <div style={{ marginBottom: '24px', padding: '20px', background: darkMode ? '#7f1d1d' : '#fef2f2', borderRadius: '12px' }}>
@@ -1649,8 +1688,8 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
               </div>
             )}
           </>
-        )}
-       {mainTab === 'trading' && (
+        )} 
+        {mainTab === 'trading' && (
           <>
             {tradingTab === 'trading-goals' && (
               <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '40px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
@@ -1793,4 +1832,4 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
       </div>
     </div>
   )
-} 
+}
