@@ -327,7 +327,7 @@ export default function Dashboard() {
     updateNetWorthHistory()
   }
   
-  // FIXED: toggleBillPaid with DEBUG logging
+  // toggleBillPaid
   const toggleBillPaid = (itemId: string | number) => {
     console.log('🔵 toggleBillPaid called with:', itemId)
     
@@ -845,7 +845,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
     })
   }
   
-  // FIXED: getCalendarItemsForDay with EXTENSIVE DEBUG LOGGING
+  // 🔥 THE CRITICAL FIX: Check BOTH item.id AND item.sourceId
   const getCalendarItemsForDay = (day: number) => {
     const { month, year } = getDaysInMonth()
     const items: any[] = []
@@ -895,19 +895,20 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
             // Check if this specific occurrence was already marked paid
             const occurrenceKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
             
-            console.log(`🔵 Recurring item "${item.name}" (ID: ${item.id}) should show on ${occurrenceKey}`)
+            console.log(`🔵 Recurring item "${item.name}" (ID: ${item.id}, sourceId: ${item.sourceId}) should show on ${occurrenceKey}`)
             
+            // 🔥 THE FIX: Check if override matches EITHER the item's ID OR the item's sourceId
             const wasPaid = calendarItems.some(i => {
-              const match = i.isOverride && 
-                i.sourceId === item.id && 
+              const matchesId = i.isOverride && 
+                (i.sourceId === item.id || (item.sourceId && i.sourceId === item.sourceId)) && 
                 i.dueDate === occurrenceKey &&
                 i.isPaid
               
-              if (i.isOverride && i.sourceId === item.id) {
-                console.log(`  Checking override: sourceId=${i.sourceId}, dueDate=${i.dueDate}, isPaid=${i.isPaid}, MATCHES=${match}`)
+              if (i.isOverride && (i.sourceId === item.id || (item.sourceId && i.sourceId === item.sourceId))) {
+                console.log(`  Checking override: sourceId=${i.sourceId}, dueDate=${i.dueDate}, isPaid=${i.isPaid}, MATCHES=${matchesId}`)
               }
               
-              return match
+              return matchesId
             })
             
             console.log(`  Was paid? ${wasPaid}`)
@@ -1333,7 +1334,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                     </div>
                   )}
                 </div>
-               {/* 4. DEBT PAYOFF WITH PROGRESS BARS */}
+              {/* 4. DEBT PAYOFF WITH PROGRESS BARS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <h2 style={{ fontSize: '28px', marginBottom: '24px', color: theme.text }}>💳 Debt Payoff Calculator</h2>
                   <div style={{ marginBottom: '24px', padding: '20px', background: darkMode ? '#7f1d1d' : '#fef2f2', borderRadius: '12px' }}>
@@ -1688,7 +1689,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
               </div>
             )}
           </>
-        )} 
+        )}
         {mainTab === 'trading' && (
           <>
             {tradingTab === 'trading-goals' && (
