@@ -204,7 +204,7 @@ export default function Dashboard() {
     input: darkMode ? '#334155' : '#ffffff',
     inputBorder: darkMode ? '#475569' : '#e2e8f0'
   }
- // CALENDAR NAVIGATION
+  // CALENDAR NAVIGATION
   const prevMonth = () => {
     setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))
   }
@@ -245,7 +245,7 @@ export default function Dashboard() {
     setDebts([...debts, { 
       ...newDebt, 
       id: Date.now(),
-      originalBalance: newDebt.balance // Store original for progress tracking
+      originalBalance: newDebt.balance
     }])
     setNewDebt({ name: '', balance: '', interestRate: '', minPayment: '', type: 'credit_card', frequency: 'monthly' })
   }
@@ -327,10 +327,8 @@ export default function Dashboard() {
     updateNetWorthHistory()
   }
   
-  // toggleBillPaid
   const toggleBillPaid = (itemId: string | number) => {
     if (typeof itemId === 'string' && itemId.includes('-')) {
-      // Extract the base ID and the date from the occurrence ID
       const parts = itemId.split('-')
       const baseId = parseInt(parts[0])
       const occurrenceDate = `${parts[1]}-${parts[2]}-${parts[3]}`
@@ -354,12 +352,8 @@ export default function Dashboard() {
     }
   }
   
-  // MARK GOAL PAYMENT AS PAID (updates saved amount + progress bar)
   const markGoalPaymentPaid = (itemId: string | number, goalId: number, amount: number) => {
-    // Mark the calendar item as paid
     toggleBillPaid(itemId)
-    
-    // Update the goal's saved amount
     setGoals(goals.map(g => {
       if (g.id === goalId) {
         const currentSaved = parseFloat(g.saved || 0)
@@ -370,12 +364,8 @@ export default function Dashboard() {
     }))
   }
   
-  // MARK DEBT PAYMENT AS PAID (updates balance + progress bar)
   const markDebtPaymentPaid = (itemId: string | number, debtId: number, amount: number) => {
-    // Mark the calendar item as paid
     toggleBillPaid(itemId)
-    
-    // Update the debt's balance
     setDebts(debts.map(d => {
       if (d.id === debtId) {
         const currentBalance = parseFloat(d.balance || 0)
@@ -386,7 +376,6 @@ export default function Dashboard() {
     }))
   }
   
-  // ADD TO CALENDAR FUNCTIONS
   const addGoalToCalendar = (goal: any) => {
     if (!goal.deadline) {
       alert('⚠️ Goal needs a deadline to add to calendar')
@@ -399,14 +388,12 @@ export default function Dashboard() {
       return
     }
     
-    // Calculate savings plan first
     const plan = calculateSavingsPlan(goal)
     if (!plan) {
       alert('⚠️ Could not calculate savings plan for this goal')
       return
     }
     
-    // Prompt for frequency
     const freqChoice = prompt(`How often do you want to save for "${goal.name}"?\n\n1 = Weekly ($${(plan.monthlyNeeded / (52/12)).toFixed(2)}/week)\n2 = Fortnightly ($${(plan.monthlyNeeded / (26/12)).toFixed(2)}/fortnight)\n3 = Monthly ($${plan.monthlyNeeded.toFixed(2)}/month)\n\nEnter 1, 2, or 3:`, '3')
     
     let freq = 'monthly'
@@ -469,7 +456,6 @@ export default function Dashboard() {
     const userDate = prompt(`📅 When is "${debt.name}" payment due?\n\nEnter date (YYYY-MM-DD):`, new Date().toISOString().split('T')[0])
     if (!userDate) return
     
-    // Calculate payment amount based on frequency
     const minPayment = parseFloat(debt.minPayment)
     let amount = minPayment
     if (debt.frequency === 'weekly') amount = minPayment / (52/12)
@@ -832,13 +818,12 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
     })
   }
   
-  // ✅ SIMPLE FIX: Just show ALL recurring items, always!
+  // ✅ THE SIMPLE FIX: Just show ALL recurring items every month!
   const getCalendarItemsForDay = (day: number) => {
     const { month, year } = getDaysInMonth()
     const items: any[] = []
     
     calendarItems.forEach(item => {
-      // Skip override entries - they shouldn't appear in the calendar grid
       if (item.isOverride) return
       
       const itemDate = new Date(item.dueDate)
@@ -846,13 +831,11 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
       const itemMonth = itemDate.getMonth()
       const itemYear = itemDate.getFullYear()
       
-      // For one-time items on this exact date
       if (itemDay === day && itemMonth === month && itemYear === year) {
         items.push(item)
         return
       }
       
-      // For recurring items, calculate if they should appear on this day
       if (item.frequency && item.frequency !== 'once') {
         const currentDate = new Date(year, month, day)
         const startDate = new Date(item.dueDate)
@@ -874,15 +857,12 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
           
           if (shouldShow) {
             const occurrenceKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-            
-            // ✅ SIMPLE: Just show ALL recurring items, always!
-            const recurringItem = {
+            items.push({
               ...item,
               id: `${item.id}-${occurrenceKey}`,
               isRecurrence: true,
               occurrenceDate: occurrenceKey
-            }
-            items.push(recurringItem)
+            })
           }
         }
       }
@@ -897,7 +877,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: theme.bg }}> 
+    <div style={{ minHeight: '100vh', background: theme.bg }}>
     <div style={{ background: 'linear-gradient(to right, #4f46e5, #7c3aed)', color: 'white', padding: '24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -990,7 +970,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                     </div>
                   </div>
                 </div>
-             {/* 2. CALENDAR WITH UPCOMING PAYMENTS */}
+              {/* 2. CALENDAR WITH UPCOMING PAYMENTS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
                     <h2 style={{ fontSize: '28px', margin: 0, color: theme.text }}>📅 Calendar & Reminders</h2>
@@ -1287,8 +1267,8 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                       })}
                     </div>
                   )}
-                </div>   
-        {/* 4. DEBT PAYOFF WITH PROGRESS BARS */}
+                </div>
+                {/* 4. DEBT PAYOFF WITH PROGRESS BARS */}
                 <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: darkMode ? '1px solid #334155' : 'none' }}>
                   <h2 style={{ fontSize: '28px', marginBottom: '24px', color: theme.text }}>💳 Debt Payoff Calculator</h2>
                   <div style={{ marginBottom: '24px', padding: '20px', background: darkMode ? '#7f1d1d' : '#fef2f2', borderRadius: '12px' }}>
