@@ -328,28 +328,30 @@ export default function Dashboard() {
   }
   
   // FIXED: toggleBillPaid - stores sourceId so we can match specific dates
-  const toggleBillPaid = (itemId: string | number) => {
-    if (typeof itemId === 'string' && itemId.includes('-')) {
-      const [originalId, ...dateParts] = itemId.split('-')
-      const occurrenceDate = `${dateParts[0]}-${dateParts[1]}-${dateParts[2]}`
-      
-      const originalItem = calendarItems.find(item => item.id.toString() === originalId)
-      if (originalItem) {
-        setCalendarItems([...calendarItems, {
-          ...originalItem,
-          id: Date.now(),
-          sourceId: originalItem.id, // CRITICAL: Store the original item ID here
-          dueDate: occurrenceDate,
-          frequency: 'once',
-          isPaid: true,
-          isOverride: true
-        }])
-      }
-    } else {
-      setCalendarItems(calendarItems.map(b => b.id === itemId ? { ...b, isPaid: !b.isPaid } : b))
+const toggleBillPaid = (itemId: string | number) => {
+  if (typeof itemId === 'string' && itemId.includes('-')) {
+    // Extract the base ID and the date from the occurrence ID
+    const parts = itemId.split('-')
+    const baseId = parseInt(parts[0]) // The original recurring item's ID
+    const occurrenceDate = `${parts[1]}-${parts[2]}-${parts[3]}` // YYYY-MM-DD
+    
+    const originalItem = calendarItems.find(item => item.id === baseId && !item.isOverride)
+    if (originalItem) {
+      console.log('Marking paid:', { baseId, occurrenceDate, originalItem })
+      setCalendarItems([...calendarItems, {
+        ...originalItem,
+        id: Date.now(),
+        sourceId: baseId, // Store the BASE recurring item ID
+        dueDate: occurrenceDate,
+        frequency: 'once',
+        isPaid: true,
+        isOverride: true
+      }])
     }
+  } else {
+    setCalendarItems(calendarItems.map(b => b.id === itemId ? { ...b, isPaid: !b.isPaid } : b))
   }
-  
+}
   // MARK GOAL PAYMENT AS PAID (updates saved amount + progress bar)
   const markGoalPaymentPaid = (itemId: string | number, goalId: number, amount: number) => {
     // Mark the calendar item as paid
