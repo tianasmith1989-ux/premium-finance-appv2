@@ -90,6 +90,9 @@ export default function Dashboard() {
   // PUSH NOTIFICATIONS
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   
+  // 🔥 NEW: Track which occurrences have been marked paid (persists across months)
+  const [paidOccurrences, setPaidOccurrences] = useState<Set<string>>(new Set())
+  
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'granted') {
       setNotificationsEnabled(true)
@@ -327,26 +330,30 @@ export default function Dashboard() {
     updateNetWorthHistory()
   }
   
+  // 🔥 FIXED: toggleBillPaid now tracks paid occurrences
   const toggleBillPaid = (itemId: string | number) => {
     if (typeof itemId === 'string' && itemId.includes('-')) {
-      const parts = itemId.split('-')
-      const baseId = parseInt(parts[0])
-      const occurrenceDate = `${parts[1]}-${parts[2]}-${parts[3]}`
-      
-      const originalItem = calendarItems.find(item => item.id === baseId && !item.isOverride)
-      
-      if (originalItem) {
-        // Don't create override - just do nothing for recurring items!
-        // This way they keep showing up every month
-        return
+      // It's a recurring occurrence like "12345-2026-02-15"
+      if (paidOccurrences.has(itemId)) {
+        // Already paid - unpay it
+        const newPaid = new Set(paidOccurrences)
+        newPaid.delete(itemId)
+        setPaidOccurrences(newPaid)
+      } else {
+        // Not paid yet - mark as paid
+        setPaidOccurrences(new Set([...paidOccurrences, itemId]))
       }
     } else {
+      // One-time item - toggle isPaid in calendarItems
       setCalendarItems(calendarItems.map(b => b.id === itemId ? { ...b, isPaid: !b.isPaid } : b))
     }
   }
   
   const markGoalPaymentPaid = (itemId: string | number, goalId: number, amount: number) => {
-    // Don't call toggleBillPaid - just update the goal directly
+    // Mark the calendar item as paid
+    toggleBillPaid(itemId)
+    
+    // Update the goal's saved amount
     setGoals(goals.map(g => {
       if (g.id === goalId) {
         const currentSaved = parseFloat(g.saved || 0)
@@ -358,6 +365,9 @@ export default function Dashboard() {
   }
   
   const markDebtPaymentPaid = (itemId: string | number, debtId: number | string, amount: number) => {
+    // Mark the calendar item as paid
+    toggleBillPaid(itemId)
+    
     // Handle "extra-debt" special case
     if (debtId === 'extra-debt') {
       // Get the target debt based on current payoff method
@@ -370,9 +380,9 @@ export default function Dashboard() {
       })
       
       if (sortedDebts.length > 0) {
-        debtId = sortedDebts[0].id // Target the first debt in the payoff order
+        debtId = sortedDebts[0].id
       } else {
-        return // No debts to pay
+        return
       }
     }
     
@@ -485,7 +495,6 @@ export default function Dashboard() {
     alert('✅ Debt payment added to calendar!')
   }
   
-  // 🔥 FIX: Link extra payment to target debt based on payoff method
   const addExtraDebtPaymentToCalendar = () => {
     if (!extraPayment || parseFloat(extraPayment) <= 0) {
       alert('⚠️ Please enter an extra payment amount first')
@@ -497,7 +506,6 @@ export default function Dashboard() {
       return
     }
     
-    // Sort debts based on current payoff method
     const sortedDebts = [...debts].sort((a, b) => {
       if (payoffMethod === 'snowball') {
         return parseFloat(a.balance) - parseFloat(b.balance)
@@ -513,7 +521,7 @@ export default function Dashboard() {
     
     setCalendarItems([...calendarItems, {
       id: Date.now(),
-      sourceId: targetDebt.id, // 🔥 FIX: Link to actual debt ID, not 'extra-debt'
+      sourceId: targetDebt.id,
       name: `💳 Extra Payment → ${targetDebt.name}`,
       amount: extraPayment,
       dueDate: userDate,
@@ -846,7 +854,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
     })
   }
   
-  // ✅ SIMPLE FIX: Just show ALL recurring items every month!
+  // 🔥 FIXED: Show ALL recurring items, check paidOccurrences for visual state
   const getCalendarItemsForDay = (day: number) => {
     const { month, year } = getDaysInMonth()
     const items: any[] = []
@@ -889,7 +897,8 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
               ...item,
               id: `${item.id}-${occurrenceKey}`,
               isRecurrence: true,
-              occurrenceDate: occurrenceKey
+              occurrenceDate: occurrenceKey,
+              isPaid: paidOccurrences.has(`${item.id}-${occurrenceKey}`) // Check if THIS occurrence is paid
             })
           }
         }
@@ -906,7 +915,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
 
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
-    {/* HEADER */}
+   {/* HEADER */}
       <div style={{ padding: '20px', borderBottom: `1px solid ${theme.border}`, background: theme.cardBg }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ margin: 0, color: theme.text, fontSize: '28px', fontWeight: 'bold' }}>
@@ -1015,7 +1024,130 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
 
             {financeTab === 'dashboard' && (
               <>
-                {/* CURRENT POSITION - CORRECTED */}
+                {/* 1️⃣ CALENDAR FIRST - MINI VERSION */}
+                <div style={{ background: theme.cardBg, padding: '25px', borderRadius: '16px', marginBottom: '25px', border: `1px solid ${theme.border}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>📅 This Month's Calendar</h2>
+                    <button
+                      onClick={() => setFinanceTab('calendar')}
+                      style={{
+                        padding: '8px 16px',
+                        background: '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontWeight: '600'
+                      }}
+                    >
+                      View Full Calendar →
+                    </button>
+                  </div>
+
+                  {/* Upcoming Items (Next 7 Days) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {calendarItems
+                      .filter(item => {
+                        if (item.isOverride) return false
+                        const dueDate = new Date(item.dueDate)
+                        const today = new Date()
+                        const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+                        return dueDate >= today && dueDate <= sevenDaysFromNow
+                      })
+                      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+                      .slice(0, 5)
+                      .map(item => (
+                        <div key={item.id} style={{
+                          padding: '12px',
+                          background: darkMode ? '#334155' : '#f8fafc',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          borderLeft: `4px solid ${
+                            item.type === 'income' ? '#10b981' :
+                            item.type === 'goal' ? '#8b5cf6' :
+                            item.type === 'debt' ? '#ef4444' :
+                            '#3b82f6'
+                          }`
+                        }}>
+                          <div>
+                            <div style={{ color: theme.text, fontWeight: '600', fontSize: '14px' }}>{item.name}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px' }}>
+                              {new Date(item.dueDate).toLocaleDateString()} • ${item.amount}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            {item.type === 'goal' && item.sourceId && (
+                              <button
+                                onClick={() => markGoalPaymentPaid(item.id, item.sourceId, parseFloat(item.amount))}
+                                style={{
+                                  padding: '6px 12px',
+                                  background: item.isPaid ? '#94a3b8' : '#10b981',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  fontWeight: '600'
+                                }}
+                              >
+                                {item.isPaid ? '✓ Paid' : 'Mark Paid'}
+                              </button>
+                            )}
+                            {item.type === 'debt' && item.sourceId && (
+                              <button
+                                onClick={() => markDebtPaymentPaid(item.id, item.sourceId, parseFloat(item.amount))}
+                                style={{
+                                  padding: '6px 12px',
+                                  background: item.isPaid ? '#94a3b8' : '#10b981',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  fontWeight: '600'
+                                }}
+                              >
+                                {item.isPaid ? '✓ Paid' : 'Mark Paid'}
+                              </button>
+                            )}
+                            {(!item.type || item.type === 'bill') && (
+                              <button
+                                onClick={() => toggleBillPaid(item.id)}
+                                style={{
+                                  padding: '6px 12px',
+                                  background: item.isPaid ? '#94a3b8' : '#10b981',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  fontWeight: '600'
+                                }}
+                              >
+                                {item.isPaid ? '✓ Paid' : 'Mark Paid'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    {calendarItems.filter(item => {
+                      if (item.isOverride) return false
+                      const dueDate = new Date(item.dueDate)
+                      const today = new Date()
+                      const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+                      return dueDate >= today && dueDate <= sevenDaysFromNow
+                    }).length === 0 && (
+                      <div style={{ color: theme.textMuted, textAlign: 'center', padding: '20px' }}>
+                        No upcoming payments in the next 7 days
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2️⃣ CURRENT POSITION */}
                 <div style={{ 
                   background: theme.cardBg, 
                   padding: '25px', 
@@ -1050,7 +1182,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                   </div>
                 </div>
 
-                {/* INCOME & EXPENSES */}
+                {/* 3️⃣ INCOME & EXPENSES */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px' }}>
                   {/* INCOME */}
                   <div style={{ background: theme.cardBg, padding: '25px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
@@ -1295,7 +1427,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                   </div>
                 </div>
 
-                {/* AI BUDGET COACH */}
+                {/* 4️⃣ AI BUDGET COACH */}
                 <div style={{ 
                   background: theme.cardBg, 
                   padding: '25px', 
@@ -1374,8 +1506,8 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                   </div>
                 </div>
               </>
-            )}
-           {financeTab === 'calendar' && (
+            )}   
+            {financeTab === 'calendar' && (
               <div style={{ background: theme.cardBg, padding: '25px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
                 <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>📅 Payment Calendar</h2>
 
@@ -1463,7 +1595,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                   </div>
                 </div>
 
-                {/* UPCOMING - NO FILTERING BY PAID STATUS */}
+                {/* UPCOMING */}
                 <div style={{ marginBottom: '25px' }}>
                   <h3 style={{ margin: '0 0 15px 0', color: theme.text, fontSize: '18px' }}>📋 Upcoming (Next 30 Days)</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1506,7 +1638,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                                 onClick={() => markGoalPaymentPaid(item.id, item.sourceId, parseFloat(item.amount))}
                                 style={{
                                   padding: '8px 16px',
-                                  background: '#10b981',
+                                  background: item.isPaid ? '#94a3b8' : '#10b981',
                                   color: 'white',
                                   border: 'none',
                                   borderRadius: '6px',
@@ -1515,7 +1647,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                                   fontWeight: '600'
                                 }}
                               >
-                                ✓ Mark Paid
+                                {item.isPaid ? '✓ Paid' : 'Mark Paid'}
                               </button>
                             )}
                             {item.type === 'debt' && item.sourceId && (
@@ -1523,7 +1655,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                                 onClick={() => markDebtPaymentPaid(item.id, item.sourceId, parseFloat(item.amount))}
                                 style={{
                                   padding: '8px 16px',
-                                  background: '#10b981',
+                                  background: item.isPaid ? '#94a3b8' : '#10b981',
                                   color: 'white',
                                   border: 'none',
                                   borderRadius: '6px',
@@ -1532,7 +1664,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                                   fontWeight: '600'
                                 }}
                               >
-                                ✓ Mark Paid
+                                {item.isPaid ? '✓ Paid' : 'Mark Paid'}
                               </button>
                             )}
                             {(!item.type || item.type === 'bill') && (
@@ -1665,10 +1797,12 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                                 fontSize: '11px',
                                 padding: '4px 6px',
                                 marginBottom: '4px',
-                                background: item.type === 'income' ? '#d1fae5' :
-                                           item.type === 'goal' ? '#ede9fe' :
-                                           item.type === 'debt' ? '#fee2e2' :
-                                           '#dbeafe',
+                                background: item.isPaid ? '#94a3b8' : (
+                                  item.type === 'income' ? '#d1fae5' :
+                                  item.type === 'goal' ? '#ede9fe' :
+                                  item.type === 'debt' ? '#fee2e2' :
+                                  '#dbeafe'
+                                ),
                                 color: '#1e293b',
                                 borderRadius: '4px',
                                 overflow: 'hidden',
@@ -1689,7 +1823,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                                     }}
                                     style={{
                                       padding: '2px 6px',
-                                      background: '#10b981',
+                                      background: item.isPaid ? '#94a3b8' : '#10b981',
                                       color: 'white',
                                       border: 'none',
                                       borderRadius: '3px',
@@ -1698,7 +1832,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                                       flexShrink: 0
                                     }}
                                   >
-                                    ✓
+                                    {item.isPaid ? '✓' : '○'}
                                   </button>
                                 )}
                                 {item.type === 'debt' && item.sourceId && (
@@ -1709,7 +1843,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                                     }}
                                     style={{
                                       padding: '2px 6px',
-                                      background: '#10b981',
+                                      background: item.isPaid ? '#94a3b8' : '#10b981',
                                       color: 'white',
                                       border: 'none',
                                       borderRadius: '3px',
@@ -1718,7 +1852,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                                       flexShrink: 0
                                     }}
                                   >
-                                    ✓
+                                    {item.isPaid ? '✓' : '○'}
                                   </button>
                                 )}
                                 {(!item.type || item.type === 'bill') && (
@@ -1771,7 +1905,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
                 </div>
               </div>
             )}
-           {financeTab === 'debt' && (
+            {financeTab === 'debt' && (
               <div style={{ background: theme.cardBg, padding: '25px', borderRadius: '16px', border: `1px solid ${theme.border}` }}>
                 <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>💳 Debt Payoff Calculator</h2>
 
@@ -2448,7 +2582,7 @@ ${transactions.filter(t => t.type === 'expense').map(t => `- ${t.name}: $${t.amo
               </div>
             )}
           </>
-        )} 
+        )}
        {mainTab === "trading" && (
           <>
             {/* TRADING SUB-TABS */}
