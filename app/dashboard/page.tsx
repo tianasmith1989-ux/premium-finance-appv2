@@ -624,7 +624,7 @@ Debts: ${debts.map(d => `${d.name}: $${d.balance} @ ${d.interestRate}%`).join(',
       </header>
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
-      {/* ==================== TAB 1: DASHBOARD ==================== */}
+        {/* ==================== TAB 1: DASHBOARD ==================== */}
         {activeTab === 'dashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             
@@ -683,7 +683,7 @@ Debts: ${debts.map(d => `${d.name}: $${d.balance} @ ${d.interestRate}%`).join(',
                 </div>
               </div>
             )}
-            {/* INCOME & EXPENSES SECTION */}
+           {/* INCOME & EXPENSES SECTION */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               
               {/* INCOME STREAMS */}
@@ -781,7 +781,7 @@ Debts: ${debts.map(d => `${d.name}: $${d.balance} @ ${d.interestRate}%`).join(',
                 </div>
               </div>
             </div>
-           {/* CALENDAR */}
+            {/* CALENDAR */}
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <button onClick={prevMonth} style={btnPrimary}>← Prev</button>
@@ -1102,7 +1102,7 @@ Debts: ${debts.map(d => `${d.name}: $${d.balance} @ ${d.interestRate}%`).join(',
               <div style={{ fontSize: '56px', fontWeight: 'bold', marginBottom: '8px' }}>${netWorth.toFixed(2)}</div>
               <div style={{ fontSize: '14px', opacity: 0.9 }}>Assets: ${totalAssets.toFixed(2)} − Liabilities: ${(totalLiabilities + totalDebtBalance).toFixed(2)}</div>
             </div>
-          {/* PASSIVE VS ACTIVE INCOME */}
+            {/* PASSIVE VS ACTIVE INCOME */}
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '20px' }}>💰 Income Analysis</h2>
               
@@ -1295,7 +1295,7 @@ Debts: ${debts.map(d => `${d.name}: $${d.balance} @ ${d.interestRate}%`).join(',
               {goals.length === 0 ? (
                 <div style={{ color: theme.textMuted, textAlign: 'center', padding: '40px' }}>
                   <div style={{ fontSize: '48px', marginBottom: '16px
-              {/* ==================== TAB 3: PATH TO GOALS ==================== */}
+               {/* ==================== TAB 3: PATH TO GOALS ==================== */}
         {activeTab === 'path' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             
@@ -1568,5 +1568,4 @@ Debts: ${debts.map(d => `${d.name}: $${d.balance} @ ${d.interestRate}%`).join(',
       </main>
     </div>
   )
-}
-              
+}             
