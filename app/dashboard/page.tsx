@@ -345,16 +345,16 @@ export default function Dashboard() {
                   return (
                     <div key={day} style={{ minHeight: '100px', padding: '8px', background: isToday ? (darkMode ? '#1e3a5f' : '#eff6ff') : (darkMode ? '#1e293b' : '#fafafa'), borderRadius: '10px', border: isToday ? '2px solid ' + theme.accent : '1px solid ' + theme.border, overflow: 'hidden' }}>
                       <div style={{ fontWeight: isToday ? 700 : 600, marginBottom: '6px', color: isToday ? theme.accent : theme.text, fontSize: '14px' }}>{day}</div>
-                      {dayItems.slice(0, 3).map(item => (
-                        <div key={item.id} style={{ fontSize: '9px', padding: '4px', marginBottom: '3px', background: item.isPaid ? (darkMode ? '#334155' : '#e2e8f0') : item.type === 'goal' ? '#ede9fe' : item.type === 'debt' ? '#fee2e2' : item.type === 'income' ? '#d1fae5' : '#dbeafe', color: item.isPaid ? theme.textMuted : '#1e293b', borderRadius: '4px', textDecoration: item.isPaid ? 'line-through' : 'none', opacity: item.isPaid ? 0.6 : 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '2px' }}>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{item.name}</span>
-                            <button onClick={(e) => { e.stopPropagation(); togglePaid(item.id, item.sourceType, item.sourceId, parseFloat(item.amount || 0)) }} style={{ padding: '2px 6px', background: item.isPaid ? '#94a3b8' : '#10b981', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '9px', fontWeight: 700, flexShrink: 0, minWidth: '20px' }}>{item.isPaid ? '✓' : '○'}</button>
+                      {dayItems.slice(0, 2).map(item => (
+                        <div key={item.id} style={{ fontSize: '10px', padding: '6px', marginBottom: '4px', background: item.isPaid ? (darkMode ? '#334155' : '#d1d5db') : item.type === 'goal' ? '#ede9fe' : item.type === 'debt' ? '#fee2e2' : item.type === 'income' ? '#d1fae5' : '#dbeafe', color: item.isPaid ? theme.textMuted : '#1e293b', borderRadius: '6px', opacity: item.isPaid ? 0.7 : 1, border: '1px solid rgba(0,0,0,0.15)' }}>
+                          <div style={{ fontWeight: 600, marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: item.isPaid ? 'line-through' : 'none' }}>{item.name}</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ fontSize: '9px', color: '#666' }}>${parseFloat(item.amount || 0).toFixed(0)}</span>
+                            <button onClick={(e) => { e.stopPropagation(); togglePaid(item.id, item.sourceType, item.sourceId, parseFloat(item.amount || 0)) }} style={{ padding: '3px 8px', background: item.isPaid ? '#6b7280' : '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}>{item.isPaid ? '✓' : 'PAY'}</button>
                           </div>
-                          <div style={{ fontSize: '8px', color: '#666', marginTop: '2px' }}>${parseFloat(item.amount || 0).toFixed(0)}</div>
                         </div>
                       ))}
-                      {dayItems.length > 3 && <div style={{ fontSize: '9px', color: theme.textMuted, textAlign: 'center' }}>+{dayItems.length - 3} more</div>}
+                      {dayItems.length > 2 && <div style={{ fontSize: '9px', color: theme.textMuted, textAlign: 'center' }}>+{dayItems.length - 2} more</div>}
                     </div>
                   )
                 })}
