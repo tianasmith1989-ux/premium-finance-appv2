@@ -173,7 +173,16 @@ export default function Dashboard() {
           const daysDiff = Math.round((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
           shouldShow = daysDiff >= 0 && daysDiff % 14 === 0 
         }
-        else if (item.frequency === 'monthly') shouldShow = day === itemDay
+        else if (item.frequency === 'monthly') {
+          // Handle end-of-month dates (29, 30, 31) for shorter months
+          const daysInCurrentMonth = new Date(year, month + 1, 0).getDate()
+          if (itemDay > daysInCurrentMonth) {
+            // If original day doesn't exist in this month, show on last day
+            shouldShow = day === daysInCurrentMonth
+          } else {
+            shouldShow = day === itemDay
+          }
+        }
         else if (item.frequency === 'yearly') shouldShow = day === itemDay && month === itemMonth
       }
       
