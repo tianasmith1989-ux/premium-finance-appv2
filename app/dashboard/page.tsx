@@ -264,12 +264,41 @@ export default function Dashboard() {
   const addExtraPaymentToCalendar = () => {
     if (!extraPayment || parseFloat(extraPayment) <= 0) { alert('Please enter an extra payment amount'); return }
     if (debts.length === 0) { alert('No debts to apply extra payment to'); return }
-    const sortedDebts = [...debts].sort((a, b) => payoffMethod === 'snowball' ? parseFloat(a.balance) - parseFloat(b.balance) : parseFloat(b.interestRate) - parseFloat(a.interestRate))
+    
+    // Sort debts based on payoff method
+    const sortedDebts = [...debts].sort((a, b) => {
+      if (payoffMethod === 'snowball') {
+        // Snowball: lowest balance first
+        return parseFloat(a.balance) - parseFloat(b.balance)
+      } else {
+        // Avalanche: highest interest rate first
+        return parseFloat(b.interestRate) - parseFloat(a.interestRate)
+      }
+    })
+    
     const targetDebt = sortedDebts[0]
+    
+    // Show which debt will be targeted and why
+    const methodExplanation = payoffMethod === 'avalanche' 
+      ? `(highest interest: ${targetDebt.interestRate}%)`
+      : `(lowest balance: $${parseFloat(targetDebt.balance).toFixed(2)})`
+    
+    const confirmMsg = `Add $${extraPayment}/month extra payment to "${targetDebt.name}" ${methodExplanation}?`
+    if (!confirm(confirmMsg)) return
+    
     const paymentDate = prompt('When should extra payment start? (YYYY-MM-DD):', new Date().toISOString().split('T')[0])
     if (!paymentDate) return
-    setExpenses([...expenses, { id: Date.now(), name: 'Extra → ' + targetDebt.name, amount: extraPayment, frequency: 'monthly', dueDate: paymentDate, targetDebtId: targetDebt.id }])
-    alert('Extra payment of $' + extraPayment + '/month added targeting ' + targetDebt.name)
+    
+    setExpenses([...expenses, { 
+      id: Date.now(), 
+      name: 'Extra → ' + targetDebt.name, 
+      amount: extraPayment, 
+      frequency: 'monthly', 
+      dueDate: paymentDate, 
+      targetDebtId: targetDebt.id 
+    }])
+    
+    alert(`✅ Extra payment of $${extraPayment}/month added!\n\nTarget: ${targetDebt.name}\nMethod: ${payoffMethod === 'avalanche' ? '🏔️ Avalanche' : '❄️ Snowball'}\nReason: ${methodExplanation}`)
     setExtraPayment('')
   }
 
@@ -554,19 +583,42 @@ export default function Dashboard() {
               {debts.length > 0 && (
                 <>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-                    {debts.map(debt => {
-                      const progress = debt.originalBalance ? ((parseFloat(debt.originalBalance) - parseFloat(debt.balance)) / parseFloat(debt.originalBalance)) * 100 : 0
-                      return (
-                        <div key={debt.id} style={{ padding: '16px', background: darkMode ? '#334155' : '#fef2f2', borderRadius: '12px', border: '1px solid ' + theme.border }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                            <div><div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{debt.name}</div><div style={{ color: theme.textMuted, fontSize: '13px' }}>${parseFloat(debt.balance).toFixed(2)} @ {debt.interestRate}%</div></div>
-                            <button onClick={() => deleteDebt(debt.id)} style={{ ...btnDanger, padding: '6px 12px', fontSize: '12px' }}>Delete</button>
+                    {(() => {
+                      // Sort to find the target debt
+                      const sortedDebts = [...debts].sort((a, b) => {
+                        if (payoffMethod === 'snowball') {
+                          return parseFloat(a.balance) - parseFloat(b.balance)
+                        } else {
+                          return parseFloat(b.interestRate) - parseFloat(a.interestRate)
+                        }
+                      })
+                      const targetDebtId = sortedDebts.length > 0 ? sortedDebts[0].id : null
+                      
+                      return debts.map(debt => {
+                        const progress = debt.originalBalance ? ((parseFloat(debt.originalBalance) - parseFloat(debt.balance)) / parseFloat(debt.originalBalance)) * 100 : 0
+                        const isTarget = debt.id === targetDebtId
+                        
+                        return (
+                          <div key={debt.id} style={{ padding: '16px', background: isTarget ? (darkMode ? '#1e3a32' : '#f0fdf4') : (darkMode ? '#334155' : '#fef2f2'), borderRadius: '12px', border: isTarget ? '2px solid ' + theme.success : '1px solid ' + theme.border }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                              <div>
+                                <div style={{ color: theme.text, fontWeight: 600, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  {debt.name}
+                                  {isTarget && <span style={{ background: theme.success, color: 'white', fontSize: '10px', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>🎯 TARGET</span>}
+                                </div>
+                                <div style={{ color: theme.textMuted, fontSize: '13px' }}>
+                                  ${parseFloat(debt.balance).toFixed(2)} @ {debt.interestRate}%
+                                  {isTarget && <span style={{ color: theme.success, marginLeft: '8px' }}>← {payoffMethod === 'avalanche' ? 'highest rate' : 'lowest balance'}</span>}
+                                </div>
+                              </div>
+                              <button onClick={() => deleteDebt(debt.id)} style={{ ...btnDanger, padding: '6px 12px', fontSize: '12px' }}>Delete</button>
+                            </div>
+                            <div style={{ width: '100%', height: '8px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}><div style={{ width: Math.max(0, progress) + '%', height: '100%', background: isTarget ? 'linear-gradient(to right, ' + theme.success + ', #059669)' : 'linear-gradient(to right, ' + theme.warning + ', ' + theme.danger + ')' }} /></div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '6px' }}>{progress.toFixed(1)}% paid off</div>
                           </div>
-                          <div style={{ width: '100%', height: '8px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}><div style={{ width: Math.max(0, progress) + '%', height: '100%', background: 'linear-gradient(to right, ' + theme.success + ', #059669)' }} /></div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '6px' }}>{progress.toFixed(1)}% paid off</div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })
+                    })()}
                   </div>
                   <div style={{ padding: '20px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '12px' }}>
                     <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
