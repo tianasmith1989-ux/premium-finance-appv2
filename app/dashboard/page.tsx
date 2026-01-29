@@ -29,6 +29,7 @@ export default function Dashboard() {
   const [liabilities, setLiabilities] = useState<any[]>([])
   const [newLiability, setNewLiability] = useState({ name: '', value: '', type: 'loan' })
   
+  // Store paid occurrences with full date string as key
   const [paidOccurrences, setPaidOccurrences] = useState<Set<string>>(new Set())
   
   const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
@@ -37,6 +38,9 @@ export default function Dashboard() {
   
   const [trades, setTrades] = useState<any[]>([])
   const [newTrade, setNewTrade] = useState({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '' })
+
+  // Expanded day modal
+  const [expandedDay, setExpandedDay] = useState<{day: number, items: any[]} | null>(null)
 
   const theme = {
     bg: darkMode ? '#0f172a' : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdf4 100%)',
@@ -126,8 +130,6 @@ export default function Dashboard() {
     return monthlyNeeded
   }
 
-  // FIXED: Goals show even without deadline (use startDate only)
-  // FIXED: Extra debt payments reduce debt balance when paid
   const getCalendarItemsForDay = (day: number) => {
     const { month, year } = getDaysInMonth()
     const items: any[] = []
@@ -136,8 +138,8 @@ export default function Dashboard() {
       ...expenses.map(exp => ({ 
         id: 'expense-' + exp.id, 
         sourceId: exp.id, 
-        sourceType: exp.targetDebtId ? 'extraDebt' : 'expense',  // FIXED: Mark extra debt payments
-        targetDebtId: exp.targetDebtId,  // FIXED: Track which debt this pays
+        sourceType: exp.targetDebtId ? 'extraDebt' : 'expense',
+        targetDebtId: exp.targetDebtId,
         name: '💸 ' + exp.name, 
         amount: exp.amount, 
         dueDate: exp.dueDate, 
@@ -145,9 +147,9 @@ export default function Dashboard() {
         type: 'expense' 
       })),
       ...debts.filter(d => d.paymentDate).map(debt => ({ id: 'debt-' + debt.id, sourceId: debt.id, sourceType: 'debt', name: '💳 ' + debt.name, amount: debt.minPayment, dueDate: debt.paymentDate, frequency: debt.frequency, type: 'debt' })),
-      // FIXED: Goals show if they have startDate (deadline optional for display)
       ...goals.filter(g => g.startDate).map(goal => ({ id: 'goal-' + goal.id, sourceId: goal.id, sourceType: 'goal', name: '🎯 ' + goal.name, amount: goal.deadline ? calculateGoalPayment(goal).toFixed(2) : '0', dueDate: goal.startDate, frequency: goal.savingsFrequency, type: 'goal' }))
     ]
+    
     allItems.forEach(item => {
       if (!item.dueDate) return
       const itemDate = new Date(item.dueDate)
@@ -156,51 +158,72 @@ export default function Dashboard() {
       const itemYear = itemDate.getFullYear()
       const currentDate = new Date(year, month, day)
       const startDate = new Date(item.dueDate)
+      startDate.setHours(0,0,0,0)
+      currentDate.setHours(0,0,0,0)
+      
       let shouldShow = false
-      if (itemDay === day && itemMonth === month && itemYear === year) shouldShow = true
-      else if (item.frequency && item.frequency !== 'once' && currentDate >= startDate) {
-        if (item.frequency === 'weekly') { const daysDiff = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)); shouldShow = daysDiff >= 0 && daysDiff % 7 === 0 }
-        else if (item.frequency === 'fortnightly') { const daysDiff = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)); shouldShow = daysDiff >= 0 && daysDiff % 14 === 0 }
+      if (itemDay === day && itemMonth === month && itemYear === year) {
+        shouldShow = true
+      } else if (item.frequency && item.frequency !== 'once' && currentDate >= startDate) {
+        if (item.frequency === 'weekly') { 
+          const daysDiff = Math.round((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+          shouldShow = daysDiff >= 0 && daysDiff % 7 === 0 
+        }
+        else if (item.frequency === 'fortnightly') { 
+          const daysDiff = Math.round((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+          shouldShow = daysDiff >= 0 && daysDiff % 14 === 0 
+        }
         else if (item.frequency === 'monthly') shouldShow = day === itemDay
         else if (item.frequency === 'yearly') shouldShow = day === itemDay && month === itemMonth
       }
+      
       if (shouldShow) {
-        const occurrenceKey = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0')
-        const uniqueId = item.id + '-' + occurrenceKey
-        items.push({ ...item, id: uniqueId, originalId: item.id, occurrenceDate: occurrenceKey, isPaid: paidOccurrences.has(uniqueId) })
+        // Create unique ID for this specific occurrence
+        const occurrenceDate = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0')
+        const uniqueId = item.id + '-' + occurrenceDate
+        items.push({ 
+          ...item, 
+          id: uniqueId, 
+          originalId: item.id, 
+          occurrenceDate: occurrenceDate, 
+          isPaid: paidOccurrences.has(uniqueId) 
+        })
       }
     })
     return items
   }
 
-  // FIXED: Toggle paid now handles extra debt payments properly
+  // Toggle paid - each occurrence is independent
   const togglePaid = (itemId: string, sourceType: string, sourceId: number, amount: number, targetDebtId?: number) => {
     const newPaid = new Set(paidOccurrences)
     const paymentAmount = amount || 0
     
     if (paidOccurrences.has(itemId)) {
-      // UNPAYING
+      // UNPAYING - remove from paid set
       newPaid.delete(itemId)
+      
+      // Reverse the balance changes
       if (sourceType === 'goal' && sourceId) {
         setGoals(prev => prev.map(g => g.id === sourceId ? { ...g, saved: Math.max(0, parseFloat(g.saved || 0) - paymentAmount).toFixed(2) } : g))
       } else if (sourceType === 'debt' && sourceId) {
         setDebts(prev => prev.map(d => d.id === sourceId ? { ...d, balance: (parseFloat(d.balance || 0) + paymentAmount).toFixed(2) } : d))
       } else if (sourceType === 'extraDebt' && targetDebtId) {
-        // FIXED: Extra debt payment - add back to debt balance
         setDebts(prev => prev.map(d => d.id === targetDebtId ? { ...d, balance: (parseFloat(d.balance || 0) + paymentAmount).toFixed(2) } : d))
       }
     } else {
-      // PAYING
+      // PAYING - add to paid set
       newPaid.add(itemId)
+      
+      // Apply the balance changes
       if (sourceType === 'goal' && sourceId) {
         setGoals(prev => prev.map(g => g.id === sourceId ? { ...g, saved: (parseFloat(g.saved || 0) + paymentAmount).toFixed(2) } : g))
       } else if (sourceType === 'debt' && sourceId) {
         setDebts(prev => prev.map(d => d.id === sourceId ? { ...d, balance: Math.max(0, parseFloat(d.balance || 0) - paymentAmount).toFixed(2) } : d))
       } else if (sourceType === 'extraDebt' && targetDebtId) {
-        // FIXED: Extra debt payment - subtract from debt balance
         setDebts(prev => prev.map(d => d.id === targetDebtId ? { ...d, balance: Math.max(0, parseFloat(d.balance || 0) - paymentAmount).toFixed(2) } : d))
       }
     }
+    
     setPaidOccurrences(newPaid)
   }
 
@@ -210,7 +233,6 @@ export default function Dashboard() {
   const deleteExpense = (id: number) => setExpenses(expenses.filter(e => e.id !== id))
   const addDebt = () => { if (!newDebt.name || !newDebt.balance) return; setDebts([...debts, { ...newDebt, id: Date.now(), originalBalance: newDebt.balance }]); setNewDebt({ name: '', balance: '', interestRate: '', minPayment: '', frequency: 'monthly', paymentDate: new Date().toISOString().split('T')[0] }) }
   const deleteDebt = (id: number) => setDebts(debts.filter(d => d.id !== id))
-  // FIXED: Goals default saved to '0'
   const addGoal = () => { if (!newGoal.name || !newGoal.target) return; setGoals([...goals, { ...newGoal, saved: newGoal.saved || '0', id: Date.now() }]); setNewGoal({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: new Date().toISOString().split('T')[0] }) }
   const deleteGoal = (id: number) => setGoals(goals.filter(g => g.id !== id))
   const addAsset = () => { if (!newAsset.name || !newAsset.value) return; setAssets([...assets, { ...newAsset, id: Date.now() }]); setNewAsset({ name: '', value: '', type: 'savings' }) }
@@ -219,7 +241,6 @@ export default function Dashboard() {
   const deleteLiability = (id: number) => setLiabilities(liabilities.filter(l => l.id !== id))
   const addTrade = () => { if (!newTrade.instrument) return; setTrades([...trades, { ...newTrade, id: Date.now() }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())); setNewTrade({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '' }) }
 
-  // FIXED: Extra payment now stores targetDebtId
   const addExtraPaymentToCalendar = () => {
     if (!extraPayment || parseFloat(extraPayment) <= 0) { alert('Please enter an extra payment amount'); return }
     if (debts.length === 0) { alert('No debts to apply extra payment to'); return }
@@ -227,7 +248,6 @@ export default function Dashboard() {
     const targetDebt = sortedDebts[0]
     const paymentDate = prompt('When should extra payment start? (YYYY-MM-DD):', new Date().toISOString().split('T')[0])
     if (!paymentDate) return
-    // FIXED: Store targetDebtId so we know which debt to reduce
     setExpenses([...expenses, { id: Date.now(), name: 'Extra → ' + targetDebt.name, amount: extraPayment, frequency: 'monthly', dueDate: paymentDate, targetDebtId: targetDebt.id }])
     alert('Extra payment of $' + extraPayment + '/month added targeting ' + targetDebt.name)
     setExtraPayment('')
@@ -279,8 +299,64 @@ export default function Dashboard() {
     finally { setIsAskingCoach(false) }
   }
 
+  // Render calendar item (reusable)
+  const renderCalendarItem = (item: any, compact: boolean = false) => (
+    <div key={item.id} style={{ 
+      fontSize: compact ? '11px' : '13px', 
+      padding: compact ? '4px 6px' : '8px 10px', 
+      marginBottom: '4px', 
+      background: item.isPaid ? (darkMode ? '#334155' : '#d1d5db') : item.type === 'goal' ? '#ede9fe' : item.type === 'debt' ? '#fee2e2' : item.type === 'income' ? '#d1fae5' : item.sourceType === 'extraDebt' ? '#f3e8ff' : '#dbeafe', 
+      color: item.isPaid ? theme.textMuted : '#1e293b', 
+      borderRadius: '6px', 
+      opacity: item.isPaid ? 0.7 : 1, 
+      border: '1px solid rgba(0,0,0,0.1)',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: '8px'
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: item.isPaid ? 'line-through' : 'none' }}>{item.name}</div>
+        <div style={{ fontSize: compact ? '9px' : '11px', color: '#666' }}>${parseFloat(item.amount || 0).toFixed(0)}</div>
+      </div>
+      <button 
+        onClick={(e) => { e.stopPropagation(); togglePaid(item.id, item.sourceType, item.sourceId, parseFloat(item.amount || 0), item.targetDebtId) }} 
+        style={{ 
+          padding: compact ? '4px 8px' : '6px 12px', 
+          background: item.isPaid ? '#6b7280' : item.sourceType === 'extraDebt' ? '#8b5cf6' : '#10b981', 
+          color: 'white', 
+          border: 'none', 
+          borderRadius: '4px', 
+          cursor: 'pointer', 
+          fontSize: compact ? '10px' : '12px', 
+          fontWeight: 700,
+          flexShrink: 0
+        }}
+      >
+        {item.isPaid ? '✓' : 'PAY'}
+      </button>
+    </div>
+  )
+
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
+      {/* EXPANDED DAY MODAL */}
+      {expandedDay && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setExpandedDay(null)}>
+          <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '24px', maxWidth: '500px', width: '90%', maxHeight: '80vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📅 {calendarMonth.toLocaleDateString('en-US', { month: 'long' })} {expandedDay.day}</h3>
+              <button onClick={() => setExpandedDay(null)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: theme.textMuted }}>×</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {expandedDay.items.length === 0 ? (
+                <div style={{ color: theme.textMuted, textAlign: 'center', padding: '20px' }}>No items scheduled</div>
+              ) : expandedDay.items.map(item => renderCalendarItem(item, false))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <header style={{ padding: '16px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ margin: 0, color: theme.text, fontSize: '24px', fontWeight: 'bold' }}>💰 Premium Finance</h1>
@@ -362,38 +438,59 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* CALENDAR - with clickable days */}
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <button onClick={prevMonth} style={btnPrimary}>← Prev</button>
                 <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>📅 {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
                 <button onClick={nextMonth} style={btnPrimary}>Next →</button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (<div key={day} style={{ textAlign: 'center', fontWeight: 600, color: theme.textMuted, padding: '12px', fontSize: '13px' }}>{day}</div>))}
-                {Array.from({ length: getDaysInMonth().firstDay }).map((_, i) => (<div key={'empty-' + i} style={{ minHeight: '120px' }} />))}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (<div key={day} style={{ textAlign: 'center', fontWeight: 600, color: theme.textMuted, padding: '10px', fontSize: '13px' }}>{day}</div>))}
+                {Array.from({ length: getDaysInMonth().firstDay }).map((_, i) => (<div key={'empty-' + i} style={{ minHeight: '110px' }} />))}
                 {Array.from({ length: getDaysInMonth().daysInMonth }).map((_, i) => {
                   const day = i + 1
                   const dayItems = getCalendarItemsForDay(day)
                   const isToday = new Date().getDate() === day && new Date().getMonth() === calendarMonth.getMonth() && new Date().getFullYear() === calendarMonth.getFullYear()
+                  const paidCount = dayItems.filter(it => it.isPaid).length
+                  const unpaidCount = dayItems.filter(it => !it.isPaid).length
+                  
                   return (
-                    <div key={day} style={{ minHeight: '120px', padding: '8px', background: isToday ? (darkMode ? '#1e3a5f' : '#eff6ff') : (darkMode ? '#1e293b' : '#fafafa'), borderRadius: '10px', border: isToday ? '2px solid ' + theme.accent : '1px solid ' + theme.border, overflow: 'hidden' }}>
-                      <div style={{ fontWeight: isToday ? 700 : 600, marginBottom: '6px', color: isToday ? theme.accent : theme.text, fontSize: '14px' }}>{day}</div>
-                      {dayItems.slice(0, 2).map(item => (
-                        <div key={item.id} style={{ fontSize: '10px', padding: '6px', marginBottom: '4px', background: item.isPaid ? (darkMode ? '#334155' : '#d1d5db') : item.type === 'goal' ? '#ede9fe' : item.type === 'debt' ? '#fee2e2' : item.type === 'income' ? '#d1fae5' : item.sourceType === 'extraDebt' ? '#f3e8ff' : '#dbeafe', color: item.isPaid ? theme.textMuted : '#1e293b', borderRadius: '6px', opacity: item.isPaid ? 0.7 : 1, border: '1px solid rgba(0,0,0,0.1)' }}>
-                          <div style={{ fontWeight: 600, marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: item.isPaid ? 'line-through' : 'none', fontSize: '9px' }}>{item.name}</div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontSize: '9px', color: '#666' }}>${parseFloat(item.amount || 0).toFixed(0)}</span>
-                            <button onClick={(e) => { e.stopPropagation(); togglePaid(item.id, item.sourceType, item.sourceId, parseFloat(item.amount || 0), item.targetDebtId) }} style={{ padding: '3px 8px', background: item.isPaid ? '#6b7280' : item.sourceType === 'extraDebt' ? '#8b5cf6' : '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}>{item.isPaid ? '✓' : 'PAY'}</button>
+                    <div 
+                      key={day} 
+                      onClick={() => dayItems.length > 0 && setExpandedDay({ day, items: dayItems })}
+                      style={{ 
+                        minHeight: '110px', 
+                        padding: '6px', 
+                        background: isToday ? (darkMode ? '#1e3a5f' : '#eff6ff') : (darkMode ? '#1e293b' : '#fafafa'), 
+                        borderRadius: '8px', 
+                        border: isToday ? '2px solid ' + theme.accent : '1px solid ' + theme.border, 
+                        overflow: 'hidden',
+                        cursor: dayItems.length > 0 ? 'pointer' : 'default'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: isToday ? 700 : 600, color: isToday ? theme.accent : theme.text, fontSize: '14px' }}>{day}</span>
+                        {dayItems.length > 0 && (
+                          <div style={{ display: 'flex', gap: '2px' }}>
+                            {unpaidCount > 0 && <span style={{ background: theme.success, color: 'white', fontSize: '9px', padding: '1px 4px', borderRadius: '4px', fontWeight: 700 }}>{unpaidCount}</span>}
+                            {paidCount > 0 && <span style={{ background: '#6b7280', color: 'white', fontSize: '9px', padding: '1px 4px', borderRadius: '4px', fontWeight: 700 }}>✓{paidCount}</span>}
                           </div>
+                        )}
+                      </div>
+                      {dayItems.slice(0, 2).map(item => renderCalendarItem(item, true))}
+                      {dayItems.length > 2 && (
+                        <div style={{ fontSize: '10px', color: theme.accent, textAlign: 'center', marginTop: '2px', fontWeight: 600 }}>
+                          +{dayItems.length - 2} more (click to view)
                         </div>
-                      ))}
-                      {dayItems.length > 2 && <div style={{ fontSize: '9px', color: theme.textMuted, textAlign: 'center', marginTop: '2px' }}>+{dayItems.length - 2} more</div>}
+                      )}
                     </div>
                   )
                 })}
               </div>
             </div>
 
+            {/* DEBT CALCULATOR */}
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '20px' }}>💳 Debt Payoff Calculator</h2>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap', padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
@@ -435,6 +532,7 @@ export default function Dashboard() {
               )}
             </div>
 
+            {/* GOALS */}
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '20px' }}>🎯 Savings Goals</h2>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap', padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
