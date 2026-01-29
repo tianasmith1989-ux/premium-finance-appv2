@@ -22,7 +22,9 @@ export default function Dashboard() {
   const [payoffMethod, setPayoffMethod] = useState<'snowball' | 'avalanche'>('avalanche')
   
   const [goals, setGoals] = useState<any[]>([])
-  const [newGoal, setNewGoal] = useState({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: new Date().toISOString().split('T')[0] })
+  const [newGoal, setNewGoal] = useState({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: new Date().toISOString().split('T')[0], paymentAmount: '' })
+  const [extraGoalPayment, setExtraGoalPayment] = useState('')
+  const [selectedGoalForExtra, setSelectedGoalForExtra] = useState<number | null>(null)
   
   const [assets, setAssets] = useState<any[]>([])
   const [newAsset, setNewAsset] = useState({ name: '', value: '', type: 'savings' })
@@ -138,8 +140,9 @@ export default function Dashboard() {
       ...expenses.map(exp => ({ 
         id: 'expense-' + exp.id, 
         sourceId: exp.id, 
-        sourceType: exp.targetDebtId ? 'extraDebt' : 'expense',
+        sourceType: exp.targetDebtId ? 'extraDebt' : exp.targetGoalId ? 'extraGoal' : 'expense',
         targetDebtId: exp.targetDebtId,
+        targetGoalId: exp.targetGoalId,
         name: '💸 ' + exp.name, 
         amount: exp.amount, 
         dueDate: exp.dueDate, 
@@ -147,7 +150,11 @@ export default function Dashboard() {
         type: 'expense' 
       })),
       ...debts.filter(d => d.paymentDate).map(debt => ({ id: 'debt-' + debt.id, sourceId: debt.id, sourceType: 'debt', name: '💳 ' + debt.name, amount: debt.minPayment, dueDate: debt.paymentDate, frequency: debt.frequency, type: 'debt' })),
-      ...goals.filter(g => g.startDate).map(goal => ({ id: 'goal-' + goal.id, sourceId: goal.id, sourceType: 'goal', name: '🎯 ' + goal.name, amount: goal.deadline ? calculateGoalPayment(goal).toFixed(2) : '0', dueDate: goal.startDate, frequency: goal.savingsFrequency, type: 'goal' }))
+      ...goals.filter(g => g.startDate).map(goal => {
+        // Use manual payment amount if set, otherwise calculate from deadline
+        const paymentAmt = goal.paymentAmount ? parseFloat(goal.paymentAmount) : (goal.deadline ? calculateGoalPayment(goal) : 0)
+        return { id: 'goal-' + goal.id, sourceId: goal.id, sourceType: 'goal', name: '🎯 ' + goal.name, amount: paymentAmt.toFixed(2), dueDate: goal.startDate, frequency: goal.savingsFrequency, type: 'goal' }
+      })
     ]
     
     allItems.forEach(item => {
@@ -203,7 +210,7 @@ export default function Dashboard() {
   }
 
   // Toggle paid - each occurrence is independent
-  const togglePaid = (itemId: string, sourceType: string, sourceId: number, amount: number, targetDebtId?: number) => {
+  const togglePaid = (itemId: string, sourceType: string, sourceId: number, amount: number, targetDebtId?: number, targetGoalId?: number) => {
     const newPaid = new Set(paidOccurrences)
     const paymentAmount = amount || 0
     
@@ -218,6 +225,8 @@ export default function Dashboard() {
         setDebts(prev => prev.map(d => d.id === sourceId ? { ...d, balance: (parseFloat(d.balance || 0) + paymentAmount).toFixed(2) } : d))
       } else if (sourceType === 'extraDebt' && targetDebtId) {
         setDebts(prev => prev.map(d => d.id === targetDebtId ? { ...d, balance: (parseFloat(d.balance || 0) + paymentAmount).toFixed(2) } : d))
+      } else if (sourceType === 'extraGoal' && targetGoalId) {
+        setGoals(prev => prev.map(g => g.id === targetGoalId ? { ...g, saved: Math.max(0, parseFloat(g.saved || 0) - paymentAmount).toFixed(2) } : g))
       }
     } else {
       // PAYING - add to paid set
@@ -230,6 +239,8 @@ export default function Dashboard() {
         setDebts(prev => prev.map(d => d.id === sourceId ? { ...d, balance: Math.max(0, parseFloat(d.balance || 0) - paymentAmount).toFixed(2) } : d))
       } else if (sourceType === 'extraDebt' && targetDebtId) {
         setDebts(prev => prev.map(d => d.id === targetDebtId ? { ...d, balance: Math.max(0, parseFloat(d.balance || 0) - paymentAmount).toFixed(2) } : d))
+      } else if (sourceType === 'extraGoal' && targetGoalId) {
+        setGoals(prev => prev.map(g => g.id === targetGoalId ? { ...g, saved: (parseFloat(g.saved || 0) + paymentAmount).toFixed(2) } : g))
       }
     }
     
@@ -242,7 +253,7 @@ export default function Dashboard() {
   const deleteExpense = (id: number) => setExpenses(expenses.filter(e => e.id !== id))
   const addDebt = () => { if (!newDebt.name || !newDebt.balance) return; setDebts([...debts, { ...newDebt, id: Date.now(), originalBalance: newDebt.balance }]); setNewDebt({ name: '', balance: '', interestRate: '', minPayment: '', frequency: 'monthly', paymentDate: new Date().toISOString().split('T')[0] }) }
   const deleteDebt = (id: number) => setDebts(debts.filter(d => d.id !== id))
-  const addGoal = () => { if (!newGoal.name || !newGoal.target) return; setGoals([...goals, { ...newGoal, saved: newGoal.saved || '0', id: Date.now() }]); setNewGoal({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: new Date().toISOString().split('T')[0] }) }
+  const addGoal = () => { if (!newGoal.name || !newGoal.target) return; setGoals([...goals, { ...newGoal, saved: newGoal.saved || '0', paymentAmount: newGoal.paymentAmount || '', id: Date.now() }]); setNewGoal({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: new Date().toISOString().split('T')[0], paymentAmount: '' }) }
   const deleteGoal = (id: number) => setGoals(goals.filter(g => g.id !== id))
   const addAsset = () => { if (!newAsset.name || !newAsset.value) return; setAssets([...assets, { ...newAsset, id: Date.now() }]); setNewAsset({ name: '', value: '', type: 'savings' }) }
   const deleteAsset = (id: number) => setAssets(assets.filter(a => a.id !== id))
@@ -260,6 +271,27 @@ export default function Dashboard() {
     setExpenses([...expenses, { id: Date.now(), name: 'Extra → ' + targetDebt.name, amount: extraPayment, frequency: 'monthly', dueDate: paymentDate, targetDebtId: targetDebt.id }])
     alert('Extra payment of $' + extraPayment + '/month added targeting ' + targetDebt.name)
     setExtraPayment('')
+  }
+
+  const addExtraGoalPayment = (goalId: number) => {
+    if (!extraGoalPayment || parseFloat(extraGoalPayment) <= 0) { alert('Please enter an extra payment amount'); return }
+    const goal = goals.find(g => g.id === goalId)
+    if (!goal) return
+    const paymentDate = prompt('When should extra goal payment start? (YYYY-MM-DD):', new Date().toISOString().split('T')[0])
+    if (!paymentDate) return
+    // Add as an income (negative expense) that goes to the goal
+    setGoals(prev => prev.map(g => {
+      if (g.id === goalId) {
+        // Create a new goal entry for the extra payment schedule
+        return g
+      }
+      return g
+    }))
+    // Add extra goal payment as a special expense type that adds to goal when paid
+    setExpenses([...expenses, { id: Date.now(), name: 'Extra → ' + goal.name, amount: extraGoalPayment, frequency: 'monthly', dueDate: paymentDate, targetGoalId: goalId }])
+    alert('Extra payment of $' + extraGoalPayment + '/month added for goal: ' + goal.name)
+    setExtraGoalPayment('')
+    setSelectedGoalForExtra(null)
   }
 
   const calculateDebtPayoff = () => {
@@ -314,7 +346,7 @@ export default function Dashboard() {
       fontSize: compact ? '11px' : '13px', 
       padding: compact ? '4px 6px' : '8px 10px', 
       marginBottom: '4px', 
-      background: item.isPaid ? (darkMode ? '#334155' : '#d1d5db') : item.type === 'goal' ? '#ede9fe' : item.type === 'debt' ? '#fee2e2' : item.type === 'income' ? '#d1fae5' : item.sourceType === 'extraDebt' ? '#f3e8ff' : '#dbeafe', 
+      background: item.isPaid ? (darkMode ? '#334155' : '#d1d5db') : item.type === 'goal' ? '#ede9fe' : item.type === 'debt' ? '#fee2e2' : item.type === 'income' ? '#d1fae5' : (item.sourceType === 'extraDebt' || item.sourceType === 'extraGoal') ? '#f3e8ff' : '#dbeafe', 
       color: item.isPaid ? theme.textMuted : '#1e293b', 
       borderRadius: '6px', 
       opacity: item.isPaid ? 0.7 : 1, 
@@ -329,10 +361,10 @@ export default function Dashboard() {
         <div style={{ fontSize: compact ? '9px' : '11px', color: '#666' }}>${parseFloat(item.amount || 0).toFixed(0)}</div>
       </div>
       <button 
-        onClick={(e) => { e.stopPropagation(); togglePaid(item.id, item.sourceType, item.sourceId, parseFloat(item.amount || 0), item.targetDebtId) }} 
+        onClick={(e) => { e.stopPropagation(); togglePaid(item.id, item.sourceType, item.sourceId, parseFloat(item.amount || 0), item.targetDebtId, item.targetGoalId) }} 
         style={{ 
           padding: compact ? '4px 8px' : '6px 12px', 
-          background: item.isPaid ? '#6b7280' : item.sourceType === 'extraDebt' ? '#8b5cf6' : '#10b981', 
+          background: item.isPaid ? '#6b7280' : (item.sourceType === 'extraDebt' || item.sourceType === 'extraGoal' || item.sourceType === 'goal') ? '#8b5cf6' : '#10b981', 
           color: 'white', 
           border: 'none', 
           borderRadius: '4px', 
@@ -545,26 +577,49 @@ export default function Dashboard() {
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '20px' }}>🎯 Savings Goals</h2>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap', padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
-                <input type="text" placeholder="Goal" value={newGoal.name} onChange={(e) => setNewGoal({ ...newGoal, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 80px' }} />
-                <input type="number" placeholder="Target" value={newGoal.target} onChange={(e) => setNewGoal({ ...newGoal, target: e.target.value })} style={{ ...inputStyle, width: '80px' }} />
-                <input type="number" placeholder="Saved" value={newGoal.saved} onChange={(e) => setNewGoal({ ...newGoal, saved: e.target.value })} style={{ ...inputStyle, width: '70px' }} />
-                <input type="date" placeholder="Deadline" value={newGoal.deadline} onChange={(e) => setNewGoal({ ...newGoal, deadline: e.target.value })} title="Deadline (optional)" style={inputStyle} />
-                <input type="date" placeholder="Start" value={newGoal.startDate} onChange={(e) => setNewGoal({ ...newGoal, startDate: e.target.value })} title="Start saving date" style={inputStyle} />
+                <input type="text" placeholder="Goal name" value={newGoal.name} onChange={(e) => setNewGoal({ ...newGoal, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
+                <input type="number" placeholder="Target $" value={newGoal.target} onChange={(e) => setNewGoal({ ...newGoal, target: e.target.value })} style={{ ...inputStyle, width: '80px' }} />
+                <input type="number" placeholder="Saved $" value={newGoal.saved} onChange={(e) => setNewGoal({ ...newGoal, saved: e.target.value })} style={{ ...inputStyle, width: '70px' }} />
+                <input type="number" placeholder="Payment $" value={newGoal.paymentAmount} onChange={(e) => setNewGoal({ ...newGoal, paymentAmount: e.target.value })} title="Amount to save each period" style={{ ...inputStyle, width: '80px' }} />
+                <input type="date" value={newGoal.startDate} onChange={(e) => setNewGoal({ ...newGoal, startDate: e.target.value })} title="Start saving date" style={inputStyle} />
                 <select value={newGoal.savingsFrequency} onChange={(e) => setNewGoal({ ...newGoal, savingsFrequency: e.target.value })} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
                 <button onClick={addGoal} style={btnPurple}>Add</button>
+              </div>
+              <div style={{ fontSize: '12px', color: theme.textMuted, marginBottom: '16px', padding: '0 16px' }}>
+                💡 Set a "Payment $" amount to add recurring savings to your calendar. Leave blank and set a deadline to auto-calculate.
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {goals.length === 0 ? <div style={{ color: theme.textMuted, textAlign: 'center', padding: '20px' }}>No goals added</div> : goals.map(goal => {
                   const progress = (parseFloat(goal.saved || 0) / parseFloat(goal.target || 1)) * 100
-                  const payment = calculateGoalPayment(goal)
+                  const payment = goal.paymentAmount ? parseFloat(goal.paymentAmount) : calculateGoalPayment(goal)
+                  const isComplete = progress >= 100
                   return (
-                    <div key={goal.id} style={{ padding: '16px', background: darkMode ? '#334155' : '#faf5ff', borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div key={goal.id} style={{ padding: '16px', background: isComplete ? (darkMode ? '#1e3a32' : '#f0fdf4') : (darkMode ? '#334155' : '#faf5ff'), borderRadius: '12px', border: isComplete ? '2px solid ' + theme.success : '1px solid ' + theme.border }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <div><div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{goal.name}</div><div style={{ color: theme.textMuted, fontSize: '13px' }}>${parseFloat(goal.saved || 0).toFixed(2)} / ${parseFloat(goal.target).toFixed(2)}{goal.deadline ? ' • Due: ' + new Date(goal.deadline).toLocaleDateString() : ''}</div></div>
-                        <button onClick={() => deleteGoal(goal.id)} style={{ ...btnDanger, padding: '6px 12px', fontSize: '12px' }}>Delete</button>
+                        <div>
+                          <div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{isComplete ? '✅ ' : '🎯 '}{goal.name}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '13px' }}>${parseFloat(goal.saved || 0).toFixed(2)} / ${parseFloat(goal.target).toFixed(2)}{goal.deadline ? ' • Due: ' + new Date(goal.deadline).toLocaleDateString() : ''}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          {!isComplete && selectedGoalForExtra === goal.id ? (
+                            <>
+                              <input type="number" placeholder="Extra $" value={extraGoalPayment} onChange={(e) => setExtraGoalPayment(e.target.value)} style={{ ...inputStyle, width: '70px', padding: '6px 10px' }} />
+                              <button onClick={() => addExtraGoalPayment(goal.id)} style={{ ...btnPurple, padding: '6px 10px', fontSize: '11px' }}>Add</button>
+                              <button onClick={() => setSelectedGoalForExtra(null)} style={{ ...btnDanger, padding: '6px 10px', fontSize: '11px' }}>✕</button>
+                            </>
+                          ) : (
+                            <>
+                              {!isComplete && <button onClick={() => setSelectedGoalForExtra(goal.id)} style={{ ...btnPurple, padding: '6px 10px', fontSize: '11px' }}>+ Extra</button>}
+                              <button onClick={() => deleteGoal(goal.id)} style={{ ...btnDanger, padding: '6px 10px', fontSize: '11px' }}>Delete</button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ width: '100%', height: '10px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '5px', overflow: 'hidden' }}><div style={{ width: Math.min(progress, 100) + '%', height: '100%', background: 'linear-gradient(to right, ' + theme.purple + ', #7c3aed)' }} /></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}><span style={{ color: theme.textMuted, fontSize: '12px' }}>{progress.toFixed(1)}%</span>{payment > 0 && <span style={{ color: theme.purple, fontSize: '12px', fontWeight: 600 }}>Save ${payment.toFixed(2)}/{goal.savingsFrequency}</span>}</div>
+                      <div style={{ width: '100%', height: '10px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '5px', overflow: 'hidden' }}><div style={{ width: Math.min(progress, 100) + '%', height: '100%', background: isComplete ? theme.success : 'linear-gradient(to right, ' + theme.purple + ', #7c3aed)' }} /></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+                        <span style={{ color: isComplete ? theme.success : theme.textMuted, fontSize: '12px', fontWeight: isComplete ? 600 : 400 }}>{isComplete ? '🎉 Goal Complete!' : progress.toFixed(1) + '%'}</span>
+                        {payment > 0 && !isComplete && <span style={{ color: theme.purple, fontSize: '12px', fontWeight: 600 }}>📅 ${payment.toFixed(2)}/{goal.savingsFrequency}</span>}
+                      </div>
                     </div>
                   )
                 })}
