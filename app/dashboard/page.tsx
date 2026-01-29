@@ -294,11 +294,19 @@ export default function Dashboard() {
     setSelectedGoalForExtra(null)
   }
 
-  const calculateDebtPayoff = () => {
-    const extra = parseFloat(extraPayment || '0')
+  const calculateDebtPayoff = (includeExtras: boolean = true) => {
+    const extra = includeExtras ? parseFloat(extraPayment || '0') : 0
+    
+    // Also include any existing extra payments from expenses
+    const scheduledExtraPayments = includeExtras ? expenses
+      .filter(exp => exp.targetDebtId)
+      .reduce((sum, exp) => sum + convertToMonthly(parseFloat(exp.amount || 0), exp.frequency), 0) : 0
+    
+    const totalExtra = extra + scheduledExtraPayments
+    
     const sortedDebts = [...debts].sort((a, b) => payoffMethod === 'snowball' ? parseFloat(a.balance) - parseFloat(b.balance) : parseFloat(b.interestRate) - parseFloat(a.interestRate))
     const remainingDebts = sortedDebts.map(d => ({ ...d, remainingBalance: parseFloat(d.balance) }))
-    let totalInterestPaid = 0, monthsToPayoff = 0, availableExtra = extra
+    let totalInterestPaid = 0, monthsToPayoff = 0, availableExtra = totalExtra
     while (remainingDebts.some(d => d.remainingBalance > 0) && monthsToPayoff < 600) {
       monthsToPayoff++
       remainingDebts.forEach((debt, idx) => {
@@ -311,7 +319,7 @@ export default function Dashboard() {
         if (debt.remainingBalance === 0) availableExtra += minPayment
       })
     }
-    return { monthsToPayoff, totalInterestPaid }
+    return { monthsToPayoff, totalInterestPaid, scheduledExtra: scheduledExtraPayments, totalExtra }
   }
 
   const fiPath = (() => {
@@ -561,13 +569,68 @@ export default function Dashboard() {
                     })}
                   </div>
                   <div style={{ padding: '20px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '12px' }}>
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
                       <button onClick={() => setPayoffMethod('avalanche')} style={{ ...btnPrimary, background: payoffMethod === 'avalanche' ? theme.success : theme.cardBg, color: payoffMethod === 'avalanche' ? 'white' : theme.text, border: '2px solid ' + (payoffMethod === 'avalanche' ? theme.success : theme.border) }}>🏔️ Avalanche</button>
                       <button onClick={() => setPayoffMethod('snowball')} style={{ ...btnPrimary, background: payoffMethod === 'snowball' ? theme.success : theme.cardBg, color: payoffMethod === 'snowball' ? 'white' : theme.text, border: '2px solid ' + (payoffMethod === 'snowball' ? theme.success : theme.border) }}>❄️ Snowball</button>
                       <input type="number" placeholder="Extra $" value={extraPayment} onChange={(e) => setExtraPayment(e.target.value)} style={{ ...inputStyle, width: '90px' }} />
                       <button onClick={addExtraPaymentToCalendar} style={btnPurple}>📅 Add Extra</button>
                     </div>
-                    {(() => { const p = calculateDebtPayoff(); return (<div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.8 }}><div>⏱️ Time: <strong>{Math.floor(p.monthsToPayoff / 12)}y {p.monthsToPayoff % 12}m</strong></div><div>💸 Interest: <strong>${p.totalInterestPaid.toFixed(2)}</strong></div></div>) })()}
+                    
+                    {/* Side-by-side comparison */}
+                    {(() => { 
+                      const withoutExtras = calculateDebtPayoff(false)
+                      const withExtras = calculateDebtPayoff(true)
+                      const timeSaved = withoutExtras.monthsToPayoff - withExtras.monthsToPayoff
+                      const interestSaved = withoutExtras.totalInterestPaid - withExtras.totalInterestPaid
+                      const hasExtras = withExtras.totalExtra > 0
+                      
+                      return (
+                        <div style={{ display: 'grid', gridTemplateColumns: hasExtras ? '1fr 1fr' : '1fr', gap: '16px' }}>
+                          {/* Without Extras */}
+                          <div style={{ padding: '16px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '12px', border: '2px solid ' + theme.danger }}>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: theme.danger, marginBottom: '12px' }}>😰 Minimum Payments Only</div>
+                            <div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}>
+                              <div>⏱️ Time: <strong>{Math.floor(withoutExtras.monthsToPayoff / 12)}y {withoutExtras.monthsToPayoff % 12}m</strong></div>
+                              <div>💸 Interest: <strong style={{ color: theme.danger }}>${withoutExtras.totalInterestPaid.toFixed(2)}</strong></div>
+                            </div>
+                          </div>
+                          
+                          {/* With Extras */}
+                          {hasExtras && (
+                            <div style={{ padding: '16px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '12px', border: '2px solid ' + theme.success }}>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: theme.success, marginBottom: '12px' }}>🚀 With Extra Payments (+${withExtras.totalExtra.toFixed(0)}/mo)</div>
+                              <div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}>
+                                <div>⏱️ Time: <strong>{Math.floor(withExtras.monthsToPayoff / 12)}y {withExtras.monthsToPayoff % 12}m</strong></div>
+                                <div>💸 Interest: <strong style={{ color: theme.success }}>${withExtras.totalInterestPaid.toFixed(2)}</strong></div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Savings Summary */}
+                          {hasExtras && timeSaved > 0 && (
+                            <div style={{ gridColumn: '1 / -1', padding: '16px', background: 'linear-gradient(135deg, ' + theme.success + '20, ' + theme.purple + '20)', borderRadius: '12px', border: '2px solid ' + theme.purple, textAlign: 'center' }}>
+                              <div style={{ fontSize: '16px', fontWeight: 700, color: theme.purple, marginBottom: '8px' }}>🎉 You Save</div>
+                              <div style={{ display: 'flex', justifyContent: 'center', gap: '32px', flexWrap: 'wrap' }}>
+                                <div>
+                                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: theme.success }}>{Math.floor(timeSaved / 12)}y {timeSaved % 12}m</div>
+                                  <div style={{ fontSize: '12px', color: theme.textMuted }}>faster payoff</div>
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: theme.success }}>${interestSaved.toFixed(0)}</div>
+                                  <div style={{ fontSize: '12px', color: theme.textMuted }}>less interest</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {!hasExtras && (
+                            <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '8px', textAlign: 'center' }}>
+                              <div style={{ color: theme.textMuted, fontSize: '13px' }}>💡 Enter an extra payment amount above to see how much faster you can be debt-free!</div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                 </>
               )}
