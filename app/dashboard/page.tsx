@@ -345,7 +345,7 @@ export default function Dashboard() {
     const totalPayments = totalMinPayments + totalExtra
     
     // If payments don't cover interest, return error state
-    if (totalPayments < totalMonthlyInterest * 0.99) { // 0.99 to handle rounding
+    if (totalPayments < totalMonthlyInterest * 0.99) {
       return { 
         monthsToPayoff: -1, 
         totalInterestPaid: 0, 
@@ -358,22 +358,66 @@ export default function Dashboard() {
       }
     }
     
-    const sortedDebts = [...debts].sort((a, b) => payoffMethod === 'snowball' ? parseFloat(a.balance) - parseFloat(b.balance) : parseFloat(b.interestRate) - parseFloat(a.interestRate))
-    const remainingDebts = sortedDebts.map(d => ({ ...d, remainingBalance: parseFloat(d.balance || 0) }))
-    let totalInterestPaid = 0, monthsToPayoff = 0, availableExtra = totalExtra
+    // Sort debts based on method
+    const sortedDebts = [...debts].sort((a, b) => {
+      if (payoffMethod === 'snowball') {
+        return parseFloat(a.balance || 0) - parseFloat(b.balance || 0)
+      } else {
+        return parseFloat(b.interestRate || 0) - parseFloat(a.interestRate || 0)
+      }
+    })
+    
+    // Create working copies with remaining balance
+    const remainingDebts = sortedDebts.map(d => ({ 
+      ...d, 
+      remainingBalance: parseFloat(d.balance || 0),
+      minPayment: convertToMonthly(parseFloat(d.minPayment || 0), d.frequency || 'monthly')
+    }))
+    
+    let totalInterestPaid = 0
+    let monthsToPayoff = 0
     
     while (remainingDebts.some(d => d.remainingBalance > 0) && monthsToPayoff < 600) {
       monthsToPayoff++
+      
+      // Calculate total available for extra payments this month
+      // (includes freed up min payments from paid off debts)
+      let availableExtra = totalExtra
+      
+      // Add minimum payments from paid-off debts to available extra
+      remainingDebts.forEach(debt => {
+        if (debt.remainingBalance <= 0) {
+          availableExtra += debt.minPayment
+        }
+      })
+      
+      // Process each debt
       remainingDebts.forEach((debt, idx) => {
         if (debt.remainingBalance <= 0) return
+        
+        // Calculate this month's interest
         const monthlyInterest = (debt.remainingBalance * parseFloat(debt.interestRate || 0) / 100) / 12
         totalInterestPaid += monthlyInterest
-        const minPayment = convertToMonthly(parseFloat(debt.minPayment || 0), debt.frequency || 'monthly')
-        const totalPayment = minPayment + (idx === 0 ? availableExtra : 0)
-        debt.remainingBalance = Math.max(0, debt.remainingBalance + monthlyInterest - totalPayment)
-        if (debt.remainingBalance === 0) availableExtra += minPayment
+        
+        // Add interest to balance
+        debt.remainingBalance += monthlyInterest
+        
+        // Apply minimum payment
+        const minPaymentApplied = Math.min(debt.minPayment, debt.remainingBalance)
+        debt.remainingBalance -= minPaymentApplied
+        
+        // Apply extra payment to the TARGET debt (first unpaid debt in sorted order)
+        const isTargetDebt = remainingDebts.findIndex(d => d.remainingBalance > 0) === idx
+        if (isTargetDebt && availableExtra > 0) {
+          const extraApplied = Math.min(availableExtra, debt.remainingBalance)
+          debt.remainingBalance -= extraApplied
+        }
+        
+        // Ensure no negative balance
+        debt.remainingBalance = Math.max(0, debt.remainingBalance)
       })
     }
+    
     return { 
       monthsToPayoff, 
       totalInterestPaid, 
