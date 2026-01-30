@@ -261,45 +261,37 @@ export default function Dashboard() {
   const deleteLiability = (id: number) => setLiabilities(liabilities.filter(l => l.id !== id))
   const addTrade = () => { if (!newTrade.instrument) return; setTrades([...trades, { ...newTrade, id: Date.now() }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())); setNewTrade({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '' }) }
 
-  const addExtraPaymentToCalendar = () => {
-    if (!extraPayment || parseFloat(extraPayment) <= 0) { alert('Please enter an extra payment amount'); return }
-    if (debts.length === 0) { alert('No debts to apply extra payment to'); return }
+  // State for per-debt extra payments
+  const [debtExtraPayment, setDebtExtraPayment] = useState<{[key: number]: {amount: string, frequency: string}}>({})
+  const [showExtraInput, setShowExtraInput] = useState<number | null>(null)
+  
+  const addExtraPaymentToDebt = (debtId: number) => {
+    const extra = debtExtraPayment[debtId]
+    if (!extra || !extra.amount || parseFloat(extra.amount) <= 0) { 
+      alert('Please enter an extra payment amount'); 
+      return 
+    }
     
-    // Sort debts based on payoff method
-    const sortedDebts = [...debts].sort((a, b) => {
-      if (payoffMethod === 'snowball') {
-        // Snowball: lowest balance first
-        return parseFloat(a.balance) - parseFloat(b.balance)
-      } else {
-        // Avalanche: highest interest rate first
-        return parseFloat(b.interestRate) - parseFloat(a.interestRate)
-      }
-    })
-    
-    const targetDebt = sortedDebts[0]
-    
-    // Show which debt will be targeted and why
-    const methodExplanation = payoffMethod === 'avalanche' 
-      ? `(highest interest: ${targetDebt.interestRate}%)`
-      : `(lowest balance: $${parseFloat(targetDebt.balance).toFixed(2)})`
-    
-    const confirmMsg = `Add $${extraPayment}/month extra payment to "${targetDebt.name}" ${methodExplanation}?`
-    if (!confirm(confirmMsg)) return
+    const debt = debts.find(d => d.id === debtId)
+    if (!debt) return
     
     const paymentDate = prompt('When should extra payment start? (YYYY-MM-DD):', new Date().toISOString().split('T')[0])
     if (!paymentDate) return
     
+    const frequencyLabel = extra.frequency === 'once' ? 'one-time' : extra.frequency
+    
     setExpenses([...expenses, { 
       id: Date.now(), 
-      name: 'Extra → ' + targetDebt.name, 
-      amount: extraPayment, 
-      frequency: 'monthly', 
+      name: 'Extra → ' + debt.name, 
+      amount: extra.amount, 
+      frequency: extra.frequency, 
       dueDate: paymentDate, 
-      targetDebtId: targetDebt.id 
+      targetDebtId: debt.id 
     }])
     
-    alert(`✅ Extra payment of $${extraPayment}/month added!\n\nTarget: ${targetDebt.name}\nMethod: ${payoffMethod === 'avalanche' ? '🏔️ Avalanche' : '❄️ Snowball'}\nReason: ${methodExplanation}`)
-    setExtraPayment('')
+    alert(`✅ Extra payment added!\n\nAmount: $${extra.amount} (${frequencyLabel})\nTarget: ${debt.name}`)
+    setDebtExtraPayment(prev => ({ ...prev, [debtId]: { amount: '', frequency: 'monthly' } }))
+    setShowExtraInput(null)
   }
 
   const addExtraGoalPayment = (goalId: number) => {
@@ -323,110 +315,85 @@ export default function Dashboard() {
     setSelectedGoalForExtra(null)
   }
 
-  const calculateDebtPayoff = (includeExtras: boolean = true) => {
-    const extra = includeExtras ? parseFloat(extraPayment || '0') : 0
+  // Calculate payoff for a single debt
+  const calculateSingleDebtPayoff = (debt: any, includeExtras: boolean = true) => {
+    const balance = parseFloat(debt.balance || 0)
+    const interestRate = parseFloat(debt.interestRate || 0)
+    const minPayment = convertToMonthly(parseFloat(debt.minPayment || 0), debt.frequency || 'monthly')
     
-    // Also include any existing extra payments from expenses
-    const scheduledExtraPayments = includeExtras ? expenses
-      .filter(exp => exp.targetDebtId)
+    // Get extra payments specifically for THIS debt
+    const debtExtras = includeExtras ? expenses
+      .filter(exp => exp.targetDebtId === debt.id)
       .reduce((sum, exp) => sum + convertToMonthly(parseFloat(exp.amount || 0), exp.frequency), 0) : 0
     
-    const totalExtra = extra + scheduledExtraPayments
+    const totalPayment = minPayment + debtExtras
+    const monthlyInterest = (balance * interestRate / 100) / 12
     
-    // Check if total payments cover total interest first
-    const totalMonthlyInterest = debts.reduce((sum, d) => {
-      return sum + (parseFloat(d.balance || 0) * parseFloat(d.interestRate || 0) / 100) / 12
-    }, 0)
-    
-    const totalMinPayments = debts.reduce((sum, d) => {
-      return sum + convertToMonthly(parseFloat(d.minPayment || 0), d.frequency || 'monthly')
-    }, 0)
-    
-    const totalPayments = totalMinPayments + totalExtra
-    
-    // If payments don't cover interest, return error state
-    if (totalPayments < totalMonthlyInterest * 0.99) {
-      return { 
-        monthsToPayoff: -1, 
-        totalInterestPaid: 0, 
-        scheduledExtra: scheduledExtraPayments, 
-        totalExtra,
+    // Check if payment covers interest
+    if (totalPayment < monthlyInterest * 0.99 && totalPayment > 0) {
+      return {
+        monthsToPayoff: -1,
+        totalInterestPaid: 0,
         error: true,
-        shortfall: totalMonthlyInterest - totalPayments,
-        totalMonthlyInterest,
-        totalPayments
+        shortfall: monthlyInterest - totalPayment,
+        monthlyInterest,
+        totalPayment,
+        extraPayments: debtExtras
       }
     }
     
-    // Sort debts based on method
-    const sortedDebts = [...debts].sort((a, b) => {
-      if (payoffMethod === 'snowball') {
-        return parseFloat(a.balance || 0) - parseFloat(b.balance || 0)
-      } else {
-        return parseFloat(b.interestRate || 0) - parseFloat(a.interestRate || 0)
+    if (totalPayment <= 0) {
+      return {
+        monthsToPayoff: -1,
+        totalInterestPaid: 0,
+        error: true,
+        shortfall: monthlyInterest,
+        monthlyInterest,
+        totalPayment: 0,
+        extraPayments: 0
       }
-    })
+    }
     
-    // Create working copies with remaining balance
-    const remainingDebts = sortedDebts.map(d => ({ 
-      ...d, 
-      remainingBalance: parseFloat(d.balance || 0),
-      minPayment: convertToMonthly(parseFloat(d.minPayment || 0), d.frequency || 'monthly')
-    }))
-    
+    let remainingBalance = balance
     let totalInterestPaid = 0
     let monthsToPayoff = 0
     
-    while (remainingDebts.some(d => d.remainingBalance > 0) && monthsToPayoff < 600) {
+    while (remainingBalance > 0 && monthsToPayoff < 600) {
       monthsToPayoff++
-      
-      // Calculate total available for extra payments this month
-      // (includes freed up min payments from paid off debts)
-      let availableExtra = totalExtra
-      
-      // Add minimum payments from paid-off debts to available extra
-      remainingDebts.forEach(debt => {
-        if (debt.remainingBalance <= 0) {
-          availableExtra += debt.minPayment
-        }
-      })
-      
-      // Process each debt
-      remainingDebts.forEach((debt, idx) => {
-        if (debt.remainingBalance <= 0) return
-        
-        // Calculate this month's interest
-        const monthlyInterest = (debt.remainingBalance * parseFloat(debt.interestRate || 0) / 100) / 12
-        totalInterestPaid += monthlyInterest
-        
-        // Add interest to balance
-        debt.remainingBalance += monthlyInterest
-        
-        // Apply minimum payment
-        const minPaymentApplied = Math.min(debt.minPayment, debt.remainingBalance)
-        debt.remainingBalance -= minPaymentApplied
-        
-        // Apply extra payment to the TARGET debt (first unpaid debt in sorted order)
-        const isTargetDebt = remainingDebts.findIndex(d => d.remainingBalance > 0) === idx
-        if (isTargetDebt && availableExtra > 0) {
-          const extraApplied = Math.min(availableExtra, debt.remainingBalance)
-          debt.remainingBalance -= extraApplied
-        }
-        
-        // Ensure no negative balance
-        debt.remainingBalance = Math.max(0, debt.remainingBalance)
-      })
+      const interest = (remainingBalance * interestRate / 100) / 12
+      totalInterestPaid += interest
+      remainingBalance += interest
+      remainingBalance -= Math.min(totalPayment, remainingBalance)
+      remainingBalance = Math.max(0, remainingBalance)
     }
     
-    return { 
-      monthsToPayoff, 
-      totalInterestPaid, 
-      scheduledExtra: scheduledExtraPayments, 
-      totalExtra,
+    return {
+      monthsToPayoff,
+      totalInterestPaid,
       error: false,
-      totalMonthlyInterest,
-      totalPayments
+      monthlyInterest,
+      totalPayment,
+      extraPayments: debtExtras
     }
+  }
+  
+  // Calculate combined totals
+  const calculateTotalDebtPayoff = () => {
+    let maxMonths = 0
+    let totalInterest = 0
+    let hasError = false
+    
+    debts.forEach(debt => {
+      const result = calculateSingleDebtPayoff(debt, true)
+      if (result.error) {
+        hasError = true
+      } else {
+        maxMonths = Math.max(maxMonths, result.monthsToPayoff)
+        totalInterest += result.totalInterestPaid
+      }
+    })
+    
+    return { maxMonths, totalInterest, hasError }
   }
 
   const fiPath = (() => {
@@ -674,131 +641,141 @@ export default function Dashboard() {
                       
                       return debts.map(debt => {
                         const progress = debt.originalBalance ? ((parseFloat(debt.originalBalance) - parseFloat(debt.balance)) / parseFloat(debt.originalBalance)) * 100 : 0
-                        const isTarget = debt.id === targetDebtId
+                        const payoffWithExtras = calculateSingleDebtPayoff(debt, true)
+                        const payoffWithoutExtras = calculateSingleDebtPayoff(debt, false)
+                        const debtExtras = expenses.filter(exp => exp.targetDebtId === debt.id)
+                        const currentExtra = debtExtraPayment[debt.id] || { amount: '', frequency: 'monthly' }
                         
                         return (
-                          <div key={debt.id} style={{ padding: '16px', background: isTarget ? (darkMode ? '#1e3a32' : '#f0fdf4') : (darkMode ? '#334155' : '#fef2f2'), borderRadius: '12px', border: isTarget ? '2px solid ' + theme.success : '1px solid ' + theme.border }}>
+                          <div key={debt.id} style={{ padding: '16px', background: darkMode ? '#334155' : '#fef2f2', borderRadius: '12px', border: '1px solid ' + theme.border }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                               <div>
-                                <div style={{ color: theme.text, fontWeight: 600, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  {debt.name}
-                                  {isTarget && <span style={{ background: theme.success, color: 'white', fontSize: '10px', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>🎯 TARGET</span>}
-                                </div>
+                                <div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{debt.name}</div>
                                 <div style={{ color: theme.textMuted, fontSize: '13px' }}>
                                   ${parseFloat(debt.balance).toFixed(2)} @ {debt.interestRate}%
-                                  {isTarget && <span style={{ color: theme.success, marginLeft: '8px' }}>← {payoffMethod === 'avalanche' ? 'highest rate' : 'lowest balance'}</span>}
+                                  {debt.minPayment && <span> • Min: ${debt.minPayment}/{debt.frequency}</span>}
                                 </div>
                               </div>
                               <button onClick={() => deleteDebt(debt.id)} style={{ ...btnDanger, padding: '6px 12px', fontSize: '12px' }}>Delete</button>
                             </div>
-                            <div style={{ width: '100%', height: '8px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}><div style={{ width: Math.max(0, progress) + '%', height: '100%', background: isTarget ? 'linear-gradient(to right, ' + theme.success + ', #059669)' : 'linear-gradient(to right, ' + theme.warning + ', ' + theme.danger + ')' }} /></div>
-                            <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '6px' }}>{progress.toFixed(1)}% paid off</div>
+                            
+                            {/* Progress bar */}
+                            <div style={{ width: '100%', height: '8px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}>
+                              <div style={{ width: Math.max(0, progress) + '%', height: '100%', background: 'linear-gradient(to right, ' + theme.success + ', #059669)' }} />
+                            </div>
+                            
+                            {/* Payoff calculations */}
+                            <div style={{ display: 'grid', gridTemplateColumns: debtExtras.length > 0 ? '1fr 1fr' : '1fr', gap: '8px', marginBottom: '12px' }}>
+                              <div style={{ padding: '10px', background: darkMode ? '#1e293b' : '#fff', borderRadius: '8px', fontSize: '12px' }}>
+                                <div style={{ color: theme.textMuted, marginBottom: '4px' }}>Without extras:</div>
+                                {payoffWithoutExtras.error ? (
+                                  <div style={{ color: theme.danger }}>⚠️ Payment too low</div>
+                                ) : (
+                                  <div style={{ color: theme.text }}>
+                                    <span style={{ fontWeight: 600 }}>{Math.floor(payoffWithoutExtras.monthsToPayoff / 12)}y {payoffWithoutExtras.monthsToPayoff % 12}m</span>
+                                    <span style={{ color: theme.danger, marginLeft: '8px' }}>${payoffWithoutExtras.totalInterestPaid.toFixed(0)} int</span>
+                                  </div>
+                                )}
+                              </div>
+                              {debtExtras.length > 0 && (
+                                <div style={{ padding: '10px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px', fontSize: '12px' }}>
+                                  <div style={{ color: theme.success, marginBottom: '4px' }}>With extras (+${payoffWithExtras.extraPayments?.toFixed(0)}/mo):</div>
+                                  {payoffWithExtras.error ? (
+                                    <div style={{ color: theme.warning }}>⚠️ Still not enough</div>
+                                  ) : (
+                                    <div style={{ color: theme.text }}>
+                                      <span style={{ fontWeight: 600 }}>{Math.floor(payoffWithExtras.monthsToPayoff / 12)}y {payoffWithExtras.monthsToPayoff % 12}m</span>
+                                      <span style={{ color: theme.success, marginLeft: '8px' }}>${payoffWithExtras.totalInterestPaid.toFixed(0)} int</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Existing extra payments for this debt */}
+                            {debtExtras.length > 0 && (
+                              <div style={{ marginBottom: '12px' }}>
+                                <div style={{ fontSize: '11px', color: theme.textMuted, marginBottom: '4px' }}>Extra payments:</div>
+                                {debtExtras.map(exp => (
+                                  <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', background: theme.purple + '20', borderRadius: '4px', fontSize: '11px', marginBottom: '2px' }}>
+                                    <span style={{ color: theme.purple }}>⚡ ${exp.amount}/{exp.frequency}</span>
+                                    <button onClick={() => deleteExpense(exp.id)} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '10px' }}>✕</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {/* Add extra payment button/form */}
+                            {showExtraInput === debt.id ? (
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                <input 
+                                  type="number" 
+                                  placeholder="Amount" 
+                                  value={currentExtra.amount}
+                                  onChange={(e) => setDebtExtraPayment(prev => ({ ...prev, [debt.id]: { ...currentExtra, amount: e.target.value } }))}
+                                  style={{ ...inputStyle, width: '70px', padding: '6px 10px', fontSize: '12px' }} 
+                                />
+                                <select 
+                                  value={currentExtra.frequency}
+                                  onChange={(e) => setDebtExtraPayment(prev => ({ ...prev, [debt.id]: { ...currentExtra, frequency: e.target.value } }))}
+                                  style={{ ...inputStyle, padding: '6px 8px', fontSize: '12px' }}
+                                >
+                                  <option value="weekly">Weekly</option>
+                                  <option value="fortnightly">Fortnightly</option>
+                                  <option value="monthly">Monthly</option>
+                                  <option value="once">One-time</option>
+                                </select>
+                                <button onClick={() => addExtraPaymentToDebt(debt.id)} style={{ ...btnPurple, padding: '6px 10px', fontSize: '11px' }}>Add</button>
+                                <button onClick={() => setShowExtraInput(null)} style={{ ...btnDanger, padding: '6px 10px', fontSize: '11px' }}>✕</button>
+                              </div>
+                            ) : (
+                              <button 
+                                onClick={() => {
+                                  setShowExtraInput(debt.id)
+                                  setDebtExtraPayment(prev => ({ ...prev, [debt.id]: { amount: '', frequency: 'monthly' } }))
+                                }} 
+                                style={{ ...btnPurple, padding: '6px 12px', fontSize: '11px', width: '100%' }}
+                              >
+                                + Add Extra Payment
+                              </button>
+                            )}
                           </div>
                         )
                       })
                     })()}
                   </div>
+                  
+                  {/* Total Summary */}
                   <div style={{ padding: '20px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '12px' }}>
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <button onClick={() => setPayoffMethod('avalanche')} style={{ ...btnPrimary, background: payoffMethod === 'avalanche' ? theme.success : theme.cardBg, color: payoffMethod === 'avalanche' ? 'white' : theme.text, border: '2px solid ' + (payoffMethod === 'avalanche' ? theme.success : theme.border) }}>🏔️ Avalanche</button>
-                      <button onClick={() => setPayoffMethod('snowball')} style={{ ...btnPrimary, background: payoffMethod === 'snowball' ? theme.success : theme.cardBg, color: payoffMethod === 'snowball' ? 'white' : theme.text, border: '2px solid ' + (payoffMethod === 'snowball' ? theme.success : theme.border) }}>❄️ Snowball</button>
-                      <input type="number" placeholder="Extra $" value={extraPayment} onChange={(e) => setExtraPayment(e.target.value)} style={{ ...inputStyle, width: '90px' }} />
-                      <button onClick={addExtraPaymentToCalendar} style={btnPurple}>📅 Add Extra</button>
-                    </div>
-                    
-                    {/* Side-by-side comparison */}
-                    {(() => { 
-                      const withoutExtras = calculateDebtPayoff(false)
-                      const withExtras = calculateDebtPayoff(true)
-                      const hasExtras = withExtras.totalExtra > 0
-                      
-                      // Check for error state (payments don't cover interest)
-                      if (withoutExtras.error) {
-                        return (
-                          <div style={{ padding: '20px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '12px', border: '2px solid ' + theme.danger }}>
-                            <div style={{ fontSize: '16px', fontWeight: 700, color: theme.danger, marginBottom: '12px' }}>⚠️ Minimum Payments Too Low!</div>
-                            <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.8, marginBottom: '16px' }}>
-                              <div>Your minimum payments don't cover the monthly interest, so the debt will keep growing.</div>
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '12px', background: darkMode ? '#1e293b' : '#fff', borderRadius: '8px' }}>
-                              <div>
-                                <div style={{ color: theme.textMuted, fontSize: '12px' }}>Monthly Interest</div>
-                                <div style={{ color: theme.danger, fontSize: '20px', fontWeight: 'bold' }}>${withoutExtras.totalMonthlyInterest?.toFixed(2)}</div>
-                              </div>
-                              <div>
-                                <div style={{ color: theme.textMuted, fontSize: '12px' }}>Your Payments</div>
-                                <div style={{ color: theme.warning, fontSize: '20px', fontWeight: 'bold' }}>${withoutExtras.totalPayments?.toFixed(2)}</div>
-                              </div>
-                            </div>
-                            <div style={{ marginTop: '12px', padding: '12px', background: theme.success + '20', borderRadius: '8px' }}>
-                              <div style={{ color: theme.success, fontSize: '14px', fontWeight: 600 }}>
-                                💡 You need at least ${((withoutExtras.totalMonthlyInterest || 0) - (withoutExtras.totalPayments || 0) + 1).toFixed(0)}/month more to start paying off the debt
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      }
-                      
-                      const timeSaved = withoutExtras.monthsToPayoff - withExtras.monthsToPayoff
-                      const interestSaved = withoutExtras.totalInterestPaid - withExtras.totalInterestPaid
+                    <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '16px' }}>📊 Total Debt Summary</h3>
+                    {(() => {
+                      const totals = calculateTotalDebtPayoff()
+                      const totalBalance = debts.reduce((sum, d) => sum + parseFloat(d.balance || 0), 0)
+                      const totalExtras = expenses.filter(exp => exp.targetDebtId).reduce((sum, exp) => sum + convertToMonthly(parseFloat(exp.amount || 0), exp.frequency), 0)
                       
                       return (
-                        <div style={{ display: 'grid', gridTemplateColumns: hasExtras ? '1fr 1fr' : '1fr', gap: '16px' }}>
-                          {/* Without Extras */}
-                          <div style={{ padding: '16px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '12px', border: '2px solid ' + theme.danger }}>
-                            <div style={{ fontSize: '13px', fontWeight: 700, color: theme.danger, marginBottom: '12px' }}>😰 Minimum Payments Only</div>
-                            <div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}>
-                              <div>⏱️ Time: <strong>{Math.floor(withoutExtras.monthsToPayoff / 12)}y {withoutExtras.monthsToPayoff % 12}m</strong></div>
-                              <div>💸 Interest: <strong style={{ color: theme.danger }}>${withoutExtras.totalInterestPaid.toFixed(2)}</strong></div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                          <div style={{ padding: '12px', background: darkMode ? '#334155' : '#fff', borderRadius: '8px', textAlign: 'center' }}>
+                            <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Total Debt</div>
+                            <div style={{ color: theme.danger, fontSize: '20px', fontWeight: 'bold' }}>${totalBalance.toFixed(0)}</div>
+                          </div>
+                          <div style={{ padding: '12px', background: darkMode ? '#334155' : '#fff', borderRadius: '8px', textAlign: 'center' }}>
+                            <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Debt-Free In</div>
+                            <div style={{ color: totals.hasError ? theme.warning : theme.success, fontSize: '20px', fontWeight: 'bold' }}>
+                              {totals.hasError ? '⚠️' : `${Math.floor(totals.maxMonths / 12)}y ${totals.maxMonths % 12}m`}
                             </div>
                           </div>
-                          
-                          {/* With Extras */}
-                          {hasExtras && !withExtras.error && (
-                            <div style={{ padding: '16px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '12px', border: '2px solid ' + theme.success }}>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: theme.success, marginBottom: '12px' }}>🚀 With Extra Payments (+${withExtras.totalExtra.toFixed(0)}/mo)</div>
-                              <div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}>
-                                <div>⏱️ Time: <strong>{Math.floor(withExtras.monthsToPayoff / 12)}y {withExtras.monthsToPayoff % 12}m</strong></div>
-                                <div>💸 Interest: <strong style={{ color: theme.success }}>${withExtras.totalInterestPaid.toFixed(2)}</strong></div>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* With Extras but still not enough */}
-                          {hasExtras && withExtras.error && (
-                            <div style={{ padding: '16px', background: darkMode ? '#3a2e1e' : '#fffbeb', borderRadius: '12px', border: '2px solid ' + theme.warning }}>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: theme.warning, marginBottom: '12px' }}>⚠️ Still Not Enough (+${withExtras.totalExtra.toFixed(0)}/mo)</div>
-                              <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6 }}>
-                                <div>Need ${((withExtras.totalMonthlyInterest || 0) - (withExtras.totalPayments || 0) + 1).toFixed(0)}/mo more</div>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Savings Summary */}
-                          {hasExtras && timeSaved > 0 && !withExtras.error && (
-                            <div style={{ gridColumn: '1 / -1', padding: '16px', background: 'linear-gradient(135deg, ' + theme.success + '20, ' + theme.purple + '20)', borderRadius: '12px', border: '2px solid ' + theme.purple, textAlign: 'center' }}>
-                              <div style={{ fontSize: '16px', fontWeight: 700, color: theme.purple, marginBottom: '8px' }}>🎉 You Save</div>
-                              <div style={{ display: 'flex', justifyContent: 'center', gap: '32px', flexWrap: 'wrap' }}>
-                                <div>
-                                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: theme.success }}>{Math.floor(timeSaved / 12)}y {timeSaved % 12}m</div>
-                                  <div style={{ fontSize: '12px', color: theme.textMuted }}>faster payoff</div>
-                                </div>
-                                <div>
-                                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: theme.success }}>${interestSaved.toFixed(0)}</div>
-                                  <div style={{ fontSize: '12px', color: theme.textMuted }}>less interest</div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {!hasExtras && (
-                            <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '8px', textAlign: 'center' }}>
-                              <div style={{ color: theme.textMuted, fontSize: '13px' }}>💡 Enter an extra payment amount above to see how much faster you can be debt-free!</div>
+                          <div style={{ padding: '12px', background: darkMode ? '#334155' : '#fff', borderRadius: '8px', textAlign: 'center' }}>
+                            <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Total Interest</div>
+                            <div style={{ color: theme.warning, fontSize: '20px', fontWeight: 'bold' }}>${totals.totalInterest.toFixed(0)}</div>
+                          </div>
+                          {totalExtras > 0 && (
+                            <div style={{ gridColumn: '1 / -1', padding: '12px', background: theme.purple + '20', borderRadius: '8px', textAlign: 'center' }}>
+                              <div style={{ color: theme.purple, fontSize: '14px', fontWeight: 600 }}>⚡ Total extra payments: ${totalExtras.toFixed(0)}/month</div>
                             </div>
                           )}
                         </div>
                       )
-                    })()}
                   </div>
                 </>
               )}
