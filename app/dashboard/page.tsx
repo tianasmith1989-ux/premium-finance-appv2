@@ -1,7 +1,7 @@
 'use client'
 
 import { useUser } from '@clerk/nextjs'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function Dashboard() {
   const { user } = useUser()
@@ -68,6 +68,12 @@ export default function Dashboard() {
   const [tradingResults, setTradingResults] = useState<any>(null)
   const [calculatingTrading, setCalculatingTrading] = useState(false)
 
+  // Trading Calendar state
+  const [tradingCalendarMonth, setTradingCalendarMonth] = useState(new Date())
+  const [projectedTradingDays, setProjectedTradingDays] = useState<any[]>([])
+  const [actualTradingResults, setActualTradingResults] = useState<any[]>([])
+  const [newActualResult, setNewActualResult] = useState({ date: new Date().toISOString().split('T')[0], profitLoss: '', notes: '' })
+
   const theme = {
     bg: darkMode ? '#0f172a' : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdf4 100%)',
     cardBg: darkMode ? '#1e293b' : 'white',
@@ -114,6 +120,122 @@ export default function Dashboard() {
   const totalPL = trades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
   const winRate = trades.length > 0 ? (trades.filter(t => parseFloat(t.profitLoss || '0') > 0).length / trades.length) * 100 : 0
 
+  // Calculate projected trading calendar
+  const calculateProjectedTradingCalendar = () => {
+    if (!tradingResults) return []
+    
+    const { totalTradingDays, tradingDaysPerYear, yearlyProgress } = tradingResults
+    const startDate = new Date()
+    const projectedDays = []
+    let dayCount = 0
+    let yearlyIndex = 0
+    let cumulativeBalance = parseFloat(tradingCalculator.startingCapital || '0')
+    const monthlyAdd = parseFloat(tradingCalculator.monthlyContribution || '0')
+    const tradingDaysPerMonth = Math.round(30 * (tradingCalculator.includeDays.length / 7))
+    const contributionPerTradingDay = tradingDaysPerMonth > 0 ? monthlyAdd / tradingDaysPerMonth : 0
+    
+    // Calculate daily rate
+    const returnRate = parseFloat(tradingCalculator.returnRate || '0') / 100
+    const tradingDaysPerWeek = tradingCalculator.includeDays.length
+    const tradingDaysRatio = tradingDaysPerWeek / 7
+    const tradingDaysPerMonthCalc = Math.round(30 * tradingDaysRatio)
+    let ratePerTradingDay: number
+    if (tradingCalculator.returnPeriod === 'daily') {
+      ratePerTradingDay = returnRate
+    } else if (tradingCalculator.returnPeriod === 'weekly') {
+      ratePerTradingDay = returnRate / tradingDaysPerWeek
+    } else if (tradingCalculator.returnPeriod === 'monthly') {
+      ratePerTradingDay = returnRate / tradingDaysPerMonthCalc
+    } else {
+      ratePerTradingDay = returnRate / tradingDaysPerYear
+    }
+    
+    const effectiveRate = ratePerTradingDay * (parseFloat(tradingCalculator.reinvestRate || '100') / 100)
+    
+    // Generate projected days
+    for (let day = 0; day < totalTradingDays; day++) {
+      const currentDate = new Date(startDate)
+      currentDate.setDate(startDate.getDate() + day)
+      
+      // Skip non-trading days
+      const dayOfWeek = currentDate.getDay()
+      const isTradingDay = (
+        (dayOfWeek === 1 && tradingCalculator.includeDays.includes('M')) ||
+        (dayOfWeek === 2 && tradingCalculator.includeDays.includes('T')) ||
+        (dayOfWeek === 3 && tradingCalculator.includeDays.includes('W')) ||
+        (dayOfWeek === 4 && tradingCalculator.includeDays.includes('T2')) ||
+        (dayOfWeek === 5 && tradingCalculator.includeDays.includes('F')) ||
+        (dayOfWeek === 6 && tradingCalculator.includeDays.includes('S')) ||
+        (dayOfWeek === 0 && tradingCalculator.includeDays.includes('S2'))
+      )
+      
+      if (isTradingDay) {
+        dayCount++
+        
+        // Calculate projected profit for this day
+        const projectedProfit = cumulativeBalance * effectiveRate
+        cumulativeBalance = cumulativeBalance * (1 + effectiveRate) + contributionPerTradingDay
+        
+        projectedDays.push({
+          date: new Date(currentDate),
+          dayOfWeek: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeek],
+          projectedProfit,
+          cumulativeBalance,
+          dayNumber: dayCount,
+          isWeekend: dayOfWeek === 0 || dayOfWeek === 6
+        })
+      }
+    }
+    
+    return projectedDays
+  }
+
+  // Get projected days for current calendar month
+  const getProjectedDaysForMonth = () => {
+    const year = tradingCalendarMonth.getFullYear()
+    const month = tradingCalendarMonth.getMonth()
+    return projectedTradingDays.filter(day => 
+      day.date.getFullYear() === year && day.date.getMonth() === month
+    )
+  }
+
+  // Get actual results for current calendar month
+  const getActualResultsForMonth = () => {
+    const year = tradingCalendarMonth.getFullYear()
+    const month = tradingCalendarMonth.getMonth()
+    return actualTradingResults.filter(result => {
+      const resultDate = new Date(result.date)
+      return resultDate.getFullYear() === year && resultDate.getMonth() === month
+    })
+  }
+
+  // Add actual trading result
+  const addActualResult = () => {
+    if (!newActualResult.date || !newActualResult.profitLoss) return
+    setActualTradingResults([
+      ...actualTradingResults,
+      {
+        ...newActualResult,
+        id: Date.now(),
+        profitLoss: parseFloat(newActualResult.profitLoss || '0')
+      }
+    ])
+    setNewActualResult({ date: new Date().toISOString().split('T')[0], profitLoss: '', notes: '' })
+  }
+
+  // Delete actual result
+  const deleteActualResult = (id: number) => {
+    setActualTradingResults(actualTradingResults.filter(result => result.id !== id))
+  }
+
+  // Update projected calendar when trading results change
+  useEffect(() => {
+    if (tradingResults) {
+      const projected = calculateProjectedTradingCalendar()
+      setProjectedTradingDays(projected)
+    }
+  }, [tradingResults])
+
   const getAlerts = () => {
     const alertsList: any[] = []
     const today = new Date()
@@ -137,8 +259,6 @@ export default function Dashboard() {
     const daysInMonth = new Date(year, month + 1, 0).getDate()
     return { firstDay, daysInMonth, month, year }
   }
-  const prevMonth = () => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))
-  const nextMonth = () => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))
   
   const calculateGoalPayment = (goal: any) => {
     const remaining = parseFloat(goal.target || '0') - parseFloat(goal.saved || '0')
@@ -379,35 +499,37 @@ export default function Dashboard() {
     const rr = parseFloat(tradingCalculator.riskReward || '0')
     const includeDays = tradingCalculator.includeDays
     
-    // Calculate trading days per week based on selected days
-    const tradingDaysPerWeek = includeDays.length
-    const tradingDaysPerYear = tradingDaysPerWeek * 52
-    const tradingDaysPerMonth = tradingDaysPerYear / 12
+    // Calculate total calendar days first
+    const totalCalendarDays = (yrs * 365) + (mos * 30) + dys
     
-    // Convert return rate to daily rate based on period
-    let dailyRate: number
+    // Calculate trading days based on selected days (ratio of week)
+    const tradingDaysPerWeek = includeDays.length
+    const tradingDaysRatio = tradingDaysPerWeek / 7
+    const totalTradingDays = Math.round(totalCalendarDays * tradingDaysRatio)
+    
+    // For display purposes
+    const tradingDaysPerYear = Math.round(365 * tradingDaysRatio)
+    
+    // The daily rate IS the rate if period is daily
+    // Otherwise convert to per-trading-day rate
+    let ratePerTradingDay: number
     if (returnPeriod === 'daily') {
-      dailyRate = returnRate
+      ratePerTradingDay = returnRate
     } else if (returnPeriod === 'weekly') {
-      dailyRate = returnRate / tradingDaysPerWeek
+      ratePerTradingDay = returnRate / tradingDaysPerWeek
     } else if (returnPeriod === 'monthly') {
-      dailyRate = returnRate / tradingDaysPerMonth
+      const tradingDaysPerMonth = Math.round(30 * tradingDaysRatio)
+      ratePerTradingDay = returnRate / tradingDaysPerMonth
     } else {
-      dailyRate = returnRate / tradingDaysPerYear
+      ratePerTradingDay = returnRate / tradingDaysPerYear
     }
     
-    // Apply reinvest rate to the daily return
-    const effectiveDailyRate = dailyRate * reinvestRate
+    // Apply reinvest rate
+    const effectiveRate = ratePerTradingDay * reinvestRate
     
-    // Total trading days for the period
-    const totalTradingDays = Math.round(
-      (yrs * tradingDaysPerYear) + 
-      (mos * tradingDaysPerMonth) + 
-      (dys * (tradingDaysPerWeek / 7))
-    )
-    
-    // Monthly contribution converted to per-trading-day
-    const contributionPerTradingDay = monthlyAdd / tradingDaysPerMonth
+    // Monthly contribution spread across trading days in month
+    const tradingDaysPerMonth = Math.round(30 * tradingDaysRatio)
+    const contributionPerTradingDay = tradingDaysPerMonth > 0 ? monthlyAdd / tradingDaysPerMonth : 0
     
     let balance = startCap
     const yearlyProgress: any[] = []
@@ -416,8 +538,7 @@ export default function Dashboard() {
     
     for (let day = 1; day <= totalTradingDays; day++) {
       // Apply daily compound return
-      const dailyGain = balance * effectiveDailyRate
-      balance = balance + dailyGain + contributionPerTradingDay
+      balance = balance * (1 + effectiveRate) + contributionPerTradingDay
       daysInCurrentYear++
       
       // Track yearly progress
@@ -448,6 +569,7 @@ export default function Dashboard() {
       totalContributed,
       profit: balance - totalContributed,
       yearlyProgress,
+      totalCalendarDays,
       totalTradingDays,
       tradingDaysPerYear,
       effectiveAnnualReturn,
@@ -496,6 +618,327 @@ export default function Dashboard() {
     </div>
   )
 
+  // Trading Calendar component
+  const TradingCalendar = () => {
+    const month = tradingCalendarMonth.getMonth()
+    const year = tradingCalendarMonth.getFullYear()
+    const firstDay = new Date(year, month, 1).getDay()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    
+    const prevTradingMonth = () => setTradingCalendarMonth(new Date(year, month - 1, 1))
+    const nextTradingMonth = () => setTradingCalendarMonth(new Date(year, month + 1, 1))
+    
+    const projectedDays = getProjectedDaysForMonth()
+    const actualResults = getActualResultsForMonth()
+    
+    const getDayData = (day: number) => {
+      const date = new Date(year, month, day)
+      const projectedDay = projectedDays.find(d => 
+        d.date.getDate() === day && 
+        d.date.getMonth() === month && 
+        d.date.getFullYear() === year
+      )
+      
+      const actualResult = actualResults.find(r => {
+        const resultDate = new Date(r.date)
+        return resultDate.getDate() === day && 
+               resultDate.getMonth() === month && 
+               resultDate.getFullYear() === year
+      })
+      
+      const dayOfWeek = date.getDay()
+      const isTradingDay = (
+        (dayOfWeek === 1 && tradingCalculator.includeDays.includes('M')) ||
+        (dayOfWeek === 2 && tradingCalculator.includeDays.includes('T')) ||
+        (dayOfWeek === 3 && tradingCalculator.includeDays.includes('W')) ||
+        (dayOfWeek === 4 && tradingCalculator.includeDays.includes('T2')) ||
+        (dayOfWeek === 5 && tradingCalculator.includeDays.includes('F')) ||
+        (dayOfWeek === 6 && tradingCalculator.includeDays.includes('S')) ||
+        (dayOfWeek === 0 && tradingCalculator.includeDays.includes('S2'))
+      )
+      
+      return {
+        date,
+        dayOfWeek: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeek],
+        projected: projectedDay,
+        actual: actualResult,
+        isTradingDay,
+        isToday: date.toDateString() === new Date().toDateString(),
+        isWeekend: dayOfWeek === 0 || dayOfWeek === 6
+      }
+    }
+    
+    const getMonthProjectedTotal = () => {
+      return projectedDays.reduce((sum, day) => sum + (day.projectedProfit || 0), 0)
+    }
+    
+    const getMonthActualTotal = () => {
+      return actualResults.reduce((sum, result) => sum + (result.profitLoss || 0), 0)
+    }
+    
+    const getDayVariance = (day: number) => {
+      const data = getDayData(day)
+      if (data.projected && data.actual) {
+        return data.actual.profitLoss - data.projected.projectedProfit
+      }
+      return null
+    }
+    
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <button onClick={prevTradingMonth} style={btnPrimary}>← Prev</button>
+          <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>
+            📅 Trading Calendar - {tradingCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </h2>
+          <button onClick={nextTradingMonth} style={btnPrimary}>Next →</button>
+        </div>
+        
+        {/* Month Summary */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(3, 1fr)', 
+          gap: '16px', 
+          marginBottom: '24px',
+          padding: '16px',
+          background: darkMode ? '#1e293b' : '#f8fafc',
+          borderRadius: '12px'
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Projected Profit</div>
+            <div style={{ color: theme.warning, fontSize: '20px', fontWeight: 'bold' }}>${getMonthProjectedTotal().toFixed(2)}</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Actual Profit</div>
+            <div style={{ 
+              color: getMonthActualTotal() >= 0 ? theme.success : theme.danger, 
+              fontSize: '20px', 
+              fontWeight: 'bold' 
+            }}>${getMonthActualTotal().toFixed(2)}</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Variance</div>
+            <div style={{ 
+              color: (getMonthActualTotal() - getMonthProjectedTotal()) >= 0 ? theme.success : theme.danger, 
+              fontSize: '20px', 
+              fontWeight: 'bold' 
+            }}>${(getMonthActualTotal() - getMonthProjectedTotal()).toFixed(2)}</div>
+          </div>
+        </div>
+        
+        {/* Add Actual Result Form */}
+        <div style={{ 
+          padding: '16px', 
+          background: darkMode ? '#334155' : '#f8fafc', 
+          borderRadius: '12px', 
+          marginBottom: '20px' 
+        }}>
+          <h3 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '16px' }}>📝 Add Actual Result</h3>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <input 
+              type="date" 
+              value={newActualResult.date} 
+              onChange={(e) => setNewActualResult({ ...newActualResult, date: e.target.value })} 
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <input 
+              type="number" 
+              placeholder="Profit/Loss ($)" 
+              value={newActualResult.profitLoss} 
+              onChange={(e) => setNewActualResult({ ...newActualResult, profitLoss: e.target.value })} 
+              style={{ ...inputStyle, width: '120px' }}
+            />
+            <input 
+              type="text" 
+              placeholder="Notes" 
+              value={newActualResult.notes} 
+              onChange={(e) => setNewActualResult({ ...newActualResult, notes: e.target.value })} 
+              style={{ ...inputStyle, flex: 2 }}
+            />
+            <button onClick={addActualResult} style={btnSuccess}>Add Result</button>
+          </div>
+        </div>
+        
+        {/* Calendar Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', marginBottom: '20px' }}>
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} style={{ 
+              textAlign: 'center', 
+              fontWeight: 600, 
+              color: theme.textMuted, 
+              padding: '10px', 
+              fontSize: '13px' 
+            }}>{day}</div>
+          ))}
+          
+          {Array.from({ length: firstDay }).map((_, i) => (
+            <div key={`empty-${i}`} style={{ minHeight: '100px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px' }} />
+          ))}
+          
+          {Array.from({ length: daysInMonth }).map((_, i) => {
+            const day = i + 1
+            const data = getDayData(day)
+            const variance = getDayVariance(day)
+            
+            return (
+              <div 
+                key={day} 
+                style={{ 
+                  minHeight: '100px', 
+                  padding: '8px', 
+                  background: data.isToday ? (darkMode ? '#1e3a5f' : '#eff6ff') : 
+                           !data.isTradingDay ? (darkMode ? '#1e293b' : '#f8fafc') : 
+                           data.isWeekend ? (darkMode ? '#2d1b69' : '#f5f3ff') : 
+                           (darkMode ? '#1e293b' : '#ffffff'),
+                  borderRadius: '8px', 
+                  border: data.isToday ? `2px solid ${theme.accent}` : `1px solid ${theme.border}`,
+                  opacity: data.isTradingDay ? 1 : 0.7
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ 
+                    fontWeight: data.isToday ? 700 : 600, 
+                    color: data.isToday ? theme.accent : 
+                           !data.isTradingDay ? theme.textMuted : theme.text, 
+                    fontSize: '14px' 
+                  }}>
+                    {day}
+                  </span>
+                  {data.isTradingDay && (
+                    <span style={{ 
+                      fontSize: '10px', 
+                      padding: '2px 4px', 
+                      borderRadius: '4px',
+                      background: theme.warning,
+                      color: 'white'
+                    }}>
+                      Trade
+                    </span>
+                  )}
+                </div>
+                
+                {data.projected && (
+                  <div style={{ 
+                    fontSize: '10px', 
+                    padding: '4px', 
+                    marginBottom: '4px',
+                    background: darkMode ? '#3a2e1e' : '#fffbeb',
+                    borderRadius: '4px',
+                    color: theme.warning
+                  }}>
+                    <div>Projected: <strong>${data.projected.projectedProfit.toFixed(2)}</strong></div>
+                    <div style={{ fontSize: '9px', opacity: 0.8 }}>Day #{data.projected.dayNumber}</div>
+                  </div>
+                )}
+                
+                {data.actual && (
+                  <div style={{ 
+                    fontSize: '10px', 
+                    padding: '4px',
+                    background: data.actual.profitLoss >= 0 ? 
+                              (darkMode ? '#1e3a32' : '#f0fdf4') : 
+                              (darkMode ? '#3a1e1e' : '#fef2f2'),
+                    borderRadius: '4px',
+                    color: data.actual.profitLoss >= 0 ? theme.success : theme.danger
+                  }}>
+                    <div>Actual: <strong>${data.actual.profitLoss.toFixed(2)}</strong></div>
+                    {data.actual.notes && (
+                      <div style={{ fontSize: '8px', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {data.actual.notes}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {variance !== null && (
+                  <div style={{ 
+                    fontSize: '9px', 
+                    textAlign: 'center',
+                    marginTop: '4px',
+                    color: variance >= 0 ? theme.success : theme.danger,
+                    fontWeight: 600
+                  }}>
+                    {variance >= 0 ? '+' : ''}{variance.toFixed(2)}
+                  </div>
+                )}
+                
+                {!data.projected && data.isTradingDay && (
+                  <div style={{ 
+                    fontSize: '9px', 
+                    color: theme.textMuted, 
+                    textAlign: 'center',
+                    marginTop: '8px'
+                  }}>
+                    No projection
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        
+        {/* Actual Results List */}
+        {actualResults.length > 0 && (
+          <div>
+            <h3 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '16px' }}>📋 Actual Results This Month</h3>
+            <div style={{ 
+              maxHeight: '200px', 
+              overflowY: 'auto',
+              padding: '12px',
+              background: darkMode ? '#1e293b' : '#f8fafc',
+              borderRadius: '8px'
+            }}>
+              {actualResults.map(result => (
+                <div key={result.id} style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  padding: '8px',
+                  marginBottom: '6px',
+                  background: darkMode ? '#334155' : '#ffffff',
+                  borderRadius: '6px'
+                }}>
+                  <div>
+                    <div style={{ color: theme.text, fontSize: '12px', fontWeight: 600 }}>
+                      {new Date(result.date).toLocaleDateString()}
+                    </div>
+                    {result.notes && (
+                      <div style={{ color: theme.textMuted, fontSize: '10px' }}>
+                        {result.notes}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ 
+                      color: result.profitLoss >= 0 ? theme.success : theme.danger,
+                      fontWeight: 700,
+                      fontSize: '14px'
+                    }}>
+                      ${result.profitLoss.toFixed(2)}
+                    </span>
+                    <button 
+                      onClick={() => deleteActualResult(result.id)} 
+                      style={{ 
+                        padding: '2px 6px', 
+                        background: theme.danger, 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '4px', 
+                        cursor: 'pointer', 
+                        fontSize: '10px' 
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
@@ -912,6 +1355,7 @@ export default function Dashboard() {
 
         {activeTab === 'trading' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Trading Calculator */}
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.warning, fontSize: '22px' }}>📈 Trading Compounding Calculator</h2>
               
@@ -1021,9 +1465,9 @@ export default function Dashboard() {
                 <div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
                     <div style={{ padding: '20px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '12px', textAlign: 'center' }}>
-                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Future Value</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Investment Value</div>
                       <div style={{ color: theme.success, fontSize: '24px', fontWeight: 'bold' }}>${tradingResults.futureValue.toFixed(2)}</div>
-                      <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>{tradingResults.totalTradingDays} trading days</div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>Total / Business: {tradingResults.totalCalendarDays} / {tradingResults.totalTradingDays}</div>
                     </div>
                     <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' }}>
                       <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Total Contributed</div>
@@ -1092,6 +1536,9 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+            
+            {/* Trading Calendar */}
+            <TradingCalendar />
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               <div style={cardStyle}>
