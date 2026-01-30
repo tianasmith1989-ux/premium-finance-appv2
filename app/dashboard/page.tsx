@@ -51,7 +51,20 @@ export default function Dashboard() {
   const [calculating, setCalculating] = useState(false)
 
   // Trading Calculator state
-  const [tradingCalculator, setTradingCalculator] = useState({ startingCapital: '10000', monthlyContribution: '500', annualReturn: '15', years: '5', riskPerTrade: '2', winRate: '55', riskReward: '1.5', compoundFrequency: 'monthly' })
+  const [tradingCalculator, setTradingCalculator] = useState({ 
+    startingCapital: '10000', 
+    monthlyContribution: '500', 
+    returnRate: '1', 
+    returnPeriod: 'daily',
+    years: '0',
+    months: '0',
+    days: '0',
+    includeDays: ['M', 'T', 'W', 'T2', 'F'], // Weekdays by default (trading days)
+    reinvestRate: '100',
+    riskPerTrade: '2', 
+    winRate: '55', 
+    riskReward: '1.5'
+  })
   const [tradingResults, setTradingResults] = useState<any>(null)
   const [calculatingTrading, setCalculatingTrading] = useState(false)
 
@@ -355,42 +368,89 @@ export default function Dashboard() {
     setCalculatingTrading(true)
     const startCap = parseFloat(tradingCalculator.startingCapital || '0')
     const monthlyAdd = parseFloat(tradingCalculator.monthlyContribution || '0')
-    const annualRet = parseFloat(tradingCalculator.annualReturn || '0') / 100
+    const returnRate = parseFloat(tradingCalculator.returnRate || '0') / 100
+    const returnPeriod = tradingCalculator.returnPeriod
+    const reinvestRate = parseFloat(tradingCalculator.reinvestRate || '100') / 100
     const yrs = parseInt(tradingCalculator.years || '0')
+    const mos = parseInt(tradingCalculator.months || '0')
+    const dys = parseInt(tradingCalculator.days || '0')
     const riskPct = parseFloat(tradingCalculator.riskPerTrade || '0')
     const winRt = parseFloat(tradingCalculator.winRate || '0') / 100
     const rr = parseFloat(tradingCalculator.riskReward || '0')
-    const freq = tradingCalculator.compoundFrequency
+    const includeDays = tradingCalculator.includeDays
     
-    // Calculate periods per year and rate per period based on frequency
-    const periodsPerYear = freq === 'daily' ? 365 : freq === 'weekly' ? 52 : freq === 'monthly' ? 12 : 1
-    const ratePerPeriod = annualRet / periodsPerYear
-    const contributionPerPeriod = (monthlyAdd * 12) / periodsPerYear
+    // Calculate trading days per week based on selected days
+    const tradingDaysPerWeek = includeDays.length
+    const tradingDaysPerYear = tradingDaysPerWeek * 52
+    const tradingDaysPerMonth = tradingDaysPerYear / 12
+    
+    // Convert return rate to daily rate based on period
+    let dailyRate: number
+    if (returnPeriod === 'daily') {
+      dailyRate = returnRate
+    } else if (returnPeriod === 'weekly') {
+      dailyRate = returnRate / tradingDaysPerWeek
+    } else if (returnPeriod === 'monthly') {
+      dailyRate = returnRate / tradingDaysPerMonth
+    } else {
+      dailyRate = returnRate / tradingDaysPerYear
+    }
+    
+    // Apply reinvest rate to the daily return
+    const effectiveDailyRate = dailyRate * reinvestRate
+    
+    // Total trading days for the period
+    const totalTradingDays = Math.round(
+      (yrs * tradingDaysPerYear) + 
+      (mos * tradingDaysPerMonth) + 
+      (dys * (tradingDaysPerWeek / 7))
+    )
+    
+    // Monthly contribution converted to per-trading-day
+    const contributionPerTradingDay = monthlyAdd / tradingDaysPerMonth
     
     let balance = startCap
     const yearlyProgress: any[] = []
+    let currentYear = 0
+    let daysInCurrentYear = 0
     
-    for (let year = 1; year <= yrs; year++) {
-      for (let period = 0; period < periodsPerYear; period++) {
-        balance = balance * (1 + ratePerPeriod) + contributionPerPeriod
+    for (let day = 1; day <= totalTradingDays; day++) {
+      // Apply daily compound return
+      const dailyGain = balance * effectiveDailyRate
+      balance = balance + dailyGain + contributionPerTradingDay
+      daysInCurrentYear++
+      
+      // Track yearly progress
+      if (daysInCurrentYear >= tradingDaysPerYear || day === totalTradingDays) {
+        currentYear++
+        const totalMonths = currentYear * 12
+        const contributed = startCap + (monthlyAdd * Math.min(totalMonths, yrs * 12 + mos))
+        yearlyProgress.push({
+          year: currentYear,
+          value: balance,
+          contributed,
+          profit: balance - contributed
+        })
+        daysInCurrentYear = 0
       }
-      const contributed = startCap + (monthlyAdd * 12 * year)
-      yearlyProgress.push({
-        year,
-        value: balance,
-        contributed,
-        profit: balance - contributed
-      })
     }
     
-    const totalContributed = startCap + (monthlyAdd * 12 * yrs)
+    const totalMonths = yrs * 12 + mos
+    const totalContributed = startCap + (monthlyAdd * totalMonths)
     const expectancy = (winRt * rr * riskPct) - ((1 - winRt) * riskPct)
+    
+    // Calculate effective annual return
+    const effectiveAnnualReturn = totalTradingDays > 0 ? 
+      (Math.pow(balance / (startCap + totalContributed - startCap), 365 / totalTradingDays) - 1) * 100 : 0
     
     setTradingResults({
       futureValue: balance,
       totalContributed,
       profit: balance - totalContributed,
       yearlyProgress,
+      totalTradingDays,
+      tradingDaysPerYear,
+      effectiveAnnualReturn,
       tradeStats: {
         expectedWinRate: winRt * 100,
         avgWin: rr * riskPct,
@@ -857,54 +917,99 @@ export default function Dashboard() {
               
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
                 <div>
-                  <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '18px' }}>💰 Capital & Time</h3>
+                  <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '18px' }}>💰 Capital & Returns</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
                       <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Starting Capital ($)</label>
                       <input type="number" value={tradingCalculator.startingCapital} onChange={(e) => setTradingCalculator({...tradingCalculator, startingCapital: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Monthly Contribution ($)</label>
-                      <input type="number" value={tradingCalculator.monthlyContribution} onChange={(e) => setTradingCalculator({...tradingCalculator, monthlyContribution: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
+                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Interest/Return Rate</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input type="number" step="0.1" placeholder="%" value={tradingCalculator.returnRate} onChange={(e) => setTradingCalculator({...tradingCalculator, returnRate: e.target.value})} style={{ ...inputStyle, width: '80px' }} />
+                        <select value={tradingCalculator.returnPeriod} onChange={(e) => setTradingCalculator({...tradingCalculator, returnPeriod: e.target.value})} style={{ ...inputStyle, flex: 1 }}>
+                          <option value="daily">% Daily</option>
+                          <option value="weekly">% Weekly</option>
+                          <option value="monthly">% Monthly</option>
+                          <option value="yearly">% Yearly</option>
+                        </select>
+                      </div>
                     </div>
                     <div>
-                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Target Annual Return (%)</label>
-                      <input type="number" step="0.1" value={tradingCalculator.annualReturn} onChange={(e) => setTradingCalculator({...tradingCalculator, annualReturn: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
+                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Time Period</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ flex: 1 }}>
+                          <input type="number" placeholder="Years" value={tradingCalculator.years} onChange={(e) => setTradingCalculator({...tradingCalculator, years: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
+                          <div style={{ fontSize: '10px', color: theme.textMuted, textAlign: 'center' }}>Years</div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <input type="number" placeholder="Months" value={tradingCalculator.months} onChange={(e) => setTradingCalculator({...tradingCalculator, months: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
+                          <div style={{ fontSize: '10px', color: theme.textMuted, textAlign: 'center' }}>Months</div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <input type="number" placeholder="Days" value={tradingCalculator.days} onChange={(e) => setTradingCalculator({...tradingCalculator, days: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
+                          <div style={{ fontSize: '10px', color: theme.textMuted, textAlign: 'center' }}>Days</div>
+                        </div>
+                      </div>
                     </div>
                     <div>
-                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Timeframe (Years)</label>
-                      <input type="number" value={tradingCalculator.years} onChange={(e) => setTradingCalculator({...tradingCalculator, years: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Compounding Frequency</label>
-                      <select value={tradingCalculator.compoundFrequency} onChange={(e) => setTradingCalculator({...tradingCalculator, compoundFrequency: e.target.value})} style={{ ...inputStyle, width: '100%' }}>
-                        <option value="daily">📅 Daily (365x/year)</option>
-                        <option value="weekly">📆 Weekly (52x/year)</option>
-                        <option value="monthly">🗓️ Monthly (12x/year)</option>
-                        <option value="yearly">📊 Yearly (1x/year)</option>
-                      </select>
-                      <div style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px' }}>More frequent = higher returns due to compound effect</div>
+                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Reinvest Rate (%)</label>
+                      <input type="number" step="1" value={tradingCalculator.reinvestRate} onChange={(e) => setTradingCalculator({...tradingCalculator, reinvestRate: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
+                      <div style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px' }}>100% = reinvest all profits, 50% = reinvest half</div>
                     </div>
                   </div>
                 </div>
                 
                 <div>
-                  <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '18px' }}>⚡ Trading Parameters</h3>
+                  <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '18px' }}>📅 Trading Schedule</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
-                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Risk Per Trade (%)</label>
-                      <input type="number" step="0.1" value={tradingCalculator.riskPerTrade} onChange={(e) => setTradingCalculator({...tradingCalculator, riskPerTrade: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
-                      <div style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px' }}>Recommended: 1-2% per trade</div>
+                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Days to Include</label>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {[{key: 'M', label: 'M'}, {key: 'T', label: 'T'}, {key: 'W', label: 'W'}, {key: 'T2', label: 'T'}, {key: 'F', label: 'F'}, {key: 'S', label: 'S'}, {key: 'S2', label: 'S'}].map(day => (
+                          <button key={day.key} onClick={() => {
+                            const newDays = tradingCalculator.includeDays.includes(day.key) 
+                              ? tradingCalculator.includeDays.filter(d => d !== day.key)
+                              : [...tradingCalculator.includeDays, day.key]
+                            setTradingCalculator({...tradingCalculator, includeDays: newDays})
+                          }} style={{ 
+                            padding: '8px 12px', 
+                            background: tradingCalculator.includeDays.includes(day.key) ? theme.warning : (darkMode ? '#334155' : '#e2e8f0'),
+                            color: tradingCalculator.includeDays.includes(day.key) ? 'white' : theme.text,
+                            border: 'none', 
+                            borderRadius: '6px', 
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            fontSize: '13px'
+                          }}>{day.label}</button>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px' }}>{tradingCalculator.includeDays.length} trading days/week ({tradingCalculator.includeDays.length * 52}/year)</div>
                     </div>
                     <div>
-                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Win Rate (%)</label>
-                      <input type="number" step="0.1" value={tradingCalculator.winRate} onChange={(e) => setTradingCalculator({...tradingCalculator, winRate: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
-                      <div style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px' }}>Your actual win rate from trades: {winRate.toFixed(1)}%</div>
+                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Monthly Contribution ($)</label>
+                      <input type="number" value={tradingCalculator.monthlyContribution} onChange={(e) => setTradingCalculator({...tradingCalculator, monthlyContribution: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                     </div>
-                    <div>
-                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Risk:Reward Ratio</label>
-                      <input type="number" step="0.1" value={tradingCalculator.riskReward} onChange={(e) => setTradingCalculator({...tradingCalculator, riskReward: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
-                      <div style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px' }}>e.g., 1.5 means risking 1% to make 1.5%</div>
+                    <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '8px', marginTop: '8px' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '8px', fontWeight: 600 }}>⚡ Quick Stats (for reference)</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px' }}>
+                        <div>
+                          <label style={{ color: theme.textMuted }}>Risk/Trade (%)</label>
+                          <input type="number" step="0.1" value={tradingCalculator.riskPerTrade} onChange={(e) => setTradingCalculator({...tradingCalculator, riskPerTrade: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '6px 10px', fontSize: '12px' }} />
+                        </div>
+                        <div>
+                          <label style={{ color: theme.textMuted }}>Win Rate (%)</label>
+                          <input type="number" step="0.1" value={tradingCalculator.winRate} onChange={(e) => setTradingCalculator({...tradingCalculator, winRate: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '6px 10px', fontSize: '12px' }} />
+                        </div>
+                        <div>
+                          <label style={{ color: theme.textMuted }}>Risk:Reward</label>
+                          <input type="number" step="0.1" value={tradingCalculator.riskReward} onChange={(e) => setTradingCalculator({...tradingCalculator, riskReward: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '6px 10px', fontSize: '12px' }} />
+                        </div>
+                        <div>
+                          <label style={{ color: theme.textMuted }}>Your Win Rate</label>
+                          <div style={{ padding: '6px 10px', background: darkMode ? '#1e293b' : '#fff', borderRadius: '6px', fontWeight: 600, color: winRate >= 50 ? theme.success : theme.danger }}>{winRate.toFixed(1)}%</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -914,11 +1019,11 @@ export default function Dashboard() {
               
               {tradingResults && (
                 <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
                     <div style={{ padding: '20px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '12px', textAlign: 'center' }}>
                       <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Future Value</div>
                       <div style={{ color: theme.success, fontSize: '24px', fontWeight: 'bold' }}>${tradingResults.futureValue.toFixed(2)}</div>
-                      <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>After {tradingCalculator.years} years ({tradingCalculator.compoundFrequency} compounding)</div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>{tradingResults.totalTradingDays} trading days</div>
                     </div>
                     <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' }}>
                       <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Total Contributed</div>
@@ -929,6 +1034,11 @@ export default function Dashboard() {
                       <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Total Profit</div>
                       <div style={{ color: theme.warning, fontSize: '24px', fontWeight: 'bold' }}>${tradingResults.profit.toFixed(2)}</div>
                       <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>{((tradingResults.profit / tradingResults.totalContributed) * 100).toFixed(1)}% ROI</div>
+                    </div>
+                    <div style={{ padding: '20px', background: darkMode ? '#2d1e3a' : '#faf5ff', borderRadius: '12px', textAlign: 'center' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Trading Days/Year</div>
+                      <div style={{ color: theme.purple, fontSize: '24px', fontWeight: 'bold' }}>{tradingResults.tradingDaysPerYear}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>{tradingCalculator.includeDays.length} days/week</div>
                     </div>
                   </div>
                   
