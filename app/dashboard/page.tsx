@@ -9,6 +9,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'overview' | 'path' | 'trading'>('dashboard')
   const [darkMode, setDarkMode] = useState(true)
   const [calendarMonth, setCalendarMonth] = useState(new Date())
+  const [tradingCalendarMonth, setTradingCalendarMonth] = useState(new Date())
   
   const [incomeStreams, setIncomeStreams] = useState<any[]>([])
   const [newIncome, setNewIncome] = useState({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0] })
@@ -52,15 +53,27 @@ export default function Dashboard() {
 
   // Forex/CFD Prop Calculator state
   const [forexProp, setForexProp] = useState({
+    phase: 'phase1',
     accountSize: '100000',
-    dailyDrawdownPercent: '5',
-    maxDrawdownPercent: '10',
-    profitTargetPercent: '10',
+    // Phase 1 rules
+    phase1DailyDD: '5',
+    phase1MaxDD: '10',
+    phase1Target: '10',
+    phase1MinDays: '4',
+    phase1MaxDays: '30',
+    // Phase 2 rules
+    phase2DailyDD: '5',
+    phase2MaxDD: '10',
+    phase2Target: '5',
+    phase2MinDays: '4',
+    phase2MaxDays: '60',
+    // Funded rules
+    fundedDailyDD: '5',
+    fundedMaxDD: '10',
+    // Current progress
     currentBalance: '100000',
-    currentProfit: '0',
     tradingDays: '0',
-    minTradingDays: '4',
-    maxTradingDays: '30',
+    // Trading plan
     riskPerTrade: '1',
     tradesPerDay: '2',
     winRate: '55',
@@ -71,16 +84,27 @@ export default function Dashboard() {
 
   // Futures Prop Calculator state
   const [futuresProp, setFuturesProp] = useState({
+    phase: 'evaluation',
     accountSize: '50000',
-    trailingDrawdown: '2500',
-    profitTarget: '3000',
+    // Evaluation rules
+    evalTrailingDD: '2500',
+    evalProfitTarget: '3000',
+    evalMinDays: '7',
+    evalDrawdownType: 'trailing',
+    // PA (Performance) rules - some props have this
+    paTrailingDD: '2500',
+    paProfitTarget: '3000',
+    paMinDays: '7',
+    paDrawdownType: 'eod',
+    // Funded rules
+    fundedTrailingDD: '2500',
+    fundedDrawdownType: 'eod',
+    // Current progress
     currentBalance: '50000',
     highWaterMark: '50000',
-    currentProfit: '0',
     tradingDays: '0',
-    minTradingDays: '7',
     contractLimit: '10',
-    drawdownType: 'trailing',
+    // Trading plan
     riskPerTrade: '200',
     tradesPerDay: '3',
     winRate: '50',
@@ -406,14 +430,35 @@ export default function Dashboard() {
 
   // Forex/CFD Prop Calculator
   const calculateForexProp = () => {
+    const phase = forexProp.phase
     const accountSize = parseFloat(forexProp.accountSize || '0')
-    const dailyDD = parseFloat(forexProp.dailyDrawdownPercent || '0') / 100
-    const maxDD = parseFloat(forexProp.maxDrawdownPercent || '0') / 100
-    const profitTarget = parseFloat(forexProp.profitTargetPercent || '0') / 100
+    
+    // Get rules based on current phase
+    let dailyDD: number, maxDD: number, profitTarget: number, minDays: number, maxDays: number
+    
+    if (phase === 'phase1') {
+      dailyDD = parseFloat(forexProp.phase1DailyDD || '0') / 100
+      maxDD = parseFloat(forexProp.phase1MaxDD || '0') / 100
+      profitTarget = parseFloat(forexProp.phase1Target || '0') / 100
+      minDays = parseInt(forexProp.phase1MinDays || '0')
+      maxDays = parseInt(forexProp.phase1MaxDays || '30')
+    } else if (phase === 'phase2') {
+      dailyDD = parseFloat(forexProp.phase2DailyDD || '0') / 100
+      maxDD = parseFloat(forexProp.phase2MaxDD || '0') / 100
+      profitTarget = parseFloat(forexProp.phase2Target || '0') / 100
+      minDays = parseInt(forexProp.phase2MinDays || '0')
+      maxDays = parseInt(forexProp.phase2MaxDays || '60')
+    } else {
+      // Funded - no profit target or max days
+      dailyDD = parseFloat(forexProp.fundedDailyDD || '0') / 100
+      maxDD = parseFloat(forexProp.fundedMaxDD || '0') / 100
+      profitTarget = 0
+      minDays = 0
+      maxDays = 999
+    }
+    
     const currentBalance = parseFloat(forexProp.currentBalance || '0')
     const tradingDays = parseInt(forexProp.tradingDays || '0')
-    const minDays = parseInt(forexProp.minTradingDays || '0')
-    const maxDays = parseInt(forexProp.maxTradingDays || '30')
     const riskPerTrade = parseFloat(forexProp.riskPerTrade || '0') / 100
     const tradesPerDay = parseInt(forexProp.tradesPerDay || '0')
     const winRate = parseFloat(forexProp.winRate || '0') / 100
@@ -425,14 +470,14 @@ export default function Dashboard() {
     const maxDrawdownAmount = accountSize * maxDD
     const profitTargetAmount = accountSize * profitTarget
     const currentProfit = currentBalance - accountSize
-    const profitRemaining = profitTargetAmount - currentProfit
-    const daysRemaining = maxDays - tradingDays
-    const drawdownUsed = accountSize - currentBalance
+    const profitRemaining = phase === 'funded' ? 0 : profitTargetAmount - currentProfit
+    const daysRemaining = phase === 'funded' ? 999 : maxDays - tradingDays
+    const drawdownUsed = Math.max(0, accountSize - currentBalance)
     const drawdownRemaining = maxDrawdownAmount - drawdownUsed
     
     // Daily targets
-    const dailyProfitNeeded = daysRemaining > 0 ? profitRemaining / daysRemaining : 0
-    const dailyProfitPercent = (dailyProfitNeeded / currentBalance) * 100
+    const dailyProfitNeeded = (daysRemaining > 0 && phase !== 'funded') ? profitRemaining / daysRemaining : 0
+    const dailyProfitPercent = currentBalance > 0 ? (dailyProfitNeeded / currentBalance) * 100 : 0
     
     // Risk analysis
     const maxLossesToday = dailyDrawdownAmount / (accountSize * riskPerTrade)
@@ -443,21 +488,22 @@ export default function Dashboard() {
     const expectedWin = riskPerTradeAmount * avgRR
     const expectancy = (winRate * expectedWin) - ((1 - winRate) * riskPerTradeAmount)
     const dailyExpectedPL = expectancy * tradesPerDay
-    const daysToTarget = dailyExpectedPL > 0 ? profitRemaining / dailyExpectedPL : 999
+    const daysToTarget = (dailyExpectedPL > 0 && phase !== 'funded') ? profitRemaining / dailyExpectedPL : 0
     
     // Progress
-    const profitProgress = (currentProfit / profitTargetAmount) * 100
-    const dayProgress = (tradingDays / minDays) * 100
-    const onTrack = dailyExpectedPL >= dailyProfitNeeded
+    const profitProgress = phase === 'funded' ? 100 : profitTargetAmount > 0 ? (currentProfit / profitTargetAmount) * 100 : 0
+    const dayProgress = minDays > 0 ? (tradingDays / minDays) * 100 : 100
+    const onTrack = phase === 'funded' || dailyExpectedPL >= dailyProfitNeeded
     
     // Payout calculation
-    const potentialPayout = profitTargetAmount * profitSplit
+    const potentialPayout = phase === 'funded' ? currentProfit * profitSplit : profitTargetAmount * profitSplit
     
     // Worst case scenarios
     const consecutiveLossesToBlow = Math.floor(maxDrawdownAmount / riskPerTradeAmount)
     const consecutiveLossesTodayLimit = Math.floor(dailyDrawdownAmount / riskPerTradeAmount)
 
     setForexPropResults({
+      phase,
       accountSize,
       dailyDrawdownAmount,
       maxDrawdownAmount,
@@ -481,21 +527,42 @@ export default function Dashboard() {
       potentialPayout,
       consecutiveLossesToBlow,
       consecutiveLossesTodayLimit,
-      minDaysComplete: tradingDays >= minDays
+      minDaysComplete: tradingDays >= minDays,
+      minDays,
+      maxDays
     })
   }
 
   // Futures Prop Calculator
   const calculateFuturesProp = () => {
+    const phase = futuresProp.phase
     const accountSize = parseFloat(futuresProp.accountSize || '0')
-    const trailingDD = parseFloat(futuresProp.trailingDrawdown || '0')
-    const profitTarget = parseFloat(futuresProp.profitTarget || '0')
+    
+    // Get rules based on current phase
+    let trailingDD: number, profitTarget: number, minDays: number, drawdownType: string
+    
+    if (phase === 'evaluation') {
+      trailingDD = parseFloat(futuresProp.evalTrailingDD || '0')
+      profitTarget = parseFloat(futuresProp.evalProfitTarget || '0')
+      minDays = parseInt(futuresProp.evalMinDays || '0')
+      drawdownType = futuresProp.evalDrawdownType
+    } else if (phase === 'pa') {
+      trailingDD = parseFloat(futuresProp.paTrailingDD || '0')
+      profitTarget = parseFloat(futuresProp.paProfitTarget || '0')
+      minDays = parseInt(futuresProp.paMinDays || '0')
+      drawdownType = futuresProp.paDrawdownType
+    } else {
+      // Funded
+      trailingDD = parseFloat(futuresProp.fundedTrailingDD || '0')
+      profitTarget = 0
+      minDays = 0
+      drawdownType = futuresProp.fundedDrawdownType
+    }
+    
     const currentBalance = parseFloat(futuresProp.currentBalance || '0')
     const highWaterMark = parseFloat(futuresProp.highWaterMark || '0')
     const tradingDays = parseInt(futuresProp.tradingDays || '0')
-    const minDays = parseInt(futuresProp.minTradingDays || '0')
     const contractLimit = parseInt(futuresProp.contractLimit || '0')
-    const drawdownType = futuresProp.drawdownType
     const riskPerTrade = parseFloat(futuresProp.riskPerTrade || '0')
     const tradesPerDay = parseInt(futuresProp.tradesPerDay || '0')
     const winRate = parseFloat(futuresProp.winRate || '0') / 100
@@ -503,28 +570,24 @@ export default function Dashboard() {
     const avgLoss = parseFloat(futuresProp.avgLoss || '0')
     const profitSplit = parseFloat(futuresProp.profitSplit || '0') / 100
 
-    // Trailing drawdown calculations
+    // Current profit calculations
     const currentProfit = currentBalance - accountSize
-    const profitRemaining = profitTarget - currentProfit
+    const profitRemaining = phase === 'funded' ? 0 : profitTarget - currentProfit
     
-    // For trailing drawdown: threshold moves up with profits
+    // Trailing drawdown calculations
     let drawdownThreshold: number
     let drawdownRemaining: number
     
     if (drawdownType === 'trailing') {
-      // Trailing follows the high water mark
       const maxBalance = Math.max(highWaterMark, currentBalance)
       drawdownThreshold = maxBalance - trailingDD
-      // But it can't go below the starting threshold
       const minThreshold = accountSize - trailingDD
       drawdownThreshold = Math.max(drawdownThreshold, minThreshold)
-      // Once locked at break-even, it stays there
       if (highWaterMark >= accountSize + trailingDD) {
-        drawdownThreshold = accountSize // Locked at break-even
+        drawdownThreshold = accountSize
       }
       drawdownRemaining = currentBalance - drawdownThreshold
     } else {
-      // EOD drawdown - simpler, just based on starting balance
       drawdownThreshold = accountSize - trailingDD
       drawdownRemaining = currentBalance - drawdownThreshold
     }
@@ -535,22 +598,23 @@ export default function Dashboard() {
     // Expected value
     const expectancy = (winRate * avgWin) - ((1 - winRate) * avgLoss)
     const dailyExpectedPL = expectancy * tradesPerDay
-    const daysToTarget = dailyExpectedPL > 0 ? profitRemaining / dailyExpectedPL : 999
+    const daysToTarget = (dailyExpectedPL > 0 && phase !== 'funded') ? profitRemaining / dailyExpectedPL : 0
     
     // Progress
-    const profitProgress = (currentProfit / profitTarget) * 100
-    const dayProgress = (tradingDays / minDays) * 100
+    const profitProgress = phase === 'funded' ? 100 : profitTarget > 0 ? (currentProfit / profitTarget) * 100 : 0
+    const dayProgress = minDays > 0 ? (tradingDays / minDays) * 100 : 100
     
     // Payout
-    const potentialPayout = profitTarget * profitSplit
+    const potentialPayout = phase === 'funded' ? currentProfit * profitSplit : profitTarget * profitSplit
     
     // Check if trailing has locked to break-even
     const lockedAtBreakeven = highWaterMark >= accountSize + trailingDD
     
     // Safety margin
-    const safetyMargin = (drawdownRemaining / riskPerTrade).toFixed(1)
+    const safetyMargin = riskPerTrade > 0 ? (drawdownRemaining / riskPerTrade).toFixed(1) : '0'
 
     setFuturesPropResults({
+      phase,
       accountSize,
       trailingDD,
       profitTarget,
@@ -569,8 +633,10 @@ export default function Dashboard() {
       lockedAtBreakeven,
       safetyMargin,
       minDaysComplete: tradingDays >= minDays,
+      minDays,
       contractLimit,
-      drawdownType
+      drawdownType,
+      riskPerTrade
     })
   }
 
@@ -1130,37 +1196,103 @@ export default function Dashboard() {
               <h2 style={{ margin: '0 0 20px 0', color: theme.accent, fontSize: '22px' }}>💱 Forex/CFD Prop Firm Calculator</h2>
               <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '20px' }}>For FTMO, MyForexFunds, The5ers, and similar prop firms with percentage-based drawdown rules.</p>
               
+              {/* Phase Selection */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+                {[
+                  { id: 'phase1', label: '🎯 Phase 1 (Challenge)', color: theme.warning },
+                  { id: 'phase2', label: '✅ Phase 2 (Verification)', color: theme.purple },
+                  { id: 'funded', label: '💰 Funded', color: theme.success }
+                ].map(phase => (
+                  <button key={phase.id} onClick={() => setForexProp({...forexProp, phase: phase.id})} style={{ flex: 1, padding: '12px 16px', background: forexProp.phase === phase.id ? phase.color : (darkMode ? '#334155' : '#f1f5f9'), color: forexProp.phase === phase.id ? 'white' : theme.text, border: '2px solid ' + (forexProp.phase === phase.id ? phase.color : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>{phase.label}</button>
+                ))}
+              </div>
+              
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '24px' }}>
-                {/* Account Rules */}
+                {/* Account & Phase Rules */}
                 <div>
-                  <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '16px' }}>📋 Account Rules</h3>
+                  <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '16px' }}>📋 {forexProp.phase === 'phase1' ? 'Phase 1' : forexProp.phase === 'phase2' ? 'Phase 2' : 'Funded'} Rules</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div>
                       <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Account Size ($)</label>
                       <input type="number" value={forexProp.accountSize} onChange={(e) => setForexProp({...forexProp, accountSize: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
                     </div>
-                    <div>
-                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Daily Drawdown (%)</label>
-                      <input type="number" step="0.1" value={forexProp.dailyDrawdownPercent} onChange={(e) => setForexProp({...forexProp, dailyDrawdownPercent: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Max Drawdown (%)</label>
-                      <input type="number" step="0.1" value={forexProp.maxDrawdownPercent} onChange={(e) => setForexProp({...forexProp, maxDrawdownPercent: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Profit Target (%)</label>
-                      <input type="number" step="0.1" value={forexProp.profitTargetPercent} onChange={(e) => setForexProp({...forexProp, profitTargetPercent: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <div>
-                        <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Min Days</label>
-                        <input type="number" value={forexProp.minTradingDays} onChange={(e) => setForexProp({...forexProp, minTradingDays: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Max Days</label>
-                        <input type="number" value={forexProp.maxTradingDays} onChange={(e) => setForexProp({...forexProp, maxTradingDays: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
-                      </div>
-                    </div>
+                    
+                    {forexProp.phase === 'phase1' && (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          <div>
+                            <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Daily DD (%)</label>
+                            <input type="number" step="0.1" value={forexProp.phase1DailyDD} onChange={(e) => setForexProp({...forexProp, phase1DailyDD: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Max DD (%)</label>
+                            <input type="number" step="0.1" value={forexProp.phase1MaxDD} onChange={(e) => setForexProp({...forexProp, phase1MaxDD: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Profit Target (%)</label>
+                          <input type="number" step="0.1" value={forexProp.phase1Target} onChange={(e) => setForexProp({...forexProp, phase1Target: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          <div>
+                            <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Min Days</label>
+                            <input type="number" value={forexProp.phase1MinDays} onChange={(e) => setForexProp({...forexProp, phase1MinDays: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Max Days</label>
+                            <input type="number" value={forexProp.phase1MaxDays} onChange={(e) => setForexProp({...forexProp, phase1MaxDays: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    
+                    {forexProp.phase === 'phase2' && (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          <div>
+                            <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Daily DD (%)</label>
+                            <input type="number" step="0.1" value={forexProp.phase2DailyDD} onChange={(e) => setForexProp({...forexProp, phase2DailyDD: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Max DD (%)</label>
+                            <input type="number" step="0.1" value={forexProp.phase2MaxDD} onChange={(e) => setForexProp({...forexProp, phase2MaxDD: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Profit Target (%)</label>
+                          <input type="number" step="0.1" value={forexProp.phase2Target} onChange={(e) => setForexProp({...forexProp, phase2Target: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          <div>
+                            <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Min Days</label>
+                            <input type="number" value={forexProp.phase2MinDays} onChange={(e) => setForexProp({...forexProp, phase2MinDays: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Max Days</label>
+                            <input type="number" value={forexProp.phase2MaxDays} onChange={(e) => setForexProp({...forexProp, phase2MaxDays: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    
+                    {forexProp.phase === 'funded' && (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          <div>
+                            <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Daily DD (%)</label>
+                            <input type="number" step="0.1" value={forexProp.fundedDailyDD} onChange={(e) => setForexProp({...forexProp, fundedDailyDD: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Max DD (%)</label>
+                            <input type="number" step="0.1" value={forexProp.fundedMaxDD} onChange={(e) => setForexProp({...forexProp, fundedMaxDD: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                          </div>
+                        </div>
+                        <div style={{ padding: '12px', background: theme.success + '20', borderRadius: '8px', textAlign: 'center' }}>
+                          <div style={{ color: theme.success, fontSize: '12px', fontWeight: 600 }}>✓ No profit target - just protect your account!</div>
+                        </div>
+                      </>
+                    )}
+                    
                     <div>
                       <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Profit Split (%)</label>
                       <input type="number" value={forexProp.profitSplit} onChange={(e) => setForexProp({...forexProp, profitSplit: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
@@ -1315,39 +1447,97 @@ export default function Dashboard() {
               <h2 style={{ margin: '0 0 20px 0', color: theme.success, fontSize: '22px' }}>📊 Futures Prop Firm Calculator</h2>
               <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '20px' }}>For Apex, Topstep, Earn2Trade, and similar futures prop firms with trailing drawdown rules.</p>
               
+              {/* Phase Selection */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+                {[
+                  { id: 'evaluation', label: '🎯 Evaluation', color: theme.warning },
+                  { id: 'pa', label: '✅ PA Account', color: theme.purple },
+                  { id: 'funded', label: '💰 Funded', color: theme.success }
+                ].map(phase => (
+                  <button key={phase.id} onClick={() => setFuturesProp({...futuresProp, phase: phase.id})} style={{ flex: 1, padding: '12px 16px', background: futuresProp.phase === phase.id ? phase.color : (darkMode ? '#334155' : '#f1f5f9'), color: futuresProp.phase === phase.id ? 'white' : theme.text, border: '2px solid ' + (futuresProp.phase === phase.id ? phase.color : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>{phase.label}</button>
+                ))}
+              </div>
+              
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '24px' }}>
-                {/* Account Rules */}
+                {/* Account & Phase Rules */}
                 <div>
-                  <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '16px' }}>📋 Account Rules</h3>
+                  <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '16px' }}>📋 {futuresProp.phase === 'evaluation' ? 'Evaluation' : futuresProp.phase === 'pa' ? 'PA Account' : 'Funded'} Rules</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div>
                       <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Account Size ($)</label>
                       <input type="number" value={futuresProp.accountSize} onChange={(e) => setFuturesProp({...futuresProp, accountSize: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
                     </div>
+                    
+                    {futuresProp.phase === 'evaluation' && (
+                      <>
+                        <div>
+                          <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Trailing Drawdown ($)</label>
+                          <input type="number" value={futuresProp.evalTrailingDD} onChange={(e) => setFuturesProp({...futuresProp, evalTrailingDD: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Drawdown Type</label>
+                          <select value={futuresProp.evalDrawdownType} onChange={(e) => setFuturesProp({...futuresProp, evalDrawdownType: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }}>
+                            <option value="trailing">Trailing (Real-time)</option>
+                            <option value="eod">End of Day (EOD)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Profit Target ($)</label>
+                          <input type="number" value={futuresProp.evalProfitTarget} onChange={(e) => setFuturesProp({...futuresProp, evalProfitTarget: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Min Trading Days</label>
+                          <input type="number" value={futuresProp.evalMinDays} onChange={(e) => setFuturesProp({...futuresProp, evalMinDays: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                        </div>
+                      </>
+                    )}
+                    
+                    {futuresProp.phase === 'pa' && (
+                      <>
+                        <div>
+                          <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Trailing Drawdown ($)</label>
+                          <input type="number" value={futuresProp.paTrailingDD} onChange={(e) => setFuturesProp({...futuresProp, paTrailingDD: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Drawdown Type</label>
+                          <select value={futuresProp.paDrawdownType} onChange={(e) => setFuturesProp({...futuresProp, paDrawdownType: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }}>
+                            <option value="trailing">Trailing (Real-time)</option>
+                            <option value="eod">End of Day (EOD)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Profit Target ($)</label>
+                          <input type="number" value={futuresProp.paProfitTarget} onChange={(e) => setFuturesProp({...futuresProp, paProfitTarget: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Min Trading Days</label>
+                          <input type="number" value={futuresProp.paMinDays} onChange={(e) => setFuturesProp({...futuresProp, paMinDays: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                        </div>
+                      </>
+                    )}
+                    
+                    {futuresProp.phase === 'funded' && (
+                      <>
+                        <div>
+                          <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Trailing Drawdown ($)</label>
+                          <input type="number" value={futuresProp.fundedTrailingDD} onChange={(e) => setFuturesProp({...futuresProp, fundedTrailingDD: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Drawdown Type</label>
+                          <select value={futuresProp.fundedDrawdownType} onChange={(e) => setFuturesProp({...futuresProp, fundedDrawdownType: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }}>
+                            <option value="trailing">Trailing (Real-time)</option>
+                            <option value="eod">End of Day (EOD)</option>
+                          </select>
+                        </div>
+                        <div style={{ padding: '12px', background: theme.success + '20', borderRadius: '8px', textAlign: 'center' }}>
+                          <div style={{ color: theme.success, fontSize: '12px', fontWeight: 600 }}>✓ No profit target - just protect your account!</div>
+                        </div>
+                      </>
+                    )}
+                    
                     <div>
-                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Trailing Drawdown ($)</label>
-                      <input type="number" value={futuresProp.trailingDrawdown} onChange={(e) => setFuturesProp({...futuresProp, trailingDrawdown: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Drawdown Type</label>
-                      <select value={futuresProp.drawdownType} onChange={(e) => setFuturesProp({...futuresProp, drawdownType: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }}>
-                        <option value="trailing">Trailing (Real-time)</option>
-                        <option value="eod">End of Day (EOD)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Profit Target ($)</label>
-                      <input type="number" value={futuresProp.profitTarget} onChange={(e) => setFuturesProp({...futuresProp, profitTarget: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <div>
-                        <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Min Days</label>
-                        <input type="number" value={futuresProp.minTradingDays} onChange={(e) => setFuturesProp({...futuresProp, minTradingDays: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Contract Limit</label>
-                        <input type="number" value={futuresProp.contractLimit} onChange={(e) => setFuturesProp({...futuresProp, contractLimit: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
-                      </div>
+                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Contract Limit</label>
+                      <input type="number" value={futuresProp.contractLimit} onChange={(e) => setFuturesProp({...futuresProp, contractLimit: e.target.value})} style={{ ...inputStyle, width: '100%', padding: '8px 12px', fontSize: '13px' }} />
                     </div>
                     <div>
                       <label style={{ display: 'block', color: theme.textMuted, fontSize: '11px', marginBottom: '4px', fontWeight: 600 }}>Profit Split (%)</label>
@@ -1694,6 +1884,95 @@ export default function Dashboard() {
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Trading Calendar */}
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <button onClick={() => setTradingCalendarMonth(new Date(tradingCalendarMonth.getFullYear(), tradingCalendarMonth.getMonth() - 1, 1))} style={btnPrimary}>← Prev</button>
+                <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>
+                  📅 Trading Calendar - {tradingCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </h2>
+                <button onClick={() => setTradingCalendarMonth(new Date(tradingCalendarMonth.getFullYear(), tradingCalendarMonth.getMonth() + 1, 1))} style={btnPrimary}>Next →</button>
+              </div>
+              
+              {tradingResults && (
+                <>
+                  {/* Month Summary */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px', padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px' }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Projected Monthly Profit</div>
+                      <div style={{ color: theme.warning, fontSize: '20px', fontWeight: 'bold' }}>${(tradingResults.profit / Math.max(1, parseInt(tradingCalculator.years || '0') * 12 + parseInt(tradingCalculator.months || '1'))).toFixed(2)}</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Trading Days/Month</div>
+                      <div style={{ color: theme.text, fontSize: '20px', fontWeight: 'bold' }}>{Math.round(tradingResults.tradingDaysPerYear / 12)}</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Daily Target</div>
+                      <div style={{ color: theme.success, fontSize: '20px', fontWeight: 'bold' }}>${tradingResults.totalTradingDays > 0 ? (tradingResults.profit / tradingResults.totalTradingDays).toFixed(2) : '0.00'}</div>
+                    </div>
+                  </div>
+                  
+                  {/* Calendar Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                      <div key={day} style={{ textAlign: 'center', fontWeight: 600, color: theme.textMuted, padding: '10px', fontSize: '13px' }}>{day}</div>
+                    ))}
+                    
+                    {Array.from({ length: new Date(tradingCalendarMonth.getFullYear(), tradingCalendarMonth.getMonth(), 1).getDay() }).map((_, i) => (
+                      <div key={`empty-${i}`} style={{ minHeight: '80px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px' }} />
+                    ))}
+                    
+                    {Array.from({ length: new Date(tradingCalendarMonth.getFullYear(), tradingCalendarMonth.getMonth() + 1, 0).getDate() }).map((_, i) => {
+                      const day = i + 1
+                      const date = new Date(tradingCalendarMonth.getFullYear(), tradingCalendarMonth.getMonth(), day)
+                      const dayOfWeek = date.getDay()
+                      const isTradingDay = (
+                        (dayOfWeek === 1 && tradingCalculator.includeDays.includes('M')) ||
+                        (dayOfWeek === 2 && tradingCalculator.includeDays.includes('T')) ||
+                        (dayOfWeek === 3 && tradingCalculator.includeDays.includes('W')) ||
+                        (dayOfWeek === 4 && tradingCalculator.includeDays.includes('T2')) ||
+                        (dayOfWeek === 5 && tradingCalculator.includeDays.includes('F')) ||
+                        (dayOfWeek === 6 && tradingCalculator.includeDays.includes('S')) ||
+                        (dayOfWeek === 0 && tradingCalculator.includeDays.includes('S2'))
+                      )
+                      const isToday = date.toDateString() === new Date().toDateString()
+                      const dailyProfit = tradingResults.totalTradingDays > 0 ? tradingResults.profit / tradingResults.totalTradingDays : 0
+                      
+                      return (
+                        <div key={day} style={{ 
+                          minHeight: '80px', 
+                          padding: '8px', 
+                          background: isToday ? (darkMode ? '#1e3a5f' : '#eff6ff') : 
+                                   !isTradingDay ? (darkMode ? '#1e293b' : '#f8fafc') : 
+                                   (darkMode ? '#1e293b' : '#ffffff'),
+                          borderRadius: '8px', 
+                          border: isToday ? `2px solid ${theme.accent}` : `1px solid ${theme.border}`,
+                          opacity: isTradingDay ? 1 : 0.6
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <span style={{ fontWeight: isToday ? 700 : 600, color: isToday ? theme.accent : !isTradingDay ? theme.textMuted : theme.text, fontSize: '14px' }}>{day}</span>
+                            {isTradingDay && <span style={{ fontSize: '10px', padding: '2px 4px', borderRadius: '4px', background: theme.warning, color: 'white' }}>Trade</span>}
+                          </div>
+                          {isTradingDay && (
+                            <div style={{ fontSize: '11px', padding: '4px', background: darkMode ? '#3a2e1e' : '#fffbeb', borderRadius: '4px', color: theme.warning, textAlign: 'center' }}>
+                              Target: <strong>${dailyProfit.toFixed(2)}</strong>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+              
+              {!tradingResults && (
+                <div style={{ textAlign: 'center', padding: '40px', color: theme.textMuted }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>📊</div>
+                  <div>Run the Compounding Calculator above to see your trading calendar projections</div>
                 </div>
               )}
             </div>
