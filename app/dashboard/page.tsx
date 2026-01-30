@@ -1,221 +1,59 @@
 'use client'
 
 import { useUser } from '@clerk/nextjs'
-import { useState, useEffect, useCallback } from 'react'
-
-// Define interfaces for our data structures
-interface Income {
-  id: number;
-  name: string;
-  amount: string;
-  frequency: string;
-  type: string;
-  startDate: string;
-}
-
-interface Expense {
-  id: number;
-  name: string;
-  amount: string;
-  frequency: string;
-  dueDate: string;
-  targetDebtId?: number;
-  targetGoalId?: number;
-}
-
-interface Debt {
-  id: number;
-  name: string;
-  balance: string;
-  interestRate: string;
-  minPayment: string;
-  frequency: string;
-  paymentDate: string;
-  originalBalance?: string;
-}
-
-interface Goal {
-  id: number;
-  name: string;
-  target: string;
-  saved: string;
-  deadline: string;
-  savingsFrequency: string;
-  startDate: string;
-  paymentAmount: string;
-}
-
-interface Asset {
-  id: number;
-  name: string;
-  value: string;
-  type: string;
-}
-
-interface Liability {
-  id: number;
-  name: string;
-  value: string;
-  type: string;
-}
-
-interface Trade {
-  id: number;
-  date: string;
-  instrument: string;
-  direction: string;
-  entryPrice: string;
-  exitPrice: string;
-  profitLoss: string;
-  notes: string;
-}
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-interface CalendarItem {
-  id: string;
-  sourceId: number;
-  sourceType: string;
-  name: string;
-  amount: string;
-  dueDate: string;
-  frequency: string;
-  type: string;
-  originalId?: string;
-  occurrenceDate?: string;
-  isPaid?: boolean;
-  targetDebtId?: number;
-  targetGoalId?: number;
-}
-
-interface Alert {
-  severity: string;
-  message: string;
-  amount: string;
-}
-
-// Add interface for trading calculator
-interface TradingCalculator {
-  startingCapital: string;
-  monthlyContribution: string;
-  annualReturn: string;
-  years: string;
-  riskPerTrade: string;
-  winRate: string;
-  riskReward: string;
-}
+import { useState } from 'react'
 
 export default function Dashboard() {
-  const { user, isLoaded } = useUser()
-  const [isClient, setIsClient] = useState(false)
-  
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
+  const { user } = useUser()
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'overview' | 'path' | 'trading'>('dashboard')
   const [darkMode, setDarkMode] = useState(true)
   const [calendarMonth, setCalendarMonth] = useState(new Date())
   
-  const [incomeStreams, setIncomeStreams] = useState<Income[]>([])
+  const [incomeStreams, setIncomeStreams] = useState<any[]>([])
   const [newIncome, setNewIncome] = useState({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0] })
   
-  const [expenses, setExpenses] = useState<Expense[]>([])
+  const [expenses, setExpenses] = useState<any[]>([])
   const [newExpense, setNewExpense] = useState({ name: '', amount: '', frequency: 'monthly', dueDate: new Date().toISOString().split('T')[0] })
   
-  const [debts, setDebts] = useState<Debt[]>([])
+  const [debts, setDebts] = useState<any[]>([])
   const [newDebt, setNewDebt] = useState({ name: '', balance: '', interestRate: '', minPayment: '', frequency: 'monthly', paymentDate: new Date().toISOString().split('T')[0] })
   const [payoffMethod, setPayoffMethod] = useState<'snowball' | 'avalanche'>('avalanche')
   
-  const [goals, setGoals] = useState<Goal[]>([])
+  const [goals, setGoals] = useState<any[]>([])
   const [newGoal, setNewGoal] = useState({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: new Date().toISOString().split('T')[0], paymentAmount: '' })
   const [extraGoalPayment, setExtraGoalPayment] = useState('')
   const [selectedGoalForExtra, setSelectedGoalForExtra] = useState<number | null>(null)
   
-  const [assets, setAssets] = useState<Asset[]>([])
+  const [assets, setAssets] = useState<any[]>([])
   const [newAsset, setNewAsset] = useState({ name: '', value: '', type: 'savings' })
-  const [liabilities, setLiabilities] = useState<Liability[]>([])
+  const [liabilities, setLiabilities] = useState<any[]>([])
   const [newLiability, setNewLiability] = useState({ name: '', value: '', type: 'loan' })
   
   const [paidOccurrences, setPaidOccurrences] = useState<Set<string>>(new Set())
   
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
   const [chatInput, setChatInput] = useState('')
   const [isAskingCoach, setIsAskingCoach] = useState(false)
   
-  const [trades, setTrades] = useState<Trade[]>([])
+  const [trades, setTrades] = useState<any[]>([])
   const [newTrade, setNewTrade] = useState({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '' })
 
-  const [expandedDay, setExpandedDay] = useState<{day: number, items: CalendarItem[]} | null>(null)
+  const [expandedDay, setExpandedDay] = useState<{day: number, items: any[]} | null>(null)
   
   // Per-debt extra payment state
-  const [debtExtraPayment, setDebtExtraPayment] = useState<Record<number, {amount: string, frequency: string}>>({})
+  const [debtExtraPayment, setDebtExtraPayment] = useState<{[key: number]: {amount: string, frequency: string}}>({})
   const [showExtraInput, setShowExtraInput] = useState<number | null>(null)
 
-  // Add these new states for the goal calculator
-  const [goalCalculator, setGoalCalculator] = useState({
-    targetAmount: '',
-    currentAmount: '',
-    monthlyContribution: '',
-    interestRate: '',
-    years: ''
-  })
-  const [calculatorResult, setCalculatorResult] = useState<{
-    months: number;
-    totalMonths: number;
-    futureValue: number;
-    totalContributed: number;
-    interestEarned: number;
-  } | null>(null)
+  // Goal Calculator state
+  const [goalCalculator, setGoalCalculator] = useState({ targetAmount: '', currentAmount: '', monthlyContribution: '', interestRate: '', years: '' })
+  const [calculatorResult, setCalculatorResult] = useState<any>(null)
   const [calculating, setCalculating] = useState(false)
 
-  // Add trading calculator state
-  const [tradingCalculator, setTradingCalculator] = useState<TradingCalculator>({
-    startingCapital: '10000',
-    monthlyContribution: '500',
-    annualReturn: '20',
-    years: '10',
-    riskPerTrade: '2',
-    winRate: '55',
-    riskReward: '1.5'
-  })
-  
-  const [tradingResults, setTradingResults] = useState<{
-    futureValue: number;
-    totalContributed: number;
-    profit: number;
-    yearlyProgress: Array<{year: number, value: number, contributed: number, profit: number}>;
-    tradeStats: {
-      tradesPerYear: number;
-      expectedWinRate: number;
-      avgWin: number;
-      avgLoss: number;
-      expectancy: number;
-    };
-  } | null>(null)
-  
+  // Trading Calculator state
+  const [tradingCalculator, setTradingCalculator] = useState({ startingCapital: '10000', monthlyContribution: '500', annualReturn: '15', years: '5', riskPerTrade: '2', winRate: '55', riskReward: '1.5' })
+  const [tradingResults, setTradingResults] = useState<any>(null)
   const [calculatingTrading, setCalculatingTrading] = useState(false)
-
-  if (!isLoaded || !isClient) {
-    return (
-      <div style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        background: '#0f172a',
-        color: 'white'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', marginBottom: '20px' }}>💰</div>
-          <div>Loading Premium Finance Dashboard...</div>
-        </div>
-      </div>
-    )
-  }
 
   const theme = {
     bg: darkMode ? '#0f172a' : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdf4 100%)',
@@ -261,18 +99,10 @@ export default function Dashboard() {
   const totalLiabilities = liabilities.reduce((sum, l) => sum + parseFloat(l.value || '0'), 0)
   const netWorth = totalAssets - totalLiabilities - totalDebtBalance
   const totalPL = trades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
-  
-  // Calculate win rate for trading stats
-  const calculateWinRate = useCallback(() => {
-    if (trades.length === 0) return 0
-    const winningTrades = trades.filter(t => parseFloat(t.profitLoss || '0') > 0).length
-    return (winningTrades / trades.length) * 100
-  }, [trades])
-  
-  const winRate = calculateWinRate()
+  const winRate = trades.length > 0 ? (trades.filter(t => parseFloat(t.profitLoss || '0') > 0).length / trades.length) * 100 : 0
 
   const getAlerts = () => {
-    const alertsList: Alert[] = []
+    const alertsList: any[] = []
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     expenses.forEach(exp => {
@@ -297,7 +127,7 @@ export default function Dashboard() {
   const prevMonth = () => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))
   const nextMonth = () => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))
   
-  const calculateGoalPayment = (goal: Goal) => {
+  const calculateGoalPayment = (goal: any) => {
     const remaining = parseFloat(goal.target || '0') - parseFloat(goal.saved || '0')
     if (!goal.deadline || remaining <= 0) return 0
     const monthsRemaining = Math.max(1, Math.ceil((new Date(goal.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24 * 30)))
@@ -307,224 +137,38 @@ export default function Dashboard() {
     return monthlyNeeded
   }
 
-  // Add a function to calculate months to goal for existing goals
-  const calculateMonthsToGoal = (goal: Goal) => {
-    const target = parseFloat(goal.target || '0')
-    const saved = parseFloat(goal.saved || '0')
+  const calculateMonthsToGoal = (goal: any) => {
+    const remaining = parseFloat(goal.target || '0') - parseFloat(goal.saved || '0')
+    if (remaining <= 0) return 0
     const payment = goal.paymentAmount ? parseFloat(goal.paymentAmount) : calculateGoalPayment(goal)
-    
-    if (target <= 0 || payment <= 0 || saved >= target) return 0
-    
-    const remaining = target - saved
-    return Math.ceil(remaining / payment)
+    const monthlyPayment = convertToMonthly(payment, goal.savingsFrequency || 'monthly')
+    if (monthlyPayment <= 0) return 999
+    return Math.ceil(remaining / monthlyPayment)
   }
-
-  // Add this new function for the goal calculator
-  const calculateGoal = () => {
-    setCalculating(true)
-    
-    // Parse inputs with defaults
-    const target = parseFloat(goalCalculator.targetAmount || '0')
-    const current = parseFloat(goalCalculator.currentAmount || '0')
-    const monthly = parseFloat(goalCalculator.monthlyContribution || '0')
-    const rate = parseFloat(goalCalculator.interestRate || '0') / 100 / 12 // Monthly rate
-    const years = parseFloat(goalCalculator.years || '0')
-    
-    if (target <= 0 || monthly <= 0) {
-      setCalculatorResult(null)
-      setCalculating(false)
-      alert('Please enter target amount and monthly contribution')
-      return
-    }
-    
-    // Calculate months needed to reach target
-    let monthsNeeded = 0
-    let futureValue = current
-    let totalContributed = current
-    
-    // If no interest, simple calculation
-    if (rate <= 0) {
-      monthsNeeded = Math.ceil((target - current) / monthly)
-      futureValue = current + (monthsNeeded * monthly)
-      totalContributed = current + (monthsNeeded * monthly)
-    } else {
-      // With compound interest
-      let months = 0
-      let fv = current
-      while (fv < target && months < 1200) { // Cap at 100 years
-        months++
-        fv = (fv + monthly) * (1 + rate)
-      }
-      monthsNeeded = months
-      futureValue = fv
-      
-      // Calculate total contributed and interest earned
-      totalContributed = current + (monthsNeeded * monthly)
-    }
-    
-    let interestEarned = futureValue - totalContributed
-    
-    // Calculate with time constraint if years provided
-    let totalMonths = monthsNeeded
-    if (years > 0) {
-      totalMonths = years * 12
-      // Calculate future value with given time
-      let fv = current
-      for (let i = 0; i < totalMonths; i++) {
-        fv = (fv + monthly) * (1 + rate)
-      }
-      futureValue = fv
-      totalContributed = current + (totalMonths * monthly)
-      interestEarned = futureValue - totalContributed
-    }
-    
-    setCalculatorResult({
-      months: monthsNeeded,
-      totalMonths: years > 0 ? years * 12 : monthsNeeded,
-      futureValue,
-      totalContributed,
-      interestEarned
-    })
-    
-    setCalculating(false)
-  }
-
-  // Add this new function for trading compounding calculator
-  const calculateTradingCompounding = useCallback(() => {
-    setCalculatingTrading(true)
-    
-    // Parse inputs
-    const start = parseFloat(tradingCalculator.startingCapital || '0')
-    const monthly = parseFloat(tradingCalculator.monthlyContribution || '0')
-    const annualReturn = parseFloat(tradingCalculator.annualReturn || '0') / 100
-    const years = parseFloat(tradingCalculator.years || '0')
-    const riskPerTrade = parseFloat(tradingCalculator.riskPerTrade || '0') / 100
-    const winRate = parseFloat(tradingCalculator.winRate || '0') / 100
-    const riskReward = parseFloat(tradingCalculator.riskReward || '0')
-    
-    if (start <= 0 || years <= 0) {
-      setTradingResults(null)
-      setCalculatingTrading(false)
-      return
-    }
-    
-    // Calculate compound growth with monthly contributions
-    let futureValue = start
-    let totalContributed = start
-    const monthlyRate = Math.pow(1 + annualReturn, 1/12) - 1
-    
-    const yearlyProgress = []
-    
-    for (let year = 1; year <= years; year++) {
-      let yearStart = futureValue
-      for (let month = 1; month <= 12; month++) {
-        // Add monthly contribution
-        futureValue += monthly
-        totalContributed += monthly
-        
-        // Apply monthly return
-        futureValue *= (1 + monthlyRate)
-      }
-      
-      yearlyProgress.push({
-        year,
-        value: futureValue,
-        contributed: totalContributed,
-        profit: futureValue - totalContributed
-      })
-    }
-    
-    // Calculate trading statistics
-    const tradesPerMonth = 20 // Assume 20 trading days per month, 1 trade per day
-    const tradesPerYear = tradesPerMonth * 12
-    
-    // Calculate expectancy
-    const avgWin = riskPerTrade * riskReward
-    const avgLoss = riskPerTrade
-    const expectancy = (winRate * avgWin) - ((1 - winRate) * avgLoss)
-    
-    setTradingResults({
-      futureValue,
-      totalContributed,
-      profit: futureValue - totalContributed,
-      yearlyProgress,
-      tradeStats: {
-        tradesPerYear,
-        expectedWinRate: winRate * 100,
-        avgWin: avgWin * 100,
-        avgLoss: avgLoss * 100,
-        expectancy: expectancy * 100
-      }
-    })
-    
-    setCalculatingTrading(false)
-  }, [tradingCalculator])
-
-  // Initialize trading calculator on component mount
-  useEffect(() => {
-    if (isClient) {
-      calculateTradingCompounding()
-    }
-  }, [isClient, calculateTradingCompounding])
 
   const getCalendarItemsForDay = (day: number) => {
     const { month, year } = getDaysInMonth()
-    const items: CalendarItem[] = []
-    
-    const incomeItems: CalendarItem[] = incomeStreams.map(inc => ({
-      id: 'income-' + inc.id,
-      sourceId: inc.id,
-      sourceType: 'income',
-      name: '💰 ' + inc.name,
-      amount: inc.amount,
-      dueDate: inc.startDate,
-      frequency: inc.frequency,
-      type: 'income'
-    }))
-
-    const expenseItems: CalendarItem[] = expenses.map(exp => ({
-      id: 'expense-' + exp.id,
-      sourceId: exp.id,
-      sourceType: exp.targetDebtId ? 'extraDebt' : exp.targetGoalId ? 'extraGoal' : 'expense',
-      targetDebtId: exp.targetDebtId,
-      targetGoalId: exp.targetGoalId,
-      name: '💸 ' + exp.name,
-      amount: exp.amount,
-      dueDate: exp.dueDate,
-      frequency: exp.frequency,
-      type: 'expense'
-    }))
-
-    const debtItems: CalendarItem[] = debts
-      .filter(d => d.paymentDate)
-      .map(debt => ({
-        id: 'debt-' + debt.id,
-        sourceId: debt.id,
-        sourceType: 'debt',
-        name: '💳 ' + debt.name,
-        amount: debt.minPayment,
-        dueDate: debt.paymentDate,
-        frequency: debt.frequency,
-        type: 'debt'
-      }))
-
-    const goalItems: CalendarItem[] = goals
-      .filter(g => g.startDate)
-      .map(goal => {
+    const items: any[] = []
+    const allItems = [
+      ...incomeStreams.map(inc => ({ id: 'income-' + inc.id, sourceId: inc.id, sourceType: 'income', name: '💰 ' + inc.name, amount: inc.amount, dueDate: inc.startDate, frequency: inc.frequency, type: 'income' })),
+      ...expenses.map(exp => ({ 
+        id: 'expense-' + exp.id, 
+        sourceId: exp.id, 
+        sourceType: exp.targetDebtId ? 'extraDebt' : exp.targetGoalId ? 'extraGoal' : 'expense',
+        targetDebtId: exp.targetDebtId,
+        targetGoalId: exp.targetGoalId,
+        name: '💸 ' + exp.name, 
+        amount: exp.amount, 
+        dueDate: exp.dueDate, 
+        frequency: exp.frequency, 
+        type: 'expense' 
+      })),
+      ...debts.filter(d => d.paymentDate).map(debt => ({ id: 'debt-' + debt.id, sourceId: debt.id, sourceType: 'debt', name: '💳 ' + debt.name, amount: debt.minPayment, dueDate: debt.paymentDate, frequency: debt.frequency, type: 'debt' })),
+      ...goals.filter(g => g.startDate).map(goal => {
         const paymentAmt = goal.paymentAmount ? parseFloat(goal.paymentAmount) : (goal.deadline ? calculateGoalPayment(goal) : 0)
-        return {
-          id: 'goal-' + goal.id,
-          sourceId: goal.id,
-          sourceType: 'goal',
-          name: '🎯 ' + goal.name,
-          amount: paymentAmt.toFixed(2),
-          dueDate: goal.startDate,
-          frequency: goal.savingsFrequency,
-          type: 'goal'
-        }
+        return { id: 'goal-' + goal.id, sourceId: goal.id, sourceType: 'goal', name: '🎯 ' + goal.name, amount: paymentAmt.toFixed(2), dueDate: goal.startDate, frequency: goal.savingsFrequency, type: 'goal' }
       })
-
-    const allItems = [...incomeItems, ...expenseItems, ...debtItems, ...goalItems]
+    ]
     
     allItems.forEach(item => {
       if (!item.dueDate) return
@@ -638,7 +282,7 @@ export default function Dashboard() {
     setSelectedGoalForExtra(null)
   }
 
-  const calculateSingleDebtPayoff = (debt: Debt, includeExtras: boolean = true) => {
+  const calculateSingleDebtPayoff = (debt: any, includeExtras: boolean = true) => {
     const balance = parseFloat(debt.balance || '0')
     const interestRate = parseFloat(debt.interestRate || '0')
     const minPayment = convertToMonthly(parseFloat(debt.minPayment || '0'), debt.frequency || 'monthly')
@@ -670,6 +314,89 @@ export default function Dashboard() {
     return { maxMonths, totalInterest, hasError }
   }
 
+  const calculateGoal = () => {
+    setCalculating(true)
+    const target = parseFloat(goalCalculator.targetAmount || '0')
+    const current = parseFloat(goalCalculator.currentAmount || '0')
+    const monthly = parseFloat(goalCalculator.monthlyContribution || '0')
+    const rate = parseFloat(goalCalculator.interestRate || '0') / 100 / 12
+    const years = parseFloat(goalCalculator.years || '0')
+    
+    let months = 0
+    let balance = current
+    const remaining = target - current
+    
+    if (years > 0) {
+      months = years * 12
+      for (let i = 0; i < months; i++) {
+        balance = balance * (1 + rate) + monthly
+      }
+    } else if (monthly > 0) {
+      while (balance < target && months < 600) {
+        balance = balance * (1 + rate) + monthly
+        months++
+      }
+    }
+    
+    const totalContributed = current + (monthly * months)
+    const interestEarned = balance - totalContributed
+    
+    setCalculatorResult({
+      months,
+      futureValue: balance,
+      totalContributed,
+      interestEarned,
+      totalMonths: months
+    })
+    setCalculating(false)
+  }
+
+  const calculateTradingCompounding = () => {
+    setCalculatingTrading(true)
+    const startCap = parseFloat(tradingCalculator.startingCapital || '0')
+    const monthlyAdd = parseFloat(tradingCalculator.monthlyContribution || '0')
+    const annualRet = parseFloat(tradingCalculator.annualReturn || '0') / 100
+    const yrs = parseInt(tradingCalculator.years || '0')
+    const riskPct = parseFloat(tradingCalculator.riskPerTrade || '0')
+    const winRt = parseFloat(tradingCalculator.winRate || '0') / 100
+    const rr = parseFloat(tradingCalculator.riskReward || '0')
+    
+    const monthlyRate = annualRet / 12
+    let balance = startCap
+    const yearlyProgress: any[] = []
+    
+    for (let year = 1; year <= yrs; year++) {
+      for (let month = 0; month < 12; month++) {
+        balance = balance * (1 + monthlyRate) + monthlyAdd
+      }
+      const contributed = startCap + (monthlyAdd * 12 * year)
+      yearlyProgress.push({
+        year,
+        value: balance,
+        contributed,
+        profit: balance - contributed
+      })
+    }
+    
+    const totalContributed = startCap + (monthlyAdd * 12 * yrs)
+    const expectancy = (winRt * rr * riskPct) - ((1 - winRt) * riskPct)
+    
+    setTradingResults({
+      futureValue: balance,
+      totalContributed,
+      profit: balance - totalContributed,
+      yearlyProgress,
+      tradeStats: {
+        expectedWinRate: winRt * 100,
+        avgWin: rr * riskPct,
+        avgLoss: riskPct,
+        expectancy,
+        tradesPerYear: 100
+      }
+    })
+    setCalculatingTrading(false)
+  }
+
   const fiPath = (() => {
     const monthlyNeed = totalOutgoing
     const passiveGap = monthlyNeed - passiveIncome
@@ -687,19 +414,14 @@ export default function Dashboard() {
     setIsAskingCoach(true)
     try {
       const context = 'Income: $' + monthlyIncome.toFixed(2) + ', Expenses: $' + monthlyExpenses.toFixed(2) + ', Debt: $' + totalDebtBalance.toFixed(2)
-      // Mock response for now
-      setTimeout(() => {
-        const mockAdvice = `Based on your financial context (${context}), I recommend focusing on building your emergency fund first. With your current surplus of $${monthlySurplus.toFixed(2)}, you could allocate 50% to debt repayment and 50% to savings.`
-        setChatMessages(prev => [...prev, { role: 'assistant', content: mockAdvice }])
-        setIsAskingCoach(false)
-      }, 1000)
-    } catch { 
-      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]) 
-    }
+      const response = await fetch('/api/budget-coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: chatInput, financialContext: context }) })
+      const data = await response.json()
+      setChatMessages(prev => [...prev, { role: 'assistant', content: data.advice || 'Sorry, I could not respond.' }])
+    } catch { setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]) }
     finally { setIsAskingCoach(false) }
   }
 
-  const renderCalendarItem = (item: CalendarItem, compact: boolean = false) => (
+  const renderCalendarItem = (item: any, compact: boolean = false) => (
     <div key={item.id} style={{ fontSize: compact ? '11px' : '13px', padding: compact ? '4px 6px' : '8px 10px', marginBottom: '4px', background: item.isPaid ? (darkMode ? '#334155' : '#d1d5db') : item.type === 'goal' ? '#ede9fe' : item.type === 'debt' ? '#fee2e2' : item.type === 'income' ? '#d1fae5' : (item.sourceType === 'extraDebt' || item.sourceType === 'extraGoal') ? '#f3e8ff' : '#dbeafe', color: item.isPaid ? theme.textMuted : '#1e293b', borderRadius: '6px', opacity: item.isPaid ? 0.7 : 1, border: '1px solid rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: item.isPaid ? 'line-through' : 'none' }}>{item.name}</div>
@@ -708,6 +430,8 @@ export default function Dashboard() {
       <button onClick={(e) => { e.stopPropagation(); togglePaid(item.id, item.sourceType, item.sourceId, parseFloat(item.amount || '0'), item.targetDebtId, item.targetGoalId) }} style={{ padding: compact ? '4px 8px' : '6px 12px', background: item.isPaid ? '#6b7280' : (item.sourceType === 'extraDebt' || item.sourceType === 'extraGoal' || item.sourceType === 'goal') ? '#8b5cf6' : '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: compact ? '10px' : '12px', fontWeight: 700, flexShrink: 0 }}>{item.isPaid ? '✓' : 'PAY'}</button>
     </div>
   )
+
+
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
       {expandedDay && (
@@ -937,69 +661,31 @@ export default function Dashboard() {
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '20px' }}>🎯 Savings Goals</h2>
               
-              {/* NEW GOAL CALCULATOR SECTION */}
               <div style={{ marginBottom: '30px', padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '2px solid ' + theme.purple }}>
                 <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>📊 Goal Calculator</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }}>
                   <div>
                     <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Target Amount ($)</label>
-                    <input 
-                      type="number" 
-                      placeholder="5000" 
-                      value={goalCalculator.targetAmount}
-                      onChange={(e) => setGoalCalculator({...goalCalculator, targetAmount: e.target.value})}
-                      style={{ ...inputStyle, width: '100%' }}
-                    />
+                    <input type="number" placeholder="5000" value={goalCalculator.targetAmount} onChange={(e) => setGoalCalculator({...goalCalculator, targetAmount: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Already Saved ($)</label>
-                    <input 
-                      type="number" 
-                      placeholder="1000" 
-                      value={goalCalculator.currentAmount}
-                      onChange={(e) => setGoalCalculator({...goalCalculator, currentAmount: e.target.value})}
-                      style={{ ...inputStyle, width: '100%' }}
-                    />
+                    <input type="number" placeholder="1000" value={goalCalculator.currentAmount} onChange={(e) => setGoalCalculator({...goalCalculator, currentAmount: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Monthly Contribution ($)</label>
-                    <input 
-                      type="number" 
-                      placeholder="200" 
-                      value={goalCalculator.monthlyContribution}
-                      onChange={(e) => setGoalCalculator({...goalCalculator, monthlyContribution: e.target.value})}
-                      style={{ ...inputStyle, width: '100%' }}
-                    />
+                    <input type="number" placeholder="200" value={goalCalculator.monthlyContribution} onChange={(e) => setGoalCalculator({...goalCalculator, monthlyContribution: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Annual Interest Rate (%)</label>
-                    <input 
-                      type="number" 
-                      placeholder="5" 
-                      step="0.1"
-                      value={goalCalculator.interestRate}
-                      onChange={(e) => setGoalCalculator({...goalCalculator, interestRate: e.target.value})}
-                      style={{ ...inputStyle, width: '100%' }}
-                    />
+                    <input type="number" placeholder="5" step="0.1" value={goalCalculator.interestRate} onChange={(e) => setGoalCalculator({...goalCalculator, interestRate: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Timeframe (Years, optional)</label>
-                    <input 
-                      type="number" 
-                      placeholder="Leave blank to calculate months needed" 
-                      value={goalCalculator.years}
-                      onChange={(e) => setGoalCalculator({...goalCalculator, years: e.target.value})}
-                      style={{ ...inputStyle, width: '100%' }}
-                    />
+                    <input type="number" placeholder="Leave blank to calculate months needed" value={goalCalculator.years} onChange={(e) => setGoalCalculator({...goalCalculator, years: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                   </div>
                 </div>
-                <button 
-                  onClick={calculateGoal} 
-                  disabled={calculating}
-                  style={{ ...btnPurple, padding: '12px 24px', fontSize: '14px', width: '100%' }}
-                >
-                  {calculating ? 'Calculating...' : 'Calculate Goal'}
-                </button>
+                <button onClick={calculateGoal} disabled={calculating} style={{ ...btnPurple, padding: '12px 24px', fontSize: '14px', width: '100%' }}>{calculating ? 'Calculating...' : 'Calculate Goal'}</button>
                 
                 {calculatorResult && (
                   <div style={{ marginTop: '20px', padding: '16px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '10px' }}>
@@ -1007,48 +693,25 @@ export default function Dashboard() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                       <div>
                         <div style={{ color: theme.textMuted, fontSize: '11px' }}>Months to Goal</div>
-                        <div style={{ color: theme.text, fontSize: '18px', fontWeight: 'bold' }}>
-                          {calculatorResult.months} months
-                        </div>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '2px' }}>
-                          ({Math.floor(calculatorResult.months / 12)} years {calculatorResult.months % 12} months)
-                        </div>
+                        <div style={{ color: theme.text, fontSize: '18px', fontWeight: 'bold' }}>{calculatorResult.months} months</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '2px' }}>({Math.floor(calculatorResult.months / 12)} years {calculatorResult.months % 12} months)</div>
                       </div>
                       <div>
                         <div style={{ color: theme.textMuted, fontSize: '11px' }}>Future Value</div>
-                        <div style={{ color: theme.success, fontSize: '18px', fontWeight: 'bold' }}>
-                          ${calculatorResult.futureValue.toFixed(2)}
-                        </div>
+                        <div style={{ color: theme.success, fontSize: '18px', fontWeight: 'bold' }}>${calculatorResult.futureValue.toFixed(2)}</div>
                       </div>
                       <div>
                         <div style={{ color: theme.textMuted, fontSize: '11px' }}>Total Contributed</div>
-                        <div style={{ color: theme.text, fontSize: '14px', fontWeight: 600 }}>
-                          ${calculatorResult.totalContributed.toFixed(2)}
-                        </div>
+                        <div style={{ color: theme.text, fontSize: '14px', fontWeight: 600 }}>${calculatorResult.totalContributed.toFixed(2)}</div>
                       </div>
                       <div>
                         <div style={{ color: theme.textMuted, fontSize: '11px' }}>Interest Earned</div>
-                        <div style={{ color: theme.purple, fontSize: '14px', fontWeight: 600 }}>
-                          ${calculatorResult.interestEarned.toFixed(2)}
-                        </div>
+                        <div style={{ color: theme.purple, fontSize: '14px', fontWeight: 600 }}>${calculatorResult.interestEarned.toFixed(2)}</div>
                       </div>
                     </div>
-                    {goalCalculator.years && parseFloat(goalCalculator.years) > 0 && (
-                      <div style={{ marginTop: '12px', padding: '10px', background: darkMode ? '#334155' : '#fff', borderRadius: '8px' }}>
-                        <div style={{ color: theme.textMuted, fontSize: '11px' }}>With {goalCalculator.years} years timeframe:</div>
-                        <div style={{ color: theme.text, fontSize: '12px' }}>
-                          You'll have <strong>${calculatorResult.futureValue.toFixed(2)}</strong> after {calculatorResult.totalMonths} months
-                          {calculatorResult.futureValue >= parseFloat(goalCalculator.targetAmount || '0') ? 
-                            <span style={{ color: theme.success }}> ✓ Goal Achieved!</span> : 
-                            <span style={{ color: theme.warning }}> ✗ ${(parseFloat(goalCalculator.targetAmount || '0') - calculatorResult.futureValue).toFixed(2)} short</span>
-                          }
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
-              {/* END OF CALCULATOR SECTION */}
               
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
                 <input type="text" placeholder="Goal name" value={newGoal.name} onChange={(e) => setNewGoal({ ...newGoal, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
@@ -1065,11 +728,6 @@ export default function Dashboard() {
                   const payment = goal.paymentAmount ? parseFloat(goal.paymentAmount) : calculateGoalPayment(goal)
                   const isComplete = progress >= 100
                   const monthsToGoal = calculateMonthsToGoal(goal)
-                  const deadlineDate = goal.deadline ? new Date(goal.deadline) : null
-                  const today = new Date()
-                  const monthsUntilDeadline = deadlineDate ? 
-                    Math.max(0, Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24 * 30.44))) : 
-                    null
                   
                   return (
                     <div key={goal.id} style={{ padding: '16px', background: isComplete ? (darkMode ? '#1e3a32' : '#f0fdf4') : (darkMode ? '#334155' : '#faf5ff'), borderRadius: '12px', border: isComplete ? '2px solid ' + theme.success : '1px solid ' + theme.border }}>
@@ -1098,71 +756,14 @@ export default function Dashboard() {
                         <div style={{ width: Math.min(progress, 100) + '%', height: '100%', background: isComplete ? theme.success : 'linear-gradient(to right, ' + theme.purple + ', #7c3aed)' }} />
                       </div>
                       
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ color: isComplete ? theme.success : theme.textMuted, fontSize: '12px', fontWeight: 600 }}>
-                            {isComplete ? '🎉 Goal Complete!' : progress.toFixed(1) + '%'}
-                          </span>
-                          
-                          {!isComplete && payment > 0 && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span style={{ color: theme.purple, fontSize: '11px' }}>📅 ${payment.toFixed(2)}/{goal.savingsFrequency}</span>
-                              <div style={{ padding: '2px 6px', background: theme.purple + '20', borderRadius: '4px', fontSize: '10px', color: theme.purple, fontWeight: 600 }}>
-                                {monthsToGoal} {monthsToGoal === 1 ? 'month' : 'months'} to go
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {goal.deadline && !isComplete && (
-                          <div style={{ padding: '4px 8px', background: monthsUntilDeadline && monthsUntilDeadline <= 3 ? theme.warning + '20' : theme.accent + '20', borderRadius: '4px' }}>
-                            <div style={{ fontSize: '10px', color: theme.textMuted }}>Deadline</div>
-                            <div style={{ fontSize: '11px', fontWeight: 600, color: monthsUntilDeadline && monthsUntilDeadline <= 3 ? theme.warning : theme.accent }}>
-                              {deadlineDate?.toLocaleDateString()} 
-                              {monthsUntilDeadline && monthsUntilDeadline > 0 && (
-                                <span style={{ marginLeft: '4px' }}>
-                                  ({monthsUntilDeadline} {monthsUntilDeadline === 1 ? 'month' : 'months'} left)
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: isComplete ? theme.success : theme.textMuted, fontSize: '12px', fontWeight: 600 }}>
+                          {isComplete ? '🎉 Goal Complete!' : progress.toFixed(1) + '%'}
+                        </span>
+                        {!isComplete && payment > 0 && (
+                          <span style={{ color: theme.purple, fontSize: '11px' }}>📅 ${payment.toFixed(2)}/{goal.savingsFrequency} • {monthsToGoal}mo to go</span>
                         )}
                       </div>
-                      
-                      {!isComplete && (
-                        <div style={{ marginTop: '8px', padding: '8px', background: darkMode ? '#2d3748' : '#f1f5f9', borderRadius: '6px' }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '10px' }}>
-                            <div>
-                              <div style={{ color: theme.textMuted }}>Remaining</div>
-                              <div style={{ color: theme.text, fontWeight: 600 }}>
-                                ${(parseFloat(goal.target || '0') - parseFloat(goal.saved || '0')).toFixed(2)}
-                              </div>
-                            </div>
-                            <div>
-                              <div style={{ color: theme.textMuted }}>Monthly Needed</div>
-                              <div style={{ color: theme.purple, fontWeight: 600 }}>
-                                ${payment.toFixed(2)}
-                              </div>
-                            </div>
-                            <div>
-                              <div style={{ color: theme.textMuted }}>Est. Completion</div>
-                              <div style={{ color: theme.success, fontWeight: 600 }}>
-                                {monthsToGoal > 0 ? 
-                                  `${Math.floor(monthsToGoal / 12)}y ${monthsToGoal % 12}m` : 
-                                  'Increase payments'
-                                }
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {goal.deadline && monthsUntilDeadline && monthsToGoal > monthsUntilDeadline && (
-                            <div style={{ marginTop: '6px', padding: '4px 6px', background: theme.warning + '20', borderRadius: '4px', fontSize: '10px', color: theme.warning }}>
-                              ⚠️ You're ${((payment * monthsToGoal) - (payment * monthsUntilDeadline)).toFixed(2)} short of deadline.
-                              Need ${((parseFloat(goal.target || '0') - parseFloat(goal.saved || '0')) / monthsUntilDeadline).toFixed(2)}/month to hit target.
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   )
                 })}
@@ -1246,7 +847,6 @@ export default function Dashboard() {
 
         {activeTab === 'trading' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* TRADING COMPOUNDING CALCULATOR SECTION */}
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.warning, fontSize: '22px' }}>📈 Trading Compounding Calculator</h2>
               
@@ -1256,40 +856,19 @@ export default function Dashboard() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
                       <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Starting Capital ($)</label>
-                      <input 
-                        type="number" 
-                        value={tradingCalculator.startingCapital}
-                        onChange={(e) => setTradingCalculator({...tradingCalculator, startingCapital: e.target.value})}
-                        style={{ ...inputStyle, width: '100%' }}
-                      />
+                      <input type="number" value={tradingCalculator.startingCapital} onChange={(e) => setTradingCalculator({...tradingCalculator, startingCapital: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                     </div>
                     <div>
                       <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Monthly Contribution ($)</label>
-                      <input 
-                        type="number" 
-                        value={tradingCalculator.monthlyContribution}
-                        onChange={(e) => setTradingCalculator({...tradingCalculator, monthlyContribution: e.target.value})}
-                        style={{ ...inputStyle, width: '100%' }}
-                      />
+                      <input type="number" value={tradingCalculator.monthlyContribution} onChange={(e) => setTradingCalculator({...tradingCalculator, monthlyContribution: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                     </div>
                     <div>
                       <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Target Annual Return (%)</label>
-                      <input 
-                        type="number" 
-                        step="0.1"
-                        value={tradingCalculator.annualReturn}
-                        onChange={(e) => setTradingCalculator({...tradingCalculator, annualReturn: e.target.value})}
-                        style={{ ...inputStyle, width: '100%' }}
-                      />
+                      <input type="number" step="0.1" value={tradingCalculator.annualReturn} onChange={(e) => setTradingCalculator({...tradingCalculator, annualReturn: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                     </div>
                     <div>
                       <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Timeframe (Years)</label>
-                      <input 
-                        type="number" 
-                        value={tradingCalculator.years}
-                        onChange={(e) => setTradingCalculator({...tradingCalculator, years: e.target.value})}
-                        style={{ ...inputStyle, width: '100%' }}
-                      />
+                      <input type="number" value={tradingCalculator.years} onChange={(e) => setTradingCalculator({...tradingCalculator, years: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                     </div>
                   </div>
                 </div>
@@ -1299,48 +878,24 @@ export default function Dashboard() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
                       <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Risk Per Trade (%)</label>
-                      <input 
-                        type="number" 
-                        step="0.1"
-                        value={tradingCalculator.riskPerTrade}
-                        onChange={(e) => setTradingCalculator({...tradingCalculator, riskPerTrade: e.target.value})}
-                        style={{ ...inputStyle, width: '100%' }}
-                      />
+                      <input type="number" step="0.1" value={tradingCalculator.riskPerTrade} onChange={(e) => setTradingCalculator({...tradingCalculator, riskPerTrade: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                       <div style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px' }}>Recommended: 1-2% per trade</div>
                     </div>
                     <div>
                       <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Win Rate (%)</label>
-                      <input 
-                        type="number" 
-                        step="0.1"
-                        value={tradingCalculator.winRate}
-                        onChange={(e) => setTradingCalculator({...tradingCalculator, winRate: e.target.value})}
-                        style={{ ...inputStyle, width: '100%' }}
-                      />
+                      <input type="number" step="0.1" value={tradingCalculator.winRate} onChange={(e) => setTradingCalculator({...tradingCalculator, winRate: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                       <div style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px' }}>Your actual win rate from trades: {winRate.toFixed(1)}%</div>
                     </div>
                     <div>
                       <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Risk:Reward Ratio</label>
-                      <input 
-                        type="number" 
-                        step="0.1"
-                        value={tradingCalculator.riskReward}
-                        onChange={(e) => setTradingCalculator({...tradingCalculator, riskReward: e.target.value})}
-                        style={{ ...inputStyle, width: '100%' }}
-                      />
+                      <input type="number" step="0.1" value={tradingCalculator.riskReward} onChange={(e) => setTradingCalculator({...tradingCalculator, riskReward: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                       <div style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px' }}>e.g., 1.5 means risking 1% to make 1.5%</div>
                     </div>
                   </div>
                 </div>
               </div>
               
-              <button 
-                onClick={calculateTradingCompounding} 
-                disabled={calculatingTrading}
-                style={{ ...btnWarning, padding: '12px 24px', fontSize: '16px', width: '100%', marginBottom: '20px' }}
-              >
-                {calculatingTrading ? 'Calculating...' : 'Calculate Compounding Growth'}
-              </button>
+              <button onClick={calculateTradingCompounding} disabled={calculatingTrading} style={{ ...btnWarning, padding: '12px 24px', fontSize: '16px', width: '100%', marginBottom: '20px' }}>{calculatingTrading ? 'Calculating...' : 'Calculate Compounding Growth'}</button>
               
               {tradingResults && (
                 <div>
@@ -1358,9 +913,7 @@ export default function Dashboard() {
                     <div style={{ padding: '20px', background: darkMode ? '#3a2e1e' : '#fffbeb', borderRadius: '12px', textAlign: 'center' }}>
                       <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Total Profit</div>
                       <div style={{ color: theme.warning, fontSize: '24px', fontWeight: 'bold' }}>${tradingResults.profit.toFixed(2)}</div>
-                      <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>
-                        {((tradingResults.profit / tradingResults.totalContributed) * 100).toFixed(1)}% ROI
-                      </div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>{((tradingResults.profit / tradingResults.totalContributed) * 100).toFixed(1)}% ROI</div>
                     </div>
                   </div>
                   
@@ -1374,28 +927,17 @@ export default function Dashboard() {
                             <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Portfolio Value</th>
                             <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Total Contributed</th>
                             <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Profit</th>
-                            <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Yearly Return</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {tradingResults.yearlyProgress.map((yearData, index) => {
-                            const prevValue = index === 0 ? 
-                              parseFloat(tradingCalculator.startingCapital || '0') + parseFloat(tradingCalculator.monthlyContribution || '0') * 12 : 
-                              tradingResults.yearlyProgress[index - 1].value
-                            const yearlyReturn = ((yearData.value - (prevValue + parseFloat(tradingCalculator.monthlyContribution || '0') * 12)) / prevValue) * 100
-                            
-                            return (
-                              <tr key={yearData.year} style={{ borderBottom: '1px solid ' + theme.border }}>
-                                <td style={{ padding: '8px', color: theme.text, fontSize: '12px', fontWeight: 600 }}>Year {yearData.year}</td>
-                                <td style={{ padding: '8px', color: theme.success, fontSize: '12px', fontWeight: 600 }}>${yearData.value.toFixed(2)}</td>
-                                <td style={{ padding: '8px', color: theme.text, fontSize: '12px' }}>${yearData.contributed.toFixed(2)}</td>
-                                <td style={{ padding: '8px', color: theme.warning, fontSize: '12px', fontWeight: 600 }}>${yearData.profit.toFixed(2)}</td>
-                                <td style={{ padding: '8px', color: yearlyReturn >= 0 ? theme.success : theme.danger, fontSize: '12px', fontWeight: 600 }}>
-                                  {yearlyReturn.toFixed(1)}%
-                                </td>
-                              </tr>
-                            )
-                          })}
+                          {tradingResults.yearlyProgress.map((yearData: any) => (
+                            <tr key={yearData.year} style={{ borderBottom: '1px solid ' + theme.border }}>
+                              <td style={{ padding: '8px', color: theme.text, fontSize: '12px', fontWeight: 600 }}>Year {yearData.year}</td>
+                              <td style={{ padding: '8px', color: theme.success, fontSize: '12px', fontWeight: 600 }}>${yearData.value.toFixed(2)}</td>
+                              <td style={{ padding: '8px', color: theme.text, fontSize: '12px' }}>${yearData.contributed.toFixed(2)}</td>
+                              <td style={{ padding: '8px', color: theme.warning, fontSize: '12px', fontWeight: 600 }}>${yearData.profit.toFixed(2)}</td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
@@ -1406,31 +948,20 @@ export default function Dashboard() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
                       <div>
                         <div style={{ color: theme.textMuted, fontSize: '11px' }}>Expected Win Rate</div>
-                        <div style={{ color: tradingResults.tradeStats.expectedWinRate >= 50 ? theme.success : theme.danger, fontSize: '16px', fontWeight: 'bold' }}>
-                          {tradingResults.tradeStats.expectedWinRate.toFixed(1)}%
-                        </div>
+                        <div style={{ color: tradingResults.tradeStats.expectedWinRate >= 50 ? theme.success : theme.danger, fontSize: '16px', fontWeight: 'bold' }}>{tradingResults.tradeStats.expectedWinRate.toFixed(1)}%</div>
                       </div>
                       <div>
                         <div style={{ color: theme.textMuted, fontSize: '11px' }}>Average Win</div>
-                        <div style={{ color: theme.success, fontSize: '16px', fontWeight: 'bold' }}>
-                          {tradingResults.tradeStats.avgWin.toFixed(1)}%
-                        </div>
+                        <div style={{ color: theme.success, fontSize: '16px', fontWeight: 'bold' }}>{tradingResults.tradeStats.avgWin.toFixed(1)}%</div>
                       </div>
                       <div>
                         <div style={{ color: theme.textMuted, fontSize: '11px' }}>Average Loss</div>
-                        <div style={{ color: theme.danger, fontSize: '16px', fontWeight: 'bold' }}>
-                          {tradingResults.tradeStats.avgLoss.toFixed(1)}%
-                        </div>
+                        <div style={{ color: theme.danger, fontSize: '16px', fontWeight: 'bold' }}>{tradingResults.tradeStats.avgLoss.toFixed(1)}%</div>
                       </div>
                       <div>
                         <div style={{ color: theme.textMuted, fontSize: '11px' }}>Trade Expectancy</div>
-                        <div style={{ color: tradingResults.tradeStats.expectancy >= 0 ? theme.success : theme.danger, fontSize: '16px', fontWeight: 'bold' }}>
-                          {tradingResults.tradeStats.expectancy.toFixed(2)}%
-                        </div>
+                        <div style={{ color: tradingResults.tradeStats.expectancy >= 0 ? theme.success : theme.danger, fontSize: '16px', fontWeight: 'bold' }}>{tradingResults.tradeStats.expectancy.toFixed(2)}%</div>
                       </div>
-                    </div>
-                    <div style={{ marginTop: '12px', padding: '8px', background: darkMode ? '#334155' : '#fff', borderRadius: '8px', fontSize: '11px', color: theme.textMuted }}>
-                      Based on {tradingResults.tradeStats.tradesPerYear} trades/year • Risk: {tradingCalculator.riskPerTrade}% • R:R {tradingCalculator.riskReward}
                     </div>
                   </div>
                 </div>
@@ -1438,10 +969,9 @@ export default function Dashboard() {
             </div>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-              {/* EXISTING TRADING STATS */}
               <div style={cardStyle}>
                 <h2 style={{ margin: '0 0 20px 0', color: theme.warning, fontSize: '20px' }}>📊 Trading Stats</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' }}>
                     <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Total P&L</div>
                     <div style={{ color: totalPL >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 'bold' }}>${totalPL.toFixed(2)}</div>
@@ -1456,27 +986,18 @@ export default function Dashboard() {
                   </div>
                   <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' }}>
                     <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Avg Win</div>
-                    <div style={{ color: theme.success, fontSize: '24px', fontWeight: 'bold' }}>
-                      ${trades.filter(t => parseFloat(t.profitLoss || '0') > 0).length > 0 ? 
-                        (trades.filter(t => parseFloat(t.profitLoss || '0') > 0).reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0) / trades.filter(t => parseFloat(t.profitLoss || '0') > 0).length).toFixed(2) : 
-                        '0.00'
-                      }
-                    </div>
+                    <div style={{ color: theme.success, fontSize: '24px', fontWeight: 'bold' }}>${trades.filter(t => parseFloat(t.profitLoss || '0') > 0).length > 0 ? (trades.filter(t => parseFloat(t.profitLoss || '0') > 0).reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0) / trades.filter(t => parseFloat(t.profitLoss || '0') > 0).length).toFixed(2) : '0.00'}</div>
                   </div>
                 </div>
               </div>
               
-              {/* EXISTING ADD TRADE FORM */}
               <div style={cardStyle}>
                 <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '20px' }}>📝 Add Trade</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <input type="date" placeholder="Date" value={newTrade.date} onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })} style={inputStyle} />
+                    <input type="date" value={newTrade.date} onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })} style={inputStyle} />
                     <input type="text" placeholder="Instrument" value={newTrade.instrument} onChange={(e) => setNewTrade({ ...newTrade, instrument: e.target.value })} style={inputStyle} />
-                    <select value={newTrade.direction} onChange={(e) => setNewTrade({ ...newTrade, direction: e.target.value })} style={inputStyle}>
-                      <option value="long">Long</option>
-                      <option value="short">Short</option>
-                    </select>
+                    <select value={newTrade.direction} onChange={(e) => setNewTrade({ ...newTrade, direction: e.target.value })} style={inputStyle}><option value="long">Long</option><option value="short">Short</option></select>
                     <input type="number" placeholder="Entry Price" value={newTrade.entryPrice} onChange={(e) => setNewTrade({ ...newTrade, entryPrice: e.target.value })} style={inputStyle} />
                     <input type="number" placeholder="Exit Price" value={newTrade.exitPrice} onChange={(e) => setNewTrade({ ...newTrade, exitPrice: e.target.value })} style={inputStyle} />
                     <input type="number" placeholder="P&L" value={newTrade.profitLoss} onChange={(e) => setNewTrade({ ...newTrade, profitLoss: e.target.value })} style={inputStyle} />
@@ -1487,7 +1008,6 @@ export default function Dashboard() {
               </div>
             </div>
             
-            {/* EXISTING TRADE HISTORY */}
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '20px' }}>📋 Trade History</h2>
               <div style={{ overflowX: 'auto' }}>
@@ -1511,28 +1031,10 @@ export default function Dashboard() {
                         <tr key={trade.id} style={{ borderBottom: '1px solid ' + theme.border }}>
                           <td style={{ padding: '12px', color: theme.text, fontSize: '13px' }}>{trade.date}</td>
                           <td style={{ padding: '12px', color: theme.text, fontSize: '13px', fontWeight: 600 }}>{trade.instrument}</td>
-                          <td style={{ padding: '12px' }}>
-                            <span style={{ 
-                              padding: '4px 8px', 
-                              borderRadius: '4px', 
-                              fontSize: '11px', 
-                              fontWeight: 600, 
-                              background: trade.direction === 'long' ? theme.success + '20' : theme.danger + '20', 
-                              color: trade.direction === 'long' ? theme.success : theme.danger 
-                            }}>
-                              {trade.direction === 'long' ? 'LONG' : 'SHORT'}
-                            </span>
-                          </td>
+                          <td style={{ padding: '12px' }}><span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, background: trade.direction === 'long' ? theme.success + '20' : theme.danger + '20', color: trade.direction === 'long' ? theme.success : theme.danger }}>{trade.direction === 'long' ? 'LONG' : 'SHORT'}</span></td>
                           <td style={{ padding: '12px', color: theme.text, fontSize: '13px' }}>${trade.entryPrice}</td>
                           <td style={{ padding: '12px', color: theme.text, fontSize: '13px' }}>${trade.exitPrice}</td>
-                          <td style={{ 
-                            padding: '12px', 
-                            fontSize: '13px', 
-                            fontWeight: 600, 
-                            color: parseFloat(trade.profitLoss || '0') >= 0 ? theme.success : theme.danger 
-                          }}>
-                            ${parseFloat(trade.profitLoss || '0').toFixed(2)}
-                          </td>
+                          <td style={{ padding: '12px', fontSize: '13px', fontWeight: 600, color: parseFloat(trade.profitLoss || '0') >= 0 ? theme.success : theme.danger }}>${parseFloat(trade.profitLoss || '0').toFixed(2)}</td>
                           <td style={{ padding: '12px', color: theme.textMuted, fontSize: '13px' }}>{trade.notes}</td>
                         </tr>
                       ))
