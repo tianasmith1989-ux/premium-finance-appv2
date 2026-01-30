@@ -97,6 +97,10 @@ export default function Dashboard() {
   const btnWarning: React.CSSProperties = { ...btnPrimary, background: theme.warning }
   const cardStyle: React.CSSProperties = { padding: '24px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }
 
+  // Missing functions from original code
+  const prevMonth = () => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))
+  const nextMonth = () => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))
+
   const convertToMonthly = (amount: number, frequency: string) => {
     if (frequency === 'weekly') return amount * (52 / 12)
     if (frequency === 'fortnightly') return amount * (26 / 12)
@@ -124,28 +128,26 @@ export default function Dashboard() {
   const calculateProjectedTradingCalendar = () => {
     if (!tradingResults) return []
     
-    const { totalTradingDays, tradingDaysPerYear, yearlyProgress } = tradingResults
+    const { totalTradingDays, tradingDaysPerYear } = tradingResults
     const startDate = new Date()
     const projectedDays = []
     let dayCount = 0
-    let yearlyIndex = 0
     let cumulativeBalance = parseFloat(tradingCalculator.startingCapital || '0')
     const monthlyAdd = parseFloat(tradingCalculator.monthlyContribution || '0')
-    const tradingDaysPerMonth = Math.round(30 * (tradingCalculator.includeDays.length / 7))
+    const tradingDaysRatio = tradingCalculator.includeDays.length / 7
+    const tradingDaysPerMonth = Math.round(30 * tradingDaysRatio)
     const contributionPerTradingDay = tradingDaysPerMonth > 0 ? monthlyAdd / tradingDaysPerMonth : 0
     
     // Calculate daily rate
     const returnRate = parseFloat(tradingCalculator.returnRate || '0') / 100
     const tradingDaysPerWeek = tradingCalculator.includeDays.length
-    const tradingDaysRatio = tradingDaysPerWeek / 7
-    const tradingDaysPerMonthCalc = Math.round(30 * tradingDaysRatio)
     let ratePerTradingDay: number
     if (tradingCalculator.returnPeriod === 'daily') {
       ratePerTradingDay = returnRate
     } else if (tradingCalculator.returnPeriod === 'weekly') {
       ratePerTradingDay = returnRate / tradingDaysPerWeek
     } else if (tradingCalculator.returnPeriod === 'monthly') {
-      ratePerTradingDay = returnRate / tradingDaysPerMonthCalc
+      ratePerTradingDay = returnRate / tradingDaysPerMonth
     } else {
       ratePerTradingDay = returnRate / tradingDaysPerYear
     }
