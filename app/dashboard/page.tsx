@@ -51,7 +51,7 @@ export default function Dashboard() {
   const [calculating, setCalculating] = useState(false)
 
   // Trading Calculator state
-  const [tradingCalculator, setTradingCalculator] = useState({ startingCapital: '10000', monthlyContribution: '500', annualReturn: '15', years: '5', riskPerTrade: '2', winRate: '55', riskReward: '1.5' })
+  const [tradingCalculator, setTradingCalculator] = useState({ startingCapital: '10000', monthlyContribution: '500', annualReturn: '15', years: '5', riskPerTrade: '2', winRate: '55', riskReward: '1.5', compoundFrequency: 'monthly' })
   const [tradingResults, setTradingResults] = useState<any>(null)
   const [calculatingTrading, setCalculatingTrading] = useState(false)
 
@@ -360,14 +360,19 @@ export default function Dashboard() {
     const riskPct = parseFloat(tradingCalculator.riskPerTrade || '0')
     const winRt = parseFloat(tradingCalculator.winRate || '0') / 100
     const rr = parseFloat(tradingCalculator.riskReward || '0')
+    const freq = tradingCalculator.compoundFrequency
     
-    const monthlyRate = annualRet / 12
+    // Calculate periods per year and rate per period based on frequency
+    const periodsPerYear = freq === 'daily' ? 365 : freq === 'weekly' ? 52 : freq === 'monthly' ? 12 : 1
+    const ratePerPeriod = annualRet / periodsPerYear
+    const contributionPerPeriod = (monthlyAdd * 12) / periodsPerYear
+    
     let balance = startCap
     const yearlyProgress: any[] = []
     
     for (let year = 1; year <= yrs; year++) {
-      for (let month = 0; month < 12; month++) {
-        balance = balance * (1 + monthlyRate) + monthlyAdd
+      for (let period = 0; period < periodsPerYear; period++) {
+        balance = balance * (1 + ratePerPeriod) + contributionPerPeriod
       }
       const contributed = startCap + (monthlyAdd * 12 * year)
       yearlyProgress.push({
@@ -870,6 +875,16 @@ export default function Dashboard() {
                       <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Timeframe (Years)</label>
                       <input type="number" value={tradingCalculator.years} onChange={(e) => setTradingCalculator({...tradingCalculator, years: e.target.value})} style={{ ...inputStyle, width: '100%' }} />
                     </div>
+                    <div>
+                      <label style={{ display: 'block', color: theme.textMuted, fontSize: '12px', marginBottom: '4px', fontWeight: 600 }}>Compounding Frequency</label>
+                      <select value={tradingCalculator.compoundFrequency} onChange={(e) => setTradingCalculator({...tradingCalculator, compoundFrequency: e.target.value})} style={{ ...inputStyle, width: '100%' }}>
+                        <option value="daily">📅 Daily (365x/year)</option>
+                        <option value="weekly">📆 Weekly (52x/year)</option>
+                        <option value="monthly">🗓️ Monthly (12x/year)</option>
+                        <option value="yearly">📊 Yearly (1x/year)</option>
+                      </select>
+                      <div style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px' }}>More frequent = higher returns due to compound effect</div>
+                    </div>
                   </div>
                 </div>
                 
@@ -903,7 +918,7 @@ export default function Dashboard() {
                     <div style={{ padding: '20px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '12px', textAlign: 'center' }}>
                       <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Future Value</div>
                       <div style={{ color: theme.success, fontSize: '24px', fontWeight: 'bold' }}>${tradingResults.futureValue.toFixed(2)}</div>
-                      <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>After {tradingCalculator.years} years</div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>After {tradingCalculator.years} years ({tradingCalculator.compoundFrequency} compounding)</div>
                     </div>
                     <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' }}>
                       <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Total Contributed</div>
