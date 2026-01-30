@@ -333,22 +333,56 @@ export default function Dashboard() {
     
     const totalExtra = extra + scheduledExtraPayments
     
+    // Check if total payments cover total interest first
+    const totalMonthlyInterest = debts.reduce((sum, d) => {
+      return sum + (parseFloat(d.balance || 0) * parseFloat(d.interestRate || 0) / 100) / 12
+    }, 0)
+    
+    const totalMinPayments = debts.reduce((sum, d) => {
+      return sum + convertToMonthly(parseFloat(d.minPayment || 0), d.frequency || 'monthly')
+    }, 0)
+    
+    const totalPayments = totalMinPayments + totalExtra
+    
+    // If payments don't cover interest, return error state
+    if (totalPayments < totalMonthlyInterest * 0.99) { // 0.99 to handle rounding
+      return { 
+        monthsToPayoff: -1, 
+        totalInterestPaid: 0, 
+        scheduledExtra: scheduledExtraPayments, 
+        totalExtra,
+        error: true,
+        shortfall: totalMonthlyInterest - totalPayments,
+        totalMonthlyInterest,
+        totalPayments
+      }
+    }
+    
     const sortedDebts = [...debts].sort((a, b) => payoffMethod === 'snowball' ? parseFloat(a.balance) - parseFloat(b.balance) : parseFloat(b.interestRate) - parseFloat(a.interestRate))
-    const remainingDebts = sortedDebts.map(d => ({ ...d, remainingBalance: parseFloat(d.balance) }))
+    const remainingDebts = sortedDebts.map(d => ({ ...d, remainingBalance: parseFloat(d.balance || 0) }))
     let totalInterestPaid = 0, monthsToPayoff = 0, availableExtra = totalExtra
+    
     while (remainingDebts.some(d => d.remainingBalance > 0) && monthsToPayoff < 600) {
       monthsToPayoff++
       remainingDebts.forEach((debt, idx) => {
         if (debt.remainingBalance <= 0) return
-        const monthlyInterest = (debt.remainingBalance * parseFloat(debt.interestRate) / 100) / 12
+        const monthlyInterest = (debt.remainingBalance * parseFloat(debt.interestRate || 0) / 100) / 12
         totalInterestPaid += monthlyInterest
-        const minPayment = convertToMonthly(parseFloat(debt.minPayment), debt.frequency)
+        const minPayment = convertToMonthly(parseFloat(debt.minPayment || 0), debt.frequency || 'monthly')
         const totalPayment = minPayment + (idx === 0 ? availableExtra : 0)
         debt.remainingBalance = Math.max(0, debt.remainingBalance + monthlyInterest - totalPayment)
         if (debt.remainingBalance === 0) availableExtra += minPayment
       })
     }
-    return { monthsToPayoff, totalInterestPaid, scheduledExtra: scheduledExtraPayments, totalExtra }
+    return { 
+      monthsToPayoff, 
+      totalInterestPaid, 
+      scheduledExtra: scheduledExtraPayments, 
+      totalExtra,
+      error: false,
+      totalMonthlyInterest,
+      totalPayments
+    }
   }
 
   const fiPath = (() => {
@@ -632,9 +666,37 @@ export default function Dashboard() {
                     {(() => { 
                       const withoutExtras = calculateDebtPayoff(false)
                       const withExtras = calculateDebtPayoff(true)
+                      const hasExtras = withExtras.totalExtra > 0
+                      
+                      // Check for error state (payments don't cover interest)
+                      if (withoutExtras.error) {
+                        return (
+                          <div style={{ padding: '20px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '12px', border: '2px solid ' + theme.danger }}>
+                            <div style={{ fontSize: '16px', fontWeight: 700, color: theme.danger, marginBottom: '12px' }}>⚠️ Minimum Payments Too Low!</div>
+                            <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.8, marginBottom: '16px' }}>
+                              <div>Your minimum payments don't cover the monthly interest, so the debt will keep growing.</div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '12px', background: darkMode ? '#1e293b' : '#fff', borderRadius: '8px' }}>
+                              <div>
+                                <div style={{ color: theme.textMuted, fontSize: '12px' }}>Monthly Interest</div>
+                                <div style={{ color: theme.danger, fontSize: '20px', fontWeight: 'bold' }}>${withoutExtras.totalMonthlyInterest?.toFixed(2)}</div>
+                              </div>
+                              <div>
+                                <div style={{ color: theme.textMuted, fontSize: '12px' }}>Your Payments</div>
+                                <div style={{ color: theme.warning, fontSize: '20px', fontWeight: 'bold' }}>${withoutExtras.totalPayments?.toFixed(2)}</div>
+                              </div>
+                            </div>
+                            <div style={{ marginTop: '12px', padding: '12px', background: theme.success + '20', borderRadius: '8px' }}>
+                              <div style={{ color: theme.success, fontSize: '14px', fontWeight: 600 }}>
+                                💡 You need at least ${((withoutExtras.totalMonthlyInterest || 0) - (withoutExtras.totalPayments || 0) + 1).toFixed(0)}/month more to start paying off the debt
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      }
+                      
                       const timeSaved = withoutExtras.monthsToPayoff - withExtras.monthsToPayoff
                       const interestSaved = withoutExtras.totalInterestPaid - withExtras.totalInterestPaid
-                      const hasExtras = withExtras.totalExtra > 0
                       
                       return (
                         <div style={{ display: 'grid', gridTemplateColumns: hasExtras ? '1fr 1fr' : '1fr', gap: '16px' }}>
@@ -648,7 +710,7 @@ export default function Dashboard() {
                           </div>
                           
                           {/* With Extras */}
-                          {hasExtras && (
+                          {hasExtras && !withExtras.error && (
                             <div style={{ padding: '16px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '12px', border: '2px solid ' + theme.success }}>
                               <div style={{ fontSize: '13px', fontWeight: 700, color: theme.success, marginBottom: '12px' }}>🚀 With Extra Payments (+${withExtras.totalExtra.toFixed(0)}/mo)</div>
                               <div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}>
@@ -658,8 +720,18 @@ export default function Dashboard() {
                             </div>
                           )}
                           
+                          {/* With Extras but still not enough */}
+                          {hasExtras && withExtras.error && (
+                            <div style={{ padding: '16px', background: darkMode ? '#3a2e1e' : '#fffbeb', borderRadius: '12px', border: '2px solid ' + theme.warning }}>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: theme.warning, marginBottom: '12px' }}>⚠️ Still Not Enough (+${withExtras.totalExtra.toFixed(0)}/mo)</div>
+                              <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6 }}>
+                                <div>Need ${((withExtras.totalMonthlyInterest || 0) - (withExtras.totalPayments || 0) + 1).toFixed(0)}/mo more</div>
+                              </div>
+                            </div>
+                          )}
+                          
                           {/* Savings Summary */}
-                          {hasExtras && timeSaved > 0 && (
+                          {hasExtras && timeSaved > 0 && !withExtras.error && (
                             <div style={{ gridColumn: '1 / -1', padding: '16px', background: 'linear-gradient(135deg, ' + theme.success + '20, ' + theme.purple + '20)', borderRadius: '12px', border: '2px solid ' + theme.purple, textAlign: 'center' }}>
                               <div style={{ fontSize: '16px', fontWeight: 700, color: theme.purple, marginBottom: '8px' }}>🎉 You Save</div>
                               <div style={{ display: 'flex', justifyContent: 'center', gap: '32px', flexWrap: 'wrap' }}>
