@@ -10,6 +10,8 @@ export default function Dashboard() {
   const [darkMode, setDarkMode] = useState(true)
   const [calendarMonth, setCalendarMonth] = useState(new Date())
   const [tradingCalendarMonth, setTradingCalendarMonth] = useState(new Date())
+  const [forexPropCalendarMonth, setForexPropCalendarMonth] = useState(new Date())
+  const [futuresPropCalendarMonth, setFuturesPropCalendarMonth] = useState(new Date())
   
   const [incomeStreams, setIncomeStreams] = useState<any[]>([])
   const [newIncome, setNewIncome] = useState({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0] })
@@ -1191,16 +1193,322 @@ export default function Dashboard() {
         {activeTab === 'trading' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             
-            {/* Forex/CFD Prop Calculator - Placeholder */}
+            {/* Forex/CFD Prop Calculator */}
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.accent, fontSize: '22px' }}>💱 Forex/CFD Prop Firm Calculator</h2>
-              <p style={{ color: theme.textMuted }}>Coming soon - configure your forex prop firm rules</p>
+              <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '20px' }}>For FTMO, MyForexFunds, The5ers, and similar prop firms</p>
+              
+              {/* Phase Selection */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+                {[
+                  { id: 'phase1', label: '🎯 Phase 1', color: theme.warning },
+                  { id: 'phase2', label: '✅ Phase 2', color: theme.purple },
+                  { id: 'funded', label: '💰 Funded', color: theme.success }
+                ].map(phase => (
+                  <button key={phase.id} onClick={() => setForexProp({...forexProp, phase: phase.id})} style={{ flex: 1, padding: '12px 16px', background: forexProp.phase === phase.id ? phase.color : (darkMode ? '#334155' : '#f1f5f9'), color: forexProp.phase === phase.id ? 'white' : theme.text, border: '2px solid ' + (forexProp.phase === phase.id ? phase.color : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>{phase.label}</button>
+                ))}
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '24px' }}>
+                {/* Rules */}
+                <div>
+                  <h3 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📋 {forexProp.phase === 'phase1' ? 'Phase 1' : forexProp.phase === 'phase2' ? 'Phase 2' : 'Funded'} Rules</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <input type="number" placeholder="Account Size ($)" value={forexProp.accountSize} onChange={(e) => setForexProp({...forexProp, accountSize: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    {forexProp.phase !== 'funded' && (
+                      <input type="number" placeholder="Profit Target (%)" value={forexProp.phase === 'phase1' ? forexProp.phase1Target : forexProp.phase2Target} onChange={(e) => setForexProp({...forexProp, [forexProp.phase === 'phase1' ? 'phase1Target' : 'phase2Target']: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <input type="number" placeholder="Daily DD %" value={forexProp.phase === 'phase1' ? forexProp.phase1DailyDD : forexProp.phase === 'phase2' ? forexProp.phase2DailyDD : forexProp.fundedDailyDD} onChange={(e) => setForexProp({...forexProp, [forexProp.phase === 'phase1' ? 'phase1DailyDD' : forexProp.phase === 'phase2' ? 'phase2DailyDD' : 'fundedDailyDD']: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                      <input type="number" placeholder="Max DD %" value={forexProp.phase === 'phase1' ? forexProp.phase1MaxDD : forexProp.phase === 'phase2' ? forexProp.phase2MaxDD : forexProp.fundedMaxDD} onChange={(e) => setForexProp({...forexProp, [forexProp.phase === 'phase1' ? 'phase1MaxDD' : forexProp.phase === 'phase2' ? 'phase2MaxDD' : 'fundedMaxDD']: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    </div>
+                    {forexProp.phase !== 'funded' && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <input type="number" placeholder="Min Days" value={forexProp.phase === 'phase1' ? forexProp.phase1MinDays : forexProp.phase2MinDays} onChange={(e) => setForexProp({...forexProp, [forexProp.phase === 'phase1' ? 'phase1MinDays' : 'phase2MinDays']: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                        <input type="number" placeholder="Max Days" value={forexProp.phase === 'phase1' ? forexProp.phase1MaxDays : forexProp.phase2MaxDays} onChange={(e) => setForexProp({...forexProp, [forexProp.phase === 'phase1' ? 'phase1MaxDays' : 'phase2MaxDays']: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                      </div>
+                    )}
+                    <input type="number" placeholder="Profit Split %" value={forexProp.profitSplit} onChange={(e) => setForexProp({...forexProp, profitSplit: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                  </div>
+                </div>
+                
+                {/* Progress */}
+                <div>
+                  <h3 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📊 Current Progress</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <input type="number" placeholder="Current Balance ($)" value={forexProp.currentBalance} onChange={(e) => setForexProp({...forexProp, currentBalance: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    <input type="number" placeholder="Trading Days Done" value={forexProp.tradingDays} onChange={(e) => setForexProp({...forexProp, tradingDays: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                  </div>
+                </div>
+                
+                {/* Trading Plan */}
+                <div>
+                  <h3 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>🎯 Your Stats</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <input type="number" placeholder="Risk Per Trade %" value={forexProp.riskPerTrade} onChange={(e) => setForexProp({...forexProp, riskPerTrade: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    <input type="number" placeholder="Trades Per Day" value={forexProp.tradesPerDay} onChange={(e) => setForexProp({...forexProp, tradesPerDay: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <input type="number" placeholder="Win Rate %" value={forexProp.winRate} onChange={(e) => setForexProp({...forexProp, winRate: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                      <input type="number" placeholder="Avg R:R" value={forexProp.avgRR} onChange={(e) => setForexProp({...forexProp, avgRR: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <button onClick={calculateForexProp} style={{ ...btnPrimary, padding: '12px 24px', fontSize: '14px', width: '100%', marginBottom: '20px' }}>Calculate Plan</button>
+              
+              {forexPropResults && (
+                <div>
+                  {/* Status Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+                    <div style={{ padding: '16px', background: forexPropResults.profitProgress >= 100 ? theme.success + '20' : (darkMode ? '#1e293b' : '#f8fafc'), borderRadius: '10px', textAlign: 'center', border: forexPropResults.profitProgress >= 100 ? '2px solid ' + theme.success : '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Profit Progress</div>
+                      <div style={{ color: forexPropResults.currentProfit >= 0 ? theme.success : theme.danger, fontSize: '20px', fontWeight: 'bold' }}>{forexPropResults.phase === 'funded' ? '$' + forexPropResults.currentProfit.toFixed(0) : forexPropResults.profitProgress.toFixed(1) + '%'}</div>
+                    </div>
+                    <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '10px', textAlign: 'center' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>DD Remaining</div>
+                      <div style={{ color: forexPropResults.drawdownRemaining > forexPropResults.maxDrawdownAmount * 0.5 ? theme.success : theme.danger, fontSize: '20px', fontWeight: 'bold' }}>${forexPropResults.drawdownRemaining.toFixed(0)}</div>
+                    </div>
+                    <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '10px', textAlign: 'center' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Days Left</div>
+                      <div style={{ color: forexPropResults.daysRemaining > 10 ? theme.text : theme.warning, fontSize: '20px', fontWeight: 'bold' }}>{forexPropResults.phase === 'funded' ? '∞' : forexPropResults.daysRemaining}</div>
+                    </div>
+                    <div style={{ padding: '16px', background: darkMode ? '#2d1e3a' : '#faf5ff', borderRadius: '10px', textAlign: 'center' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Payout</div>
+                      <div style={{ color: theme.purple, fontSize: '20px', fontWeight: 'bold' }}>${forexPropResults.potentialPayout.toFixed(0)}</div>
+                    </div>
+                  </div>
+                  
+                  {/* Challenge Calendar */}
+                  <div style={{ marginTop: '20px', padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <button onClick={() => setForexPropCalendarMonth(new Date(forexPropCalendarMonth.getFullYear(), forexPropCalendarMonth.getMonth() - 1, 1))} style={{ ...btnPrimary, padding: '6px 12px', fontSize: '12px' }}>←</button>
+                      <h3 style={{ margin: 0, color: theme.text, fontSize: '16px' }}>📅 Challenge Plan - {forexPropCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
+                      <button onClick={() => setForexPropCalendarMonth(new Date(forexPropCalendarMonth.getFullYear(), forexPropCalendarMonth.getMonth() + 1, 1))} style={{ ...btnPrimary, padding: '6px 12px', fontSize: '12px' }}>→</button>
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '12px' }}>
+                      {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                        <div key={i} style={{ textAlign: 'center', fontWeight: 600, color: theme.textMuted, padding: '8px', fontSize: '11px' }}>{d}</div>
+                      ))}
+                      
+                      {Array.from({ length: new Date(forexPropCalendarMonth.getFullYear(), forexPropCalendarMonth.getMonth(), 1).getDay() }).map((_, i) => (
+                        <div key={`empty-${i}`} style={{ minHeight: '60px' }} />
+                      ))}
+                      
+                      {Array.from({ length: new Date(forexPropCalendarMonth.getFullYear(), forexPropCalendarMonth.getMonth() + 1, 0).getDate() }).map((_, i) => {
+                        const day = i + 1
+                        const date = new Date(forexPropCalendarMonth.getFullYear(), forexPropCalendarMonth.getMonth(), day)
+                        const dayOfWeek = date.getDay()
+                        const isWeekday = dayOfWeek !== 0 && dayOfWeek !== 6
+                        const isToday = date.toDateString() === new Date().toDateString()
+                        const dailyTarget = forexPropResults.dailyProfitNeeded
+                        const isPast = date < new Date(new Date().setHours(0,0,0,0))
+                        
+                        return (
+                          <div key={day} style={{ 
+                            minHeight: '60px', 
+                            padding: '4px', 
+                            background: isToday ? theme.accent + '30' : isPast ? (darkMode ? '#334155' : '#e2e8f0') : isWeekday ? (darkMode ? '#1e293b' : '#fff') : (darkMode ? '#0f172a' : '#f1f5f9'),
+                            borderRadius: '6px', 
+                            border: isToday ? `2px solid ${theme.accent}` : `1px solid ${theme.border}`,
+                            opacity: isWeekday ? 1 : 0.5
+                          }}>
+                            <div style={{ fontSize: '11px', fontWeight: isToday ? 700 : 500, color: isToday ? theme.accent : theme.text }}>{day}</div>
+                            {isWeekday && forexPropResults.phase !== 'funded' && (
+                              <div style={{ fontSize: '9px', color: theme.success, marginTop: '2px' }}>+${dailyTarget.toFixed(0)}</div>
+                            )}
+                            {isWeekday && (
+                              <div style={{ fontSize: '8px', color: theme.textMuted, marginTop: '1px' }}>Trade</div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', padding: '12px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '8px' }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '10px' }}>Daily Target</div>
+                        <div style={{ color: theme.success, fontSize: '14px', fontWeight: 600 }}>${forexPropResults.dailyProfitNeeded.toFixed(2)}</div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '10px' }}>Est. Days to Pass</div>
+                        <div style={{ color: theme.text, fontSize: '14px', fontWeight: 600 }}>{forexPropResults.daysToTarget > 500 ? '∞' : forexPropResults.daysToTarget}</div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '10px' }}>Max Losses/Day</div>
+                        <div style={{ color: theme.danger, fontSize: '14px', fontWeight: 600 }}>{Math.floor(forexPropResults.maxLossesToday)}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Futures Prop Calculator - Placeholder */}
+            {/* Futures Prop Calculator */}
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.success, fontSize: '22px' }}>📊 Futures Prop Firm Calculator</h2>
-              <p style={{ color: theme.textMuted }}>Coming soon - configure your futures prop firm rules</p>
+              <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '20px' }}>For Apex, Topstep, Earn2Trade, and similar futures prop firms</p>
+              
+              {/* Phase Selection */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+                {[
+                  { id: 'evaluation', label: '🎯 Evaluation', color: theme.warning },
+                  { id: 'pa', label: '✅ PA Account', color: theme.purple },
+                  { id: 'funded', label: '💰 Funded', color: theme.success }
+                ].map(phase => (
+                  <button key={phase.id} onClick={() => setFuturesProp({...futuresProp, phase: phase.id})} style={{ flex: 1, padding: '12px 16px', background: futuresProp.phase === phase.id ? phase.color : (darkMode ? '#334155' : '#f1f5f9'), color: futuresProp.phase === phase.id ? 'white' : theme.text, border: '2px solid ' + (futuresProp.phase === phase.id ? phase.color : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>{phase.label}</button>
+                ))}
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '24px' }}>
+                {/* Rules */}
+                <div>
+                  <h3 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📋 {futuresProp.phase === 'evaluation' ? 'Evaluation' : futuresProp.phase === 'pa' ? 'PA' : 'Funded'} Rules</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <input type="number" placeholder="Account Size ($)" value={futuresProp.accountSize} onChange={(e) => setFuturesProp({...futuresProp, accountSize: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    <input type="number" placeholder="Trailing Drawdown ($)" value={futuresProp.phase === 'evaluation' ? futuresProp.evalTrailingDD : futuresProp.phase === 'pa' ? futuresProp.paTrailingDD : futuresProp.fundedTrailingDD} onChange={(e) => setFuturesProp({...futuresProp, [futuresProp.phase === 'evaluation' ? 'evalTrailingDD' : futuresProp.phase === 'pa' ? 'paTrailingDD' : 'fundedTrailingDD']: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    <select value={futuresProp.phase === 'evaluation' ? futuresProp.evalDrawdownType : futuresProp.phase === 'pa' ? futuresProp.paDrawdownType : futuresProp.fundedDrawdownType} onChange={(e) => setFuturesProp({...futuresProp, [futuresProp.phase === 'evaluation' ? 'evalDrawdownType' : futuresProp.phase === 'pa' ? 'paDrawdownType' : 'fundedDrawdownType']: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}>
+                      <option value="trailing">Trailing (Real-time)</option>
+                      <option value="eod">End of Day (EOD)</option>
+                    </select>
+                    {futuresProp.phase !== 'funded' && (
+                      <>
+                        <input type="number" placeholder="Profit Target ($)" value={futuresProp.phase === 'evaluation' ? futuresProp.evalProfitTarget : futuresProp.paProfitTarget} onChange={(e) => setFuturesProp({...futuresProp, [futuresProp.phase === 'evaluation' ? 'evalProfitTarget' : 'paProfitTarget']: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                        <input type="number" placeholder="Min Trading Days" value={futuresProp.phase === 'evaluation' ? futuresProp.evalMinDays : futuresProp.paMinDays} onChange={(e) => setFuturesProp({...futuresProp, [futuresProp.phase === 'evaluation' ? 'evalMinDays' : 'paMinDays']: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                      </>
+                    )}
+                    <input type="number" placeholder="Profit Split %" value={futuresProp.profitSplit} onChange={(e) => setFuturesProp({...futuresProp, profitSplit: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                  </div>
+                </div>
+                
+                {/* Progress */}
+                <div>
+                  <h3 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📊 Current Progress</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <input type="number" placeholder="Current Balance ($)" value={futuresProp.currentBalance} onChange={(e) => setFuturesProp({...futuresProp, currentBalance: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    <input type="number" placeholder="High Water Mark ($)" value={futuresProp.highWaterMark} onChange={(e) => setFuturesProp({...futuresProp, highWaterMark: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    <input type="number" placeholder="Trading Days Done" value={futuresProp.tradingDays} onChange={(e) => setFuturesProp({...futuresProp, tradingDays: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                  </div>
+                </div>
+                
+                {/* Trading Plan */}
+                <div>
+                  <h3 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>🎯 Your Stats</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <input type="number" placeholder="Risk Per Trade ($)" value={futuresProp.riskPerTrade} onChange={(e) => setFuturesProp({...futuresProp, riskPerTrade: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    <input type="number" placeholder="Trades Per Day" value={futuresProp.tradesPerDay} onChange={(e) => setFuturesProp({...futuresProp, tradesPerDay: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <input type="number" placeholder="Win %" value={futuresProp.winRate} onChange={(e) => setFuturesProp({...futuresProp, winRate: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                      <input type="number" placeholder="Avg Win $" value={futuresProp.avgWin} onChange={(e) => setFuturesProp({...futuresProp, avgWin: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                    </div>
+                    <input type="number" placeholder="Avg Loss ($)" value={futuresProp.avgLoss} onChange={(e) => setFuturesProp({...futuresProp, avgLoss: e.target.value})} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }} />
+                  </div>
+                </div>
+              </div>
+              
+              <button onClick={calculateFuturesProp} style={{ ...btnSuccess, padding: '12px 24px', fontSize: '14px', width: '100%', marginBottom: '20px' }}>Calculate Plan</button>
+              
+              {futuresPropResults && (
+                <div>
+                  {/* Status Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+                    <div style={{ padding: '16px', background: futuresPropResults.profitProgress >= 100 ? theme.success + '20' : (darkMode ? '#1e293b' : '#f8fafc'), borderRadius: '10px', textAlign: 'center', border: futuresPropResults.profitProgress >= 100 ? '2px solid ' + theme.success : '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Profit Progress</div>
+                      <div style={{ color: futuresPropResults.currentProfit >= 0 ? theme.success : theme.danger, fontSize: '20px', fontWeight: 'bold' }}>{futuresPropResults.phase === 'funded' ? '$' + futuresPropResults.currentProfit.toFixed(0) : futuresPropResults.profitProgress.toFixed(1) + '%'}</div>
+                    </div>
+                    <div style={{ padding: '16px', background: futuresPropResults.lockedAtBreakeven ? theme.success + '20' : (darkMode ? '#1e293b' : '#f8fafc'), borderRadius: '10px', textAlign: 'center' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>DD Buffer</div>
+                      <div style={{ color: futuresPropResults.drawdownRemaining > futuresPropResults.trailingDD * 0.5 ? theme.success : theme.danger, fontSize: '20px', fontWeight: 'bold' }}>${futuresPropResults.drawdownRemaining.toFixed(0)}</div>
+                      {futuresPropResults.lockedAtBreakeven && <div style={{ fontSize: '9px', color: theme.success }}>🔒 Locked!</div>}
+                    </div>
+                    <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '10px', textAlign: 'center' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Trading Days</div>
+                      <div style={{ color: theme.text, fontSize: '20px', fontWeight: 'bold' }}>{futuresProp.tradingDays}</div>
+                      <div style={{ fontSize: '9px', color: futuresPropResults.minDaysComplete ? theme.success : theme.warning }}>{futuresPropResults.minDaysComplete ? '✓ Min met' : `Need ${futuresPropResults.minDays - parseInt(futuresProp.tradingDays)}`}</div>
+                    </div>
+                    <div style={{ padding: '16px', background: darkMode ? '#2d1e3a' : '#faf5ff', borderRadius: '10px', textAlign: 'center' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Payout</div>
+                      <div style={{ color: theme.purple, fontSize: '20px', fontWeight: 'bold' }}>${futuresPropResults.potentialPayout.toFixed(0)}</div>
+                    </div>
+                  </div>
+                  
+                  {/* Trailing DD Visual */}
+                  <div style={{ marginBottom: '20px', padding: '12px', background: darkMode ? '#3a2e1e' : '#fffbeb', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '4px' }}>
+                      <span style={{ color: theme.danger }}>Threshold: ${futuresPropResults.drawdownThreshold.toFixed(0)}</span>
+                      <span style={{ color: theme.text }}>Balance: ${futuresPropResults.currentBalance.toFixed(0)}</span>
+                      <span style={{ color: theme.success }}>Target: ${(futuresPropResults.accountSize + futuresPropResults.profitTarget).toFixed(0)}</span>
+                    </div>
+                    <div style={{ width: '100%', height: '12px', background: theme.danger + '30', borderRadius: '6px', overflow: 'hidden' }}>
+                      <div style={{ width: Math.max(0, Math.min(100, ((futuresPropResults.currentBalance - futuresPropResults.drawdownThreshold) / (futuresPropResults.accountSize + futuresPropResults.profitTarget - futuresPropResults.drawdownThreshold)) * 100)) + '%', height: '100%', background: `linear-gradient(to right, ${theme.warning}, ${theme.success})`, borderRadius: '6px' }} />
+                    </div>
+                  </div>
+                  
+                  {/* Challenge Calendar */}
+                  <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <button onClick={() => setFuturesPropCalendarMonth(new Date(futuresPropCalendarMonth.getFullYear(), futuresPropCalendarMonth.getMonth() - 1, 1))} style={{ ...btnSuccess, padding: '6px 12px', fontSize: '12px' }}>←</button>
+                      <h3 style={{ margin: 0, color: theme.text, fontSize: '16px' }}>📅 Evaluation Plan - {futuresPropCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
+                      <button onClick={() => setFuturesPropCalendarMonth(new Date(futuresPropCalendarMonth.getFullYear(), futuresPropCalendarMonth.getMonth() + 1, 1))} style={{ ...btnSuccess, padding: '6px 12px', fontSize: '12px' }}>→</button>
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '12px' }}>
+                      {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                        <div key={i} style={{ textAlign: 'center', fontWeight: 600, color: theme.textMuted, padding: '8px', fontSize: '11px' }}>{d}</div>
+                      ))}
+                      
+                      {Array.from({ length: new Date(futuresPropCalendarMonth.getFullYear(), futuresPropCalendarMonth.getMonth(), 1).getDay() }).map((_, i) => (
+                        <div key={`empty-${i}`} style={{ minHeight: '60px' }} />
+                      ))}
+                      
+                      {Array.from({ length: new Date(futuresPropCalendarMonth.getFullYear(), futuresPropCalendarMonth.getMonth() + 1, 0).getDate() }).map((_, i) => {
+                        const day = i + 1
+                        const date = new Date(futuresPropCalendarMonth.getFullYear(), futuresPropCalendarMonth.getMonth(), day)
+                        const dayOfWeek = date.getDay()
+                        const isWeekday = dayOfWeek !== 0 && dayOfWeek !== 6
+                        const isToday = date.toDateString() === new Date().toDateString()
+                        const dailyTarget = futuresPropResults.profitRemaining / Math.max(1, 20 - parseInt(futuresProp.tradingDays || '0'))
+                        const isPast = date < new Date(new Date().setHours(0,0,0,0))
+                        
+                        return (
+                          <div key={day} style={{ 
+                            minHeight: '60px', 
+                            padding: '4px', 
+                            background: isToday ? theme.success + '30' : isPast ? (darkMode ? '#334155' : '#e2e8f0') : isWeekday ? (darkMode ? '#1e293b' : '#fff') : (darkMode ? '#0f172a' : '#f1f5f9'),
+                            borderRadius: '6px', 
+                            border: isToday ? `2px solid ${theme.success}` : `1px solid ${theme.border}`,
+                            opacity: isWeekday ? 1 : 0.5
+                          }}>
+                            <div style={{ fontSize: '11px', fontWeight: isToday ? 700 : 500, color: isToday ? theme.success : theme.text }}>{day}</div>
+                            {isWeekday && futuresPropResults.phase !== 'funded' && dailyTarget > 0 && (
+                              <div style={{ fontSize: '9px', color: theme.success, marginTop: '2px' }}>+${dailyTarget.toFixed(0)}</div>
+                            )}
+                            {isWeekday && (
+                              <div style={{ fontSize: '8px', color: theme.textMuted, marginTop: '1px' }}>Trade</div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', padding: '12px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '8px' }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '10px' }}>Daily Target</div>
+                        <div style={{ color: theme.success, fontSize: '14px', fontWeight: 600 }}>${futuresPropResults.dailyExpectedPL > 0 ? futuresPropResults.dailyExpectedPL.toFixed(0) : '0'}</div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '10px' }}>Est. Days to Pass</div>
+                        <div style={{ color: theme.text, fontSize: '14px', fontWeight: 600 }}>{futuresPropResults.daysToTarget > 500 ? '∞' : futuresPropResults.daysToTarget}</div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '10px' }}>Max Losses</div>
+                        <div style={{ color: theme.danger, fontSize: '14px', fontWeight: 600 }}>{futuresPropResults.maxLossesBeforeBlow}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Trading Compounding Calculator */}
