@@ -28,26 +28,21 @@ interface ForexAccount {
   accountName: string;
   phase: 'phase1' | 'phase2' | 'funded';
   accountSize: string;
-  // Phase 1 rules
   phase1DailyDD: string;
   phase1MaxDD: string;
   phase1Target: string;
   phase1MinDays: string;
   phase1MaxDays: string;
-  // Phase 2 rules
   phase2DailyDD: string;
   phase2MaxDD: string;
   phase2Target: string;
   phase2MinDays: string;
   phase2MaxDays: string;
-  // Funded rules
   fundedDailyDD: string;
   fundedMaxDD: string;
-  // Current progress
   currentBalance: string;
   tradingDays: string;
   startDate: string;
-  // Trading plan
   riskPerTrade: string;
   tradesPerDay: string;
   winRate: string;
@@ -60,26 +55,21 @@ interface FuturesAccount {
   accountName: string;
   phase: 'evaluation' | 'pa' | 'funded';
   accountSize: string;
-  // Evaluation rules
   evalTrailingDD: string;
   evalProfitTarget: string;
   evalMinDays: string;
   evalDrawdownType: 'trailing' | 'eod';
-  // PA (Performance) rules
   paTrailingDD: string;
   paProfitTarget: string;
   paMinDays: string;
   paDrawdownType: 'trailing' | 'eod';
-  // Funded rules
   fundedTrailingDD: string;
   fundedDrawdownType: 'trailing' | 'eod';
-  // Current progress
   currentBalance: string;
   highWaterMark: string;
   tradingDays: string;
   startDate: string;
   contractLimit: string;
-  // Trading plan
   riskPerTrade: string;
   tradesPerDay: string;
   winRate: string;
@@ -93,10 +83,6 @@ const formatDate = (date: Date): string => {
   return date.toISOString().split('T')[0];
 };
 
-const isSameDay = (date1: Date, date2: Date): boolean => {
-  return formatDate(date1) === formatDate(date2);
-};
-
 const validateDate = (dateStr: string): boolean => {
   return /^\d{4}-\d{2}-\d{2}$/.test(dateStr) && !isNaN(new Date(dateStr).getTime());
 };
@@ -106,12 +92,9 @@ export default function Dashboard() {
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'overview' | 'path' | 'trading'>('dashboard')
   const [darkMode, setDarkMode] = useState(true)
-  const [calendarMonth, setCalendarMonth] = useState(new Date())
-  const [tradingCalendarMonth, setTradingCalendarMonth] = useState(new Date())
   
   // Trading related state
   const [selectedSymbol, setSelectedSymbol] = useState('EURUSD')
-  const [timeframe, setTimeframe] = useState('1h')
   const [marketStatus, setMarketStatus] = useState({
     forex: 'OPEN',
     futures: 'OPEN',
@@ -188,7 +171,7 @@ export default function Dashboard() {
   }), [darkMode])
 
   // Component styles
-  const cardStyle = useMemo(() => ({
+  const cardStyle: React.CSSProperties = useMemo(() => ({
     background: theme.cardBg,
     borderRadius: '16px',
     padding: '24px',
@@ -196,7 +179,7 @@ export default function Dashboard() {
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
   }), [theme])
 
-  const btnPrimary = useMemo(() => ({
+  const btnPrimary: React.CSSProperties = useMemo(() => ({
     background: theme.accent,
     color: 'white',
     border: 'none',
@@ -205,13 +188,10 @@ export default function Dashboard() {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: 600,
-    transition: 'all 0.2s ease',
-    '&:hover': {
-      opacity: 0.9
-    }
-  }), [theme]) as React.CSSProperties
+    transition: 'all 0.2s ease'
+  }), [theme])
 
-  const btnSuccess = useMemo(() => ({
+  const btnSuccess: React.CSSProperties = useMemo(() => ({
     background: theme.success,
     color: 'white',
     border: 'none',
@@ -220,13 +200,10 @@ export default function Dashboard() {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: 600,
-    transition: 'all 0.2s ease',
-    '&:hover': {
-      opacity: 0.9
-    }
-  }), [theme]) as React.CSSProperties
+    transition: 'all 0.2s ease'
+  }), [theme])
 
-  const btnSecondary = useMemo(() => ({
+  const btnSecondary: React.CSSProperties = useMemo(() => ({
     background: 'transparent',
     color: theme.text,
     border: `1px solid ${theme.border}`,
@@ -235,11 +212,8 @@ export default function Dashboard() {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: 600,
-    transition: 'all 0.2s ease',
-    '&:hover': {
-      background: darkMode ? '#334155' : '#f1f5f9'
-    }
-  }), [theme, darkMode]) as React.CSSProperties
+    transition: 'all 0.2s ease'
+  }), [theme, darkMode])
 
   // Forex/CFD Prop Calculator state
   const [forexProp, setForexProp] = useState<ForexAccount>({
@@ -247,26 +221,21 @@ export default function Dashboard() {
     accountName: 'My Forex Account',
     phase: 'phase1',
     accountSize: '100000',
-    // Phase 1 rules
     phase1DailyDD: '5',
     phase1MaxDD: '10',
     phase1Target: '10',
     phase1MinDays: '4',
     phase1MaxDays: '30',
-    // Phase 2 rules
     phase2DailyDD: '5',
     phase2MaxDD: '10',
     phase2Target: '5',
     phase2MinDays: '4',
     phase2MaxDays: '60',
-    // Funded rules
     fundedDailyDD: '5',
     fundedMaxDD: '10',
-    // Current progress
     currentBalance: '100000',
     tradingDays: '0',
     startDate: formatDate(new Date()),
-    // Trading plan
     riskPerTrade: '1',
     tradesPerDay: '2',
     winRate: '55',
@@ -285,26 +254,21 @@ export default function Dashboard() {
     accountName: 'My Futures Account',
     phase: 'evaluation',
     accountSize: '50000',
-    // Evaluation rules
     evalTrailingDD: '2500',
     evalProfitTarget: '3000',
     evalMinDays: '7',
     evalDrawdownType: 'trailing',
-    // PA (Performance) rules
     paTrailingDD: '2500',
     paProfitTarget: '3000',
     paMinDays: '7',
     paDrawdownType: 'eod',
-    // Funded rules
     fundedTrailingDD: '2500',
     fundedDrawdownType: 'eod',
-    // Current progress
     currentBalance: '50000',
     highWaterMark: '50000',
     tradingDays: '0',
     startDate: formatDate(new Date()),
     contractLimit: '10',
-    // Trading plan
     riskPerTrade: '200',
     tradesPerDay: '3',
     winRate: '50',
@@ -324,7 +288,8 @@ export default function Dashboard() {
     riskPercent: '1',
     stopLossPips: '20',
     positionSize: '0.50',
-    pipValue: '10'
+    pipValue: '10',
+    riskAmount: '100'
   })
 
   const [tradePlanner, setTradePlanner] = useState({
@@ -356,21 +321,14 @@ export default function Dashboard() {
   useEffect(() => {
     calculateForexProp()
     calculateFuturesProp()
+    calculateRisk()
+    calculateTradePlan()
     updateMarketStatus()
     
     // Update market status every minute
     const interval = setInterval(updateMarketStatus, 60000)
     return () => clearInterval(interval)
   }, [])
-
-  // Recalculate when dependencies change
-  useEffect(() => {
-    calculateForexProp()
-  }, [forexProp, selectedForexAccount, forexAccounts, forexDailyEntries])
-
-  useEffect(() => {
-    calculateFuturesProp()
-  }, [futuresProp, selectedFuturesAccount, futuresAccounts, futuresDailyEntries])
 
   // Update market status function
   const updateMarketStatus = () => {
@@ -392,7 +350,7 @@ export default function Dashboard() {
   }
 
   // Forex/CFD Prop Calculator
-  const calculateForexProp = () => {
+  const calculateForexProp = useCallback(() => {
     const selectedAccount = forexAccounts.find(acc => acc.id === selectedForexAccount) || forexProp
     const phase = selectedAccount.phase
     const accountSize = parseFloat(selectedAccount.accountSize || '0')
@@ -425,6 +383,12 @@ export default function Dashboard() {
         minDays = 0
         maxDays = 0
         break
+      default:
+        dailyDD = 0
+        maxDD = 0
+        target = 0
+        minDays = 0
+        maxDays = 0
     }
     
     profitTarget = accountSize * (target / 100)
@@ -436,7 +400,7 @@ export default function Dashboard() {
       : currentBalance
     
     // Calculate current drawdown
-    const currentDrawdown = ((highWaterMark - currentBalance) / highWaterMark) * 100
+    const currentDrawdown = highWaterMark > 0 ? ((highWaterMark - currentBalance) / highWaterMark) * 100 : 0
     
     const results = {
       phase,
@@ -481,10 +445,10 @@ export default function Dashboard() {
         drawdownUsed: 0
       }])
     }
-  }
+  }, [forexAccounts, selectedForexAccount, forexProp, forexDailyEntries])
 
   // Futures Prop Calculator
-  const calculateFuturesProp = () => {
+  const calculateFuturesProp = useCallback(() => {
     const selectedAccount = futuresAccounts.find(acc => acc.id === selectedFuturesAccount) || futuresProp
     const phase = selectedAccount.phase
     const accountSize = parseFloat(selectedAccount.accountSize || '0')
@@ -515,6 +479,11 @@ export default function Dashboard() {
         minDays = 0
         drawdownType = selectedAccount.fundedDrawdownType
         break
+      default:
+        trailingDD = 0
+        profitTarget = 0
+        minDays = 0
+        drawdownType = 'eod'
     }
     
     // Calculate from daily entries if available
@@ -566,13 +535,13 @@ export default function Dashboard() {
         drawdownUsed: 0
       }])
     }
-  }
+  }, [futuresAccounts, selectedFuturesAccount, futuresProp, futuresDailyEntries])
 
   // Risk Calculator
-  const calculateRisk = () => {
-    const accountSize = parseFloat(riskCalculator.accountSize)
-    const riskPercent = parseFloat(riskCalculator.riskPercent)
-    const stopLossPips = parseFloat(riskCalculator.stopLossPips)
+  const calculateRisk = useCallback(() => {
+    const accountSize = parseFloat(riskCalculator.accountSize) || 0
+    const riskPercent = parseFloat(riskCalculator.riskPercent) || 0
+    const stopLossPips = parseFloat(riskCalculator.stopLossPips) || 1
     
     const riskAmount = accountSize * (riskPercent / 100)
     const pipValue = riskAmount / stopLossPips
@@ -586,20 +555,20 @@ export default function Dashboard() {
       pipValue: pipValue.toFixed(2),
       positionSize
     }))
-  }
+  }, [riskCalculator.accountSize, riskCalculator.riskPercent, riskCalculator.stopLossPips])
 
   // Trade Planner
-  const calculateTradePlan = () => {
-    const entry = parseFloat(tradePlanner.entryPrice)
-    const stopLoss = parseFloat(tradePlanner.stopLoss)
-    const positionSize = parseFloat(tradePlanner.positionSize)
+  const calculateTradePlan = useCallback(() => {
+    const entry = parseFloat(tradePlanner.entryPrice) || 0
+    const stopLoss = parseFloat(tradePlanner.stopLoss) || 0
+    const positionSize = parseFloat(tradePlanner.positionSize) || 0
     
     const riskPerPip = positionSize * 10 // $10 per pip per standard lot
-    const pipsToStop = Math.abs(entry - stopLoss)
+    const pipsToStop = Math.abs(entry - stopLoss) || 1
     const riskAmount = riskPerPip * pipsToStop
     
-    const takeProfit1 = parseFloat(tradePlanner.takeProfit1)
-    const takeProfit2 = parseFloat(tradePlanner.takeProfit2)
+    const takeProfit1 = parseFloat(tradePlanner.takeProfit1) || 0
+    const takeProfit2 = parseFloat(tradePlanner.takeProfit2) || 0
     
     const profit1 = Math.abs(takeProfit1 - entry) * riskPerPip
     const profit2 = Math.abs(takeProfit2 - entry) * riskPerPip
@@ -610,7 +579,7 @@ export default function Dashboard() {
       riskAmount: riskAmount.toFixed(2),
       potentialProfit: potentialProfit.toFixed(2)
     }))
-  }
+  }, [tradePlanner.entryPrice, tradePlanner.stopLoss, tradePlanner.positionSize, tradePlanner.takeProfit1, tradePlanner.takeProfit2])
 
   // Forex Daily Entry Function
   const addForexDailyEntry = useCallback((prefilledDate?: string) => {
@@ -673,7 +642,7 @@ export default function Dashboard() {
     setForexProp(prev => ({
       ...prev,
       currentBalance: newBalance.toString(),
-      tradingDays: (prev.tradingDays === entryDate ? prev.tradingDays : (parseInt(prev.tradingDays) + 1).toString())
+      tradingDays: (parseInt(prev.tradingDays) + 1).toString()
     }))
     
     alert(`Daily entry added!\nBalance: $${newBalance.toFixed(2)}\nHigh Water Mark: $${newHighWaterMark.toFixed(2)}`)
@@ -740,7 +709,7 @@ export default function Dashboard() {
       ...prev,
       currentBalance: newBalance.toString(),
       highWaterMark: newHighWaterMark.toString(),
-      tradingDays: (prev.tradingDays === entryDate ? prev.tradingDays : (parseInt(prev.tradingDays) + 1).toString())
+      tradingDays: (parseInt(prev.tradingDays) + 1).toString()
     }))
     
     alert(`Daily entry added!\nBalance: $${newBalance.toFixed(2)}\nHigh Water Mark: $${newHighWaterMark.toFixed(2)}`)
@@ -770,7 +739,10 @@ export default function Dashboard() {
       const daysSinceStart = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
       
       if (forexPropResults) {
-        const { phase, minDays, maxDays } = forexPropResults
+        const minDays = forexPropResults.minDays || 0
+        const maxDays = forexPropResults.maxDays || 0
+        const phase = forexPropResults.phase || 'phase1'
+        
         if (daysSinceStart === minDays) {
           items.push({
             type: 'milestone',
@@ -785,7 +757,7 @@ export default function Dashboard() {
             description: `Maximum days reached - account expires`
           })
         }
-        if (entry.balance >= forexPropResults.profitTarget + forexPropResults.accountSize) {
+        if (entry.balance >= (forexPropResults.profitTarget || 0) + (forexPropResults.accountSize || 0)) {
           items.push({
             type: 'success',
             title: '✅ Profit Target Hit!',
@@ -822,7 +794,9 @@ export default function Dashboard() {
       const daysSinceStart = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
       
       if (futuresPropResults) {
-        const { phase, minDays } = futuresPropResults
+        const minDays = futuresPropResults.minDays || 0
+        const phase = futuresPropResults.phase || 'evaluation'
+        
         if (daysSinceStart === minDays) {
           items.push({
             type: 'milestone',
@@ -843,39 +817,8 @@ export default function Dashboard() {
     return items
   }, [futuresDailyEntries, futuresProp, futuresPropResults])
 
-  // Render Forex Calendar Item
-  const renderForexCalendarItem = useCallback((item: CalendarItem) => {
-    const color = item.type === 'trade' 
-      ? (item.profitLoss! >= 0 ? theme.success : theme.danger)
-      : item.type === 'success' ? theme.success
-      : item.type === 'warning' ? theme.warning
-      : item.type === 'milestone' ? theme.accent
-      : theme.text
-    
-    return (
-      <div style={{
-        padding: '6px',
-        marginBottom: '4px',
-        background: darkMode ? '#334155' : '#f8fafc',
-        borderRadius: '6px',
-        fontSize: '11px',
-        borderLeft: `3px solid ${color}`
-      }}>
-        <div style={{ fontWeight: 600, color: theme.text }}>{item.title}</div>
-        {item.profitLoss !== undefined && (
-          <div style={{ color, fontSize: '10px' }}>
-            P&L: ${item.profitLoss.toFixed(2)} • Trades: {item.trades}
-          </div>
-        )}
-        {item.description && (
-          <div style={{ color: theme.textMuted, fontSize: '9px' }}>{item.description}</div>
-        )}
-      </div>
-    )
-  }, [theme, darkMode])
-
-  // Render Futures Calendar Item
-  const renderFuturesCalendarItem = useCallback((item: CalendarItem) => {
+  // Render Calendar Item
+  const renderCalendarItem = useCallback((item: CalendarItem, isForex: boolean = true) => {
     const color = item.type === 'trade' 
       ? (item.profitLoss! >= 0 ? theme.success : theme.danger)
       : item.type === 'success' ? theme.success
@@ -945,15 +888,13 @@ export default function Dashboard() {
   }, [futuresAccounts, selectedFuturesAccount, futuresDailyEntries, futuresPropResults])
 
   // Memoized calendar days
-  const forexCalendarDays = useMemo(() => {
-    const daysInMonth = new Date(forexCalendarMonth.getFullYear(), forexCalendarMonth.getMonth() + 1, 0).getDate()
+  const getCalendarDays = useCallback((month: Date) => {
+    const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
     return Array.from({ length: daysInMonth }, (_, i) => i + 1)
-  }, [forexCalendarMonth])
+  }, [])
 
-  const futuresCalendarDays = useMemo(() => {
-    const daysInMonth = new Date(futuresCalendarMonth.getFullYear(), futuresCalendarMonth.getMonth() + 1, 0).getDate()
-    return Array.from({ length: daysInMonth }, (_, i) => i + 1)
-  }, [futuresCalendarMonth])
+  const forexCalendarDays = useMemo(() => getCalendarDays(forexCalendarMonth), [forexCalendarMonth, getCalendarDays])
+  const futuresCalendarDays = useMemo(() => getCalendarDays(futuresCalendarMonth), [futuresCalendarMonth, getCalendarDays])
 
   // Add new journal entry
   const addJournalEntry = () => {
@@ -1568,6 +1509,280 @@ export default function Dashboard() {
     </div>
   )
 
+  // Calendar Day Component
+  const CalendarDay = ({ 
+    day, 
+    month, 
+    isForex = true,
+    getCalendarItems,
+    addDailyEntry 
+  }: { 
+    day: number; 
+    month: Date; 
+    isForex: boolean;
+    getCalendarItems: (day: number, month: Date) => CalendarItem[];
+    addDailyEntry: (date?: string) => void;
+  }) => {
+    const date = new Date(month.getFullYear(), month.getMonth(), day)
+    const dayOfWeek = date.getDay()
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+    const isToday = date.toDateString() === new Date().toDateString()
+    const calendarItems = getCalendarItems(day, month)
+    const hasEntry = calendarItems.length > 0
+    const dateStr = formatDate(date)
+    const isPast = date < new Date() && !isToday
+    const isFuture = date > new Date()
+    
+    return (
+      <div 
+        style={{ 
+          minHeight: '120px', 
+          padding: '8px', 
+          background: isToday ? theme.todayBg : 
+                   isWeekend ? theme.weekendBg : theme.cardBg,
+          borderRadius: '8px', 
+          border: isToday ? `2px solid ${isForex ? theme.accent : theme.success}` : `1px solid ${theme.border}`,
+          opacity: isWeekend || isFuture ? 0.7 : 1,
+          cursor: !hasEntry && !isWeekend && !isFuture ? 'pointer' : 'default'
+        }}
+        onClick={() => !hasEntry && !isWeekend && !isFuture && addDailyEntry(dateStr)}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+          <span style={{ 
+            fontWeight: isToday ? 700 : 600, 
+            color: isToday ? (isForex ? theme.accent : theme.success) : theme.text, 
+            fontSize: '14px' 
+          }}>
+            {day}
+          </span>
+          {hasEntry && (
+            <span style={{ 
+              background: isForex ? theme.accent : theme.success, 
+              color: 'white', 
+              fontSize: '9px', 
+              padding: '1px 4px', 
+              borderRadius: '4px' 
+            }}>
+              {calendarItems.length}
+            </span>
+          )}
+        </div>
+        
+        {calendarItems.map((item, idx) => (
+          <div key={idx}>
+            {renderCalendarItem(item, isForex)}
+          </div>
+        ))}
+        
+        {!hasEntry && !isWeekend && (
+          <div style={{ 
+            fontSize: '10px', 
+            color: isPast ? theme.warning : theme.textMuted, 
+            textAlign: 'center', 
+            padding: '8px' 
+          }}>
+            {isPast ? 'Click to add entry' : 'No trading'}
+          </div>
+        )}
+        
+        {isWeekend && (
+          <div style={{ 
+            fontSize: '10px', 
+            color: theme.textMuted, 
+            textAlign: 'center', 
+            padding: '8px' 
+          }}>
+            Weekend
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Trading Calendar Component
+  const TradingCalendar = ({ 
+    title, 
+    calendarMonth, 
+    setCalendarMonth, 
+    isForex = true,
+    getCalendarItems,
+    addDailyEntry,
+    dailyEntries,
+    prop,
+    propResults
+  }: { 
+    title: string; 
+    calendarMonth: Date; 
+    setCalendarMonth: (date: Date) => void; 
+    isForex: boolean;
+    getCalendarItems: (day: number, month: Date) => CalendarItem[];
+    addDailyEntry: (date?: string) => void;
+    dailyEntries: DailyEntry[];
+    prop: ForexAccount | FuturesAccount;
+    propResults: any;
+  }) => {
+    const calendarDays = useMemo(() => getCalendarDays(calendarMonth), [calendarMonth, getCalendarDays])
+    
+    return (
+      <div style={{ marginTop: '32px', padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h3 style={{ margin: 0, color: theme.text, fontSize: '20px', marginBottom: '4px' }}>{title}</h3>
+            <div style={{ color: theme.textMuted, fontSize: '14px' }}>
+              {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button 
+              onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))} 
+              style={btnPrimary}
+            >
+              ← Prev
+            </button>
+            <button 
+              onClick={() => setCalendarMonth(new Date())} 
+              style={btnPrimary}
+            >
+              Today
+            </button>
+            <button 
+              onClick={() => addDailyEntry()} 
+              style={{ ...btnSuccess, padding: '8px 16px', fontSize: '13px' }}
+            >
+              + Add Daily Entry
+            </button>
+            <button 
+              onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))} 
+              style={btnPrimary}
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+        
+        {/* Calendar Legend */}
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', fontSize: '12px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '12px', height: '12px', background: theme.success, borderRadius: '2px' }}></div>
+            <span style={{ color: theme.textMuted }}>Profitable Day</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '12px', height: '12px', background: theme.danger, borderRadius: '2px' }}></div>
+            <span style={{ color: theme.textMuted }}>Losing Day</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '12px', height: '12px', background: theme.warning, borderRadius: '2px' }}></div>
+            <span style={{ color: theme.textMuted }}>Milestone</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '12px', height: '12px', background: theme.accent, borderRadius: '2px' }}></div>
+            <span style={{ color: theme.textMuted }}>Success</span>
+          </div>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', marginBottom: '20px' }}>
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} style={{ textAlign: 'center', fontWeight: 600, color: theme.textMuted, padding: '10px', fontSize: '13px' }}>{day}</div>
+          ))}
+          
+          {Array.from({ length: new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay() }).map((_, i) => (
+            <div key={`empty-${i}`} style={{ minHeight: '120px', background: theme.bg, borderRadius: '8px' }} />
+          ))}
+          
+          {calendarDays.map(day => (
+            <CalendarDay
+              key={day}
+              day={day}
+              month={calendarMonth}
+              isForex={isForex}
+              getCalendarItems={getCalendarItems}
+              addDailyEntry={addDailyEntry}
+            />
+          ))}
+        </div>
+        
+        {/* Daily Summary */}
+        <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
+          <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '16px' }}>📊 Daily Summary</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: theme.textMuted, fontSize: '11px' }}>Trading Days</div>
+              <div style={{ color: theme.text, fontSize: '18px', fontWeight: 'bold' }}>{prop.tradingDays}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: theme.textMuted, fontSize: '11px' }}>Days Remaining</div>
+              <div style={{ 
+                color: isForex ? 
+                  (propResults?.daysRemaining > 10 ? theme.success : theme.warning) :
+                  (Math.max(0, (propResults?.minDays || 0) - parseInt(prop.tradingDays)) > 0 ? theme.warning : theme.success), 
+                fontSize: '18px', 
+                fontWeight: 'bold' 
+              }}>
+                {isForex ? 
+                  (propResults?.daysRemaining || 0) :
+                  Math.max(0, (propResults?.minDays || 0) - parseInt(prop.tradingDays))
+                }
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: theme.textMuted, fontSize: '11px' }}>Avg Daily P&L</div>
+              <div style={{ 
+                color: dailyEntries.length > 0 ? 
+                  (dailyEntries.reduce((sum, e) => sum + e.profitLoss, 0) / dailyEntries.length >= 0 ? theme.success : theme.danger) : 
+                  theme.text, 
+                fontSize: '18px', 
+                fontWeight: 'bold' 
+              }}>
+                ${dailyEntries.length > 0 ? (dailyEntries.reduce((sum, e) => sum + e.profitLoss, 0) / dailyEntries.length).toFixed(2) : '0.00'}
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: theme.textMuted, fontSize: '11px' }}>Total Trades</div>
+              <div style={{ color: theme.text, fontSize: '18px', fontWeight: 'bold' }}>
+                {dailyEntries.reduce((sum, e) => sum + e.trades, 0)}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Recent Entries Table */}
+        {dailyEntries.length > 0 && (
+          <div style={{ marginTop: '20px' }}>
+            <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '16px' }}>📋 Recent Trading Days</h4>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid ' + theme.border }}>
+                    <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Date</th>
+                    <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>P&L</th>
+                    <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Balance</th>
+                    <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>High Water Mark</th>
+                    <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Trades</th>
+                    <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dailyEntries.slice(-5).reverse().map((entry, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid ' + theme.border }}>
+                      <td style={{ padding: '8px', color: theme.text, fontSize: '12px' }}>{entry.date}</td>
+                      <td style={{ padding: '8px', fontSize: '12px', fontWeight: 600, color: entry.profitLoss >= 0 ? theme.success : theme.danger }}>
+                        ${entry.profitLoss.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '8px', color: theme.text, fontSize: '12px' }}>${entry.balance.toFixed(2)}</td>
+                      <td style={{ padding: '8px', color: theme.accent, fontSize: '12px', fontWeight: 600 }}>${entry.highWaterMark.toFixed(2)}</td>
+                      <td style={{ padding: '8px', color: theme.text, fontSize: '12px' }}>{entry.trades}</td>
+                      <td style={{ padding: '8px', color: theme.textMuted, fontSize: '12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.notes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
       <Header />
@@ -1634,7 +1849,7 @@ export default function Dashboard() {
                   <label style={{ display: 'block', marginBottom: '8px', color: theme.text, fontSize: '14px' }}>Phase</label>
                   <select
                     value={forexProp.phase}
-                    onChange={(e) => setForexProp(prev => ({ ...prev, phase: e.target.value as any }))}
+                    onChange={(e) => setForexProp(prev => ({ ...prev, phase: e.target.value as 'phase1' | 'phase2' | 'funded' }))}
                     style={{
                       width: '100%',
                       padding: '10px',
@@ -1673,74 +1888,6 @@ export default function Dashboard() {
                     type="number"
                     value={forexProp.currentBalance}
                     onChange={(e) => setForexProp(prev => ({ ...prev, currentBalance: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      border: `1px solid ${theme.border}`,
-                      background: theme.bg,
-                      color: theme.text,
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', color: theme.text, fontSize: '14px' }}>Daily Drawdown (%)</label>
-                  <input
-                    type="number"
-                    value={forexProp.phase1DailyDD}
-                    onChange={(e) => setForexProp(prev => ({ ...prev, phase1DailyDD: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      border: `1px solid ${theme.border}`,
-                      background: theme.bg,
-                      color: theme.text,
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', color: theme.text, fontSize: '14px' }}>Max Drawdown (%)</label>
-                  <input
-                    type="number"
-                    value={forexProp.phase1MaxDD}
-                    onChange={(e) => setForexProp(prev => ({ ...prev, phase1MaxDD: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      border: `1px solid ${theme.border}`,
-                      background: theme.bg,
-                      color: theme.text,
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', color: theme.text, fontSize: '14px' }}>Profit Target (%)</label>
-                  <input
-                    type="number"
-                    value={forexProp.phase1Target}
-                    onChange={(e) => setForexProp(prev => ({ ...prev, phase1Target: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      border: `1px solid ${theme.border}`,
-                      background: theme.bg,
-                      color: theme.text,
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', color: theme.text, fontSize: '14px' }}>Trading Days</label>
-                  <input
-                    type="number"
-                    value={forexProp.tradingDays}
-                    onChange={(e) => setForexProp(prev => ({ ...prev, tradingDays: e.target.value }))}
                     style={{
                       width: '100%',
                       padding: '10px',
@@ -1841,222 +1988,17 @@ export default function Dashboard() {
                   </div>
                   
                   {/* Forex Trading Calendar */}
-                  <div style={{ marginTop: '32px', padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                      <div>
-                        <h3 style={{ margin: 0, color: theme.text, fontSize: '20px', marginBottom: '4px' }}>📅 Forex Trading Calendar</h3>
-                        <div style={{ color: theme.textMuted, fontSize: '14px' }}>
-                          {forexCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button 
-                          onClick={() => setForexCalendarMonth(new Date(forexCalendarMonth.getFullYear(), forexCalendarMonth.getMonth() - 1, 1))} 
-                          style={btnPrimary}
-                        >
-                          ← Prev
-                        </button>
-                        <button 
-                          onClick={() => setForexCalendarMonth(new Date())} 
-                          style={btnPrimary}
-                        >
-                          Today
-                        </button>
-                        <button 
-                          onClick={() => addForexDailyEntry()} 
-                          style={{ ...btnSuccess, padding: '8px 16px', fontSize: '13px' }}
-                        >
-                          + Add Daily Entry
-                        </button>
-                        <button 
-                          onClick={() => setForexCalendarMonth(new Date(forexCalendarMonth.getFullYear(), forexCalendarMonth.getMonth() + 1, 1))} 
-                          style={btnPrimary}
-                        >
-                          Next →
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Calendar Legend */}
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', fontSize: '12px', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <div style={{ width: '12px', height: '12px', background: theme.success, borderRadius: '2px' }}></div>
-                        <span style={{ color: theme.textMuted }}>Profitable Day</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <div style={{ width: '12px', height: '12px', background: theme.danger, borderRadius: '2px' }}></div>
-                        <span style={{ color: theme.textMuted }}>Losing Day</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <div style={{ width: '12px', height: '12px', background: theme.warning, borderRadius: '2px' }}></div>
-                        <span style={{ color: theme.textMuted }}>Milestone</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <div style={{ width: '12px', height: '12px', background: theme.accent, borderRadius: '2px' }}></div>
-                        <span style={{ color: theme.textMuted }}>Success</span>
-                      </div>
-                    </div>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', marginBottom: '20px' }}>
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} style={{ textAlign: 'center', fontWeight: 600, color: theme.textMuted, padding: '10px', fontSize: '13px' }}>{day}</div>
-                      ))}
-                      
-                      {Array.from({ length: new Date(forexCalendarMonth.getFullYear(), forexCalendarMonth.getMonth(), 1).getDay() }).map((_, i) => (
-                        <div key={`empty-${i}`} style={{ minHeight: '120px', background: theme.bg, borderRadius: '8px' }} />
-                      ))}
-                      
-                      {forexCalendarDays.map(day => {
-                        const date = new Date(forexCalendarMonth.getFullYear(), forexCalendarMonth.getMonth(), day)
-                        const dayOfWeek = date.getDay()
-                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-                        const isToday = isSameDay(date, new Date())
-                        const calendarItems = getForexCalendarItemsForDay(day, forexCalendarMonth)
-                        const hasEntry = calendarItems.length > 0
-                        const dateStr = formatDate(date)
-                        const isPast = date < new Date() && !isSameDay(date, new Date())
-                        const isFuture = date > new Date()
-                        
-                        return (
-                          <div key={day} style={{ 
-                            minHeight: '120px', 
-                            padding: '8px', 
-                            background: isToday ? theme.todayBg : 
-                                     isWeekend ? theme.weekendBg : theme.cardBg,
-                            borderRadius: '8px', 
-                            border: isToday ? `2px solid ${theme.accent}` : `1px solid ${theme.border}`,
-                            opacity: isWeekend || isFuture ? 0.7 : 1,
-                            cursor: !hasEntry && !isWeekend && !isFuture ? 'pointer' : 'default'
-                          }}
-                          onClick={() => !hasEntry && !isWeekend && !isFuture && addForexDailyEntry(dateStr)}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                              <span style={{ 
-                                fontWeight: isToday ? 700 : 600, 
-                                color: isToday ? theme.accent : theme.text, 
-                                fontSize: '14px' 
-                              }}>
-                                {day}
-                              </span>
-                              {hasEntry && (
-                                <span style={{ 
-                                  background: theme.accent, 
-                                  color: 'white', 
-                                  fontSize: '9px', 
-                                  padding: '1px 4px', 
-                                  borderRadius: '4px' 
-                                }}>
-                                  {calendarItems.length}
-                                </span>
-                              )}
-                            </div>
-                            
-                            {calendarItems.map((item, idx) => (
-                              <div key={idx}>
-                                {renderForexCalendarItem(item)}
-                              </div>
-                            ))}
-                            
-                            {!hasEntry && !isWeekend && (
-                              <div style={{ 
-                                fontSize: '10px', 
-                                color: isPast ? theme.warning : theme.textMuted, 
-                                textAlign: 'center', 
-                                padding: '8px' 
-                              }}>
-                                {isPast ? 'Click to add entry' : 'No trading'}
-                              </div>
-                            )}
-                            
-                            {isWeekend && (
-                              <div style={{ 
-                                fontSize: '10px', 
-                                color: theme.textMuted, 
-                                textAlign: 'center', 
-                                padding: '8px' 
-                              }}>
-                                Weekend
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                    
-                    {/* Daily Summary */}
-                    <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
-                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '16px' }}>📊 Daily Summary</h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Trading Days</div>
-                          <div style={{ color: theme.text, fontSize: '18px', fontWeight: 'bold' }}>{forexProp.tradingDays}</div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Days Remaining</div>
-                          <div style={{ 
-                            color: forexPropResults.daysRemaining > 10 ? theme.success : theme.warning, 
-                            fontSize: '18px', 
-                            fontWeight: 'bold' 
-                          }}>
-                            {forexPropResults.daysRemaining}
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Avg Daily P&L</div>
-                          <div style={{ 
-                            color: forexDailyEntries.length > 0 ? 
-                              (forexDailyEntries.reduce((sum, e) => sum + e.profitLoss, 0) / forexDailyEntries.length >= 0 ? theme.success : theme.danger) : 
-                              theme.text, 
-                            fontSize: '18px', 
-                            fontWeight: 'bold' 
-                          }}>
-                            ${forexDailyEntries.length > 0 ? (forexDailyEntries.reduce((sum, e) => sum + e.profitLoss, 0) / forexDailyEntries.length).toFixed(2) : '0.00'}
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Total Trades</div>
-                          <div style={{ color: theme.text, fontSize: '18px', fontWeight: 'bold' }}>
-                            {forexDailyEntries.reduce((sum, e) => sum + e.trades, 0)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Recent Entries Table */}
-                    {forexDailyEntries.length > 0 && (
-                      <div style={{ marginTop: '20px' }}>
-                        <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '16px' }}>📋 Recent Trading Days</h4>
-                        <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                              <tr style={{ borderBottom: '2px solid ' + theme.border }}>
-                                <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Date</th>
-                                <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>P&L</th>
-                                <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Balance</th>
-                                <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>High Water Mark</th>
-                                <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Trades</th>
-                                <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Notes</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {forexDailyEntries.slice(-5).reverse().map((entry, idx) => (
-                                <tr key={idx} style={{ borderBottom: '1px solid ' + theme.border }}>
-                                  <td style={{ padding: '8px', color: theme.text, fontSize: '12px' }}>{entry.date}</td>
-                                  <td style={{ padding: '8px', fontSize: '12px', fontWeight: 600, color: entry.profitLoss >= 0 ? theme.success : theme.danger }}>
-                                    ${entry.profitLoss.toFixed(2)}
-                                  </td>
-                                  <td style={{ padding: '8px', color: theme.text, fontSize: '12px' }}>${entry.balance.toFixed(2)}</td>
-                                  <td style={{ padding: '8px', color: theme.accent, fontSize: '12px', fontWeight: 600 }}>${entry.highWaterMark.toFixed(2)}</td>
-                                  <td style={{ padding: '8px', color: theme.text, fontSize: '12px' }}>{entry.trades}</td>
-                                  <td style={{ padding: '8px', color: theme.textMuted, fontSize: '12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.notes}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <TradingCalendar
+                    title="📅 Forex Trading Calendar"
+                    calendarMonth={forexCalendarMonth}
+                    setCalendarMonth={setForexCalendarMonth}
+                    isForex={true}
+                    getCalendarItems={getForexCalendarItemsForDay}
+                    addDailyEntry={addForexDailyEntry}
+                    dailyEntries={forexDailyEntries}
+                    prop={forexProp}
+                    propResults={forexPropResults}
+                  />
                 </div>
               )}
             </div>
@@ -2116,7 +2058,7 @@ export default function Dashboard() {
                   <label style={{ display: 'block', marginBottom: '8px', color: theme.text, fontSize: '14px' }}>Phase</label>
                   <select
                     value={futuresProp.phase}
-                    onChange={(e) => setFuturesProp(prev => ({ ...prev, phase: e.target.value as any }))}
+                    onChange={(e) => setFuturesProp(prev => ({ ...prev, phase: e.target.value as 'evaluation' | 'pa' | 'funded' }))}
                     style={{
                       width: '100%',
                       padding: '10px',
@@ -2155,74 +2097,6 @@ export default function Dashboard() {
                     type="number"
                     value={futuresProp.currentBalance}
                     onChange={(e) => setFuturesProp(prev => ({ ...prev, currentBalance: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      border: `1px solid ${theme.border}`,
-                      background: theme.bg,
-                      color: theme.text,
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', color: theme.text, fontSize: '14px' }}>Trailing Drawdown ($)</label>
-                  <input
-                    type="number"
-                    value={futuresProp.evalTrailingDD}
-                    onChange={(e) => setFuturesProp(prev => ({ ...prev, evalTrailingDD: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      border: `1px solid ${theme.border}`,
-                      background: theme.bg,
-                      color: theme.text,
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', color: theme.text, fontSize: '14px' }}>Profit Target ($)</label>
-                  <input
-                    type="number"
-                    value={futuresProp.evalProfitTarget}
-                    onChange={(e) => setFuturesProp(prev => ({ ...prev, evalProfitTarget: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      border: `1px solid ${theme.border}`,
-                      background: theme.bg,
-                      color: theme.text,
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', color: theme.text, fontSize: '14px' }}>Minimum Days</label>
-                  <input
-                    type="number"
-                    value={futuresProp.evalMinDays}
-                    onChange={(e) => setFuturesProp(prev => ({ ...prev, evalMinDays: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      border: `1px solid ${theme.border}`,
-                      background: theme.bg,
-                      color: theme.text,
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', color: theme.text, fontSize: '14px' }}>Trading Days</label>
-                  <input
-                    type="number"
-                    value={futuresProp.tradingDays}
-                    onChange={(e) => setFuturesProp(prev => ({ ...prev, tradingDays: e.target.value }))}
                     style={{
                       width: '100%',
                       padding: '10px',
@@ -2320,222 +2194,17 @@ export default function Dashboard() {
                   </div>
                   
                   {/* Futures Trading Calendar */}
-                  <div style={{ marginTop: '32px', padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                      <div>
-                        <h3 style={{ margin: 0, color: theme.text, fontSize: '20px', marginBottom: '4px' }}>📅 Futures Trading Calendar</h3>
-                        <div style={{ color: theme.textMuted, fontSize: '14px' }}>
-                          {futuresCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button 
-                          onClick={() => setFuturesCalendarMonth(new Date(futuresCalendarMonth.getFullYear(), futuresCalendarMonth.getMonth() - 1, 1))} 
-                          style={btnPrimary}
-                        >
-                          ← Prev
-                        </button>
-                        <button 
-                          onClick={() => setFuturesCalendarMonth(new Date())} 
-                          style={btnPrimary}
-                        >
-                          Today
-                        </button>
-                        <button 
-                          onClick={() => addFuturesDailyEntry()} 
-                          style={{ ...btnSuccess, padding: '8px 16px', fontSize: '13px' }}
-                        >
-                          + Add Daily Entry
-                        </button>
-                        <button 
-                          onClick={() => setFuturesCalendarMonth(new Date(futuresCalendarMonth.getFullYear(), futuresCalendarMonth.getMonth() + 1, 1))} 
-                          style={btnPrimary}
-                        >
-                          Next →
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Calendar Legend */}
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', fontSize: '12px', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <div style={{ width: '12px', height: '12px', background: theme.success, borderRadius: '2px' }}></div>
-                        <span style={{ color: theme.textMuted }}>Profitable Day</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <div style={{ width: '12px', height: '12px', background: theme.danger, borderRadius: '2px' }}></div>
-                        <span style={{ color: theme.textMuted }}>Losing Day</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <div style={{ width: '12px', height: '12px', background: theme.warning, borderRadius: '2px' }}></div>
-                        <span style={{ color: theme.textMuted }}>Milestone</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <div style={{ width: '12px', height: '12px', background: theme.accent, borderRadius: '2px' }}></div>
-                        <span style={{ color: theme.textMuted }}>Success</span>
-                      </div>
-                    </div>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', marginBottom: '20px' }}>
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} style={{ textAlign: 'center', fontWeight: 600, color: theme.textMuted, padding: '10px', fontSize: '13px' }}>{day}</div>
-                      ))}
-                      
-                      {Array.from({ length: new Date(futuresCalendarMonth.getFullYear(), futuresCalendarMonth.getMonth(), 1).getDay() }).map((_, i) => (
-                        <div key={`empty-${i}`} style={{ minHeight: '120px', background: theme.bg, borderRadius: '8px' }} />
-                      ))}
-                      
-                      {futuresCalendarDays.map(day => {
-                        const date = new Date(futuresCalendarMonth.getFullYear(), futuresCalendarMonth.getMonth(), day)
-                        const dayOfWeek = date.getDay()
-                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-                        const isToday = isSameDay(date, new Date())
-                        const calendarItems = getFuturesCalendarItemsForDay(day, futuresCalendarMonth)
-                        const hasEntry = calendarItems.length > 0
-                        const dateStr = formatDate(date)
-                        const isPast = date < new Date() && !isSameDay(date, new Date())
-                        const isFuture = date > new Date()
-                        
-                        return (
-                          <div key={day} style={{ 
-                            minHeight: '120px', 
-                            padding: '8px', 
-                            background: isToday ? theme.todayBg : 
-                                     isWeekend ? theme.weekendBg : theme.cardBg,
-                            borderRadius: '8px', 
-                            border: isToday ? `2px solid ${theme.success}` : `1px solid ${theme.border}`,
-                            opacity: isWeekend || isFuture ? 0.7 : 1,
-                            cursor: !hasEntry && !isWeekend && !isFuture ? 'pointer' : 'default'
-                          }}
-                          onClick={() => !hasEntry && !isWeekend && !isFuture && addFuturesDailyEntry(dateStr)}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                              <span style={{ 
-                                fontWeight: isToday ? 700 : 600, 
-                                color: isToday ? theme.success : theme.text, 
-                                fontSize: '14px' 
-                              }}>
-                                {day}
-                              </span>
-                              {hasEntry && (
-                                <span style={{ 
-                                  background: theme.success, 
-                                  color: 'white', 
-                                  fontSize: '9px', 
-                                  padding: '1px 4px', 
-                                  borderRadius: '4px' 
-                                }}>
-                                  {calendarItems.length}
-                                </span>
-                              )}
-                            </div>
-                            
-                            {calendarItems.map((item, idx) => (
-                              <div key={idx}>
-                                {renderFuturesCalendarItem(item)}
-                              </div>
-                            ))}
-                            
-                            {!hasEntry && !isWeekend && (
-                              <div style={{ 
-                                fontSize: '10px', 
-                                color: isPast ? theme.warning : theme.textMuted, 
-                                textAlign: 'center', 
-                                padding: '8px' 
-                              }}>
-                                {isPast ? 'Click to add entry' : 'No trading'}
-                              </div>
-                            )}
-                            
-                            {isWeekend && (
-                              <div style={{ 
-                                fontSize: '10px', 
-                                color: theme.textMuted, 
-                                textAlign: 'center', 
-                                padding: '8px' 
-                              }}>
-                                Weekend
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                    
-                    {/* Daily Summary */}
-                    <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
-                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '16px' }}>📊 Daily Summary</h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Trading Days</div>
-                          <div style={{ color: theme.text, fontSize: '18px', fontWeight: 'bold' }}>{futuresProp.tradingDays}</div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Min Days Remaining</div>
-                          <div style={{ 
-                            color: Math.max(0, futuresPropResults.minDays - parseInt(futuresProp.tradingDays)) > 0 ? theme.warning : theme.success, 
-                            fontSize: '18px', 
-                            fontWeight: 'bold' 
-                          }}>
-                            {Math.max(0, futuresPropResults.minDays - parseInt(futuresProp.tradingDays))}
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Avg Daily P&L</div>
-                          <div style={{ 
-                            color: futuresDailyEntries.length > 0 ? 
-                              (futuresDailyEntries.reduce((sum, e) => sum + e.profitLoss, 0) / futuresDailyEntries.length >= 0 ? theme.success : theme.danger) : 
-                              theme.text, 
-                            fontSize: '18px', 
-                            fontWeight: 'bold' 
-                          }}>
-                            ${futuresDailyEntries.length > 0 ? (futuresDailyEntries.reduce((sum, e) => sum + e.profitLoss, 0) / futuresDailyEntries.length).toFixed(2) : '0.00'}
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Total Trades</div>
-                          <div style={{ color: theme.text, fontSize: '18px', fontWeight: 'bold' }}>
-                            {futuresDailyEntries.reduce((sum, e) => sum + e.trades, 0)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Recent Entries Table */}
-                    {futuresDailyEntries.length > 0 && (
-                      <div style={{ marginTop: '20px' }}>
-                        <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '16px' }}>📋 Recent Trading Days</h4>
-                        <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                              <tr style={{ borderBottom: '2px solid ' + theme.border }}>
-                                <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Date</th>
-                                <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>P&L</th>
-                                <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Balance</th>
-                                <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>High Water Mark</th>
-                                <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Trades</th>
-                                <th style={{ textAlign: 'left', padding: '8px', color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>Notes</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {futuresDailyEntries.slice(-5).reverse().map((entry, idx) => (
-                                <tr key={idx} style={{ borderBottom: '1px solid ' + theme.border }}>
-                                  <td style={{ padding: '8px', color: theme.text, fontSize: '12px' }}>{entry.date}</td>
-                                  <td style={{ padding: '8px', fontSize: '12px', fontWeight: 600, color: entry.profitLoss >= 0 ? theme.success : theme.danger }}>
-                                    ${entry.profitLoss.toFixed(2)}
-                                  </td>
-                                  <td style={{ padding: '8px', color: theme.text, fontSize: '12px' }}>${entry.balance.toFixed(2)}</td>
-                                  <td style={{ padding: '8px', color: theme.accent, fontSize: '12px', fontWeight: 600 }}>${entry.highWaterMark.toFixed(2)}</td>
-                                  <td style={{ padding: '8px', color: theme.text, fontSize: '12px' }}>{entry.trades}</td>
-                                  <td style={{ padding: '8px', color: theme.textMuted, fontSize: '12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.notes}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <TradingCalendar
+                    title="📅 Futures Trading Calendar"
+                    calendarMonth={futuresCalendarMonth}
+                    setCalendarMonth={setFuturesCalendarMonth}
+                    isForex={false}
+                    getCalendarItems={getFuturesCalendarItemsForDay}
+                    addDailyEntry={addFuturesDailyEntry}
+                    dailyEntries={futuresDailyEntries}
+                    prop={futuresProp}
+                    propResults={futuresPropResults}
+                  />
                 </div>
               )}
             </div>
