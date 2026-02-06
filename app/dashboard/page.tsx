@@ -1087,7 +1087,7 @@ export default function Dashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px', maxWidth: '800px', width: '100%' }}>
           <button 
             onClick={() => { setAppMode('budget'); setShowModeSelector(false); setActiveTab('dashboard') }}
-            style={{ padding: '40px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left' as const as const, boxShadow: '0 10px 40px rgba(16, 185, 129, 0.3)' }}
+            style={{ padding: '40px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left' as const, boxShadow: '0 10px 40px rgba(16, 185, 129, 0.3)' }}
           >
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>💰</div>
             <h2 style={{ color: 'white', fontSize: '28px', fontWeight: 700, margin: '0 0 12px 0' }}>Budget Mode</h2>
@@ -1101,7 +1101,7 @@ export default function Dashboard() {
           
           <button 
             onClick={() => { setAppMode('trading'); setShowModeSelector(false); setActiveTab('trading') }}
-            style={{ padding: '40px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left' as const as const, boxShadow: '0 10px 40px rgba(245, 158, 11, 0.3)' }}
+            style={{ padding: '40px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left' as const, boxShadow: '0 10px 40px rgba(245, 158, 11, 0.3)' }}
           >
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>📈</div>
             <h2 style={{ color: 'white', fontSize: '28px', fontWeight: 700, margin: '0 0 12px 0' }}>Trading Mode</h2>
