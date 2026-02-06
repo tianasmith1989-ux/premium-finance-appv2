@@ -1,4 +1,4 @@
-'use client'
+use client'
 
 import { useUser } from '@clerk/nextjs'
 import { useState, useRef } from 'react'
@@ -31,6 +31,12 @@ export default function Dashboard() {
   const [selectedGoalForExtra, setSelectedGoalForExtra] = useState<number | null>(null)
   
   const [paidOccurrences, setPaidOccurrences] = useState<Set<string>>(new Set())
+  
+  // Assets & Liabilities (for overview)
+  const [assets, setAssets] = useState<any[]>([])
+  const [newAsset, setNewAsset] = useState({ name: '', value: '', type: 'savings' })
+  const [liabilities, setLiabilities] = useState<any[]>([])
+  const [newLiability, setNewLiability] = useState({ name: '', value: '', type: 'loan' })
   
   const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
   const [chatInput, setChatInput] = useState('')
@@ -295,6 +301,8 @@ export default function Dashboard() {
   const totalDebtBalance = debts.reduce((sum, d) => sum + parseFloat(d.balance || '0'), 0)
   const totalOutgoing = monthlyExpenses + monthlyDebtPayments
   const monthlySurplus = monthlyIncome - totalOutgoing
+  const totalAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || '0'), 0)
+  const totalLiabilities = liabilities.reduce((sum, l) => sum + parseFloat(l.value || '0'), 0)
   const totalPL = trades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
   const winRate = trades.length > 0 ? (trades.filter(t => parseFloat(t.profitLoss || '0') > 0).length / trades.length) * 100 : 0
 
@@ -448,6 +456,10 @@ export default function Dashboard() {
   const deleteDebt = (id: number) => setDebts(debts.filter(d => d.id !== id))
   const addGoal = () => { if (!newGoal.name || !newGoal.target) return; setGoals([...goals, { ...newGoal, saved: newGoal.saved || '0', paymentAmount: newGoal.paymentAmount || '', id: Date.now() }]); setNewGoal({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: new Date().toISOString().split('T')[0], paymentAmount: '' }) }
   const deleteGoal = (id: number) => setGoals(goals.filter(g => g.id !== id))
+  const addAsset = () => { if (!newAsset.name || !newAsset.value) return; setAssets([...assets, { ...newAsset, id: Date.now() }]); setNewAsset({ name: '', value: '', type: 'savings' }) }
+  const deleteAsset = (id: number) => setAssets(assets.filter(a => a.id !== id))
+  const addLiability = () => { if (!newLiability.name || !newLiability.value) return; setLiabilities([...liabilities, { ...newLiability, id: Date.now() }]); setNewLiability({ name: '', value: '', type: 'loan' }) }
+  const deleteLiability = (id: number) => setLiabilities(liabilities.filter(l => l.id !== id))
   const addTrade = () => { if (!newTrade.instrument) return; setTrades([...trades, { ...newTrade, id: Date.now() }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())); setNewTrade({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '' }) }
 
   // Add preset bill as expense
