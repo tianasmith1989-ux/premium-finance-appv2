@@ -1,7 +1,7 @@
 'use client'
 
 import { useUser } from '@clerk/nextjs'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 export default function Dashboard() {
   const { user } = useUser()
@@ -19,7 +19,7 @@ export default function Dashboard() {
   const [newIncome, setNewIncome] = useState({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0] })
   
   const [expenses, setExpenses] = useState<any[]>([])
-  const [newExpense, setNewExpense] = useState({ name: '', amount: '', frequency: 'monthly', dueDate: new Date().toISOString().split('T')[0] })
+  const [newExpense, setNewExpense] = useState({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: new Date().toISOString().split('T')[0] })
   
   const [debts, setDebts] = useState<any[]>([])
   const [newDebt, setNewDebt] = useState({ name: '', balance: '', interestRate: '', minPayment: '', frequency: 'monthly', paymentDate: new Date().toISOString().split('T')[0] })
@@ -29,11 +29,6 @@ export default function Dashboard() {
   const [newGoal, setNewGoal] = useState({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: new Date().toISOString().split('T')[0], paymentAmount: '' })
   const [extraGoalPayment, setExtraGoalPayment] = useState('')
   const [selectedGoalForExtra, setSelectedGoalForExtra] = useState<number | null>(null)
-  
-  const [assets, setAssets] = useState<any[]>([])
-  const [newAsset, setNewAsset] = useState({ name: '', value: '', type: 'savings' })
-  const [liabilities, setLiabilities] = useState<any[]>([])
-  const [newLiability, setNewLiability] = useState({ name: '', value: '', type: 'loan' })
   
   const [paidOccurrences, setPaidOccurrences] = useState<Set<string>>(new Set())
   
@@ -49,6 +44,61 @@ export default function Dashboard() {
   // Per-debt extra payment state
   const [debtExtraPayment, setDebtExtraPayment] = useState<{[key: number]: {amount: string, frequency: string}}>({})
   const [showExtraInput, setShowExtraInput] = useState<number | null>(null)
+
+  // Preset bills
+  const [showPresets, setShowPresets] = useState(false)
+  const presetBills = [
+    { name: 'Rent/Mortgage', amount: '', category: 'housing', frequency: 'monthly' },
+    { name: 'Electricity', amount: '', category: 'utilities', frequency: 'monthly' },
+    { name: 'Gas', amount: '', category: 'utilities', frequency: 'monthly' },
+    { name: 'Water', amount: '', category: 'utilities', frequency: 'quarterly' },
+    { name: 'Internet', amount: '', category: 'utilities', frequency: 'monthly' },
+    { name: 'Phone', amount: '', category: 'utilities', frequency: 'monthly' },
+    { name: 'Car Insurance', amount: '', category: 'transport', frequency: 'monthly' },
+    { name: 'Health Insurance', amount: '', category: 'health', frequency: 'monthly' },
+    { name: 'Home Insurance', amount: '', category: 'housing', frequency: 'yearly' },
+    { name: 'Netflix', amount: '15.99', category: 'subscriptions', frequency: 'monthly' },
+    { name: 'Spotify', amount: '11.99', category: 'subscriptions', frequency: 'monthly' },
+    { name: 'Disney+', amount: '13.99', category: 'subscriptions', frequency: 'monthly' },
+    { name: 'Amazon Prime', amount: '14.99', category: 'subscriptions', frequency: 'monthly' },
+    { name: 'YouTube Premium', amount: '13.99', category: 'subscriptions', frequency: 'monthly' },
+    { name: 'Gym Membership', amount: '', category: 'health', frequency: 'monthly' },
+    { name: 'Groceries', amount: '', category: 'food', frequency: 'weekly' },
+    { name: 'Petrol/Fuel', amount: '', category: 'transport', frequency: 'weekly' },
+    { name: 'Public Transport', amount: '', category: 'transport', frequency: 'weekly' },
+    { name: 'Council Rates', amount: '', category: 'housing', frequency: 'quarterly' },
+  ]
+  const [customPresets, setCustomPresets] = useState<any[]>([])
+
+  // CSV Import
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [csvTransactions, setCsvTransactions] = useState<any[]>([])
+  const [showCsvImport, setShowCsvImport] = useState(false)
+
+  // Expense categories for auto-categorization
+  const expenseCategories = ['housing', 'utilities', 'food', 'transport', 'entertainment', 'shopping', 'health', 'subscriptions', 'income', 'transfer', 'other']
+  
+  // Auto-categorization keywords
+  const categoryKeywords: {[key: string]: string[]} = {
+    housing: ['rent', 'mortgage', 'strata', 'body corp', 'council', 'rates'],
+    utilities: ['electricity', 'electric', 'power', 'gas', 'water', 'internet', 'phone', 'telstra', 'optus', 'vodafone', 'nbn'],
+    food: ['woolworths', 'coles', 'aldi', 'iga', 'grocery', 'groceries', 'uber eats', 'doordash', 'menulog', 'mcdonald', 'kfc', 'hungry jack', 'subway', 'restaurant', 'cafe', 'coffee'],
+    transport: ['fuel', 'petrol', 'shell', 'bp', 'caltex', 'ampol', '7-eleven', 'uber', 'didi', 'ola', 'taxi', 'parking', 'toll', 'rego', 'registration', 'car insurance'],
+    entertainment: ['netflix', 'spotify', 'disney', 'stan', 'binge', 'amazon prime', 'youtube', 'apple music', 'cinema', 'movie', 'ticketek', 'ticketmaster', 'gaming', 'steam', 'playstation', 'xbox'],
+    shopping: ['amazon', 'ebay', 'kmart', 'target', 'big w', 'jb hi-fi', 'officeworks', 'bunnings', 'ikea', 'clothing', 'fashion'],
+    health: ['pharmacy', 'chemist', 'doctor', 'medical', 'dentist', 'hospital', 'health insurance', 'medibank', 'bupa', 'hcf', 'gym', 'fitness'],
+    subscriptions: ['subscription', 'membership', 'monthly fee', 'annual fee'],
+    income: ['salary', 'wage', 'pay', 'deposit', 'transfer from', 'refund', 'cashback'],
+    transfer: ['transfer', 'tfr', 'internal']
+  }
+
+  const autoCategorize = (description: string): string => {
+    const lowerDesc = description.toLowerCase()
+    for (const [category, keywords] of Object.entries(categoryKeywords)) {
+      if (keywords.some(kw => lowerDesc.includes(kw))) return category
+    }
+    return 'other'
+  }
 
   // Goal Calculator state
   const [goalCalculator, setGoalCalculator] = useState({ targetAmount: '', currentAmount: '', monthlyContribution: '', interestRate: '', years: '' })
@@ -159,11 +209,80 @@ export default function Dashboard() {
   const btnWarning: React.CSSProperties = { ...btnPrimary, background: theme.warning }
   const cardStyle: React.CSSProperties = { padding: '24px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }
 
+  // Calculate occurrences in a specific month for weekly/fortnightly items
+  const getOccurrencesInMonth = (startDate: string, frequency: string, targetMonth: number, targetYear: number): number => {
+    const start = new Date(startDate)
+    start.setHours(0, 0, 0, 0)
+    const monthStart = new Date(targetYear, targetMonth, 1)
+    const monthEnd = new Date(targetYear, targetMonth + 1, 0)
+    
+    if (start > monthEnd) return 0 // Hasn't started yet
+    
+    if (frequency === 'monthly') return 1
+    if (frequency === 'yearly') {
+      const startMonth = start.getMonth()
+      return startMonth === targetMonth ? 1 : 0
+    }
+    if (frequency === 'quarterly') {
+      // Check if this month is a quarter from start
+      const monthsDiff = (targetYear - start.getFullYear()) * 12 + (targetMonth - start.getMonth())
+      return monthsDiff >= 0 && monthsDiff % 3 === 0 ? 1 : 0
+    }
+    if (frequency === 'once') {
+      const startMonth = start.getMonth()
+      const startYear = start.getFullYear()
+      return startMonth === targetMonth && startYear === targetYear ? 1 : 0
+    }
+    
+    // Weekly or fortnightly - count actual occurrences in the month
+    const intervalDays = frequency === 'weekly' ? 7 : 14
+    let count = 0
+    let currentDate = new Date(start)
+    
+    // Find first occurrence on or after month start
+    while (currentDate < monthStart) {
+      currentDate.setDate(currentDate.getDate() + intervalDays)
+    }
+    
+    // Count occurrences in the month
+    while (currentDate <= monthEnd) {
+      count++
+      currentDate.setDate(currentDate.getDate() + intervalDays)
+    }
+    
+    return count
+  }
+
+  // Calculate totals for a specific month
+  const calculateMonthlyTotals = (month: number, year: number) => {
+    const incomeTotal = incomeStreams.reduce((sum, inc) => {
+      const occurrences = getOccurrencesInMonth(inc.startDate, inc.frequency, month, year)
+      return sum + (parseFloat(inc.amount || '0') * occurrences)
+    }, 0)
+    
+    const expenseTotal = expenses.filter(e => !e.targetDebtId && !e.targetGoalId).reduce((sum, exp) => {
+      const occurrences = getOccurrencesInMonth(exp.dueDate, exp.frequency, month, year)
+      return sum + (parseFloat(exp.amount || '0') * occurrences)
+    }, 0)
+    
+    const debtTotal = debts.reduce((sum, debt) => {
+      const occurrences = getOccurrencesInMonth(debt.paymentDate, debt.frequency, month, year)
+      return sum + (parseFloat(debt.minPayment || '0') * occurrences)
+    }, 0)
+    
+    return { incomeTotal, expenseTotal, debtTotal, total: incomeTotal - expenseTotal - debtTotal }
+  }
+
+  // Current month totals (for the calendar view)
+  const currentMonthTotals = calculateMonthlyTotals(calendarMonth.getMonth(), calendarMonth.getFullYear())
+
+  // Generic monthly average (for overview display)
   const convertToMonthly = (amount: number, frequency: string) => {
     if (frequency === 'weekly') return amount * (52 / 12)
     if (frequency === 'fortnightly') return amount * (26 / 12)
     if (frequency === 'yearly') return amount / 12
-    if (frequency === 'once') return amount
+    if (frequency === 'quarterly') return amount / 3
+    if (frequency === 'once') return 0 // Don't count one-time in monthly average
     return amount
   }
   
@@ -176,9 +295,6 @@ export default function Dashboard() {
   const totalDebtBalance = debts.reduce((sum, d) => sum + parseFloat(d.balance || '0'), 0)
   const totalOutgoing = monthlyExpenses + monthlyDebtPayments
   const monthlySurplus = monthlyIncome - totalOutgoing
-  const totalAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || '0'), 0)
-  const totalLiabilities = liabilities.reduce((sum, l) => sum + parseFloat(l.value || '0'), 0)
-  const netWorth = totalAssets - totalLiabilities - totalDebtBalance
   const totalPL = trades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
   const winRate = trades.length > 0 ? (trades.filter(t => parseFloat(t.profitLoss || '0') > 0).length / trades.length) * 100 : 0
 
@@ -326,17 +442,184 @@ export default function Dashboard() {
 
   const addIncome = () => { if (!newIncome.name || !newIncome.amount) return; setIncomeStreams([...incomeStreams, { ...newIncome, id: Date.now() }]); setNewIncome({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0] }) }
   const deleteIncome = (id: number) => setIncomeStreams(incomeStreams.filter(i => i.id !== id))
-  const addExpense = () => { if (!newExpense.name || !newExpense.amount) return; setExpenses([...expenses, { ...newExpense, id: Date.now() }]); setNewExpense({ name: '', amount: '', frequency: 'monthly', dueDate: new Date().toISOString().split('T')[0] }) }
+  const addExpense = () => { if (!newExpense.name || !newExpense.amount) return; setExpenses([...expenses, { ...newExpense, id: Date.now() }]); setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: new Date().toISOString().split('T')[0] }) }
   const deleteExpense = (id: number) => setExpenses(expenses.filter(e => e.id !== id))
   const addDebt = () => { if (!newDebt.name || !newDebt.balance) return; setDebts([...debts, { ...newDebt, id: Date.now(), originalBalance: newDebt.balance }]); setNewDebt({ name: '', balance: '', interestRate: '', minPayment: '', frequency: 'monthly', paymentDate: new Date().toISOString().split('T')[0] }) }
   const deleteDebt = (id: number) => setDebts(debts.filter(d => d.id !== id))
   const addGoal = () => { if (!newGoal.name || !newGoal.target) return; setGoals([...goals, { ...newGoal, saved: newGoal.saved || '0', paymentAmount: newGoal.paymentAmount || '', id: Date.now() }]); setNewGoal({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: new Date().toISOString().split('T')[0], paymentAmount: '' }) }
   const deleteGoal = (id: number) => setGoals(goals.filter(g => g.id !== id))
-  const addAsset = () => { if (!newAsset.name || !newAsset.value) return; setAssets([...assets, { ...newAsset, id: Date.now() }]); setNewAsset({ name: '', value: '', type: 'savings' }) }
-  const deleteAsset = (id: number) => setAssets(assets.filter(a => a.id !== id))
-  const addLiability = () => { if (!newLiability.name || !newLiability.value) return; setLiabilities([...liabilities, { ...newLiability, id: Date.now() }]); setNewLiability({ name: '', value: '', type: 'loan' }) }
-  const deleteLiability = (id: number) => setLiabilities(liabilities.filter(l => l.id !== id))
   const addTrade = () => { if (!newTrade.instrument) return; setTrades([...trades, { ...newTrade, id: Date.now() }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())); setNewTrade({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '' }) }
+
+  // Add preset bill as expense
+  const addPresetBill = (preset: any) => {
+    const amount = prompt(`Enter amount for ${preset.name}:`, preset.amount || '')
+    if (!amount) return
+    const dueDate = prompt('When is this due? (YYYY-MM-DD):', new Date().toISOString().split('T')[0])
+    if (!dueDate) return
+    setExpenses([...expenses, { id: Date.now(), name: preset.name, amount, frequency: preset.frequency, category: preset.category, dueDate }])
+  }
+
+  // Add custom preset
+  const addCustomPreset = () => {
+    const name = prompt('Preset name:')
+    if (!name) return
+    const category = prompt('Category (housing, utilities, food, transport, entertainment, shopping, health, subscriptions, other):', 'other')
+    const frequency = prompt('Frequency (weekly, fortnightly, monthly, quarterly, yearly):', 'monthly')
+    setCustomPresets([...customPresets, { name, amount: '', category: category || 'other', frequency: frequency || 'monthly' }])
+  }
+
+  // Delete custom preset
+  const deleteCustomPreset = (index: number) => {
+    setCustomPresets(customPresets.filter((_, i) => i !== index))
+  }
+
+  // Add goal to calendar (quick add)
+  const addGoalToCalendar = (goal: any) => {
+    const paymentAmount = goal.paymentAmount || calculateGoalPayment(goal)
+    if (paymentAmount <= 0) {
+      alert('Please set a payment amount or deadline for this goal first')
+      return
+    }
+    // Update goal with startDate if not set
+    if (!goal.startDate) {
+      const startDate = new Date().toISOString().split('T')[0]
+      setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, startDate } : g))
+    }
+    alert(`${goal.name} is now on your calendar! $${paymentAmount.toFixed(2)}/${goal.savingsFrequency || 'monthly'}`)
+  }
+
+  // CSV Import handlers
+  const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = e.target?.result as string
+      const lines = text.split('\n').filter(line => line.trim())
+      if (lines.length < 2) { alert('CSV file appears empty'); return }
+      
+      // Try to parse header
+      const header = lines[0].toLowerCase()
+      const hasHeader = header.includes('date') || header.includes('description') || header.includes('amount')
+      const dataLines = hasHeader ? lines.slice(1) : lines
+      
+      const transactions: any[] = []
+      dataLines.forEach((line, idx) => {
+        // Handle CSV with possible quoted fields
+        const parts: string[] = []
+        let current = ''
+        let inQuotes = false
+        for (const char of line) {
+          if (char === '"') inQuotes = !inQuotes
+          else if (char === ',' && !inQuotes) { parts.push(current.trim()); current = '' }
+          else current += char
+        }
+        parts.push(current.trim())
+        
+        if (parts.length >= 2) {
+          // Try different CSV formats
+          // Format 1: Date, Description, Amount
+          // Format 2: Date, Description, Debit, Credit
+          // Format 3: Description, Amount, Date
+          let date = '', description = '', amount = 0
+          
+          // Try to find date (looks like YYYY-MM-DD or DD/MM/YYYY)
+          const datePatterns = [/\d{4}-\d{2}-\d{2}/, /\d{2}\/\d{2}\/\d{4}/, /\d{1,2}\/\d{1,2}\/\d{2,4}/]
+          for (let i = 0; i < parts.length; i++) {
+            for (const pattern of datePatterns) {
+              if (pattern.test(parts[i])) {
+                date = parts[i]
+                break
+              }
+            }
+            if (date) break
+          }
+          
+          // Try to find amount (number, possibly negative or with $ sign)
+          for (let i = parts.length - 1; i >= 0; i--) {
+            const cleaned = parts[i].replace(/[$,]/g, '').trim()
+            const num = parseFloat(cleaned)
+            if (!isNaN(num) && num !== 0) {
+              amount = num
+              break
+            }
+          }
+          
+          // Description is usually the longest text field
+          let longestText = ''
+          for (const part of parts) {
+            const cleaned = part.replace(/["']/g, '').trim()
+            if (cleaned.length > longestText.length && !datePatterns.some(p => p.test(cleaned)) && isNaN(parseFloat(cleaned.replace(/[$,]/g, '')))) {
+              longestText = cleaned
+            }
+          }
+          description = longestText || `Transaction ${idx + 1}`
+          
+          if (date || amount !== 0) {
+            const category = autoCategorize(description)
+            const isExpense = amount < 0
+            transactions.push({
+              id: Date.now() + idx,
+              date: date || new Date().toISOString().split('T')[0],
+              description,
+              amount: Math.abs(amount),
+              category,
+              isExpense,
+              selected: isExpense // Auto-select expenses
+            })
+          }
+        }
+      })
+      
+      if (transactions.length === 0) {
+        alert('Could not parse any transactions from the CSV')
+        return
+      }
+      
+      setCsvTransactions(transactions)
+      setShowCsvImport(true)
+    }
+    reader.readAsText(file)
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const importSelectedTransactions = () => {
+    const selectedExpenses = csvTransactions.filter(t => t.selected && t.isExpense)
+    const selectedIncome = csvTransactions.filter(t => t.selected && !t.isExpense)
+    
+    // Add as expenses
+    const newExpenses = selectedExpenses.map(t => ({
+      id: Date.now() + Math.random(),
+      name: t.description,
+      amount: t.amount.toString(),
+      frequency: 'once',
+      category: t.category,
+      dueDate: t.date
+    }))
+    
+    // Add as income
+    const newIncomes = selectedIncome.map(t => ({
+      id: Date.now() + Math.random(),
+      name: t.description,
+      amount: t.amount.toString(),
+      frequency: 'once',
+      type: 'active',
+      startDate: t.date
+    }))
+    
+    if (newExpenses.length > 0) setExpenses(prev => [...prev, ...newExpenses])
+    if (newIncomes.length > 0) setIncomeStreams(prev => [...prev, ...newIncomes])
+    
+    alert(`Imported ${newExpenses.length} expenses and ${newIncomes.length} income items`)
+    setShowCsvImport(false)
+    setCsvTransactions([])
+  }
+
+  const updateCsvTransaction = (id: number, field: string, value: any) => {
+    setCsvTransactions(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t))
+  }
 
   const addExtraPaymentToDebt = (debtId: number) => {
     const extra = debtExtraPayment[debtId]
@@ -798,7 +1081,7 @@ export default function Dashboard() {
             <h2 style={{ color: 'white', fontSize: '28px', fontWeight: 700, margin: '0 0 12px 0' }}>Budget Mode</h2>
             <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '16px', margin: 0, lineHeight: 1.5 }}>Track spending, crush debt, build savings, and feel calm about your money</p>
             <div style={{ marginTop: '20px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {['Income', 'Expenses', 'Debts', 'Goals', 'Net Worth'].map(tag => (
+              {['Income', 'Expenses', 'Debts', 'Goals', 'Calendar'].map(tag => (
                 <span key={tag} style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.2)', borderRadius: '20px', fontSize: '12px', color: 'white' }}>{tag}</span>
               ))}
             </div>
@@ -849,6 +1132,73 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* CSV Import Modal */}
+      {showCsvImport && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowCsvImport(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '24px', maxWidth: '800px', width: '95%', maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📤 Import Bank Transactions</h3>
+              <button onClick={() => setShowCsvImport(false)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: theme.textMuted }}>×</button>
+            </div>
+            
+            <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '16px' }}>
+              Review and edit categories below. Select the transactions you want to import. Expenses (negative amounts) will be added to your expenses, positive amounts to income.
+            </p>
+            
+            <div style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
+              <button onClick={() => setCsvTransactions(prev => prev.map(t => ({ ...t, selected: t.isExpense })))} style={{ ...btnPrimary, padding: '8px 16px', fontSize: '12px' }}>Select Expenses</button>
+              <button onClick={() => setCsvTransactions(prev => prev.map(t => ({ ...t, selected: true })))} style={{ ...btnPrimary, padding: '8px 16px', fontSize: '12px', background: theme.purple }}>Select All</button>
+              <button onClick={() => setCsvTransactions(prev => prev.map(t => ({ ...t, selected: false })))} style={{ ...btnPrimary, padding: '8px 16px', fontSize: '12px', background: theme.textMuted }}>Select None</button>
+            </div>
+            
+            <div style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '20px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid ' + theme.border }}>
+                    <th style={{ padding: '8px', textAlign: 'left', color: theme.textMuted, fontSize: '12px' }}>✓</th>
+                    <th style={{ padding: '8px', textAlign: 'left', color: theme.textMuted, fontSize: '12px' }}>Date</th>
+                    <th style={{ padding: '8px', textAlign: 'left', color: theme.textMuted, fontSize: '12px' }}>Description</th>
+                    <th style={{ padding: '8px', textAlign: 'left', color: theme.textMuted, fontSize: '12px' }}>Amount</th>
+                    <th style={{ padding: '8px', textAlign: 'left', color: theme.textMuted, fontSize: '12px' }}>Category</th>
+                    <th style={{ padding: '8px', textAlign: 'left', color: theme.textMuted, fontSize: '12px' }}>Type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {csvTransactions.map(t => (
+                    <tr key={t.id} style={{ borderBottom: '1px solid ' + theme.border, background: t.selected ? (darkMode ? '#1e3a5f' : '#eff6ff') : 'transparent' }}>
+                      <td style={{ padding: '8px' }}>
+                        <input type="checkbox" checked={t.selected} onChange={(e) => updateCsvTransaction(t.id, 'selected', e.target.checked)} />
+                      </td>
+                      <td style={{ padding: '8px', color: theme.text, fontSize: '12px' }}>{t.date}</td>
+                      <td style={{ padding: '8px', color: theme.text, fontSize: '12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</td>
+                      <td style={{ padding: '8px', color: t.isExpense ? theme.danger : theme.success, fontSize: '12px', fontWeight: 600 }}>{t.isExpense ? '-' : '+'}${t.amount.toFixed(2)}</td>
+                      <td style={{ padding: '8px' }}>
+                        <select value={t.category} onChange={(e) => updateCsvTransaction(t.id, 'category', e.target.value)} style={{ ...inputStyle, padding: '4px 8px', fontSize: '11px' }}>
+                          {expenseCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
+                      </td>
+                      <td style={{ padding: '8px' }}>
+                        <button onClick={() => updateCsvTransaction(t.id, 'isExpense', !t.isExpense)} style={{ padding: '4px 8px', background: t.isExpense ? theme.danger : theme.success, color: 'white', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }}>
+                          {t.isExpense ? 'Expense' : 'Income'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: theme.textMuted, fontSize: '13px' }}>{csvTransactions.filter(t => t.selected).length} of {csvTransactions.length} selected</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setShowCsvImport(false)} style={{ ...btnPrimary, background: theme.textMuted }}>Cancel</button>
+                <button onClick={importSelectedTransactions} style={btnSuccess}>Import Selected</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header style={{ padding: '16px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -872,12 +1222,26 @@ export default function Dashboard() {
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
         {activeTab === 'dashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>💵 Incoming</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 'bold' }}>${monthlyIncome.toFixed(2)}</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>💸 Outgoing</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${totalOutgoing.toFixed(2)}</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>📈 Surplus</div><div style={{ color: monthlySurplus >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${monthlySurplus.toFixed(2)}</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>💳 Debt</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${totalDebtBalance.toFixed(2)}</div></div>
-              <div style={{ padding: '20px', background: 'linear-gradient(135deg, ' + theme.accent + ', ' + theme.purple + ')', borderRadius: '16px', color: 'white' }}><div style={{ fontSize: '13px', marginBottom: '8px', opacity: 0.9 }}>💎 Net Worth</div><div style={{ fontSize: '28px', fontWeight: 'bold' }}>${netWorth.toFixed(2)}</div></div>
+            {/* This Month Summary */}
+            <div style={{ padding: '20px', background: 'linear-gradient(135deg, ' + theme.accent + '20, ' + theme.purple + '20)', borderRadius: '16px', border: '2px solid ' + theme.accent }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ margin: 0, color: theme.text, fontSize: '18px' }}>📅 {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
+                <span style={{ color: theme.textMuted, fontSize: '12px' }}>Based on actual occurrences</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                <div style={{ textAlign: 'center' }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Income</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 'bold' }}>${currentMonthTotals.incomeTotal.toFixed(0)}</div></div>
+                <div style={{ textAlign: 'center' }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Expenses</div><div style={{ color: theme.danger, fontSize: '24px', fontWeight: 'bold' }}>${currentMonthTotals.expenseTotal.toFixed(0)}</div></div>
+                <div style={{ textAlign: 'center' }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Debt Payments</div><div style={{ color: theme.warning, fontSize: '24px', fontWeight: 'bold' }}>${currentMonthTotals.debtTotal.toFixed(0)}</div></div>
+                <div style={{ textAlign: 'center' }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Net This Month</div><div style={{ color: currentMonthTotals.total >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 'bold' }}>${currentMonthTotals.total.toFixed(0)}</div></div>
+              </div>
+            </div>
+
+            {/* Average Monthly Stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>💵 Avg Monthly Income</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 'bold' }}>${monthlyIncome.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>💸 Avg Monthly Out</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${totalOutgoing.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>📈 Avg Surplus</div><div style={{ color: monthlySurplus >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${monthlySurplus.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>💳 Total Debt</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${totalDebtBalance.toFixed(0)}</div></div>
             </div>
 
             {alerts.length > 0 && (
@@ -914,18 +1278,47 @@ export default function Dashboard() {
               </div>
 
               <div style={cardStyle}>
-                <h3 style={{ margin: '0 0 16px 0', color: theme.danger, fontSize: '18px' }}>💸 Expenses & Bills</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ margin: 0, color: theme.danger, fontSize: '18px' }}>💸 Expenses & Bills</h3>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => setShowPresets(!showPresets)} style={{ ...btnPrimary, padding: '6px 12px', fontSize: '12px', background: theme.purple }}>📋 Presets</button>
+                    <input type="file" accept=".csv" ref={fileInputRef} onChange={handleCsvUpload} style={{ display: 'none' }} />
+                    <button onClick={() => fileInputRef.current?.click()} style={{ ...btnPrimary, padding: '6px 12px', fontSize: '12px', background: theme.success }}>📤 Import CSV</button>
+                  </div>
+                </div>
+                
+                {/* Preset Bills Panel */}
+                {showPresets && (
+                  <div style={{ marginBottom: '16px', padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h4 style={{ margin: 0, color: theme.text, fontSize: '14px' }}>Quick Add Common Bills</h4>
+                      <button onClick={addCustomPreset} style={{ ...btnPrimary, padding: '4px 10px', fontSize: '11px' }}>+ Custom</button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {[...presetBills, ...customPresets].map((preset, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <button onClick={() => addPresetBill(preset)} style={{ padding: '6px 12px', background: darkMode ? '#475569' : '#e2e8f0', color: theme.text, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>{preset.name}</button>
+                          {idx >= presetBills.length && <button onClick={() => deleteCustomPreset(idx - presetBills.length)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
                   <input type="text" placeholder="Name" value={newExpense.name} onChange={(e) => setNewExpense({ ...newExpense, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 80px' }} />
                   <input type="number" placeholder="$" value={newExpense.amount} onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })} style={{ ...inputStyle, width: '70px' }} />
-                  <select value={newExpense.frequency} onChange={(e) => setNewExpense({ ...newExpense, frequency: e.target.value })} style={inputStyle}><option value="once">One-time</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
+                  <select value={newExpense.frequency} onChange={(e) => setNewExpense({ ...newExpense, frequency: e.target.value })} style={inputStyle}><option value="once">One-time</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select>
+                  <select value={newExpense.category} onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })} style={inputStyle}>
+                    {expenseCategories.filter(c => c !== 'income' && c !== 'transfer').map(cat => <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>)}
+                  </select>
                   <input type="date" value={newExpense.dueDate} onChange={(e) => setNewExpense({ ...newExpense, dueDate: e.target.value })} style={inputStyle} />
                   <button onClick={addExpense} style={btnDanger}>Add</button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
                   {expenses.filter(e => !e.targetDebtId && !e.targetGoalId).length === 0 ? <div style={{ color: theme.textMuted, textAlign: 'center', padding: '20px' }}>No expenses added</div> : expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(exp => (
                     <div key={exp.id} style={{ padding: '12px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div><div style={{ color: theme.text, fontWeight: 600 }}>{exp.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${exp.amount}/{exp.frequency}</div></div>
+                      <div><div style={{ color: theme.text, fontWeight: 600 }}>{exp.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${exp.amount}/{exp.frequency} {exp.category && `• ${exp.category}`}</div></div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><span style={{ color: theme.danger, fontWeight: 700 }}>${convertToMonthly(parseFloat(exp.amount || '0'), exp.frequency).toFixed(2)}/mo</span><button onClick={() => deleteExpense(exp.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>✕</button></div>
                     </div>
                   ))}
@@ -1151,6 +1544,7 @@ export default function Dashboard() {
                             </>
                           ) : (
                             <>
+                              {!isComplete && <button onClick={() => addGoalToCalendar(goal)} style={{ ...btnSuccess, padding: '6px 10px', fontSize: '11px' }}>📅 Calendar</button>}
                               {!isComplete && <button onClick={() => setSelectedGoalForExtra(goal.id)} style={{ ...btnPurple, padding: '6px 10px', fontSize: '11px' }}>+ Extra</button>}
                               <button onClick={() => deleteGoal(goal.id)} style={{ ...btnDanger, padding: '6px 10px', fontSize: '11px' }}>Delete</button>
                             </>
@@ -1206,7 +1600,6 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            <div style={{ padding: '32px', background: 'linear-gradient(135deg, ' + theme.accent + ', ' + theme.purple + ')', borderRadius: '16px', color: 'white', textAlign: 'center' }}><div style={{ fontSize: '16px', marginBottom: '8px', opacity: 0.9 }}>💎 Net Worth</div><div style={{ fontSize: '56px', fontWeight: 'bold' }}>${netWorth.toFixed(2)}</div></div>
             
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '20px' }}>🤖 AI Budget Coach</h2>
@@ -1222,8 +1615,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>📍 Where You Are Now</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-                <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>💎 Net Worth</div><div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${netWorth.toFixed(0)}</div></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
                 <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>📈 Surplus</div><div style={{ color: monthlySurplus >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${monthlySurplus.toFixed(0)}</div></div>
                 <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>💳 Debt</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${totalDebtBalance.toFixed(0)}</div></div>
                 <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>🌴 Passive</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 'bold' }}>${passiveIncome.toFixed(0)}/mo</div></div>
