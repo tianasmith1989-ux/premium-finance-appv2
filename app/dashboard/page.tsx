@@ -792,9 +792,7 @@ export default function Dashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px', maxWidth: '800px', width: '100%' }}>
           <button 
             onClick={() => { setAppMode('budget'); setShowModeSelector(false); setActiveTab('dashboard') }}
-            style={{ padding: '40px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left', boxShadow: '0 10px 40px rgba(16, 185, 129, 0.3)', transition: 'transform 0.2s' }}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            style={{ padding: '40px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left' as const, boxShadow: '0 10px 40px rgba(16, 185, 129, 0.3)' }}
           >
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>💰</div>
             <h2 style={{ color: 'white', fontSize: '28px', fontWeight: 700, margin: '0 0 12px 0' }}>Budget Mode</h2>
@@ -808,9 +806,7 @@ export default function Dashboard() {
           
           <button 
             onClick={() => { setAppMode('trading'); setShowModeSelector(false); setActiveTab('trading') }}
-            style={{ padding: '40px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left', boxShadow: '0 10px 40px rgba(245, 158, 11, 0.3)', transition: 'transform 0.2s' }}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            style={{ padding: '40px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left' as const, boxShadow: '0 10px 40px rgba(245, 158, 11, 0.3)' }}
           >
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>📈</div>
             <h2 style={{ color: 'white', fontSize: '28px', fontWeight: 700, margin: '0 0 12px 0' }}>Trading Mode</h2>
@@ -860,6 +856,7 @@ export default function Dashboard() {
               {appMode === 'budget' ? '💰' : '📈'} {appMode === 'budget' ? 'Budget' : 'Trading'} Mode ▼
             </button>
             <h1 style={{ margin: 0, color: theme.text, fontSize: '24px', fontWeight: 'bold' }}>Premium Finance</h1>
+          </div>
           <nav style={{ display: 'flex', gap: '8px' }}>
             {[{ id: 'dashboard', label: '📊 Dashboard', color: theme.accent }, { id: 'overview', label: '💎 Overview', color: theme.purple }, { id: 'path', label: '🎯 Path', color: theme.success }, { id: 'trading', label: '📈 Trading', color: theme.warning }].map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{ padding: '10px 20px', background: activeTab === tab.id ? tab.color : 'transparent', color: activeTab === tab.id ? 'white' : theme.text, border: '2px solid ' + (activeTab === tab.id ? tab.color : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }}>{tab.label}</button>
