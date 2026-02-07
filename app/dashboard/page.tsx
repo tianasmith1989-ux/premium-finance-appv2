@@ -139,7 +139,13 @@ export default function Dashboard() {
   const [showConfetti, setShowConfetti] = useState(false)
   const [achievements, setAchievements] = useState<string[]>([])
   const [newAchievement, setNewAchievement] = useState<string | null>(null)
- // ===== GAMIFICATION SYSTEM =====
+
+  // What-If Scenario state
+  const [showWhatIf, setShowWhatIf] = useState(false)
+  const [whatIfExtra, setWhatIfExtra] = useState('500')
+  const [whatIfReturn, setWhatIfReturn] = useState('7')
+  const [whatIfYears, setWhatIfYears] = useState('10') 
+  // ===== GAMIFICATION SYSTEM =====
   const getLevel = (xp: number) => {
     if (xp >= 5000) return { level: 10, title: '🏆 Financial Legend', color: '#fbbf24', next: 99999 }
     if (xp >= 3500) return { level: 9, title: '💎 Diamond Hands', color: '#60a5fa', next: 5000 }
@@ -1571,11 +1577,6 @@ const calculateForexProp = () => {
 
             {/* ===== WHAT-IF SCENARIO SLIDERS ===== */}
             {(() => {
-              const [showWhatIf, setShowWhatIf] = useState(false)
-              const [whatIfExtra, setWhatIfExtra] = useState('500')
-              const [whatIfReturn, setWhatIfReturn] = useState('7')
-              const [whatIfYears, setWhatIfYears] = useState('10')
-
               const extraMonthly = parseFloat(whatIfExtra || '0')
               const annualReturn = parseFloat(whatIfReturn || '0') / 100
               const years = parseInt(whatIfYears || '0')
@@ -1717,6 +1718,8 @@ const calculateForexProp = () => {
             </div>
           </div>
         )}
+
+     
    {activeTab === 'path' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             <div style={{ padding: '32px', background: 'linear-gradient(135deg, '+theme.success+'20, '+theme.purple+'20)', borderRadius: '24px', border: '2px solid '+theme.success }}>
