@@ -139,7 +139,7 @@ export default function Dashboard() {
   const [showConfetti, setShowConfetti] = useState(false)
   const [achievements, setAchievements] = useState<string[]>([])
   const [newAchievement, setNewAchievement] = useState<string | null>(null)
-   // ===== GAMIFICATION SYSTEM =====
+ // ===== GAMIFICATION SYSTEM =====
   const getLevel = (xp: number) => {
     if (xp >= 5000) return { level: 10, title: '🏆 Financial Legend', color: '#fbbf24', next: 99999 }
     if (xp >= 3500) return { level: 9, title: '💎 Diamond Hands', color: '#60a5fa', next: 5000 }
@@ -906,7 +906,484 @@ const calculateForexProp = () => {
                 </div>
               </div>
             </div>
-   {activeTab === 'overview' && (
+
+            {/* Calendar */}
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <button onClick={prevMonth} style={btnPrimary}>← Prev</button>
+                <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>📅 {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
+                <button onClick={nextMonth} style={btnPrimary}>Next →</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (<div key={day} style={{ textAlign: 'center' as const, fontWeight: 600, color: theme.textMuted, padding: '10px', fontSize: '13px' }}>{day}</div>))}
+                {Array.from({ length: getDaysInMonth().firstDay }).map((_, i) => (<div key={'empty-' + i} style={{ minHeight: '100px' }} />))}
+                {Array.from({ length: getDaysInMonth().daysInMonth }).map((_, i) => {
+                  const day = i + 1; const dayItems = getCalendarItemsForDay(day)
+                  const isToday = new Date().getDate() === day && new Date().getMonth() === calendarMonth.getMonth() && new Date().getFullYear() === calendarMonth.getFullYear()
+                  return (
+                    <div key={day} onClick={() => dayItems.length > 0 && setExpandedDay({ day, items: dayItems })} style={{ minHeight: '100px', padding: '6px', background: isToday ? (darkMode ? '#1e3a5f' : '#eff6ff') : (darkMode ? '#1e293b' : '#fafafa'), borderRadius: '8px', border: isToday ? '2px solid ' + theme.accent : '1px solid ' + theme.border, cursor: dayItems.length > 0 ? 'pointer' : 'default' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: isToday ? 700 : 600, color: isToday ? theme.accent : theme.text, fontSize: '14px' }}>{day}</span>
+                        {dayItems.length > 0 && <span style={{ background: theme.success, color: 'white', fontSize: '9px', padding: '1px 4px', borderRadius: '4px' }}>{dayItems.filter(it => !it.isPaid).length}</span>}
+                      </div>
+                      {dayItems.slice(0, 2).map(item => renderCalendarItem(item, true))}
+                      {dayItems.length > 2 && <div style={{ fontSize: '10px', color: theme.accent, textAlign: 'center' as const, fontWeight: 600 }}>+{dayItems.length - 2} more</div>}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            {/* ===== GAMIFIED DEBT BOSS BATTLES ===== */}
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>⚔️ Debt Boss Battles</h2>
+                {debts.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: theme.textMuted, fontSize: '12px' }}>Strategy:</span>
+                    <button onClick={() => setPayoffMethod('avalanche')} style={{ padding: '4px 10px', background: payoffMethod === 'avalanche' ? theme.danger : 'transparent', color: payoffMethod === 'avalanche' ? 'white' : theme.text, border: '1px solid '+theme.border, borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>🏔️ Avalanche</button>
+                    <button onClick={() => setPayoffMethod('snowball')} style={{ padding: '4px 10px', background: payoffMethod === 'snowball' ? theme.accent : 'transparent', color: payoffMethod === 'snowball' ? 'white' : theme.text, border: '1px solid '+theme.border, borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>⛄ Snowball</button>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' as const, padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
+                <input type="text" placeholder="Boss name" value={newDebt.name} onChange={(e) => setNewDebt({ ...newDebt, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
+                <input type="number" placeholder="HP $" value={newDebt.balance} onChange={(e) => setNewDebt({ ...newDebt, balance: e.target.value })} style={{ ...inputStyle, width: '90px' }} />
+                <input type="number" placeholder="%" value={newDebt.interestRate} onChange={(e) => setNewDebt({ ...newDebt, interestRate: e.target.value })} style={{ ...inputStyle, width: '60px' }} />
+                <input type="number" placeholder="Min hit" value={newDebt.minPayment} onChange={(e) => setNewDebt({ ...newDebt, minPayment: e.target.value })} style={{ ...inputStyle, width: '70px' }} />
+                <input type="date" value={newDebt.paymentDate} onChange={(e) => setNewDebt({ ...newDebt, paymentDate: e.target.value })} style={inputStyle} />
+                <select value={newDebt.frequency} onChange={(e) => setNewDebt({ ...newDebt, frequency: e.target.value })} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
+                <button onClick={addDebt} style={btnDanger}>⚔️ Add Boss</button>
+              </div>
+              {debts.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px', marginBottom: '20px' }}>
+                    {debts.map(debt => {
+                      const originalBal = parseFloat(debt.originalBalance || debt.balance || '0')
+                      const currentBal = parseFloat(debt.balance || '0')
+                      const boss = getDebtBoss(currentBal, originalBal)
+                      const healthPct = originalBal > 0 ? (currentBal / originalBal) * 100 : 100
+                      const damageDone = 100 - healthPct
+                      const isDefeated = currentBal <= 0
+                      const payoffWithExtras = calculateSingleDebtPayoff(debt, true)
+                      const payoffWithoutExtras = calculateSingleDebtPayoff(debt, false)
+                      const debtExtras = expenses.filter(exp => exp.targetDebtId === debt.id)
+                      const currentExtra = debtExtraPayment[debt.id] || { amount: '', frequency: 'monthly' }
+                      return (
+                        <div key={debt.id} style={{ padding: '20px', background: isDefeated ? 'linear-gradient(135deg, '+theme.success+'20, '+theme.success+'10)' : (darkMode ? 'linear-gradient(135deg, #3a1e1e, #2d1e1e)' : 'linear-gradient(135deg, #fef2f2, #fff1f2)'), borderRadius: '16px', border: isDefeated ? '2px solid '+theme.success : '2px solid '+boss.color+'40' }}>
+                          {/* Boss Header */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{ fontSize: '36px', filter: isDefeated ? 'grayscale(1)' : 'none' }}>{boss.emoji}</div>
+                              <div>
+                                <div style={{ color: theme.text, fontWeight: 700, fontSize: '18px', textDecoration: isDefeated ? 'line-through' : 'none' }}>{debt.name}</div>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
+                                  <span style={{ padding: '2px 8px', background: boss.color+'30', color: boss.color, borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>{boss.label}</span>
+                                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>{debt.interestRate}% APR • ${debt.minPayment}/{debt.frequency}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right' as const }}>
+                              <div style={{ color: isDefeated ? theme.success : theme.danger, fontSize: '24px', fontWeight: 800 }}>${currentBal.toFixed(0)}</div>
+                              <div style={{ color: theme.textMuted, fontSize: '11px' }}>of ${originalBal.toFixed(0)} HP</div>
+                            </div>
+                          </div>
+                          {/* HP Bar */}
+                          <div style={{ marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span style={{ color: theme.textMuted, fontSize: '11px' }}>❤️ BOSS HP</span>
+                              <span style={{ color: theme.success, fontSize: '11px', fontWeight: 600 }}>🗡️ {damageDone.toFixed(1)}% damage dealt</span>
+                            </div>
+                            <div style={{ width: '100%', height: '14px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '7px', overflow: 'hidden' }}>
+                              <div style={{ width: healthPct + '%', height: '100%', background: `linear-gradient(to right, ${boss.color}, ${healthPct > 50 ? '#ef4444' : '#f59e0b'})`, borderRadius: '7px', transition: 'width 0.5s ease' }} />
+                            </div>
+                          </div>
+                          {/* Payoff Stats */}
+                          <div style={{ display: 'grid', gridTemplateColumns: debtExtras.length > 0 ? '1fr 1fr' : '1fr', gap: '8px', marginBottom: '12px' }}>
+                            <div style={{ padding: '10px', background: darkMode ? '#1e293b' : '#fff', borderRadius: '8px', fontSize: '12px' }}>
+                              <div style={{ color: theme.textMuted, marginBottom: '4px' }}>⏱️ Without power-ups:</div>
+                              {payoffWithoutExtras.error ? <div style={{ color: theme.danger }}>⚠️ Attack too weak!</div> : <div style={{ color: theme.text }}><span style={{ fontWeight: 600 }}>{Math.floor(payoffWithoutExtras.monthsToPayoff / 12)}y {payoffWithoutExtras.monthsToPayoff % 12}m</span><span style={{ color: theme.danger, marginLeft: '8px' }}>${payoffWithoutExtras.totalInterestPaid.toFixed(0)} shield</span></div>}
+                            </div>
+                            {debtExtras.length > 0 && (
+                              <div style={{ padding: '10px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px', fontSize: '12px' }}>
+                                <div style={{ color: theme.success, marginBottom: '4px' }}>⚡ With power-ups:</div>
+                                {payoffWithExtras.error ? <div style={{ color: theme.warning }}>Still not enough!</div> : <div style={{ color: theme.text }}><span style={{ fontWeight: 600 }}>{Math.floor(payoffWithExtras.monthsToPayoff / 12)}y {payoffWithExtras.monthsToPayoff % 12}m</span><span style={{ color: theme.success, marginLeft: '8px' }}>${payoffWithExtras.totalInterestPaid.toFixed(0)} shield</span></div>}
+                              </div>
+                            )}
+                          </div>
+                          {/* Active Power-ups */}
+                          {debtExtras.length > 0 && (
+                            <div style={{ marginBottom: '12px' }}>
+                              <div style={{ fontSize: '11px', color: theme.textMuted, marginBottom: '4px' }}>⚡ Power-ups active:</div>
+                              {debtExtras.map(exp => (
+                                <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', background: theme.purple+'20', borderRadius: '4px', fontSize: '11px', marginBottom: '2px' }}>
+                                  <span style={{ color: theme.purple }}>⚡ ${exp.amount}/{exp.frequency}</span>
+                                  <button onClick={() => deleteExpense(exp.id)} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '10px' }}>✕</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {/* Action Buttons */}
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            {showExtraInput === debt.id ? (
+                              <>
+                                <input type="number" placeholder="Power $" value={currentExtra.amount} onChange={(e) => setDebtExtraPayment(prev => ({ ...prev, [debt.id]: { ...currentExtra, amount: e.target.value } }))} style={{ ...inputStyle, width: '70px', padding: '6px 10px', fontSize: '12px' }} />
+                                <select value={currentExtra.frequency} onChange={(e) => setDebtExtraPayment(prev => ({ ...prev, [debt.id]: { ...currentExtra, frequency: e.target.value } }))} style={{ ...inputStyle, padding: '6px 8px', fontSize: '12px' }}><option value="weekly">Weekly</option><option value="fortnightly">FN</option><option value="monthly">Monthly</option></select>
+                                <button onClick={() => addExtraPaymentToDebt(debt.id)} style={{ ...btnPurple, padding: '6px 10px', fontSize: '11px' }}>⚡ Add</button>
+                                <button onClick={() => setShowExtraInput(null)} style={{ ...btnDanger, padding: '6px 10px', fontSize: '11px' }}>✕</button>
+                              </>
+                            ) : (
+                              <>
+                                <button onClick={() => { setShowExtraInput(debt.id); setDebtExtraPayment(prev => ({ ...prev, [debt.id]: { amount: '', frequency: 'monthly' } })) }} style={{ ...btnPurple, padding: '8px 14px', fontSize: '12px', flex: 1 }}>⚡ Add Power-Up</button>
+                                <button onClick={() => deleteDebt(debt.id)} style={{ ...btnDanger, padding: '8px 14px', fontSize: '12px' }}>🗑️</button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {(() => { const payoff = calculateTotalDebtPayoff(); return (
+                    <div style={{ padding: '16px', background: 'linear-gradient(135deg, '+theme.purple+'20, '+theme.accent+'20)', borderRadius: '12px', display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+                      <div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Total Bosses</div><div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>{debts.length}</div></div>
+                      <div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>All Defeated In</div><div style={{ color: payoff.hasError ? theme.danger : theme.success, fontSize: '20px', fontWeight: 700 }}>{payoff.hasError ? '⚠️ Needs more power' : Math.floor(payoff.maxMonths/12)+'y '+payoff.maxMonths%12+'m'}</div></div>
+                      <div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Boss Shield (Interest)</div><div style={{ color: theme.danger, fontSize: '20px', fontWeight: 700 }}>${payoff.totalInterest.toFixed(0)}</div></div>
+                    </div>
+                  )})()}
+                </>
+              )}
+            </div>
+
+            {/* ===== GAMIFIED GOALS QUEST ===== */}
+            <div style={cardStyle}>
+              <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>🎯 Savings Quests</h2>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' as const, padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
+                <input type="text" placeholder="Quest name" value={newGoal.name} onChange={(e) => setNewGoal({ ...newGoal, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
+                <input type="number" placeholder="Target $" value={newGoal.target} onChange={(e) => setNewGoal({ ...newGoal, target: e.target.value })} style={{ ...inputStyle, width: '90px' }} />
+                <input type="number" placeholder="Saved $" value={newGoal.saved} onChange={(e) => setNewGoal({ ...newGoal, saved: e.target.value })} style={{ ...inputStyle, width: '80px' }} />
+                <input type="number" placeholder="Per payment $" value={newGoal.paymentAmount} onChange={(e) => setNewGoal({ ...newGoal, paymentAmount: e.target.value })} style={{ ...inputStyle, width: '100px' }} />
+                <select value={newGoal.savingsFrequency} onChange={(e) => setNewGoal({ ...newGoal, savingsFrequency: e.target.value })} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
+                <input type="date" placeholder="Deadline" value={newGoal.deadline} onChange={(e) => setNewGoal({ ...newGoal, deadline: e.target.value })} style={inputStyle} />
+                <input type="date" value={newGoal.startDate} onChange={(e) => setNewGoal({ ...newGoal, startDate: e.target.value })} style={inputStyle} />
+                <button onClick={addGoal} style={btnPurple}>🎯 Add Quest</button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
+                {goals.length === 0 ? <div style={{ color: theme.textMuted, textAlign: 'center' as const, padding: '40px' }}>No quests yet. Add a savings goal above!</div> : goals.map(goal => {
+                  const progress = (parseFloat(goal.saved || '0') / parseFloat(goal.target || '1')) * 100
+                  const payment = goal.paymentAmount ? parseFloat(goal.paymentAmount) : calculateGoalPayment(goal)
+                  const isComplete = progress >= 100
+                  const monthsToGoal = calculateMonthsToGoal(goal)
+                  const rank = getGoalRank(progress)
+                  const isOnCalendar = goal.startDate && (goal.paymentAmount || goal.deadline)
+                  const goalExtras = expenses.filter(exp => exp.targetGoalId === goal.id)
+                  return (
+                    <div key={goal.id} style={{ padding: '20px', background: isComplete ? 'linear-gradient(135deg, '+theme.success+'20, #fbbf2420)' : (darkMode ? '#334155' : '#faf5ff'), borderRadius: '16px', border: isComplete ? '2px solid #fbbf24' : '2px solid '+rank.color+'40' }}>
+                      {/* Goal Header with Rank */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ fontSize: '32px' }}>{rank.emoji}</div>
+                          <div>
+                            <div style={{ color: theme.text, fontWeight: 700, fontSize: '18px' }}>{goal.name}</div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                              <span style={{ padding: '2px 8px', background: rank.color+'30', color: rank.color, borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>{rank.label}</span>
+                              {isOnCalendar && <span style={{ padding: '2px 8px', background: theme.success+'30', color: theme.success, borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>📅 On Calendar</span>}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' as const }}>
+                          <div style={{ color: isComplete ? '#fbbf24' : theme.text, fontSize: '22px', fontWeight: 800 }}>${parseFloat(goal.saved||'0').toFixed(0)}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>of ${parseFloat(goal.target||'0').toFixed(0)}</div>
+                        </div>
+                      </div>
+                      {/* XP-style Progress Bar */}
+                      <div style={{ marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ color: rank.color, fontSize: '12px', fontWeight: 700 }}>{Math.min(progress, 100).toFixed(1)}%</span>
+                          {!isComplete && payment > 0 && <span style={{ color: theme.textMuted, fontSize: '11px' }}>${payment.toFixed(2)}/{goal.savingsFrequency} • {monthsToGoal}mo left</span>}
+                        </div>
+                        <div style={{ width: '100%', height: '14px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '7px', overflow: 'hidden' }}>
+                          <div style={{ width: Math.min(progress, 100) + '%', height: '100%', background: isComplete ? 'linear-gradient(to right, #fbbf24, #f59e0b)' : `linear-gradient(to right, ${rank.color}, ${rank.color}dd)`, borderRadius: '7px', transition: 'width 0.5s ease', boxShadow: isComplete ? '0 0 10px #fbbf2480' : 'none' }} />
+                        </div>
+                        {isComplete && <div style={{ textAlign: 'center' as const, marginTop: '8px', color: '#fbbf24', fontSize: '14px', fontWeight: 700 }}>🎉 QUEST COMPLETE! +25 XP 🎉</div>}
+                      </div>
+                      {/* Extra boosts */}
+                      {goalExtras.length > 0 && (
+                        <div style={{ marginBottom: '12px' }}>
+                          <div style={{ fontSize: '11px', color: theme.textMuted, marginBottom: '4px' }}>⚡ Boosts active:</div>
+                          {goalExtras.map(exp => (
+                            <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', background: theme.purple+'20', borderRadius: '4px', fontSize: '11px', marginBottom: '2px' }}>
+                              <span style={{ color: theme.purple }}>⚡ ${exp.amount}/{exp.frequency}</span>
+                              <button onClick={() => deleteExpense(exp.id)} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '10px' }}>✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Action Buttons */}
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
+                        {!isComplete && selectedGoalForExtra === goal.id ? (
+                          <>
+                            <input type="number" placeholder="Extra $" value={extraGoalPayment} onChange={(e) => setExtraGoalPayment(e.target.value)} style={{ ...inputStyle, width: '80px', padding: '6px 10px' }} />
+                            <button onClick={() => addExtraGoalPayment(goal.id)} style={{ ...btnPurple, padding: '6px 12px', fontSize: '11px' }}>⚡ Boost</button>
+                            <button onClick={() => setSelectedGoalForExtra(null)} style={{ ...btnDanger, padding: '6px 10px', fontSize: '11px' }}>✕</button>
+                          </>
+                        ) : (
+                          <>
+                            {!isComplete && <button onClick={() => addGoalAndPlanToCalendar(goal)} style={{ padding: '8px 14px', background: isOnCalendar ? theme.textMuted : 'linear-gradient(135deg, '+theme.success+', #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>{isOnCalendar ? '✅ On Calendar' : '📅 Add to Calendar'}</button>}
+                            {!isComplete && <button onClick={() => setSelectedGoalForExtra(goal.id)} style={{ ...btnPurple, padding: '8px 14px', fontSize: '12px' }}>⚡ Power-Up</button>}
+                            <button onClick={() => deleteGoal(goal.id)} style={{ padding: '8px 14px', background: 'transparent', color: theme.textMuted, border: '1px solid '+theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>🗑️</button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Budget Coach */}
+            <div style={cardStyle}>
+              <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '18px' }}>🤖 Budget Coach</h3>
+              <div style={{ maxHeight: '300px', overflowY: 'auto' as const, marginBottom: '12px', display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                {chatMessages.length === 0 && <div style={{ color: theme.textMuted, textAlign: 'center' as const, padding: '20px' }}>Ask me anything about your finances!</div>}
+                {chatMessages.map((msg, i) => (
+                  <div key={i} style={{ padding: '12px', background: msg.role === 'user' ? theme.accent + '20' : (darkMode ? '#334155' : '#f0fdf4'), borderRadius: '10px', maxWidth: '85%', alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start' } as any}>
+                    <div style={{ color: theme.text, fontSize: '14px', whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
+                  </div>
+                ))}
+                {isAskingCoach && <div style={{ color: theme.textMuted, padding: '12px' }}>Thinking...</div>}
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input type="text" placeholder="Ask about your finances..." value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && askBudgetCoach()} style={{ ...inputStyle, flex: 1 }} />
+                <button onClick={askBudgetCoach} disabled={isAskingCoach} style={btnPrimary}>Send</button>
+              </div>
+            </div>
+          </div>
+        )}
+            {/* ===== GAMIFIED DEBT BOSS BATTLES ===== */}
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>⚔️ Debt Boss Battles</h2>
+                {debts.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: theme.textMuted, fontSize: '12px' }}>Strategy:</span>
+                    <button onClick={() => setPayoffMethod('avalanche')} style={{ padding: '4px 10px', background: payoffMethod === 'avalanche' ? theme.danger : 'transparent', color: payoffMethod === 'avalanche' ? 'white' : theme.text, border: '1px solid '+theme.border, borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>🏔️ Avalanche</button>
+                    <button onClick={() => setPayoffMethod('snowball')} style={{ padding: '4px 10px', background: payoffMethod === 'snowball' ? theme.accent : 'transparent', color: payoffMethod === 'snowball' ? 'white' : theme.text, border: '1px solid '+theme.border, borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>⛄ Snowball</button>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' as const, padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
+                <input type="text" placeholder="Boss name" value={newDebt.name} onChange={(e) => setNewDebt({ ...newDebt, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
+                <input type="number" placeholder="HP $" value={newDebt.balance} onChange={(e) => setNewDebt({ ...newDebt, balance: e.target.value })} style={{ ...inputStyle, width: '90px' }} />
+                <input type="number" placeholder="%" value={newDebt.interestRate} onChange={(e) => setNewDebt({ ...newDebt, interestRate: e.target.value })} style={{ ...inputStyle, width: '60px' }} />
+                <input type="number" placeholder="Min hit" value={newDebt.minPayment} onChange={(e) => setNewDebt({ ...newDebt, minPayment: e.target.value })} style={{ ...inputStyle, width: '70px' }} />
+                <input type="date" value={newDebt.paymentDate} onChange={(e) => setNewDebt({ ...newDebt, paymentDate: e.target.value })} style={inputStyle} />
+                <select value={newDebt.frequency} onChange={(e) => setNewDebt({ ...newDebt, frequency: e.target.value })} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
+                <button onClick={addDebt} style={btnDanger}>⚔️ Add Boss</button>
+              </div>
+              {debts.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px', marginBottom: '20px' }}>
+                    {debts.map(debt => {
+                      const originalBal = parseFloat(debt.originalBalance || debt.balance || '0')
+                      const currentBal = parseFloat(debt.balance || '0')
+                      const boss = getDebtBoss(currentBal, originalBal)
+                      const healthPct = originalBal > 0 ? (currentBal / originalBal) * 100 : 100
+                      const damageDone = 100 - healthPct
+                      const isDefeated = currentBal <= 0
+                      const payoffWithExtras = calculateSingleDebtPayoff(debt, true)
+                      const payoffWithoutExtras = calculateSingleDebtPayoff(debt, false)
+                      const debtExtras = expenses.filter(exp => exp.targetDebtId === debt.id)
+                      const currentExtra = debtExtraPayment[debt.id] || { amount: '', frequency: 'monthly' }
+                      return (
+                        <div key={debt.id} style={{ padding: '20px', background: isDefeated ? 'linear-gradient(135deg, '+theme.success+'20, '+theme.success+'10)' : (darkMode ? 'linear-gradient(135deg, #3a1e1e, #2d1e1e)' : 'linear-gradient(135deg, #fef2f2, #fff1f2)'), borderRadius: '16px', border: isDefeated ? '2px solid '+theme.success : '2px solid '+boss.color+'40' }}>
+                          {/* Boss Header */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{ fontSize: '36px', filter: isDefeated ? 'grayscale(1)' : 'none' }}>{boss.emoji}</div>
+                              <div>
+                                <div style={{ color: theme.text, fontWeight: 700, fontSize: '18px', textDecoration: isDefeated ? 'line-through' : 'none' }}>{debt.name}</div>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
+                                  <span style={{ padding: '2px 8px', background: boss.color+'30', color: boss.color, borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>{boss.label}</span>
+                                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>{debt.interestRate}% APR • ${debt.minPayment}/{debt.frequency}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right' as const }}>
+                              <div style={{ color: isDefeated ? theme.success : theme.danger, fontSize: '24px', fontWeight: 800 }}>${currentBal.toFixed(0)}</div>
+                              <div style={{ color: theme.textMuted, fontSize: '11px' }}>of ${originalBal.toFixed(0)} HP</div>
+                            </div>
+                          </div>
+                          {/* HP Bar */}
+                          <div style={{ marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span style={{ color: theme.textMuted, fontSize: '11px' }}>❤️ BOSS HP</span>
+                              <span style={{ color: theme.success, fontSize: '11px', fontWeight: 600 }}>🗡️ {damageDone.toFixed(1)}% damage dealt</span>
+                            </div>
+                            <div style={{ width: '100%', height: '14px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '7px', overflow: 'hidden' }}>
+                              <div style={{ width: healthPct + '%', height: '100%', background: `linear-gradient(to right, ${boss.color}, ${healthPct > 50 ? '#ef4444' : '#f59e0b'})`, borderRadius: '7px', transition: 'width 0.5s ease' }} />
+                            </div>
+                          </div>
+                          {/* Payoff Stats */}
+                          <div style={{ display: 'grid', gridTemplateColumns: debtExtras.length > 0 ? '1fr 1fr' : '1fr', gap: '8px', marginBottom: '12px' }}>
+                            <div style={{ padding: '10px', background: darkMode ? '#1e293b' : '#fff', borderRadius: '8px', fontSize: '12px' }}>
+                              <div style={{ color: theme.textMuted, marginBottom: '4px' }}>⏱️ Without power-ups:</div>
+                              {payoffWithoutExtras.error ? <div style={{ color: theme.danger }}>⚠️ Attack too weak!</div> : <div style={{ color: theme.text }}><span style={{ fontWeight: 600 }}>{Math.floor(payoffWithoutExtras.monthsToPayoff / 12)}y {payoffWithoutExtras.monthsToPayoff % 12}m</span><span style={{ color: theme.danger, marginLeft: '8px' }}>${payoffWithoutExtras.totalInterestPaid.toFixed(0)} shield</span></div>}
+                            </div>
+                            {debtExtras.length > 0 && (
+                              <div style={{ padding: '10px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px', fontSize: '12px' }}>
+                                <div style={{ color: theme.success, marginBottom: '4px' }}>⚡ With power-ups:</div>
+                                {payoffWithExtras.error ? <div style={{ color: theme.warning }}>Still not enough!</div> : <div style={{ color: theme.text }}><span style={{ fontWeight: 600 }}>{Math.floor(payoffWithExtras.monthsToPayoff / 12)}y {payoffWithExtras.monthsToPayoff % 12}m</span><span style={{ color: theme.success, marginLeft: '8px' }}>${payoffWithExtras.totalInterestPaid.toFixed(0)} shield</span></div>}
+                              </div>
+                            )}
+                          </div>
+                          {/* Active Power-ups */}
+                          {debtExtras.length > 0 && (
+                            <div style={{ marginBottom: '12px' }}>
+                              <div style={{ fontSize: '11px', color: theme.textMuted, marginBottom: '4px' }}>⚡ Power-ups active:</div>
+                              {debtExtras.map(exp => (
+                                <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', background: theme.purple+'20', borderRadius: '4px', fontSize: '11px', marginBottom: '2px' }}>
+                                  <span style={{ color: theme.purple }}>⚡ ${exp.amount}/{exp.frequency}</span>
+                                  <button onClick={() => deleteExpense(exp.id)} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '10px' }}>✕</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {/* Action Buttons */}
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            {showExtraInput === debt.id ? (
+                              <>
+                                <input type="number" placeholder="Power $" value={currentExtra.amount} onChange={(e) => setDebtExtraPayment(prev => ({ ...prev, [debt.id]: { ...currentExtra, amount: e.target.value } }))} style={{ ...inputStyle, width: '70px', padding: '6px 10px', fontSize: '12px' }} />
+                                <select value={currentExtra.frequency} onChange={(e) => setDebtExtraPayment(prev => ({ ...prev, [debt.id]: { ...currentExtra, frequency: e.target.value } }))} style={{ ...inputStyle, padding: '6px 8px', fontSize: '12px' }}><option value="weekly">Weekly</option><option value="fortnightly">FN</option><option value="monthly">Monthly</option></select>
+                                <button onClick={() => addExtraPaymentToDebt(debt.id)} style={{ ...btnPurple, padding: '6px 10px', fontSize: '11px' }}>⚡ Add</button>
+                                <button onClick={() => setShowExtraInput(null)} style={{ ...btnDanger, padding: '6px 10px', fontSize: '11px' }}>✕</button>
+                              </>
+                            ) : (
+                              <>
+                                <button onClick={() => { setShowExtraInput(debt.id); setDebtExtraPayment(prev => ({ ...prev, [debt.id]: { amount: '', frequency: 'monthly' } })) }} style={{ ...btnPurple, padding: '8px 14px', fontSize: '12px', flex: 1 }}>⚡ Add Power-Up</button>
+                                <button onClick={() => deleteDebt(debt.id)} style={{ ...btnDanger, padding: '8px 14px', fontSize: '12px' }}>🗑️</button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {(() => { const payoff = calculateTotalDebtPayoff(); return (
+                    <div style={{ padding: '16px', background: 'linear-gradient(135deg, '+theme.purple+'20, '+theme.accent+'20)', borderRadius: '12px', display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+                      <div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Total Bosses</div><div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>{debts.length}</div></div>
+                      <div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>All Defeated In</div><div style={{ color: payoff.hasError ? theme.danger : theme.success, fontSize: '20px', fontWeight: 700 }}>{payoff.hasError ? '⚠️ Needs more power' : Math.floor(payoff.maxMonths/12)+'y '+payoff.maxMonths%12+'m'}</div></div>
+                      <div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Boss Shield (Interest)</div><div style={{ color: theme.danger, fontSize: '20px', fontWeight: 700 }}>${payoff.totalInterest.toFixed(0)}</div></div>
+                    </div>
+                  )})()}
+                </>
+              )}
+            </div>
+
+            {/* ===== GAMIFIED GOALS QUEST ===== */}
+            <div style={cardStyle}>
+              <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>🎯 Savings Quests</h2>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' as const, padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
+                <input type="text" placeholder="Quest name" value={newGoal.name} onChange={(e) => setNewGoal({ ...newGoal, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
+                <input type="number" placeholder="Target $" value={newGoal.target} onChange={(e) => setNewGoal({ ...newGoal, target: e.target.value })} style={{ ...inputStyle, width: '90px' }} />
+                <input type="number" placeholder="Saved $" value={newGoal.saved} onChange={(e) => setNewGoal({ ...newGoal, saved: e.target.value })} style={{ ...inputStyle, width: '80px' }} />
+                <input type="number" placeholder="Per payment $" value={newGoal.paymentAmount} onChange={(e) => setNewGoal({ ...newGoal, paymentAmount: e.target.value })} style={{ ...inputStyle, width: '100px' }} />
+                <select value={newGoal.savingsFrequency} onChange={(e) => setNewGoal({ ...newGoal, savingsFrequency: e.target.value })} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
+                <input type="date" placeholder="Deadline" value={newGoal.deadline} onChange={(e) => setNewGoal({ ...newGoal, deadline: e.target.value })} style={inputStyle} />
+                <input type="date" value={newGoal.startDate} onChange={(e) => setNewGoal({ ...newGoal, startDate: e.target.value })} style={inputStyle} />
+                <button onClick={addGoal} style={btnPurple}>🎯 Add Quest</button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
+                {goals.length === 0 ? <div style={{ color: theme.textMuted, textAlign: 'center' as const, padding: '40px' }}>No quests yet. Add a savings goal above!</div> : goals.map(goal => {
+                  const progress = (parseFloat(goal.saved || '0') / parseFloat(goal.target || '1')) * 100
+                  const payment = goal.paymentAmount ? parseFloat(goal.paymentAmount) : calculateGoalPayment(goal)
+                  const isComplete = progress >= 100
+                  const monthsToGoal = calculateMonthsToGoal(goal)
+                  const rank = getGoalRank(progress)
+                  const isOnCalendar = goal.startDate && (goal.paymentAmount || goal.deadline)
+                  const goalExtras = expenses.filter(exp => exp.targetGoalId === goal.id)
+                  return (
+                    <div key={goal.id} style={{ padding: '20px', background: isComplete ? 'linear-gradient(135deg, '+theme.success+'20, #fbbf2420)' : (darkMode ? '#334155' : '#faf5ff'), borderRadius: '16px', border: isComplete ? '2px solid #fbbf24' : '2px solid '+rank.color+'40' }}>
+                      {/* Goal Header with Rank */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ fontSize: '32px' }}>{rank.emoji}</div>
+                          <div>
+                            <div style={{ color: theme.text, fontWeight: 700, fontSize: '18px' }}>{goal.name}</div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                              <span style={{ padding: '2px 8px', background: rank.color+'30', color: rank.color, borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>{rank.label}</span>
+                              {isOnCalendar && <span style={{ padding: '2px 8px', background: theme.success+'30', color: theme.success, borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>📅 On Calendar</span>}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' as const }}>
+                          <div style={{ color: isComplete ? '#fbbf24' : theme.text, fontSize: '22px', fontWeight: 800 }}>${parseFloat(goal.saved||'0').toFixed(0)}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>of ${parseFloat(goal.target||'0').toFixed(0)}</div>
+                        </div>
+                      </div>
+                      {/* XP-style Progress Bar */}
+                      <div style={{ marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ color: rank.color, fontSize: '12px', fontWeight: 700 }}>{Math.min(progress, 100).toFixed(1)}%</span>
+                          {!isComplete && payment > 0 && <span style={{ color: theme.textMuted, fontSize: '11px' }}>${payment.toFixed(2)}/{goal.savingsFrequency} • {monthsToGoal}mo left</span>}
+                        </div>
+                        <div style={{ width: '100%', height: '14px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '7px', overflow: 'hidden' }}>
+                          <div style={{ width: Math.min(progress, 100) + '%', height: '100%', background: isComplete ? 'linear-gradient(to right, #fbbf24, #f59e0b)' : `linear-gradient(to right, ${rank.color}, ${rank.color}dd)`, borderRadius: '7px', transition: 'width 0.5s ease', boxShadow: isComplete ? '0 0 10px #fbbf2480' : 'none' }} />
+                        </div>
+                        {isComplete && <div style={{ textAlign: 'center' as const, marginTop: '8px', color: '#fbbf24', fontSize: '14px', fontWeight: 700 }}>🎉 QUEST COMPLETE! +25 XP 🎉</div>}
+                      </div>
+                      {/* Extra boosts */}
+                      {goalExtras.length > 0 && (
+                        <div style={{ marginBottom: '12px' }}>
+                          <div style={{ fontSize: '11px', color: theme.textMuted, marginBottom: '4px' }}>⚡ Boosts active:</div>
+                          {goalExtras.map(exp => (
+                            <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', background: theme.purple+'20', borderRadius: '4px', fontSize: '11px', marginBottom: '2px' }}>
+                              <span style={{ color: theme.purple }}>⚡ ${exp.amount}/{exp.frequency}</span>
+                              <button onClick={() => deleteExpense(exp.id)} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '10px' }}>✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Action Buttons */}
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
+                        {!isComplete && selectedGoalForExtra === goal.id ? (
+                          <>
+                            <input type="number" placeholder="Extra $" value={extraGoalPayment} onChange={(e) => setExtraGoalPayment(e.target.value)} style={{ ...inputStyle, width: '80px', padding: '6px 10px' }} />
+                            <button onClick={() => addExtraGoalPayment(goal.id)} style={{ ...btnPurple, padding: '6px 12px', fontSize: '11px' }}>⚡ Boost</button>
+                            <button onClick={() => setSelectedGoalForExtra(null)} style={{ ...btnDanger, padding: '6px 10px', fontSize: '11px' }}>✕</button>
+                          </>
+                        ) : (
+                          <>
+                            {!isComplete && <button onClick={() => addGoalAndPlanToCalendar(goal)} style={{ padding: '8px 14px', background: isOnCalendar ? theme.textMuted : 'linear-gradient(135deg, '+theme.success+', #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>{isOnCalendar ? '✅ On Calendar' : '📅 Add to Calendar'}</button>}
+                            {!isComplete && <button onClick={() => setSelectedGoalForExtra(goal.id)} style={{ ...btnPurple, padding: '8px 14px', fontSize: '12px' }}>⚡ Power-Up</button>}
+                            <button onClick={() => deleteGoal(goal.id)} style={{ padding: '8px 14px', background: 'transparent', color: theme.textMuted, border: '1px solid '+theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>🗑️</button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Budget Coach */}
+            <div style={cardStyle}>
+              <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '18px' }}>🤖 Budget Coach</h3>
+              <div style={{ maxHeight: '300px', overflowY: 'auto' as const, marginBottom: '12px', display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                {chatMessages.length === 0 && <div style={{ color: theme.textMuted, textAlign: 'center' as const, padding: '20px' }}>Ask me anything about your finances!</div>}
+                {chatMessages.map((msg, i) => (
+                  <div key={i} style={{ padding: '12px', background: msg.role === 'user' ? theme.accent + '20' : (darkMode ? '#334155' : '#f0fdf4'), borderRadius: '10px', maxWidth: '85%', alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start' } as any}>
+                    <div style={{ color: theme.text, fontSize: '14px', whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
+                  </div>
+                ))}
+                {isAskingCoach && <div style={{ color: theme.textMuted, padding: '12px' }}>Thinking...</div>}
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input type="text" placeholder="Ask about your finances..." value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && askBudgetCoach()} style={{ ...inputStyle, flex: 1 }} />
+                <button onClick={askBudgetCoach} disabled={isAskingCoach} style={btnPrimary}>Send</button>
+              </div>
+            </div>
+          </div>
+        )}
+      {activeTab === 'overview' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
               <div style={{ padding: '24px', background: 'linear-gradient(135deg, #10b981, #059669)', borderRadius: '16px' }}><div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px', marginBottom: '8px' }}>Total Assets</div><div style={{ color: 'white', fontSize: '32px', fontWeight: 800 }}>${totalAssets.toFixed(0)}</div></div>
@@ -1119,128 +1596,3 @@ const calculateForexProp = () => {
             </div>
           </div>
         )}
-      {activeTab === 'trading' && (
-          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-            {/* Trade Journal */}
-            <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 16px 0', color: theme.warning, fontSize: '18px' }}>📓 Trade Journal</h3>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' as const }}>
-                <input type="date" value={newTrade.date} onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })} style={inputStyle} />
-                <input type="text" placeholder="Instrument" value={newTrade.instrument} onChange={(e) => setNewTrade({ ...newTrade, instrument: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
-                <select value={newTrade.direction} onChange={(e) => setNewTrade({ ...newTrade, direction: e.target.value })} style={inputStyle}><option value="long">Long</option><option value="short">Short</option></select>
-                <input type="number" placeholder="Entry $" value={newTrade.entryPrice} onChange={(e) => setNewTrade({ ...newTrade, entryPrice: e.target.value })} style={{ ...inputStyle, width: '80px' }} />
-                <input type="number" placeholder="Exit $" value={newTrade.exitPrice} onChange={(e) => setNewTrade({ ...newTrade, exitPrice: e.target.value })} style={{ ...inputStyle, width: '80px' }} />
-                <input type="number" placeholder="P/L $" value={newTrade.profitLoss} onChange={(e) => setNewTrade({ ...newTrade, profitLoss: e.target.value })} style={{ ...inputStyle, width: '80px' }} />
-                <input type="text" placeholder="Notes" value={newTrade.notes} onChange={(e) => setNewTrade({ ...newTrade, notes: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
-                <button onClick={addTrade} style={btnWarning}>Add Trade</button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
-                <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Total P/L</div><div style={{ color: totalPL >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${totalPL.toFixed(2)}</div></div>
-                <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Win Rate</div><div style={{ color: winRate >= 50 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>{winRate.toFixed(0)}%</div></div>
-                <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Total Trades</div><div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>{trades.length}</div></div>
-              </div>
-              <div style={{ maxHeight: '300px', overflowY: 'auto' as const }}>
-                {trades.map(trade => (
-                  <div key={trade.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid ' + theme.border }}>
-                    <div><span style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{trade.instrument}</span><span style={{ color: theme.textMuted, marginLeft: '8px', fontSize: '12px' }}>{trade.date} • {trade.direction}</span>{trade.notes && <span style={{ color: theme.textMuted, marginLeft: '8px', fontSize: '11px' }}>• {trade.notes}</span>}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: parseFloat(trade.profitLoss) >= 0 ? theme.success : theme.danger, fontWeight: 700 }}>{parseFloat(trade.profitLoss) >= 0 ? '+' : ''}${parseFloat(trade.profitLoss).toFixed(2)}</span></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Forex Prop */}
-            <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 16px 0', color: theme.accent, fontSize: '18px' }}>📊 Forex Prop Calculator</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' }}>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Phase</label><select value={forexProp.phase} onChange={(e) => setForexProp({ ...forexProp, phase: e.target.value })} style={{ ...inputStyle, width: '100%' }}><option value="phase1">Phase 1</option><option value="phase2">Phase 2</option><option value="funded">Funded</option></select></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Account Size</label><input type="number" value={forexProp.accountSize} onChange={(e) => setForexProp({ ...forexProp, accountSize: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Current Balance</label><input type="number" value={forexProp.currentBalance} onChange={(e) => setForexProp({ ...forexProp, currentBalance: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Trading Days</label><input type="number" value={forexProp.tradingDays} onChange={(e) => setForexProp({ ...forexProp, tradingDays: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Risk/Trade %</label><input type="number" value={forexProp.riskPerTrade} onChange={(e) => setForexProp({ ...forexProp, riskPerTrade: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Trades/Day</label><input type="number" value={forexProp.tradesPerDay} onChange={(e) => setForexProp({ ...forexProp, tradesPerDay: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Win Rate %</label><input type="number" value={forexProp.winRate} onChange={(e) => setForexProp({ ...forexProp, winRate: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Avg RR</label><input type="number" value={forexProp.avgRR} onChange={(e) => setForexProp({ ...forexProp, avgRR: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-              </div>
-              <button onClick={calculateForexProp} style={{ ...btnPrimary, width: '100%', marginBottom: '16px' }}>Calculate</button>
-              {forexPropResults && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                  <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Profit Progress</div><div style={{ color: theme.success, fontSize: '18px', fontWeight: 700 }}>{forexPropResults.profitProgress.toFixed(1)}%</div><div style={{ width: '100%', height: '6px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}><div style={{ width: Math.min(forexPropResults.profitProgress, 100)+'%', height: '100%', background: theme.success, borderRadius: '3px' }} /></div></div>
-                  <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>DD Remaining</div><div style={{ color: forexPropResults.drawdownRemaining > forexPropResults.dailyDrawdownAmount ? theme.success : theme.danger, fontSize: '18px', fontWeight: 700 }}>${forexPropResults.drawdownRemaining.toFixed(0)}</div></div>
-                  <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Est. Days to Target</div><div style={{ color: theme.accent, fontSize: '18px', fontWeight: 700 }}>{forexPropResults.daysToTarget > 0 ? forexPropResults.daysToTarget : 'N/A'}</div></div>
-                  <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Daily Expectancy</div><div style={{ color: forexPropResults.dailyExpectedPL >= 0 ? theme.success : theme.danger, fontSize: '18px', fontWeight: 700 }}>${forexPropResults.dailyExpectedPL.toFixed(2)}</div></div>
-                  <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Max Losses Today</div><div style={{ color: theme.warning, fontSize: '18px', fontWeight: 700 }}>{forexPropResults.maxLossesToday.toFixed(1)}</div></div>
-                  <div style={{ padding: '12px', background: forexPropResults.onTrack ? (darkMode ? '#1e3a32' : '#f0fdf4') : (darkMode ? '#3a1e1e' : '#fef2f2'), borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Status</div><div style={{ color: forexPropResults.onTrack ? theme.success : theme.danger, fontSize: '18px', fontWeight: 700 }}>{forexPropResults.onTrack ? '✅ On Track' : '⚠️ Behind'}</div></div>
-                </div>
-              )}
-            </div>
-
-            {/* Futures Prop */}
-            <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>📊 Futures Prop Calculator</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' }}>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Phase</label><select value={futuresProp.phase} onChange={(e) => setFuturesProp({ ...futuresProp, phase: e.target.value })} style={{ ...inputStyle, width: '100%' }}><option value="evaluation">Evaluation</option><option value="pa">PA</option><option value="funded">Funded</option></select></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Account Size</label><input type="number" value={futuresProp.accountSize} onChange={(e) => setFuturesProp({ ...futuresProp, accountSize: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Current Balance</label><input type="number" value={futuresProp.currentBalance} onChange={(e) => setFuturesProp({ ...futuresProp, currentBalance: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>High Water Mark</label><input type="number" value={futuresProp.highWaterMark} onChange={(e) => setFuturesProp({ ...futuresProp, highWaterMark: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Trailing DD $</label><input type="number" value={futuresProp.evalTrailingDD} onChange={(e) => setFuturesProp({ ...futuresProp, evalTrailingDD: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Profit Target $</label><input type="number" value={futuresProp.evalProfitTarget} onChange={(e) => setFuturesProp({ ...futuresProp, evalProfitTarget: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Risk/Trade $</label><input type="number" value={futuresProp.riskPerTrade} onChange={(e) => setFuturesProp({ ...futuresProp, riskPerTrade: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Win Rate %</label><input type="number" value={futuresProp.winRate} onChange={(e) => setFuturesProp({ ...futuresProp, winRate: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-              </div>
-              <button onClick={calculateFuturesProp} style={{ ...btnPurple, width: '100%', marginBottom: '16px' }}>Calculate</button>
-              {futuresPropResults && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                  <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Profit Progress</div><div style={{ color: theme.success, fontSize: '18px', fontWeight: 700 }}>{futuresPropResults.profitProgress.toFixed(1)}%</div></div>
-                  <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>DD Remaining</div><div style={{ color: futuresPropResults.drawdownRemaining > 500 ? theme.success : theme.danger, fontSize: '18px', fontWeight: 700 }}>${futuresPropResults.drawdownRemaining.toFixed(0)}</div></div>
-                  <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Safety Margin</div><div style={{ color: theme.warning, fontSize: '18px', fontWeight: 700 }}>{futuresPropResults.safetyMargin} trades</div></div>
-                  <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Daily Expectancy</div><div style={{ color: futuresPropResults.dailyExpectedPL >= 0 ? theme.success : theme.danger, fontSize: '18px', fontWeight: 700 }}>${futuresPropResults.dailyExpectedPL.toFixed(2)}</div></div>
-                  <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Est. Days</div><div style={{ color: theme.accent, fontSize: '18px', fontWeight: 700 }}>{futuresPropResults.daysToTarget > 0 ? futuresPropResults.daysToTarget : 'N/A'}</div></div>
-                  <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>DD Lock</div><div style={{ color: futuresPropResults.lockedAtBreakeven ? theme.success : theme.textMuted, fontSize: '18px', fontWeight: 700 }}>{futuresPropResults.lockedAtBreakeven ? '🔒 Locked' : 'Trailing'}</div></div>
-                </div>
-              )}
-            </div>
-
-            {/* Compounding Calculator */}
-            <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 16px 0', color: theme.success, fontSize: '18px' }}>📈 Trading Compounding Calculator</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' }}>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Starting Capital</label><input type="number" value={tradingCalculator.startingCapital} onChange={(e) => setTradingCalculator({ ...tradingCalculator, startingCapital: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Monthly Add</label><input type="number" value={tradingCalculator.monthlyContribution} onChange={(e) => setTradingCalculator({ ...tradingCalculator, monthlyContribution: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Return Rate %</label><input type="number" value={tradingCalculator.returnRate} onChange={(e) => setTradingCalculator({ ...tradingCalculator, returnRate: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Period</label><select value={tradingCalculator.returnPeriod} onChange={(e) => setTradingCalculator({ ...tradingCalculator, returnPeriod: e.target.value })} style={{ ...inputStyle, width: '100%' }}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Years</label><input type="number" value={tradingCalculator.years} onChange={(e) => setTradingCalculator({ ...tradingCalculator, years: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Months</label><input type="number" value={tradingCalculator.months} onChange={(e) => setTradingCalculator({ ...tradingCalculator, months: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Days</label><input type="number" value={tradingCalculator.days} onChange={(e) => setTradingCalculator({ ...tradingCalculator, days: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Reinvest %</label><input type="number" value={tradingCalculator.reinvestRate} onChange={(e) => setTradingCalculator({ ...tradingCalculator, reinvestRate: e.target.value })} style={{ ...inputStyle, width: '100%' }} /></div>
-              </div>
-              <button onClick={calculateTradingCompounding} disabled={calculatingTrading} style={{ ...btnSuccess, width: '100%', marginBottom: '16px' }}>{calculatingTrading ? 'Calculating...' : 'Calculate'}</button>
-              {tradingResults && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                  <div style={{ padding: '16px', background: 'linear-gradient(135deg, #10b981, #059669)', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>Future Value</div><div style={{ color: 'white', fontSize: '24px', fontWeight: 800 }}>${tradingResults.futureValue.toFixed(0)}</div></div>
-                  <div style={{ padding: '16px', background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>Profit</div><div style={{ color: 'white', fontSize: '24px', fontWeight: 800 }}>${tradingResults.profit.toFixed(0)}</div></div>
-                  <div style={{ padding: '16px', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>Trading Days</div><div style={{ color: 'white', fontSize: '24px', fontWeight: 800 }}>{tradingResults.totalTradingDays}</div></div>
-                </div>
-              )}
-              {tradingResults?.yearlyProgress && tradingResults.yearlyProgress.length > 0 && (
-                <div style={{ marginTop: '16px', maxHeight: '200px', overflowY: 'auto' as const }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead><tr style={{ borderBottom: '2px solid ' + theme.border }}>{['Year', 'Value', 'Contributed', 'Profit'].map(h => <th key={h} style={{ padding: '8px', textAlign: 'left' as const, color: theme.textMuted, fontSize: '12px' }}>{h}</th>)}</tr></thead>
-                    <tbody>{tradingResults.yearlyProgress.map((yr: any) => (
-                      <tr key={yr.year} style={{ borderBottom: '1px solid ' + theme.border }}>
-                        <td style={{ padding: '8px', color: theme.text, fontSize: '13px' }}>Year {yr.year}</td>
-                        <td style={{ padding: '8px', color: theme.success, fontSize: '13px', fontWeight: 600 }}>${yr.value.toFixed(0)}</td>
-                        <td style={{ padding: '8px', color: theme.text, fontSize: '13px' }}>${yr.contributed.toFixed(0)}</td>
-                        <td style={{ padding: '8px', color: yr.profit >= 0 ? theme.success : theme.danger, fontSize: '13px', fontWeight: 600 }}>${yr.profit.toFixed(0)}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
-  )
-}
