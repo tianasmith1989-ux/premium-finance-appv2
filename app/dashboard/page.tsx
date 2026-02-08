@@ -205,8 +205,8 @@ export default function Dashboard() {
     return { rank: '🐣 Paper Trader', color: '#94a3b8', tier: 1 }
   }
 
-  const getWinStreak = (tradesList: any[]) => {
-    let current = 0, best = 0, type: 'win'|'loss'|'none' = 'none'
+  const getWinStreak = (tradesList: any[]): { currentStreak: number, currentType: string, bestStreak: number, lastThree: string[] } => {
+    let current = 0, best = 0, type = 'none' as string
     const sorted = [...tradesList].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     sorted.forEach(t => {
       if (parseFloat(t.profitLoss || '0') > 0) { if (type === 'win') current++; else { current = 1; type = 'win' }; best = Math.max(best, current) }
