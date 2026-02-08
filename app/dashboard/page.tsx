@@ -152,6 +152,96 @@ export default function Dashboard() {
   // Guide tab state
   const [expandedGuideSection, setExpandedGuideSection] = useState<string | null>(null)
   const [expandedGuideItem, setExpandedGuideItem] = useState<string | null>(null)
+  // === ENHANCED TRADING STATE ===
+  // Collapsible sections
+  const [tradingSections, setTradingSections] = useState<{[key:string]:boolean}>({ journal: true, analytics: false, psychology: false, props: false, risk: false, session: false, rank: false })
+  const toggleTradingSection = (id: string) => setTradingSections(prev => ({ ...prev, [id]: !prev[id] }))
+
+  // Enhanced trade fields
+  const [newTradeExtra, setNewTradeExtra] = useState({ emotion: 'disciplined', setup: '', rMultiple: '', session: 'london', rulesBroken: '' as string })
+
+  // Prop accounts tracker
+  const [propAccounts, setPropAccounts] = useState<any[]>([])
+  const [newPropAccount, setNewPropAccount] = useState({ firm: 'FTMO', type: 'forex', phase: 'phase1', accountSize: '100000', currentBalance: '100000', maxDrawdown: '10000', profitTarget: '10000', startDate: new Date().toISOString().split('T')[0], status: 'active' })
+  const [propPayouts, setPropPayouts] = useState<any[]>([])
+  const [newPayout, setNewPayout] = useState({ accountId: '', amount: '', date: new Date().toISOString().split('T')[0] })
+
+  // Session planner
+  const [sessionPlan, setSessionPlan] = useState({ bias: 'neutral', pairs: '', keyLevels: '', newsEvents: '', maxTrades: '3', maxLoss: '', goals: '', notes: '' })
+  const [sessionPlans, setSessionPlans] = useState<any[]>([])
+
+  // Pre-trade checklist
+  const [checklist, setChecklist] = useState([
+    { id: 1, text: 'Identified clear trend/structure', checked: false },
+    { id: 2, text: 'Entry aligns with higher timeframe', checked: false },
+    { id: 3, text: 'Risk:Reward is 1:2 or better', checked: false },
+    { id: 4, text: 'Stop loss is at logical level', checked: false },
+    { id: 5, text: 'Position size is within risk limits', checked: false },
+    { id: 6, text: 'No revenge trading or FOMO', checked: false },
+    { id: 7, text: 'Checked economic calendar', checked: false },
+    { id: 8, text: 'Trading plan followed', checked: false },
+  ])
+  const [customChecklistItem, setCustomChecklistItem] = useState('')
+
+  // Risk management
+  const [riskLimits, setRiskLimits] = useState({ maxDailyLoss: '300', maxWeeklyLoss: '1000', maxDailyTrades: '5', maxRiskPerTrade: '2', maxOpenPositions: '3' })
+
+  // Trading rank
+  const getTraderRank = (tradesList: any[]) => {
+    const count = tradesList.length
+    const wins = tradesList.filter(t => parseFloat(t.profitLoss || '0') > 0).length
+    const wr = count > 0 ? (wins / count) * 100 : 0
+    const totalProfit = tradesList.reduce((s, t) => s + parseFloat(t.profitLoss || '0'), 0)
+    const score = count * 2 + (wr > 50 ? wr * 2 : 0) + (totalProfit > 0 ? Math.log10(totalProfit + 1) * 20 : 0)
+    if (score >= 500) return { rank: '🏆 Market Wizard', color: '#fbbf24', tier: 10 }
+    if (score >= 400) return { rank: '💎 Elite Trader', color: '#60a5fa', tier: 9 }
+    if (score >= 300) return { rank: '🔥 Funded Pro', color: '#f97316', tier: 8 }
+    if (score >= 220) return { rank: '⚡ Consistent', color: '#a78bfa', tier: 7 }
+    if (score >= 160) return { rank: '🎯 Sharpshooter', color: '#10b981', tier: 6 }
+    if (score >= 110) return { rank: '📈 Rising Trader', color: '#3b82f6', tier: 5 }
+    if (score >= 70) return { rank: '💪 Getting Edge', color: '#f472b6', tier: 4 }
+    if (score >= 40) return { rank: '📊 Learning', color: '#14b8a6', tier: 3 }
+    if (score >= 15) return { rank: '🌱 Beginner', color: '#86efac', tier: 2 }
+    return { rank: '🐣 Paper Trader', color: '#94a3b8', tier: 1 }
+  }
+
+  const getWinStreak = (tradesList: any[]) => {
+    let current = 0, best = 0, type: 'win'|'loss'|'none' = 'none'
+    const sorted = [...tradesList].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    sorted.forEach(t => {
+      if (parseFloat(t.profitLoss || '0') > 0) { if (type === 'win') current++; else { current = 1; type = 'win' }; best = Math.max(best, current) }
+      else { if (type === 'loss') current++; else { current = 1; type = 'loss' } }
+    })
+    const lastThree = sorted.slice(-3).map(t => parseFloat(t.profitLoss||'0') > 0 ? 'W' : 'L')
+    return { currentStreak: current, currentType: type, bestStreak: best, lastThree }
+  }
+
+  const addEnhancedTrade = () => {
+    if (!newTrade.instrument) return
+    const trade = { ...newTrade, ...newTradeExtra, id: Date.now() }
+    setTrades(prev => [...prev, trade].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()))
+    setNewTrade({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '' })
+    setNewTradeExtra({ emotion: 'disciplined', setup: '', rMultiple: '', session: 'london', rulesBroken: '' })
+    awardXP(15)
+  }
+
+  const addPropAccount = () => {
+    if (!newPropAccount.firm) return
+    setPropAccounts(prev => [...prev, { ...newPropAccount, id: Date.now() }])
+    setNewPropAccount({ firm: 'FTMO', type: 'forex', phase: 'phase1', accountSize: '100000', currentBalance: '100000', maxDrawdown: '10000', profitTarget: '10000', startDate: new Date().toISOString().split('T')[0], status: 'active' })
+  }
+
+  const addPropPayout = () => {
+    if (!newPayout.amount) return
+    setPropPayouts(prev => [...prev, { ...newPayout, id: Date.now() }])
+    setNewPayout({ accountId: '', amount: '', date: new Date().toISOString().split('T')[0] })
+  }
+
+  const saveSessionPlan = () => {
+    setSessionPlans(prev => [...prev, { ...sessionPlan, id: Date.now(), date: new Date().toISOString().split('T')[0] }])
+    setSessionPlan({ bias: 'neutral', pairs: '', keyLevels: '', newsEvents: '', maxTrades: '3', maxLoss: '', goals: '', notes: '' })
+  }
+
   // ===== GAMIFICATION SYSTEM =====
   const getLevel = (xp: number) => {
     if (xp >= 5000) return { level: 10, title: '🏆 Financial Legend', color: '#fbbf24', next: 99999 }
@@ -1161,18 +1251,252 @@ export default function Dashboard() {
 
         {activeTab === 'trading' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-            <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 16px 0', color: theme.warning, fontSize: '18px' }}>📓 Trade Journal</h3>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' as const }}><input type="date" value={newTrade.date} onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })} style={inputStyle} /><input type="text" placeholder="Instrument" value={newTrade.instrument} onChange={(e) => setNewTrade({ ...newTrade, instrument: e.target.value })} style={{ ...inputStyle, flex: 1 }} /><select value={newTrade.direction} onChange={(e) => setNewTrade({ ...newTrade, direction: e.target.value })} style={inputStyle}><option value="long">Long</option><option value="short">Short</option></select><input type="number" placeholder="P/L $" value={newTrade.profitLoss} onChange={(e) => setNewTrade({ ...newTrade, profitLoss: e.target.value })} style={{ ...inputStyle, width: '80px' }} /><input type="text" placeholder="Notes" value={newTrade.notes} onChange={(e) => setNewTrade({ ...newTrade, notes: e.target.value })} style={{ ...inputStyle, flex: 1 }} /><button onClick={addTrade} style={btnWarning}>Add Trade</button></div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}><div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Total P/L</div><div style={{ color: totalPL >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${totalPL.toFixed(2)}</div></div><div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Win Rate</div><div style={{ color: winRate >= 50 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>{winRate.toFixed(0)}%</div></div><div style={{ padding: '12px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Trades</div><div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>{trades.length}</div></div></div>
-              <div style={{ maxHeight: '300px', overflowY: 'auto' as const }}>{trades.map(t => (<div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid ' + theme.border }}><div><span style={{ color: theme.text, fontWeight: 600 }}>{t.instrument}</span><span style={{ color: theme.textMuted, marginLeft: '8px', fontSize: '12px' }}>{t.date} • {t.direction}</span>{t.notes && <span style={{ color: theme.textMuted, marginLeft: '8px', fontSize: '11px' }}>• {t.notes}</span>}</div><span style={{ color: parseFloat(t.profitLoss) >= 0 ? theme.success : theme.danger, fontWeight: 700 }}>{parseFloat(t.profitLoss) >= 0 ? '+' : ''}${parseFloat(t.profitLoss).toFixed(2)}</span></div>))}</div>
-            </div>
-            <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 16px 0', color: theme.accent, fontSize: '18px' }}>📊 Forex Prop Calculator</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' }}>{[{l:'Phase',el:<select value={forexProp.phase} onChange={(e) => setForexProp({...forexProp, phase: e.target.value})} style={{...inputStyle,width:'100%'}}><option value="phase1">Phase 1</option><option value="phase2">Phase 2</option><option value="funded">Funded</option></select>},{l:'Account',el:<input type="number" value={forexProp.accountSize} onChange={(e) => setForexProp({...forexProp, accountSize: e.target.value})} style={{...inputStyle,width:'100%'}} />},{l:'Balance',el:<input type="number" value={forexProp.currentBalance} onChange={(e) => setForexProp({...forexProp, currentBalance: e.target.value})} style={{...inputStyle,width:'100%'}} />},{l:'Risk %',el:<input type="number" value={forexProp.riskPerTrade} onChange={(e) => setForexProp({...forexProp, riskPerTrade: e.target.value})} style={{...inputStyle,width:'100%'}} />},{l:'Trades/Day',el:<input type="number" value={forexProp.tradesPerDay} onChange={(e) => setForexProp({...forexProp, tradesPerDay: e.target.value})} style={{...inputStyle,width:'100%'}} />},{l:'Win %',el:<input type="number" value={forexProp.winRate} onChange={(e) => setForexProp({...forexProp, winRate: e.target.value})} style={{...inputStyle,width:'100%'}} />},{l:'Avg RR',el:<input type="number" value={forexProp.avgRR} onChange={(e) => setForexProp({...forexProp, avgRR: e.target.value})} style={{...inputStyle,width:'100%'}} />},{l:'Days',el:<input type="number" value={forexProp.tradingDays} onChange={(e) => setForexProp({...forexProp, tradingDays: e.target.value})} style={{...inputStyle,width:'100%'}} />}].map((f,i) => (<div key={i}><label style={{color:theme.textMuted,fontSize:'11px',display:'block',marginBottom:'4px'}}>{f.l}</label>{f.el}</div>))}</div>
-              <button onClick={calculateForexProp} style={{...btnPrimary,width:'100%',marginBottom:'16px'}}>Calculate</button>
-              {forexPropResults && (<div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>{[{l:'Profit Progress',v:forexPropResults.profitProgress.toFixed(1)+'%',c:theme.success},{l:'DD Remaining',v:'$'+forexPropResults.drawdownRemaining.toFixed(0),c:forexPropResults.drawdownRemaining>forexPropResults.dailyDrawdownAmount?theme.success:theme.danger},{l:'Days to Target',v:forexPropResults.daysToTarget>0?forexPropResults.daysToTarget:'N/A',c:theme.accent},{l:'Daily Expectancy',v:'$'+forexPropResults.dailyExpectedPL.toFixed(2),c:forexPropResults.dailyExpectedPL>=0?theme.success:theme.danger},{l:'Max Losses Today',v:forexPropResults.maxLossesToday.toFixed(1),c:theme.warning},{l:'Status',v:forexPropResults.onTrack?'✅ On Track':'⚠️ Behind',c:forexPropResults.onTrack?theme.success:theme.danger}].map((s,i) => (<div key={i} style={{padding:'12px',background:darkMode?'#334155':'#f8fafc',borderRadius:'10px',textAlign:'center' as const}}><div style={{color:theme.textMuted,fontSize:'11px'}}>{s.l}</div><div style={{color:s.c,fontSize:'18px',fontWeight:700}}>{s.v}</div></div>))}</div>)}
-            </div>
+
+            {/* TRADER RANK HERO */}
+            {(() => {
+              const traderRank = getTraderRank(trades)
+              const streak = getWinStreak(trades)
+              const todayTrades = trades.filter(t => t.date === new Date().toISOString().split('T')[0])
+              const todayPL = todayTrades.reduce((s, t) => s + parseFloat(t.profitLoss || '0'), 0)
+              const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+              const weekTrades = trades.filter(t => new Date(t.date) >= weekStart)
+              const weekPL = weekTrades.reduce((s, t) => s + parseFloat(t.profitLoss || '0'), 0)
+              const dailyMaxLoss = parseFloat(riskLimits.maxDailyLoss || '0')
+              const weeklyMaxLoss = parseFloat(riskLimits.maxWeeklyLoss || '0')
+              const dailyDanger = dailyMaxLoss > 0 && todayPL < 0 && Math.abs(todayPL) >= dailyMaxLoss * 0.8
+              const weeklyDanger = weeklyMaxLoss > 0 && weekPL < 0 && Math.abs(weekPL) >= weeklyMaxLoss * 0.8
+              return (
+                <div style={{ padding: '28px', background: darkMode ? 'linear-gradient(135deg, #1e293b, #1e1b2e)' : 'linear-gradient(135deg, #fefce8, #fff7ed, #faf5ff)', borderRadius: '24px', border: '2px solid ' + traderRank.color + '50' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: '16px' }}>
+                    <div>
+                      <div style={{ fontSize: '12px', color: theme.textMuted, letterSpacing: '3px', textTransform: 'uppercase' as const, marginBottom: '6px' }}>TRADER RANK</div>
+                      <div style={{ fontSize: '32px', fontWeight: 900, color: traderRank.color }}>{traderRank.rank}</div>
+                      <div style={{ marginTop: '8px', display: 'flex', gap: '4px' }}>{Array.from({length:10}).map((_,i) => <div key={i} style={{ width: '20px', height: '6px', borderRadius: '3px', background: i < traderRank.tier ? traderRank.color : (darkMode ? '#334155' : '#e2e8f0') }} />)}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' as const }}>
+                      <div style={{ padding: '14px 20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.border, minWidth: '100px' }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Today</div><div style={{ color: todayPL >= 0 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 800 }}>{todayPL >= 0 ? '+' : ''}${todayPL.toFixed(0)}</div><div style={{ fontSize: '10px', color: theme.textMuted }}>{todayTrades.length} trades</div>{dailyDanger && <div style={{ fontSize: '10px', color: theme.danger, fontWeight: 700, marginTop: '2px' }}>⚠️ Near daily limit!</div>}</div>
+                      <div style={{ padding: '14px 20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.border, minWidth: '100px' }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>This Week</div><div style={{ color: weekPL >= 0 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 800 }}>{weekPL >= 0 ? '+' : ''}${weekPL.toFixed(0)}</div><div style={{ fontSize: '10px', color: theme.textMuted }}>{weekTrades.length} trades</div>{weeklyDanger && <div style={{ fontSize: '10px', color: theme.danger, fontWeight: 700, marginTop: '2px' }}>⚠️ Near weekly limit!</div>}</div>
+                      <div style={{ padding: '14px 20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.border, minWidth: '100px' }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Win Streak</div><div style={{ color: streak.currentType === 'win' ? theme.success : theme.danger, fontSize: '22px', fontWeight: 800 }}>{streak.currentStreak}{streak.currentType === 'win' ? '🔥' : ''}</div><div style={{ fontSize: '10px', color: theme.textMuted }}>Best: {streak.bestStreak}</div></div>
+                      <div style={{ padding: '14px 20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.border, minWidth: '100px' }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>All Time</div><div style={{ color: totalPL >= 0 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 800 }}>{totalPL >= 0 ? '+' : ''}${totalPL.toFixed(0)}</div><div style={{ fontSize: '10px', color: theme.textMuted }}>{trades.length} trades • {winRate.toFixed(0)}% WR</div></div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* === COLLAPSIBLE SECTIONS === */}
+            {[
+              { id: 'journal', icon: '📓', title: 'Trade Journal', color: theme.warning },
+              { id: 'analytics', icon: '📊', title: 'Analytics & Performance', color: theme.accent },
+              { id: 'psychology', icon: '🧠', title: 'Psychology & Discipline', color: theme.purple },
+              { id: 'props', icon: '🏢', title: 'Prop Firm Dashboard', color: theme.success },
+              { id: 'risk', icon: '🛡️', title: 'Risk Management', color: theme.danger },
+              { id: 'session', icon: '📋', title: 'Session Planner', color: '#14b8a6' },
+            ].map(sec => (
+              <div key={sec.id} style={cardStyle}>
+                <div onClick={() => toggleTradingSection(sec.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}><div style={{ width: '44px', height: '44px', borderRadius: '12px', background: sec.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>{sec.icon}</div><h3 style={{ margin: 0, color: theme.text, fontSize: '18px', fontWeight: 700 }}>{sec.title}</h3></div>
+                  <div style={{ fontSize: '20px', color: theme.textMuted, transition: 'transform 0.3s', transform: tradingSections[sec.id] ? 'rotate(180deg)' : 'rotate(0)' }}>▼</div>
+                </div>
+
+                {/* JOURNAL */}
+                {tradingSections[sec.id] && sec.id === 'journal' && (
+                  <div style={{ marginTop: '20px' }}>
+                    <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
+                        <input type="date" value={newTrade.date} onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }} />
+                        <input type="text" placeholder="Instrument (e.g. EURUSD)" value={newTrade.instrument} onChange={(e) => setNewTrade({ ...newTrade, instrument: e.target.value })} style={{ ...inputStyle, flex: '1 1 120px', fontSize: '12px' }} />
+                        <select value={newTrade.direction} onChange={(e) => setNewTrade({ ...newTrade, direction: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }}><option value="long">📈 Long</option><option value="short">📉 Short</option></select>
+                        <input type="number" placeholder="Entry $" value={newTrade.entryPrice} onChange={(e) => setNewTrade({ ...newTrade, entryPrice: e.target.value })} style={{ ...inputStyle, width: '80px', fontSize: '12px' }} />
+                        <input type="number" placeholder="Exit $" value={newTrade.exitPrice} onChange={(e) => setNewTrade({ ...newTrade, exitPrice: e.target.value })} style={{ ...inputStyle, width: '80px', fontSize: '12px' }} />
+                        <input type="number" placeholder="P/L $" value={newTrade.profitLoss} onChange={(e) => setNewTrade({ ...newTrade, profitLoss: e.target.value })} style={{ ...inputStyle, width: '80px', fontSize: '12px' }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
+                        <select value={newTradeExtra.emotion} onChange={(e) => setNewTradeExtra({ ...newTradeExtra, emotion: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }}><option value="disciplined">🎯 Disciplined</option><option value="confident">💪 Confident</option><option value="neutral">😐 Neutral</option><option value="anxious">😰 Anxious</option><option value="fomo">🤯 FOMO</option><option value="revenge">😤 Revenge</option><option value="greedy">🤑 Greedy</option><option value="fearful">😨 Fearful</option></select>
+                        <select value={newTradeExtra.session} onChange={(e) => setNewTradeExtra({ ...newTradeExtra, session: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }}><option value="asian">🌏 Asian</option><option value="london">🇬🇧 London</option><option value="newyork">🇺🇸 New York</option><option value="overlap">🔄 Overlap</option></select>
+                        <input type="text" placeholder="R-Multiple (e.g. 2.5)" value={newTradeExtra.rMultiple} onChange={(e) => setNewTradeExtra({ ...newTradeExtra, rMultiple: e.target.value })} style={{ ...inputStyle, width: '120px', fontSize: '12px' }} />
+                        <input type="text" placeholder="Setup type (e.g. breakout, pullback)" value={newTradeExtra.setup} onChange={(e) => setNewTradeExtra({ ...newTradeExtra, setup: e.target.value })} style={{ ...inputStyle, flex: 1, fontSize: '12px' }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                        <input type="text" placeholder="Notes / Trade thesis" value={newTrade.notes} onChange={(e) => setNewTrade({ ...newTrade, notes: e.target.value })} style={{ ...inputStyle, flex: 1, fontSize: '12px' }} />
+                        <input type="text" placeholder="Rules broken? (leave empty if clean)" value={newTradeExtra.rulesBroken} onChange={(e) => setNewTradeExtra({ ...newTradeExtra, rulesBroken: e.target.value })} style={{ ...inputStyle, flex: 1, fontSize: '12px', borderColor: newTradeExtra.rulesBroken ? theme.danger : theme.inputBorder }} />
+                        <button onClick={addEnhancedTrade} style={{ ...btnWarning, fontSize: '12px' }}>📝 Log Trade</button>
+                      </div>
+                    </div>
+                    <div style={{ maxHeight: '400px', overflowY: 'auto' as const }}>
+                      {trades.length === 0 ? <div style={{ color: theme.textMuted, textAlign: 'center' as const, padding: '30px' }}>No trades logged yet</div> : trades.map(t => {
+                        const pl = parseFloat(t.profitLoss || '0'); const isWin = pl > 0
+                        const emotionIcons: {[k:string]:string} = { disciplined:'🎯', confident:'💪', neutral:'😐', anxious:'😰', fomo:'🤯', revenge:'😤', greedy:'🤑', fearful:'😨' }
+                        return (
+                          <div key={t.id} style={{ padding: '12px 16px', borderBottom: '1px solid ' + theme.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' as const }}>
+                                <span style={{ color: theme.text, fontWeight: 700 }}>{t.instrument}</span>
+                                <span style={{ padding: '2px 6px', background: t.direction === 'long' ? theme.success + '20' : theme.danger + '20', color: t.direction === 'long' ? theme.success : theme.danger, borderRadius: '4px', fontSize: '10px', fontWeight: 700 }}>{t.direction === 'long' ? '📈 LONG' : '📉 SHORT'}</span>
+                                {t.emotion && <span style={{ fontSize: '14px' }}>{emotionIcons[t.emotion] || ''}</span>}
+                                {t.session && <span style={{ padding: '2px 6px', background: darkMode ? '#334155' : '#f1f5f9', borderRadius: '4px', fontSize: '10px', color: theme.textMuted }}>{t.session}</span>}
+                                {t.setup && <span style={{ padding: '2px 6px', background: theme.purple + '15', borderRadius: '4px', fontSize: '10px', color: theme.purple }}>{t.setup}</span>}
+                                {t.rulesBroken && <span style={{ padding: '2px 6px', background: theme.danger + '15', borderRadius: '4px', fontSize: '10px', color: theme.danger }}>⚠️ {t.rulesBroken}</span>}
+                              </div>
+                              <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>{t.date}{t.entryPrice && t.exitPrice ? ' • '+t.entryPrice+'→'+t.exitPrice : ''}{t.rMultiple ? ' • '+t.rMultiple+'R' : ''}{t.notes ? ' • '+t.notes : ''}</div>
+                            </div>
+                            <div style={{ textAlign: 'right' as const, flexShrink: 0 }}><div style={{ color: isWin ? theme.success : theme.danger, fontWeight: 800, fontSize: '16px' }}>{isWin ? '+' : ''}${pl.toFixed(2)}</div></div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* ANALYTICS */}
+                {tradingSections[sec.id] && sec.id === 'analytics' && (
+                  <div style={{ marginTop: '20px' }}>
+                    {trades.length === 0 ? <div style={{ color: theme.textMuted, textAlign: 'center' as const, padding: '30px' }}>Log trades to see analytics</div> : (() => {
+                      const wins = trades.filter(t => parseFloat(t.profitLoss||'0') > 0)
+                      const losses = trades.filter(t => parseFloat(t.profitLoss||'0') <= 0)
+                      const avgWin = wins.length > 0 ? wins.reduce((s,t) => s+parseFloat(t.profitLoss||'0'),0)/wins.length : 0
+                      const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s,t) => s+parseFloat(t.profitLoss||'0'),0)/losses.length) : 0
+                      const expectancy = trades.length > 0 ? ((winRate/100) * avgWin) - ((1-winRate/100) * avgLoss) : 0
+                      const profitFactor = losses.length > 0 ? Math.abs(wins.reduce((s,t)=>s+parseFloat(t.profitLoss||'0'),0)) / Math.abs(losses.reduce((s,t)=>s+parseFloat(t.profitLoss||'0'),0)) : wins.length > 0 ? 999 : 0
+                      const instruments: {[k:string]:{count:number,pl:number,wins:number}} = {}
+                      trades.forEach(t => { const inst = t.instrument || 'Unknown'; if (!instruments[inst]) instruments[inst] = {count:0,pl:0,wins:0}; instruments[inst].count++; instruments[inst].pl += parseFloat(t.profitLoss||'0'); if (parseFloat(t.profitLoss||'0') > 0) instruments[inst].wins++ })
+                      const emotions: {[k:string]:{count:number,pl:number,wins:number}} = {}
+                      trades.forEach(t => { const em = t.emotion || 'neutral'; if (!emotions[em]) emotions[em] = {count:0,pl:0,wins:0}; emotions[em].count++; emotions[em].pl += parseFloat(t.profitLoss||'0'); if (parseFloat(t.profitLoss||'0') > 0) emotions[em].wins++ })
+                      const sessions: {[k:string]:{count:number,pl:number,wins:number}} = {}
+                      trades.forEach(t => { const s = t.session || 'unknown'; if (!sessions[s]) sessions[s] = {count:0,pl:0,wins:0}; sessions[s].count++; sessions[s].pl += parseFloat(t.profitLoss||'0'); if (parseFloat(t.profitLoss||'0') > 0) sessions[s].wins++ })
+                      const equityCurve = (() => { let bal = 0; return [...trades].sort((a,b)=>new Date(a.date).getTime()-new Date(b.date).getTime()).map(t => { bal += parseFloat(t.profitLoss||'0'); return { date: t.date, balance: bal } }) })()
+                      const maxBal = Math.max(...equityCurve.map(e=>e.balance), 1); const minBal = Math.min(...equityCurve.map(e=>e.balance), 0)
+                      const range = maxBal - minBal || 1
+                      return (<>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+                          {[{l:'Win Rate',v:winRate.toFixed(1)+'%',c:winRate>=50?theme.success:theme.danger},{l:'Avg Win',v:'$'+avgWin.toFixed(2),c:theme.success},{l:'Avg Loss',v:'$'+avgLoss.toFixed(2),c:theme.danger},{l:'Expectancy',v:'$'+expectancy.toFixed(2),c:expectancy>=0?theme.success:theme.danger},{l:'Profit Factor',v:profitFactor>=999?'∞':profitFactor.toFixed(2),c:profitFactor>=1.5?theme.success:profitFactor>=1?theme.warning:theme.danger},{l:'Best Trade',v:'$'+Math.max(...trades.map(t=>parseFloat(t.profitLoss||'0')),0).toFixed(0),c:theme.success},{l:'Worst Trade',v:'$'+Math.min(...trades.map(t=>parseFloat(t.profitLoss||'0')),0).toFixed(0),c:theme.danger},{l:'Trades',v:String(trades.length),c:theme.text}].map((s,i) => (<div key={i} style={{ padding: '14px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const, marginBottom: '4px' }}>{s.l}</div><div style={{ color: s.c, fontSize: '20px', fontWeight: 800 }}>{s.v}</div></div>))}
+                        </div>
+                        {equityCurve.length > 1 && <div style={{ marginBottom: '20px' }}><h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📈 Equity Curve</h4><div style={{ height: '120px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', padding: '12px', position: 'relative' as const, border: '1px solid ' + theme.border, overflow: 'hidden' }}><svg viewBox={'0 0 ' + Math.max(equityCurve.length * 3, 100) + ' 100'} style={{ width: '100%', height: '100%' }} preserveAspectRatio="none"><defs><linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={totalPL >= 0 ? theme.success : theme.danger} stopOpacity="0.3" /><stop offset="100%" stopColor={totalPL >= 0 ? theme.success : theme.danger} stopOpacity="0.05" /></linearGradient></defs><line x1="0" y1={String(100 - ((0-minBal)/range)*100)} x2={String(equityCurve.length * 3)} y2={String(100 - ((0-minBal)/range)*100)} stroke={darkMode ? '#334155' : '#e2e8f0'} strokeWidth="0.5" strokeDasharray="2 2" /><polygon points={equityCurve.map((e,i) => (i*3)+','+String(100-((e.balance-minBal)/range)*100)).join(' ') + ' ' + ((equityCurve.length-1)*3)+',100 0,100'} fill="url(#eqGrad)" /><polyline points={equityCurve.map((e,i) => (i*3)+','+String(100-((e.balance-minBal)/range)*100)).join(' ')} fill="none" stroke={totalPL >= 0 ? theme.success : theme.danger} strokeWidth="1.5" /></svg></div></div>}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          <div><h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>🎯 By Instrument</h4>{Object.entries(instruments).sort((a,b) => b[1].pl - a[1].pl).map(([inst,data]) => (<div key={inst} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '8px', marginBottom: '4px' }}><div><span style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{inst}</span><span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '8px' }}>{data.count} trades • {((data.wins/data.count)*100).toFixed(0)}% WR</span></div><span style={{ color: data.pl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '13px' }}>{data.pl >= 0 ? '+' : ''}${data.pl.toFixed(0)}</span></div>))}</div>
+                          <div><h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>🧠 By Emotion</h4>{Object.entries(emotions).sort((a,b) => b[1].pl - a[1].pl).map(([em,data]) => { const emIcons: {[k:string]:string} = {disciplined:'🎯',confident:'💪',neutral:'😐',anxious:'😰',fomo:'🤯',revenge:'😤',greedy:'🤑',fearful:'😨'}; return (<div key={em} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '8px', marginBottom: '4px' }}><div><span style={{ fontSize: '14px' }}>{emIcons[em]||''}</span><span style={{ color: theme.text, fontWeight: 600, fontSize: '13px', marginLeft: '6px', textTransform: 'capitalize' as const }}>{em}</span><span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '8px' }}>{data.count} • {((data.wins/data.count)*100).toFixed(0)}% WR</span></div><span style={{ color: data.pl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '13px' }}>{data.pl >= 0 ? '+' : ''}${data.pl.toFixed(0)}</span></div>) })}</div>
+                        </div>
+                        <div style={{ marginTop: '16px' }}><h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>🕐 By Session</h4><div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>{Object.entries(sessions).map(([s,data]) => { const sIcons: {[k:string]:string} = {asian:'🌏',london:'🇬🇧',newyork:'🇺🇸',overlap:'🔄'}; return (<div key={s} style={{ padding: '14px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const, border: '1px solid ' + theme.border }}><div style={{ fontSize: '20px', marginBottom: '4px' }}>{sIcons[s]||'🕐'}</div><div style={{ color: theme.text, fontWeight: 700, fontSize: '14px', textTransform: 'capitalize' as const }}>{s}</div><div style={{ color: data.pl >= 0 ? theme.success : theme.danger, fontWeight: 800, fontSize: '18px', marginTop: '4px' }}>{data.pl >= 0 ? '+' : ''}${data.pl.toFixed(0)}</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{data.count} trades • {((data.wins/data.count)*100).toFixed(0)}%</div></div>) })}</div></div>
+                      </>)
+                    })()}
+                  </div>
+                )}
+
+                {/* PSYCHOLOGY */}
+                {tradingSections[sec.id] && sec.id === 'psychology' && (
+                  <div style={{ marginTop: '20px' }}>
+                    <div style={{ marginBottom: '24px' }}>
+                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '16px' }}>✅ Pre-Trade Checklist</h4>
+                      <p style={{ color: theme.textMuted, fontSize: '12px', margin: '0 0 12px 0' }}>Complete before every trade. Resets when you log a trade.</p>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                        {checklist.map(item => (<div key={item.id} onClick={() => setChecklist(prev => prev.map(c => c.id === item.id ? { ...c, checked: !c.checked } : c))} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: item.checked ? (darkMode ? '#1e3a32' : '#f0fdf4') : (darkMode ? '#1e293b' : '#fafafa'), borderRadius: '10px', cursor: 'pointer', border: '1px solid ' + (item.checked ? theme.success + '40' : theme.border) }}><div style={{ width: '24px', height: '24px', borderRadius: '6px', background: item.checked ? theme.success : 'transparent', border: item.checked ? 'none' : '2px solid ' + theme.border, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '14px', flexShrink: 0 }}>{item.checked ? '✓' : ''}</div><span style={{ color: item.checked ? theme.success : theme.text, fontSize: '14px', textDecoration: item.checked ? 'line-through' : 'none' }}>{item.text}</span></div>))}
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}><input type="text" placeholder="Add custom check..." value={customChecklistItem} onChange={(e) => setCustomChecklistItem(e.target.value)} style={{ ...inputStyle, flex: 1, fontSize: '12px' }} /><button onClick={() => { if (customChecklistItem) { setChecklist(prev => [...prev, { id: Date.now(), text: customChecklistItem, checked: false }]); setCustomChecklistItem('') } }} style={{ ...btnPurple, fontSize: '12px', padding: '8px 14px' }}>+ Add</button></div>
+                      </div>
+                      <div style={{ marginTop: '12px', padding: '12px 16px', background: checklist.every(c=>c.checked) ? theme.success+'15' : theme.warning+'15', borderRadius: '10px', textAlign: 'center' as const }}><span style={{ color: checklist.every(c=>c.checked) ? theme.success : theme.warning, fontWeight: 700 }}>{checklist.filter(c=>c.checked).length}/{checklist.length} complete {checklist.every(c=>c.checked) ? '— ✅ Clear to trade!' : '— Complete checklist before trading'}</span></div>
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '16px' }}>⚠️ Rule Violations Log</h4>
+                      {(() => { const violations = trades.filter(t => t.rulesBroken); return violations.length === 0 ? <div style={{ padding: '20px', background: theme.success+'10', borderRadius: '12px', textAlign: 'center' as const }}><span style={{ color: theme.success, fontWeight: 700 }}>🎯 Clean record — no rule violations logged!</span></div> : <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>{violations.map(t => (<div key={t.id} style={{ padding: '10px 14px', background: theme.danger+'10', borderRadius: '8px', marginBottom: '6px', borderLeft: '3px solid '+theme.danger }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{t.instrument} — {t.date}</span><span style={{ color: theme.danger, fontWeight: 700, fontSize: '13px' }}>${parseFloat(t.profitLoss||'0').toFixed(2)}</span></div><div style={{ color: theme.danger, fontSize: '12px', marginTop: '4px' }}>⚠️ {t.rulesBroken}</div></div>))}</div> })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* PROP FIRM DASHBOARD */}
+                {tradingSections[sec.id] && sec.id === 'props' && (
+                  <div style={{ marginTop: '20px' }}>
+                    <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
+                        <select value={newPropAccount.firm} onChange={(e) => setNewPropAccount({ ...newPropAccount, firm: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }}><option value="FTMO">FTMO</option><option value="MyForexFunds">MyForexFunds</option><option value="TFT">The Funded Trader</option><option value="Apex">Apex Trader</option><option value="TopStep">TopStep</option><option value="E8">E8 Funding</option><option value="Custom">Custom</option></select>
+                        <select value={newPropAccount.type} onChange={(e) => setNewPropAccount({ ...newPropAccount, type: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }}><option value="forex">Forex</option><option value="futures">Futures</option></select>
+                        <select value={newPropAccount.phase} onChange={(e) => setNewPropAccount({ ...newPropAccount, phase: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }}><option value="phase1">Phase 1</option><option value="phase2">Phase 2</option><option value="funded">Funded</option></select>
+                        <input type="number" placeholder="Account $" value={newPropAccount.accountSize} onChange={(e) => setNewPropAccount({ ...newPropAccount, accountSize: e.target.value })} style={{ ...inputStyle, width: '100px', fontSize: '12px' }} />
+                        <input type="number" placeholder="Balance $" value={newPropAccount.currentBalance} onChange={(e) => setNewPropAccount({ ...newPropAccount, currentBalance: e.target.value })} style={{ ...inputStyle, width: '100px', fontSize: '12px' }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                        <input type="number" placeholder="Max DD $" value={newPropAccount.maxDrawdown} onChange={(e) => setNewPropAccount({ ...newPropAccount, maxDrawdown: e.target.value })} style={{ ...inputStyle, width: '100px', fontSize: '12px' }} />
+                        <input type="number" placeholder="Profit Target $" value={newPropAccount.profitTarget} onChange={(e) => setNewPropAccount({ ...newPropAccount, profitTarget: e.target.value })} style={{ ...inputStyle, width: '120px', fontSize: '12px' }} />
+                        <input type="date" value={newPropAccount.startDate} onChange={(e) => setNewPropAccount({ ...newPropAccount, startDate: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }} />
+                        <button onClick={addPropAccount} style={{ ...btnSuccess, fontSize: '12px' }}>🏢 Add Account</button>
+                      </div>
+                    </div>
+                    {propAccounts.length === 0 ? <div style={{ color: theme.textMuted, textAlign: 'center' as const, padding: '30px' }}>No prop accounts — add one above</div> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '20px' }}>{propAccounts.map(acc => {
+                      const profit = parseFloat(acc.currentBalance) - parseFloat(acc.accountSize)
+                      const profitPct = parseFloat(acc.profitTarget) > 0 ? (profit / parseFloat(acc.profitTarget)) * 100 : 0
+                      const ddUsed = parseFloat(acc.accountSize) - parseFloat(acc.currentBalance)
+                      const ddPct = parseFloat(acc.maxDrawdown) > 0 ? (Math.max(0, ddUsed) / parseFloat(acc.maxDrawdown)) * 100 : 0
+                      const isHealthy = ddPct < 50 && profitPct >= 0
+                      const phaseColors: {[k:string]:string} = { phase1: theme.warning, phase2: theme.accent, funded: theme.success }
+                      return (
+                        <div key={acc.id} style={{ padding: '20px', background: darkMode ? '#1e293b' : 'white', borderRadius: '16px', border: '2px solid ' + (isHealthy ? theme.success + '40' : theme.danger + '40') }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                            <div><div style={{ color: theme.text, fontWeight: 700, fontSize: '16px' }}>{acc.firm}</div><div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}><span style={{ padding: '2px 8px', background: (phaseColors[acc.phase]||theme.accent)+'20', color: phaseColors[acc.phase]||theme.accent, borderRadius: '4px', fontSize: '10px', fontWeight: 700, textTransform: 'capitalize' as const }}>{acc.phase}</span><span style={{ padding: '2px 8px', background: darkMode ? '#334155' : '#f1f5f9', borderRadius: '4px', fontSize: '10px', color: theme.textMuted }}>{acc.type}</span><span style={{ padding: '2px 8px', background: darkMode ? '#334155' : '#f1f5f9', borderRadius: '4px', fontSize: '10px', color: theme.textMuted }}>${parseFloat(acc.accountSize).toFixed(0)}</span></div></div>
+                            <div style={{ textAlign: 'right' as const }}><div style={{ color: profit >= 0 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 800 }}>{profit >= 0 ? '+' : ''}${profit.toFixed(0)}</div><button onClick={() => setPropAccounts(prev => prev.filter(a => a.id !== acc.id))} style={{ padding: '4px 8px', background: theme.danger+'20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px', marginTop: '4px' }}>Remove</button></div>
+                          </div>
+                          <div style={{ marginBottom: '10px' }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><span style={{ color: theme.textMuted, fontSize: '11px' }}>Profit Target</span><span style={{ color: theme.success, fontSize: '11px', fontWeight: 700 }}>{Math.min(profitPct, 100).toFixed(0)}%</span></div><div style={{ width: '100%', height: '8px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}><div style={{ width: Math.min(Math.max(profitPct, 0), 100) + '%', height: '100%', background: 'linear-gradient(90deg, '+theme.success+', #34d399)', borderRadius: '4px' }} /></div></div>
+                          <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><span style={{ color: theme.textMuted, fontSize: '11px' }}>Drawdown Used</span><span style={{ color: ddPct > 70 ? theme.danger : ddPct > 40 ? theme.warning : theme.success, fontSize: '11px', fontWeight: 700 }}>{ddPct.toFixed(0)}%</span></div><div style={{ width: '100%', height: '8px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}><div style={{ width: Math.min(ddPct, 100) + '%', height: '100%', background: ddPct > 70 ? theme.danger : ddPct > 40 ? theme.warning : theme.success, borderRadius: '4px' }} /></div></div>
+                        </div>
+                      )
+                    })}</div>}
+                    <div style={{ borderTop: '1px solid ' + theme.border, paddingTop: '20px' }}>
+                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>💸 Payout Tracker</h4>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
+                        <input type="number" placeholder="Payout $" value={newPayout.amount} onChange={(e) => setNewPayout({ ...newPayout, amount: e.target.value })} style={{ ...inputStyle, width: '120px', fontSize: '12px' }} />
+                        <input type="date" value={newPayout.date} onChange={(e) => setNewPayout({ ...newPayout, date: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }} />
+                        <button onClick={addPropPayout} style={{ ...btnSuccess, fontSize: '12px' }}>💰 Log Payout</button>
+                      </div>
+                      {propPayouts.length > 0 && <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>{propPayouts.map(p => (<div key={p.id} style={{ padding: '8px 14px', background: theme.success+'15', borderRadius: '8px', border: '1px solid '+theme.success+'30' }}><span style={{ color: theme.success, fontWeight: 700 }}>+${parseFloat(p.amount).toFixed(0)}</span><span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '8px' }}>{p.date}</span></div>))}</div>}
+                      <div style={{ marginTop: '12px', padding: '12px', background: 'linear-gradient(135deg, '+theme.success+'15, #fbbf2415)', borderRadius: '10px', textAlign: 'center' as const }}><span style={{ color: theme.success, fontWeight: 800, fontSize: '20px' }}>Total Payouts: ${propPayouts.reduce((s,p) => s + parseFloat(p.amount||'0'), 0).toFixed(0)}</span></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* RISK MANAGEMENT */}
+                {tradingSections[sec.id] && sec.id === 'risk' && (
+                  <div style={{ marginTop: '20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
+                      {[{l:'Max Daily Loss',k:'maxDailyLoss',prefix:'$',c:theme.danger},{l:'Max Weekly Loss',k:'maxWeeklyLoss',prefix:'$',c:theme.danger},{l:'Max Daily Trades',k:'maxDailyTrades',prefix:'',c:theme.warning},{l:'Risk Per Trade %',k:'maxRiskPerTrade',prefix:'',c:theme.accent},{l:'Max Open Positions',k:'maxOpenPositions',prefix:'',c:theme.purple}].map((f,i) => (<div key={i} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '6px', textTransform: 'uppercase' as const }}>{f.l}</label><input type="number" value={(riskLimits as any)[f.k]} onChange={(e) => setRiskLimits(prev => ({ ...prev, [f.k]: e.target.value }))} style={{ ...inputStyle, width: '100%', fontSize: '16px', fontWeight: 700, textAlign: 'center' as const, background: 'transparent', border: '2px solid '+f.c+'40', color: f.c }} /></div>))}
+                    </div>
+                    <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📊 Position Size Calculator</h4>
+                    {(() => {
+                      const accountBal = parseFloat(forexProp.currentBalance || forexProp.accountSize || '100000')
+                      const riskPct = parseFloat(riskLimits.maxRiskPerTrade || '2') / 100
+                      const riskAmount = accountBal * riskPct
+                      return (<div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                        <div style={{ padding: '20px', background: 'linear-gradient(135deg, '+theme.accent+'15, '+theme.purple+'15)', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid '+theme.accent+'30' }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>Account Balance</div><div style={{ color: theme.text, fontSize: '28px', fontWeight: 900 }}>${accountBal.toFixed(0)}</div></div>
+                        <div style={{ padding: '20px', background: 'linear-gradient(135deg, '+theme.danger+'15, '+theme.warning+'15)', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid '+theme.danger+'30' }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>Risk per Trade ({riskLimits.maxRiskPerTrade}%)</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 900 }}>${riskAmount.toFixed(0)}</div></div>
+                        <div style={{ padding: '20px', background: 'linear-gradient(135deg, '+theme.success+'15, #fbbf2415)', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid '+theme.success+'30' }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>Max Daily Exposure</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 900 }}>${(riskAmount * parseInt(riskLimits.maxDailyTrades || '5')).toFixed(0)}</div></div>
+                      </div>)
+                    })()}
+                  </div>
+                )}
+
+                {/* SESSION PLANNER */}
+                {tradingSections[sec.id] && sec.id === 'session' && (
+                  <div style={{ marginTop: '20px' }}>
+                    <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
+                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Market Bias</label><select value={sessionPlan.bias} onChange={(e) => setSessionPlan({ ...sessionPlan, bias: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }}><option value="bullish">🟢 Bullish</option><option value="bearish">🔴 Bearish</option><option value="neutral">⚪ Neutral / Range</option></select></div>
+                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Max Trades Today</label><input type="number" value={sessionPlan.maxTrades} onChange={(e) => setSessionPlan({ ...sessionPlan, maxTrades: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
+                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Max Loss Today $</label><input type="number" value={sessionPlan.maxLoss} onChange={(e) => setSessionPlan({ ...sessionPlan, maxLoss: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Pairs / Instruments</label><input type="text" placeholder="EURUSD, GBPUSD, NAS100..." value={sessionPlan.pairs} onChange={(e) => setSessionPlan({ ...sessionPlan, pairs: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
+                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Key Levels</label><input type="text" placeholder="1.0850 support, 1.0920 resistance..." value={sessionPlan.keyLevels} onChange={(e) => setSessionPlan({ ...sessionPlan, keyLevels: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>News / Events</label><input type="text" placeholder="CPI at 8:30, FOMC at 14:00..." value={sessionPlan.newsEvents} onChange={(e) => setSessionPlan({ ...sessionPlan, newsEvents: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
+                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Session Goals</label><input type="text" placeholder="Follow the plan, no revenge trades..." value={sessionPlan.goals} onChange={(e) => setSessionPlan({ ...sessionPlan, goals: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
+                      </div>
+                      <div style={{ marginBottom: '12px' }}><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Notes / Trade Ideas</label><textarea placeholder="What setups am I looking for today? What to avoid?" value={sessionPlan.notes} onChange={(e) => setSessionPlan({ ...sessionPlan, notes: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px', minHeight: '60px', resize: 'vertical' as const }} /></div>
+                      <button onClick={saveSessionPlan} style={{ ...btnPrimary, width: '100%', background: '#14b8a6', fontSize: '12px' }}>📋 Save Session Plan</button>
+                    </div>
+                    {sessionPlans.length > 0 && <div><h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>Previous Plans</h4>{sessionPlans.slice().reverse().slice(0,5).map(sp => (<div key={sp.id} style={{ padding: '12px 16px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '10px', marginBottom: '8px', border: '1px solid ' + theme.border }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}><span style={{ color: theme.text, fontWeight: 600 }}>{sp.date}</span><span style={{ padding: '2px 8px', background: sp.bias === 'bullish' ? theme.success+'20' : sp.bias === 'bearish' ? theme.danger+'20' : theme.textMuted+'20', color: sp.bias === 'bullish' ? theme.success : sp.bias === 'bearish' ? theme.danger : theme.textMuted, borderRadius: '4px', fontSize: '11px' }}>{sp.bias === 'bullish' ? '🟢' : sp.bias === 'bearish' ? '🔴' : '⚪'} {sp.bias}</span></div>{sp.pairs && <div style={{ fontSize: '12px', color: theme.textMuted }}>📊 {sp.pairs}</div>}{sp.keyLevels && <div style={{ fontSize: '12px', color: theme.textMuted }}>📏 {sp.keyLevels}</div>}{sp.goals && <div style={{ fontSize: '12px', color: theme.purple }}>🎯 {sp.goals}</div>}</div>))}</div>}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* COMPOUNDING CALCULATOR - always visible */}
             <div style={cardStyle}>
               <h3 style={{ margin: '0 0 16px 0', color: theme.success, fontSize: '18px' }}>📈 Compounding Calculator</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' }}>{[{l:'Starting $',v:tradingCalculator.startingCapital,k:'startingCapital'},{l:'Monthly Add',v:tradingCalculator.monthlyContribution,k:'monthlyContribution'},{l:'Return %',v:tradingCalculator.returnRate,k:'returnRate'},{l:'Years',v:tradingCalculator.years,k:'years'},{l:'Months',v:tradingCalculator.months,k:'months'},{l:'Days',v:tradingCalculator.days,k:'days'},{l:'Reinvest %',v:tradingCalculator.reinvestRate,k:'reinvestRate'}].map((f,i) => (<div key={i}><label style={{color:theme.textMuted,fontSize:'11px',display:'block',marginBottom:'4px'}}>{f.l}</label><input type="number" value={f.v} onChange={(e) => setTradingCalculator({...tradingCalculator, [f.k]: e.target.value})} style={{...inputStyle,width:'100%'}} /></div>))}<div><label style={{color:theme.textMuted,fontSize:'11px',display:'block',marginBottom:'4px'}}>Period</label><select value={tradingCalculator.returnPeriod} onChange={(e) => setTradingCalculator({...tradingCalculator, returnPeriod: e.target.value})} style={{...inputStyle,width:'100%'}}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div></div>
@@ -1216,3 +1540,4 @@ export default function Dashboard() {
     </div>
   )
 }
+
