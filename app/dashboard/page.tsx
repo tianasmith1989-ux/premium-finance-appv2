@@ -139,8 +139,7 @@ export default function Dashboard() {
   const [showConfetti, setShowConfetti] = useState(false)
   const [achievements, setAchievements] = useState<string[]>([])
   const [newAchievement, setNewAchievement] = useState<string | null>(null)
-
-  // What-If Scenario state
+// What-If Scenario state
   const [showWhatIf, setShowWhatIf] = useState(false)
   const [whatIfExtra, setWhatIfExtra] = useState('500')
   const [whatIfReturn, setWhatIfReturn] = useState('7')
@@ -148,7 +147,7 @@ export default function Dashboard() {
 
   // Quest Board state
   const [expandedQuestId, setExpandedQuestId] = useState<string | null>(null)
-   // ===== GAMIFICATION SYSTEM =====
+ // ===== GAMIFICATION SYSTEM =====
   const getLevel = (xp: number) => {
     if (xp >= 5000) return { level: 10, title: '🏆 Financial Legend', color: '#fbbf24', next: 99999 }
     if (xp >= 3500) return { level: 9, title: '💎 Diamond Hands', color: '#60a5fa', next: 5000 }
@@ -1167,303 +1166,268 @@ const calculateForexProp = () => {
             </div>
           </div>
         )}
+   {activeTab === 'overview' && (
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
 
-            {/* ===== ASSET vs LIABILITY SCORECARD (Kiyosaki Style) ===== */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <div>
-                  <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>⚖️ Asset vs Liability Scorecard</h2>
-                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Kiyosaki Rule: Assets put money IN your pocket. Liabilities take money OUT.</p>
-                </div>
-              </div>
-
-              {/* Tug of War Visual */}
-              {(() => {
-                const assetCashFlow = incomeStreams.filter(i => i.type === 'passive').reduce((sum, i) => sum + convertToMonthly(parseFloat(i.amount || '0'), i.frequency), 0)
-                const liabilityCashFlow = monthlyDebtPayments + expenses.filter(e => e.targetDebtId).reduce((sum, e) => sum + convertToMonthly(parseFloat(e.amount || '0'), e.frequency), 0)
-                const totalFlow = assetCashFlow + liabilityCashFlow
-                const assetPct = totalFlow > 0 ? (assetCashFlow / totalFlow) * 100 : 50
-                const isCashFlowPositive = assetCashFlow > liabilityCashFlow
-
-                return (
-                  <>
-                    {/* Tug of war bar */}
-                    <div style={{ marginBottom: '24px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span style={{ color: theme.success, fontWeight: 700, fontSize: '14px' }}>💪 Assets: +${assetCashFlow.toFixed(0)}/mo</span>
-                        <span style={{ color: theme.danger, fontWeight: 700, fontSize: '14px' }}>-${liabilityCashFlow.toFixed(0)}/mo 🏋️</span>
-                      </div>
-                      <div style={{ width: '100%', height: '20px', background: theme.danger + '40', borderRadius: '10px', overflow: 'hidden', position: 'relative' as const }}>
-                        <div style={{ width: assetPct + '%', height: '100%', background: 'linear-gradient(90deg, #10b981, #34d399)', borderRadius: '10px', transition: 'width 0.5s ease', boxShadow: isCashFlowPositive ? '0 0 12px #10b98140' : 'none' }} />
-                        {/* Center marker */}
-                        <div style={{ position: 'absolute' as const, left: '50%', top: '-4px', bottom: '-4px', width: '3px', background: theme.text, transform: 'translateX(-50%)', borderRadius: '2px' }} />
-                      </div>
-                      <div style={{ textAlign: 'center' as const, marginTop: '8px' }}>
-                        <span style={{ padding: '4px 12px', background: isCashFlowPositive ? theme.success + '20' : theme.danger + '20', color: isCashFlowPositive ? theme.success : theme.danger, borderRadius: '6px', fontSize: '12px', fontWeight: 700 }}>
-                          {isCashFlowPositive ? '✅ Cash Flow Positive!' : '⚠️ Liabilities winning — build more assets!'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                      {/* Assets Column */}
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                          <h3 style={{ margin: 0, color: theme.success, fontSize: '16px' }}>✅ Real Assets</h3>
-                          <span style={{ color: theme.success, fontWeight: 700, fontSize: '14px' }}>+${assetCashFlow.toFixed(0)}/mo</span>
-                        </div>
-                        <p style={{ margin: '0 0 12px 0', color: theme.textMuted, fontSize: '11px' }}>Things that generate income or appreciate in value</p>
-                        
-                        {/* Add Asset */}
-                        <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
-                          <input type="text" placeholder="Asset name" value={newAsset.name} onChange={(e) => setNewAsset({ ...newAsset, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 80px', padding: '8px 12px', fontSize: '13px' }} />
-                          <input type="number" placeholder="Value $" value={newAsset.value} onChange={(e) => setNewAsset({ ...newAsset, value: e.target.value })} style={{ ...inputStyle, width: '80px', padding: '8px 12px', fontSize: '13px' }} />
-                          <select value={newAsset.type} onChange={(e) => setNewAsset({ ...newAsset, type: e.target.value })} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}>
-                            <option value="savings">💵 Savings</option><option value="investment">📈 Investment</option><option value="property">🏠 Property</option><option value="business">🏢 Business</option><option value="crypto">🪙 Crypto</option><option value="other">📦 Other</option>
-                          </select>
-                          <button onClick={addAsset} style={{ ...btnSuccess, padding: '8px 14px', fontSize: '12px' }}>+</button>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', maxHeight: '250px', overflowY: 'auto' as const }}>
-                          {assets.length === 0 ? (
-                            <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const, border: '2px dashed ' + theme.success + '30' }}>
-                              <div style={{ fontSize: '20px', marginBottom: '8px' }}>📈</div>
-                              <div style={{ color: theme.textMuted, fontSize: '12px' }}>Add investments, rental properties, businesses...</div>
-                            </div>
-                          ) : assets.map(asset => {
-                            const typeIcons: {[key: string]: string} = { savings: '💵', investment: '📈', property: '🏠', business: '🏢', crypto: '🪙', vehicle: '🚗', other: '📦' }
-                            return (
-                              <div key={asset.id} style={{ padding: '12px 14px', background: darkMode ? 'linear-gradient(135deg, #1e3a32, #1e293b)' : '#f0fdf4', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.success + '20' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                  <span style={{ fontSize: '20px' }}>{typeIcons[asset.type] || '📦'}</span>
-                                  <div><div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{asset.name}</div><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'capitalize' as const }}>{asset.type}</div></div>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ color: theme.success, fontWeight: 700, fontSize: '16px' }}>${parseFloat(asset.value).toFixed(0)}</span>
-                                  <button onClick={() => deleteAsset(asset.id)} style={{ padding: '4px 8px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>✕</button>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                        {assets.length > 0 && (
-                          <div style={{ marginTop: '12px', padding: '10px', background: theme.success + '10', borderRadius: '8px', textAlign: 'center' as const }}>
-                            <span style={{ color: theme.success, fontWeight: 700, fontSize: '16px' }}>Total: ${totalAssets.toFixed(0)}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Liabilities Column */}
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                          <h3 style={{ margin: 0, color: theme.danger, fontSize: '16px' }}>❌ Liabilities</h3>
-                          <span style={{ color: theme.danger, fontWeight: 700, fontSize: '14px' }}>-${liabilityCashFlow.toFixed(0)}/mo</span>
-                        </div>
-                        <p style={{ margin: '0 0 12px 0', color: theme.textMuted, fontSize: '11px' }}>Things that take money out of your pocket every month</p>
-
-                        {/* Add Liability */}
-                        <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
-                          <input type="text" placeholder="Liability" value={newLiability.name} onChange={(e) => setNewLiability({ ...newLiability, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 80px', padding: '8px 12px', fontSize: '13px' }} />
-                          <input type="number" placeholder="Value $" value={newLiability.value} onChange={(e) => setNewLiability({ ...newLiability, value: e.target.value })} style={{ ...inputStyle, width: '80px', padding: '8px 12px', fontSize: '13px' }} />
-                          <select value={newLiability.type} onChange={(e) => setNewLiability({ ...newLiability, type: e.target.value })} style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}>
-                            <option value="loan">🏦 Loan</option><option value="credit">💳 Credit Card</option><option value="mortgage">🏠 Mortgage</option><option value="car">🚗 Car Loan</option><option value="other">📋 Other</option>
-                          </select>
-                          <button onClick={addLiability} style={{ ...btnDanger, padding: '8px 14px', fontSize: '12px' }}>+</button>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', maxHeight: '250px', overflowY: 'auto' as const }}>
-                          {/* Auto-include debts as liabilities */}
-                          {debts.map(debt => (
-                            <div key={'debt-liab-'+debt.id} style={{ padding: '12px 14px', background: darkMode ? 'linear-gradient(135deg, #3a1e1e, #1e293b)' : '#fef2f2', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.danger + '20' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ fontSize: '20px' }}>💳</span>
-                                <div><div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{debt.name}</div><div style={{ color: theme.danger, fontSize: '11px' }}>-${convertToMonthly(parseFloat(debt.minPayment || '0'), debt.frequency).toFixed(0)}/mo • {debt.interestRate}% APR</div></div>
-                              </div>
-                              <span style={{ color: theme.danger, fontWeight: 700, fontSize: '16px' }}>${parseFloat(debt.balance).toFixed(0)}</span>
-                            </div>
-                          ))}
-                          {liabilities.map(l => {
-                            const typeIcons: {[key: string]: string} = { loan: '🏦', credit: '💳', mortgage: '🏠', car: '🚗', other: '📋' }
-                            return (
-                              <div key={l.id} style={{ padding: '12px 14px', background: darkMode ? 'linear-gradient(135deg, #3a1e1e, #1e293b)' : '#fef2f2', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.danger + '20' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                  <span style={{ fontSize: '20px' }}>{typeIcons[l.type] || '📋'}</span>
-                                  <div><div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{l.name}</div><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'capitalize' as const }}>{l.type}</div></div>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ color: theme.danger, fontWeight: 700, fontSize: '16px' }}>${parseFloat(l.value).toFixed(0)}</span>
-                                  <button onClick={() => deleteLiability(l.id)} style={{ padding: '4px 8px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>✕</button>
-                                </div>
-                              </div>
-                            )
-                          })}
-                          {debts.length === 0 && liabilities.length === 0 && (
-                            <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const, border: '2px dashed ' + theme.danger + '30' }}>
-                              <div style={{ fontSize: '20px', marginBottom: '8px' }}>🎉</div>
-                              <div style={{ color: theme.textMuted, fontSize: '12px' }}>No liabilities — that's the dream!</div>
-                            </div>
-                          )}
-                        </div>
-                        {(totalLiabilities + totalDebtBalance) > 0 && (
-                          <div style={{ marginTop: '12px', padding: '10px', background: theme.danger + '10', borderRadius: '8px', textAlign: 'center' as const }}>
-                            <span style={{ color: theme.danger, fontWeight: 700, fontSize: '16px' }}>Total: ${(totalLiabilities + totalDebtBalance).toFixed(0)}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )
-              })()}
-            </div>
-
-            {/* ===== WHAT-IF SCENARIO SLIDERS ===== */}
+            {/* ===== RAT RACE ESCAPE TRACKER - HERO SECTION ===== */}
             {(() => {
-              const [showWhatIf, setShowWhatIf] = useState(false)
-              const [whatIfExtra, setWhatIfExtra] = useState('500')
-              const [whatIfReturn, setWhatIfReturn] = useState('7')
-              const [whatIfYears, setWhatIfYears] = useState('10')
-
-              const extraMonthly = parseFloat(whatIfExtra || '0')
-              const annualReturn = parseFloat(whatIfReturn || '0') / 100
-              const years = parseInt(whatIfYears || '0')
-              const monthlyReturn = annualReturn / 12
+              const totalMonthlyExpenses = monthlyExpenses + monthlyDebtPayments
+              const escapePercent = totalMonthlyExpenses > 0 ? Math.min((passiveIncome / totalMonthlyExpenses) * 100, 100) : 0
+              const passiveDaily = passiveIncome / 30
+              const passiveHourly = passiveIncome / 720
+              const isEscaped = escapePercent >= 100
+              const milestones = [
+                { pct: 25, label: '🌱 Seed Planted', desc: 'Your money is starting to work' },
+                { pct: 50, label: '🔥 Halfway Free', desc: 'Half your bills paid by assets' },
+                { pct: 75, label: '⚡ Almost There', desc: 'Freedom is in sight' },
+                { pct: 100, label: '🏆 RAT RACE ESCAPED', desc: 'Your assets cover your life!' },
+              ]
+              const currentMilestone = milestones.filter(m => escapePercent >= m.pct).pop()
+              const nextMilestone = milestones.find(m => escapePercent < m.pct)
               
-              // Project future passive income if surplus invested
-              const currentInvestments = assets.filter(a => a.type === 'investment' || a.type === 'crypto').reduce((sum, a) => sum + parseFloat(a.value || '0'), 0)
-              let futureValue = currentInvestments
-              let monthlyPassiveProjected = passiveIncome
-              for (let m = 0; m < years * 12; m++) {
-                futureValue = futureValue * (1 + monthlyReturn) + extraMonthly
-              }
-              const annualDividend = futureValue * 0.04 // 4% rule
-              const monthlyFromInvestments = annualDividend / 12
-              const projectedTotalPassive = passiveIncome + monthlyFromInvestments
-              const projectedEscapePct = totalOutgoing > 0 ? Math.min((projectedTotalPassive / totalOutgoing) * 100, 100) : 0
-              const monthsToEscape = (() => {
-                if (passiveIncome >= totalOutgoing) return 0
-                let bal = currentInvestments; let months = 0
-                while (months < 600) {
-                  bal = bal * (1 + monthlyReturn) + extraMonthly
-                  const projected = passiveIncome + ((bal * 0.04) / 12)
-                  if (projected >= totalOutgoing) return months
-                  months++
-                }
-                return -1
-              })()
-
               return (
-                <div style={cardStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowWhatIf(!showWhatIf)}>
-                    <div>
-                      <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🔮 What-If Scenarios</h2>
-                      <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>See how investing your surplus accelerates your freedom date</p>
+                <div style={{ padding: '32px', background: isEscaped ? 'linear-gradient(135deg, #fbbf2415, #10b98115, #fbbf2415)' : (darkMode ? 'linear-gradient(135deg, #1e293b, #0f172a, #1e1b4b)' : 'linear-gradient(135deg, #faf5ff, #f0f9ff, #f0fdf4)'), borderRadius: '24px', border: isEscaped ? '2px solid #fbbf24' : '2px solid ' + theme.border, position: 'relative' as const, overflow: 'hidden' }}>
+                  {/* Animated background glow */}
+                  <div style={{ position: 'absolute' as const, top: '-50%', right: '-20%', width: '400px', height: '400px', background: `radial-gradient(circle, ${currentLevel.color}15, transparent 70%)`, borderRadius: '50%', pointerEvents: 'none' as const }} />
+                  
+                  <div style={{ position: 'relative' as const, zIndex: 1 }}>
+                    {/* Title */}
+                    <div style={{ textAlign: 'center' as const, marginBottom: '28px' }}>
+                      <div style={{ fontSize: '14px', color: theme.textMuted, letterSpacing: '3px', textTransform: 'uppercase' as const, marginBottom: '8px', fontWeight: 600 }}>RAT RACE ESCAPE TRACKER</div>
+                      <div style={{ fontSize: '56px', fontWeight: 900, color: isEscaped ? '#fbbf24' : theme.text, lineHeight: 1 }}>{escapePercent.toFixed(1)}%</div>
+                      <div style={{ fontSize: '16px', color: isEscaped ? '#fbbf24' : theme.purple, fontWeight: 700, marginTop: '8px' }}>
+                        {isEscaped ? '🏆 YOU HAVE ESCAPED THE RAT RACE! 🏆' : currentMilestone ? currentMilestone.label : '🐀 Still in the Rat Race'}
+                      </div>
+                      {!isEscaped && currentMilestone && <div style={{ fontSize: '13px', color: theme.textMuted, marginTop: '4px' }}>{currentMilestone.desc}</div>}
                     </div>
-                    <div style={{ fontSize: '24px', color: theme.textMuted, transition: 'transform 0.3s', transform: showWhatIf ? 'rotate(180deg)' : 'rotate(0)' }}>▼</div>
+
+                    {/* Main Progress Bar with Milestones */}
+                    <div style={{ position: 'relative' as const, marginBottom: '32px', padding: '0 4px' }}>
+                      {/* Milestone markers */}
+                      <div style={{ position: 'relative' as const, height: '20px', marginBottom: '8px' }}>
+                        {milestones.map(m => (
+                          <div key={m.pct} style={{ position: 'absolute' as const, left: m.pct + '%', transform: 'translateX(-50%)', textAlign: 'center' as const }}>
+                            <span style={{ fontSize: '14px', opacity: escapePercent >= m.pct ? 1 : 0.3 }}>{m.pct === 100 ? '🏁' : m.pct === 75 ? '⚡' : m.pct === 50 ? '🔥' : '🌱'}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {/* The bar */}
+                      <div style={{ width: '100%', height: '28px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '14px', overflow: 'hidden', position: 'relative' as const, boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)' }}>
+                        <div style={{ width: escapePercent + '%', height: '100%', background: isEscaped ? 'linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)' : escapePercent > 50 ? 'linear-gradient(90deg, #8b5cf6, #3b82f6, #10b981)' : 'linear-gradient(90deg, #8b5cf6, #3b82f6)', borderRadius: '14px', transition: 'width 1s ease', position: 'relative' as const, boxShadow: isEscaped ? '0 0 20px #fbbf2460' : '0 0 10px rgba(139,92,246,0.3)' }}>
+                          {/* Animated shimmer */}
+                          <div style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)', animation: 'shimmer 2s infinite', borderRadius: '14px' }} />
+                        </div>
+                        {/* Milestone tick marks */}
+                        {[25, 50, 75].map(pct => (
+                          <div key={pct} style={{ position: 'absolute' as const, left: pct + '%', top: 0, bottom: 0, width: '2px', background: darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }} />
+                        ))}
+                      </div>
+                      <style>{`@keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(200%)} }`}</style>
+                      {/* Percentage labels */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', padding: '0 2px' }}>
+                        {milestones.map(m => (
+                          <div key={m.pct} style={{ fontSize: '10px', color: escapePercent >= m.pct ? theme.text : theme.textMuted, fontWeight: escapePercent >= m.pct ? 700 : 400, textAlign: 'center' as const, width: '60px', marginLeft: m.pct === 25 ? 'calc(25% - 30px)' : undefined }}>
+                            {m.pct}%
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Key Stats Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                      <div style={{ padding: '16px', background: darkMode ? '#334155' : 'white', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.border }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' as const, marginBottom: '6px' }}>Passive Income</div>
+                        <div style={{ color: theme.success, fontSize: '26px', fontWeight: 800 }}>${passiveIncome.toFixed(0)}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px' }}>/month</div>
+                      </div>
+                      <div style={{ padding: '16px', background: darkMode ? '#334155' : 'white', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.border }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' as const, marginBottom: '6px' }}>Total Outgoing</div>
+                        <div style={{ color: theme.danger, fontSize: '26px', fontWeight: 800 }}>${totalMonthlyExpenses.toFixed(0)}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px' }}>/month</div>
+                      </div>
+                      <div style={{ padding: '16px', background: darkMode ? '#334155' : 'white', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.border }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' as const, marginBottom: '6px' }}>Money Works 24/7</div>
+                        <div style={{ color: theme.purple, fontSize: '26px', fontWeight: 800 }}>${passiveHourly.toFixed(2)}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px' }}>/hour while you sleep</div>
+                      </div>
+                      <div style={{ padding: '16px', background: darkMode ? '#334155' : 'white', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.border }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' as const, marginBottom: '6px' }}>Gap to Freedom</div>
+                        <div style={{ color: (totalMonthlyExpenses - passiveIncome) <= 0 ? theme.success : theme.warning, fontSize: '26px', fontWeight: 800 }}>${Math.max(0, totalMonthlyExpenses - passiveIncome).toFixed(0)}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px' }}>{(totalMonthlyExpenses - passiveIncome) <= 0 ? 'COVERED! 🎉' : 'passive income needed'}</div>
+                      </div>
+                    </div>
+
+                    {/* Next milestone hint */}
+                    {nextMilestone && (
+                      <div style={{ marginTop: '16px', padding: '12px 20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const, border: '1px dashed ' + theme.border }}>
+                        <span style={{ color: theme.textMuted, fontSize: '13px' }}>Next milestone: </span>
+                        <span style={{ color: theme.purple, fontSize: '13px', fontWeight: 700 }}>{nextMilestone.label}</span>
+                        <span style={{ color: theme.textMuted, fontSize: '13px' }}> — need ${(totalMonthlyExpenses * nextMilestone.pct / 100 - passiveIncome).toFixed(0)} more in passive income</span>
+                      </div>
+                    )}
                   </div>
-
-                  {showWhatIf && (
-                    <div style={{ marginTop: '24px' }}>
-                      {/* Sliders */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '28px' }}>
-                        <div>
-                          <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '8px' }}>💰 Monthly Investment</label>
-                          <input type="range" min="0" max="5000" step="50" value={whatIfExtra} onChange={(e) => setWhatIfExtra(e.target.value)} style={{ width: '100%', accentColor: theme.purple }} />
-                          <div style={{ textAlign: 'center' as const, marginTop: '4px' }}>
-                            <span style={{ color: theme.purple, fontWeight: 800, fontSize: '22px' }}>${whatIfExtra}</span>
-                            <span style={{ color: theme.textMuted, fontSize: '12px' }}>/month</span>
-                          </div>
-                        </div>
-                        <div>
-                          <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '8px' }}>📈 Annual Return</label>
-                          <input type="range" min="1" max="20" step="0.5" value={whatIfReturn} onChange={(e) => setWhatIfReturn(e.target.value)} style={{ width: '100%', accentColor: theme.success }} />
-                          <div style={{ textAlign: 'center' as const, marginTop: '4px' }}>
-                            <span style={{ color: theme.success, fontWeight: 800, fontSize: '22px' }}>{whatIfReturn}%</span>
-                            <span style={{ color: theme.textMuted, fontSize: '12px' }}>/year</span>
-                          </div>
-                        </div>
-                        <div>
-                          <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '8px' }}>⏰ Time Horizon</label>
-                          <input type="range" min="1" max="30" step="1" value={whatIfYears} onChange={(e) => setWhatIfYears(e.target.value)} style={{ width: '100%', accentColor: theme.accent }} />
-                          <div style={{ textAlign: 'center' as const, marginTop: '4px' }}>
-                            <span style={{ color: theme.accent, fontWeight: 800, fontSize: '22px' }}>{whatIfYears}</span>
-                            <span style={{ color: theme.textMuted, fontSize: '12px' }}> years</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Results */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '20px' }}>
-                        <div style={{ padding: '20px', background: 'linear-gradient(135deg, #10b98120, #10b98110)', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.success + '30' }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' as const, marginBottom: '6px' }}>Portfolio Value</div>
-                          <div style={{ color: theme.success, fontSize: '28px', fontWeight: 900 }}>${futureValue >= 1000000 ? (futureValue / 1000000).toFixed(1) + 'M' : futureValue.toFixed(0)}</div>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>in {whatIfYears} years</div>
-                        </div>
-                        <div style={{ padding: '20px', background: 'linear-gradient(135deg, #8b5cf620, #8b5cf610)', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.purple + '30' }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' as const, marginBottom: '6px' }}>Passive Income</div>
-                          <div style={{ color: theme.purple, fontSize: '28px', fontWeight: 900 }}>${projectedTotalPassive.toFixed(0)}</div>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>/month (4% rule)</div>
-                        </div>
-                        <div style={{ padding: '20px', background: 'linear-gradient(135deg, #3b82f620, #3b82f610)', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.accent + '30' }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' as const, marginBottom: '6px' }}>Escape Progress</div>
-                          <div style={{ color: projectedEscapePct >= 100 ? '#fbbf24' : theme.accent, fontSize: '28px', fontWeight: 900 }}>{projectedEscapePct.toFixed(0)}%</div>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>{projectedEscapePct >= 100 ? '🏆 ESCAPED!' : 'of expenses covered'}</div>
-                        </div>
-                        <div style={{ padding: '20px', background: monthsToEscape >= 0 && monthsToEscape < 600 ? 'linear-gradient(135deg, #fbbf2420, #fbbf2410)' : 'linear-gradient(135deg, #ef444420, #ef444410)', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + (monthsToEscape >= 0 && monthsToEscape < 600 ? '#fbbf24' : theme.danger) + '30' }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' as const, marginBottom: '6px' }}>Freedom Date</div>
-                          <div style={{ color: monthsToEscape >= 0 && monthsToEscape < 600 ? '#fbbf24' : theme.danger, fontSize: '28px', fontWeight: 900 }}>
-                            {monthsToEscape === 0 ? 'NOW!' : monthsToEscape > 0 && monthsToEscape < 600 ? Math.floor(monthsToEscape/12) + 'y ' + (monthsToEscape%12) + 'm' : '∞'}
-                          </div>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>
-                            {monthsToEscape === 0 ? 'Already free!' : monthsToEscape > 0 && monthsToEscape < 600 ? 'until passive > expenses' : 'Need more investment'}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Projected escape progress bar */}
-                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                          <span style={{ color: theme.textMuted, fontSize: '12px' }}>🐀 Rat Race</span>
-                          <span style={{ color: theme.textMuted, fontSize: '12px' }}>🏆 Freedom</span>
-                        </div>
-                        <div style={{ width: '100%', height: '20px', background: darkMode ? '#0f172a' : '#e2e8f0', borderRadius: '10px', overflow: 'hidden', position: 'relative' as const }}>
-                          {/* Current position */}
-                          <div style={{ position: 'absolute' as const, width: Math.min((passiveIncome / Math.max(totalOutgoing, 1)) * 100, 100) + '%', height: '100%', background: theme.accent + '60', borderRadius: '10px' }} />
-                          {/* Projected position */}
-                          <div style={{ position: 'absolute' as const, width: Math.min(projectedEscapePct, 100) + '%', height: '100%', background: 'linear-gradient(90deg, ' + theme.purple + ', ' + theme.success + ')', borderRadius: '10px', opacity: 0.8 }} />
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                          <span style={{ color: theme.accent, fontSize: '11px', fontWeight: 600 }}>Now: {(passiveIncome / Math.max(totalOutgoing, 1) * 100).toFixed(0)}%</span>
-                          <span style={{ color: theme.purple, fontSize: '11px', fontWeight: 600 }}>In {whatIfYears}yr: {projectedEscapePct.toFixed(0)}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )
             })()}
 
-            {/* ===== GOAL CALCULATOR ===== */}
-            <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🧮 Goal Calculator</h3>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' as const }}>
-                <input type="number" placeholder="Target $" value={goalCalculator.targetAmount} onChange={(e) => setGoalCalculator({ ...goalCalculator, targetAmount: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
-                <input type="number" placeholder="Current $" value={goalCalculator.currentAmount} onChange={(e) => setGoalCalculator({ ...goalCalculator, currentAmount: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
-                <input type="number" placeholder="Monthly $" value={goalCalculator.monthlyContribution} onChange={(e) => setGoalCalculator({ ...goalCalculator, monthlyContribution: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
-                <input type="number" placeholder="Interest %" value={goalCalculator.interestRate} onChange={(e) => setGoalCalculator({ ...goalCalculator, interestRate: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
-                <input type="number" placeholder="Years" value={goalCalculator.years} onChange={(e) => setGoalCalculator({ ...goalCalculator, years: e.target.value })} style={{ ...inputStyle, width: '80px' }} />
-                <button onClick={calculateGoal} disabled={calculating} style={btnPurple}>{calculating ? '...' : 'Calculate'}</button>
-              </div>
-              {calculatorResult && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
-                  <div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Time</div><div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>{Math.floor(calculatorResult.totalMonths/12)}y {calculatorResult.totalMonths%12}m</div></div>
-                  <div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Future Value</div><div style={{ color: theme.success, fontSize: '20px', fontWeight: 700 }}>${calculatorResult.futureValue.toFixed(0)}</div></div>
-                  <div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Contributed</div><div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>${calculatorResult.totalContributed.toFixed(0)}</div></div>
-                  <div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Interest Earned</div><div style={{ color: theme.purple, fontSize: '20px', fontWeight: 700 }}>${calculatorResult.interestEarned.toFixed(0)}</div></div>
+            {/* ===== CASH FLOW QUADRANT (Kiyosaki E/S/B/I) ===== */}
+            {(() => {
+              const employeeIncome = incomeStreams.filter(i => i.type === 'active' && !i.name.toLowerCase().includes('business') && !i.name.toLowerCase().includes('freelance') && !i.name.toLowerCase().includes('contract')).reduce((sum, i) => sum + convertToMonthly(parseFloat(i.amount || '0'), i.frequency), 0)
+              const selfEmployedIncome = incomeStreams.filter(i => i.type === 'active' && (i.name.toLowerCase().includes('freelance') || i.name.toLowerCase().includes('contract') || i.name.toLowerCase().includes('consulting') || i.name.toLowerCase().includes('side'))).reduce((sum, i) => sum + convertToMonthly(parseFloat(i.amount || '0'), i.frequency), 0)
+              const businessIncome = incomeStreams.filter(i => i.type === 'passive' && (i.name.toLowerCase().includes('business') || i.name.toLowerCase().includes('royalt') || i.name.toLowerCase().includes('license'))).reduce((sum, i) => sum + convertToMonthly(parseFloat(i.amount || '0'), i.frequency), 0)
+              const investorIncome = incomeStreams.filter(i => i.type === 'passive' && (i.name.toLowerCase().includes('dividend') || i.name.toLowerCase().includes('interest') || i.name.toLowerCase().includes('rental') || i.name.toLowerCase().includes('invest') || i.name.toLowerCase().includes('stock') || i.name.toLowerCase().includes('etf') || i.name.toLowerCase().includes('crypto'))).reduce((sum, i) => sum + convertToMonthly(parseFloat(i.amount || '0'), i.frequency), 0)
+              const otherPassive = passiveIncome - businessIncome - investorIncome
+              const totalAll = employeeIncome + selfEmployedIncome + businessIncome + investorIncome + otherPassive
+              const leftSide = employeeIncome + selfEmployedIncome
+              const rightSide = businessIncome + investorIncome + otherPassive
+              
+              const quadrants = [
+                { key: 'E', label: 'Employee', desc: 'You work for money', amount: employeeIncome, color: '#ef4444', icon: '👔', side: 'left' },
+                { key: 'S', label: 'Self-Employed', desc: 'You own a job', amount: selfEmployedIncome, color: '#f59e0b', icon: '🔧', side: 'left' },
+                { key: 'B', label: 'Business Owner', desc: 'Systems work for you', amount: businessIncome + otherPassive, color: '#10b981', icon: '🏢', side: 'right' },
+                { key: 'I', label: 'Investor', desc: 'Money works for you', amount: investorIncome, color: '#8b5cf6', icon: '📈', side: 'right' },
+              ]
+
+              return (
+                <div style={cardStyle}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                    <div>
+                      <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>💡 Cash Flow Quadrant</h2>
+                      <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Where does your income come from? Move from left → right to build freedom.</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <div style={{ textAlign: 'center' as const }}><div style={{ fontSize: '10px', color: theme.danger }}>⬅️ You work</div><div style={{ color: theme.danger, fontWeight: 800, fontSize: '18px' }}>${leftSide.toFixed(0)}</div></div>
+                      <div style={{ width: '2px', height: '30px', background: theme.border }} />
+                      <div style={{ textAlign: 'center' as const }}><div style={{ fontSize: '10px', color: theme.success }}>Money works ➡️</div><div style={{ color: theme.success, fontWeight: 800, fontSize: '18px' }}>${rightSide.toFixed(0)}</div></div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px', background: theme.border, borderRadius: '20px', overflow: 'hidden' }}>
+                    {quadrants.map(q => {
+                      const pct = totalAll > 0 ? (q.amount / totalAll) * 100 : 0
+                      const isActive = q.amount > 0
+                      return (
+                        <div key={q.key} style={{ padding: '24px', background: isActive ? (darkMode ? '#1e293b' : 'white') : (darkMode ? '#151e2d' : '#f8fafc'), position: 'relative' as const, overflow: 'hidden' }}>
+                          {/* Glow effect for active quadrants */}
+                          {isActive && <div style={{ position: 'absolute' as const, top: '-20px', right: '-20px', width: '100px', height: '100px', background: q.color + '15', borderRadius: '50%' }} />}
+                          <div style={{ position: 'relative' as const, zIndex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                              <div>
+                                <div style={{ fontSize: '28px', marginBottom: '4px' }}>{q.icon}</div>
+                                <div style={{ fontSize: '32px', fontWeight: 900, color: isActive ? q.color : theme.textMuted + '40' }}>{q.key}</div>
+                              </div>
+                              <div style={{ textAlign: 'right' as const }}>
+                                <div style={{ color: isActive ? theme.text : theme.textMuted, fontSize: '24px', fontWeight: 800 }}>${q.amount.toFixed(0)}</div>
+                                <div style={{ color: theme.textMuted, fontSize: '12px' }}>{pct.toFixed(0)}% of income</div>
+                              </div>
+                            </div>
+                            <div style={{ color: isActive ? theme.text : theme.textMuted, fontWeight: 600, fontSize: '15px' }}>{q.label}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>{q.desc}</div>
+                            {/* Mini progress bar */}
+                            <div style={{ width: '100%', height: '6px', background: darkMode ? '#0f172a' : '#e2e8f0', borderRadius: '3px', marginTop: '12px', overflow: 'hidden' }}>
+                              <div style={{ width: pct + '%', height: '100%', background: q.color, borderRadius: '3px', transition: 'width 0.5s ease' }} />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  
+                  {/* Direction indicator */}
+                  <div style={{ marginTop: '16px', padding: '12px 20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}>
+                    {rightSide > leftSide ? (
+                      <span style={{ color: theme.success, fontWeight: 700, fontSize: '14px' }}>🎯 Cash Flow Positive — Your money earns more than your time!</span>
+                    ) : rightSide > 0 ? (
+                      <span style={{ color: theme.warning, fontWeight: 700, fontSize: '14px' }}>📈 Building momentum — {((rightSide / Math.max(totalAll, 1)) * 100).toFixed(0)}% from the right side</span>
+                    ) : (
+                      <span style={{ color: theme.textMuted, fontWeight: 600, fontSize: '14px' }}>💡 Tip: Add passive income streams (dividends, rental, business) to light up the right side</span>
+                    )}
+                  </div>
                 </div>
-              )}
+              )
+            })()}
+
+            {/* ===== PASSIVE INCOME PIPELINE ===== */}
+            <div style={cardStyle}>
+              <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>🔄 Passive Income Pipeline</h2>
+              <p style={{ margin: '0 0 24px 0', color: theme.textMuted, fontSize: '13px' }}>Money flowing in while you sleep vs money flowing out</p>
+              
+              <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch' }}>
+                {/* Inflow Side */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ textAlign: 'center' as const, marginBottom: '16px' }}>
+                    <div style={{ fontSize: '12px', color: theme.success, letterSpacing: '2px', textTransform: 'uppercase' as const, fontWeight: 700 }}>💰 Flowing In</div>
+                    <div style={{ fontSize: '32px', fontWeight: 900, color: theme.success }}>${passiveIncome.toFixed(0)}<span style={{ fontSize: '14px', fontWeight: 400, color: theme.textMuted }}>/mo</span></div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                    {incomeStreams.filter(i => i.type === 'passive').length === 0 ? (
+                      <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const, border: '2px dashed ' + theme.border }}>
+                        <div style={{ fontSize: '24px', marginBottom: '8px' }}>🌱</div>
+                        <div style={{ color: theme.textMuted, fontSize: '13px' }}>No passive income yet</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>Add income streams marked as "Passive" on the Dashboard</div>
+                      </div>
+                    ) : incomeStreams.filter(i => i.type === 'passive').map(inc => {
+                      const monthly = convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency)
+                      const pctOfExpenses = totalOutgoing > 0 ? (monthly / totalOutgoing) * 100 : 0
+                      return (
+                        <div key={inc.id} style={{ padding: '14px 16px', background: darkMode ? 'linear-gradient(135deg, #1e3a32, #1e293b)' : 'linear-gradient(135deg, #f0fdf4, #faf5ff)', borderRadius: '12px', border: '1px solid ' + theme.success + '30', position: 'relative' as const, overflow: 'hidden' }}>
+                          {/* Flow animation bar */}
+                          <div style={{ position: 'absolute' as const, left: 0, top: 0, bottom: 0, width: Math.min(pctOfExpenses, 100) + '%', background: theme.success + '10', transition: 'width 0.5s ease' }} />
+                          <div style={{ position: 'relative' as const, zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>🌴 {inc.name}</div>
+                              <div style={{ color: theme.textMuted, fontSize: '11px' }}>${inc.amount}/{inc.frequency} • Covers {pctOfExpenses.toFixed(1)}% of expenses</div>
+                            </div>
+                            <div style={{ color: theme.success, fontWeight: 800, fontSize: '18px' }}>+${monthly.toFixed(0)}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Center Divider with flow animation */}
+                <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '0 8px' }}>
+                  <div style={{ width: '3px', flex: 1, background: `linear-gradient(to bottom, ${theme.success}, ${theme.border}, ${theme.danger})`, borderRadius: '2px' }} />
+                  <div style={{ padding: '12px', background: darkMode ? '#334155' : '#f1f5f9', borderRadius: '12px', textAlign: 'center' as const }}>
+                    <div style={{ fontSize: '10px', color: theme.textMuted, marginBottom: '4px' }}>CASH FLOW</div>
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: (passiveIncome - totalOutgoing) >= 0 ? theme.success : theme.danger }}>
+                      {(passiveIncome - totalOutgoing) >= 0 ? '+' : ''}${(passiveIncome - totalOutgoing).toFixed(0)}
+                    </div>
+                  </div>
+                  <div style={{ width: '3px', flex: 1, background: `linear-gradient(to bottom, ${theme.border}, ${theme.danger})`, borderRadius: '2px' }} />
+                </div>
+
+                {/* Outflow Side */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ textAlign: 'center' as const, marginBottom: '16px' }}>
+                    <div style={{ fontSize: '12px', color: theme.danger, letterSpacing: '2px', textTransform: 'uppercase' as const, fontWeight: 700 }}>💸 Flowing Out</div>
+                    <div style={{ fontSize: '32px', fontWeight: 900, color: theme.danger }}>${totalOutgoing.toFixed(0)}<span style={{ fontSize: '14px', fontWeight: 400, color: theme.textMuted }}>/mo</span></div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
+                    {(() => {
+                      const categories: {[key: string]: number} = {}
+                      expenses.filter(e => !e.targetDebtId && !e.targetGoalId).forEach(exp => {
+                        const cat = exp.category || 'other'
+                        categories[cat] = (categories[cat] || 0) + convertToMonthly(parseFloat(exp.amount || '0'), exp.frequency)
+                      })
+                      if (monthlyDebtPayments > 0) categories['debt payments'] = monthlyDebtPayments
+                      const sorted = Object.entries(categories).sort((a, b) => b[1] - a[1])
+                      const catColors: {[key: string]: string} = { housing: '#8b5cf6', utilities: '#3b82f6', food: '#f59e0b', transport: '#10b981', entertainment: '#f472b6', shopping: '#ef4444', health: '#14b8a6', subscriptions: '#6366f1', 'debt payments': '#dc2626', other: '#94a3b8' }
+                      return sorted.slice(0, 6).map(([cat, amount]) => (
+                        <div key={cat} style={{ padding: '10px 14px', background: darkMode ? 'linear-gradient(135deg, #2d1e1e, #1e293b)' : 'linear-gradient(135deg, #fef2f2, #fff)', borderRadius: '10px', border: '1px solid ' + (catColors[cat] || '#94a3b8') + '30', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: catColors[cat] || '#94a3b8' }} />
+                            <span style={{ color: theme.text, fontSize: '13px', fontWeight: 600, textTransform: 'capitalize' as const }}>{cat}</span>
+                          </div>
+                          <span style={{ color: theme.danger, fontWeight: 700, fontSize: '14px' }}>-${amount.toFixed(0)}</span>
+                        </div>
+                      ))
+                    })()}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
 
             {/* ===== PASSIVE INCOME QUEST BOARD ===== */}
             {(() => {
