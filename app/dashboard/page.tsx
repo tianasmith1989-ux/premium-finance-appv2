@@ -158,7 +158,7 @@ export default function Dashboard() {
   const toggleTradingSection = (id: string) => setTradingSections(prev => ({ ...prev, [id]: !prev[id] }))
 
   // Enhanced trade fields
-  const [newTradeExtra, setNewTradeExtra] = useState({ emotion: 'disciplined', setup: '', rMultiple: '', session: 'london', rulesBroken: '' as string })
+  const [newTradeExtra, setNewTradeExtra] = useState({ emotion: 'disciplined', setup: '', rMultiple: '', session: 'london', rulesBroken: '' })
 
   // Prop accounts tracker
   const [propAccounts, setPropAccounts] = useState<any[]>([])
@@ -171,7 +171,7 @@ export default function Dashboard() {
   const [sessionPlans, setSessionPlans] = useState<any[]>([])
 
   // Pre-trade checklist
-  const [checklist, setChecklist] = useState([
+  const [checklist, setChecklist] = useState<{id:number,text:string,checked:boolean}[]>([
     { id: 1, text: 'Identified clear trend/structure', checked: false },
     { id: 2, text: 'Entry aligns with higher timeframe', checked: false },
     { id: 3, text: 'Risk:Reward is 1:2 or better', checked: false },
@@ -184,7 +184,7 @@ export default function Dashboard() {
   const [customChecklistItem, setCustomChecklistItem] = useState('')
 
   // Risk management
-  const [riskLimits, setRiskLimits] = useState({ maxDailyLoss: '300', maxWeeklyLoss: '1000', maxDailyTrades: '5', maxRiskPerTrade: '2', maxOpenPositions: '3' })
+  const [riskLimits, setRiskLimits] = useState<{[key:string]:string}>({ maxDailyLoss: '300', maxWeeklyLoss: '1000', maxDailyTrades: '5', maxRiskPerTrade: '2', maxOpenPositions: '3' })
 
   // Trading rank
   const getTraderRank = (tradesList: any[]) => {
@@ -731,7 +731,7 @@ export default function Dashboard() {
       const response = await fetch('/api/budget-coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: chatInput, financialContext: context }) })
       const data = await response.json()
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.advice || 'Sorry, I could not respond.' }])
-    } catch { setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]) }
+    } catch(err) { setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]) }
     finally { setIsAskingCoach(false) }
   }
 
@@ -1454,7 +1454,7 @@ export default function Dashboard() {
                 {tradingSections[sec.id] && sec.id === 'risk' && (
                   <div style={{ marginTop: '20px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
-                      {[{l:'Max Daily Loss',k:'maxDailyLoss',prefix:'$',c:theme.danger},{l:'Max Weekly Loss',k:'maxWeeklyLoss',prefix:'$',c:theme.danger},{l:'Max Daily Trades',k:'maxDailyTrades',prefix:'',c:theme.warning},{l:'Risk Per Trade %',k:'maxRiskPerTrade',prefix:'',c:theme.accent},{l:'Max Open Positions',k:'maxOpenPositions',prefix:'',c:theme.purple}].map((f,i) => (<div key={i} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '6px', textTransform: 'uppercase' as const }}>{f.l}</label><input type="number" value={(riskLimits as any)[f.k]} onChange={(e) => setRiskLimits(prev => ({ ...prev, [f.k]: e.target.value }))} style={{ ...inputStyle, width: '100%', fontSize: '16px', fontWeight: 700, textAlign: 'center' as const, background: 'transparent', border: '2px solid '+f.c+'40', color: f.c }} /></div>))}
+                      {[{l:'Max Daily Loss',k:'maxDailyLoss',prefix:'$',c:theme.danger},{l:'Max Weekly Loss',k:'maxWeeklyLoss',prefix:'$',c:theme.danger},{l:'Max Daily Trades',k:'maxDailyTrades',prefix:'',c:theme.warning},{l:'Risk Per Trade %',k:'maxRiskPerTrade',prefix:'',c:theme.accent},{l:'Max Open Positions',k:'maxOpenPositions',prefix:'',c:theme.purple}].map((f,i) => (<div key={i} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '6px', textTransform: 'uppercase' as const }}>{f.l}</label><input type="number" value={riskLimits[f.k]} onChange={(e) => setRiskLimits(prev => ({ ...prev, [f.k]: e.target.value }))} style={{ ...inputStyle, width: '100%', fontSize: '16px', fontWeight: 700, textAlign: 'center' as const, background: 'transparent', border: '2px solid '+f.c+'40', color: f.c }} /></div>))}
                     </div>
                     <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📊 Position Size Calculator</h4>
                     {(() => {
