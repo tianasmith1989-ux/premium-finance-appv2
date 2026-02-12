@@ -15,6 +15,72 @@ export default function Dashboard() {
   
   const [incomeStreams, setIncomeStreams] = useState<any[]>([])
   const [newIncome, setNewIncome] = useState({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0] })
+  const [showIncomePresets, setShowIncomePresets] = useState(false)
+  const [tradingPayoutsAsIncome, setTradingPayoutsAsIncome] = useState(false)
+  const [payslipData, setPayslipData] = useState<{gross:number,net:number,super_:number,tax:number,leave:{annual:number,sick:number,long_service:number}}|null>(null)
+  const incomePresets = [
+    { name: 'Salary/Wages', amount: '', frequency: 'fortnightly', type: 'active', category: 'employment' },
+    { name: 'Freelance Income', amount: '', frequency: 'monthly', type: 'active', category: 'self-employed' },
+    { name: 'Side Hustle', amount: '', frequency: 'weekly', type: 'active', category: 'self-employed' },
+    { name: 'Overtime Pay', amount: '', frequency: 'fortnightly', type: 'active', category: 'employment' },
+    { name: 'Commission', amount: '', frequency: 'monthly', type: 'active', category: 'employment' },
+    { name: 'Centrelink Payment', amount: '', frequency: 'fortnightly', type: 'active', category: 'government' },
+    { name: 'Child Support Received', amount: '', frequency: 'monthly', type: 'active', category: 'government' },
+    { name: 'Dividend Income', amount: '', frequency: 'quarterly', type: 'passive', category: 'investing' },
+    { name: 'ETF Distributions (VAS/VHY)', amount: '', frequency: 'quarterly', type: 'passive', category: 'investing' },
+    { name: 'Rental Property Income', amount: '', frequency: 'monthly', type: 'passive', category: 'property' },
+    { name: 'REIT Distributions', amount: '', frequency: 'quarterly', type: 'passive', category: 'investing' },
+    { name: 'Interest Income (HISA)', amount: '', frequency: 'monthly', type: 'passive', category: 'savings' },
+    { name: 'Term Deposit Interest', amount: '', frequency: 'quarterly', type: 'passive', category: 'savings' },
+    { name: 'Royalties / IP Income', amount: '', frequency: 'monthly', type: 'passive', category: 'business' },
+    { name: 'Digital Product Sales', amount: '', frequency: 'monthly', type: 'passive', category: 'business' },
+    { name: 'Affiliate Commissions', amount: '', frequency: 'monthly', type: 'passive', category: 'business' },
+    { name: 'YouTube / Content Revenue', amount: '', frequency: 'monthly', type: 'passive', category: 'content' },
+    { name: 'P2P Lending Returns', amount: '', frequency: 'monthly', type: 'passive', category: 'investing' },
+    { name: 'Crypto Staking Rewards', amount: '', frequency: 'weekly', type: 'passive', category: 'investing' },
+    { name: 'Business Distributions', amount: '', frequency: 'monthly', type: 'passive', category: 'business' },
+    { name: 'Print-on-Demand Income', amount: '', frequency: 'monthly', type: 'passive', category: 'business' },
+    { name: 'Dropshipping Revenue', amount: '', frequency: 'monthly', type: 'passive', category: 'business' },
+    { name: 'Vending Machine Income', amount: '', frequency: 'monthly', type: 'passive', category: 'business' },
+    { name: 'Trading Payouts', amount: '', frequency: 'monthly', type: 'passive', category: 'trading' },
+  ]
+  const addIncomePreset = (preset: any) => {
+    const amount = prompt('Enter amount for ' + preset.name + ':')
+    if (amount && parseFloat(amount) > 0) {
+      setIncomeStreams(prev => [...prev, { ...preset, id: Date.now(), amount }])
+      awardXP(15)
+    }
+  }
+  const handlePayslipCsv = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = e.target?.result as string
+      const lines = text.split('\n').map(l => l.split(','))
+      let gross = 0, net = 0, superAmt = 0, tax = 0, annual = 0, sick = 0, lsl = 0
+      lines.forEach(cols => {
+        const label = (cols[0] || '').toLowerCase().trim()
+        const val = parseFloat((cols[1] || '').replace(/[^0-9.-]/g, '')) || 0
+        if (label.includes('gross')) gross = val
+        else if (label.includes('net') || label.includes('take home')) net = val
+        else if (label.includes('super')) superAmt = val
+        else if (label.includes('tax') || label.includes('payg')) tax = val
+        else if (label.includes('annual leave') || label.includes('holiday')) annual = val
+        else if (label.includes('sick') || label.includes('personal')) sick = val
+        else if (label.includes('long service') || label.includes('lsl')) lsl = val
+      })
+      if (net > 0 || gross > 0) {
+        setPayslipData({ gross, net, super_: superAmt, tax, leave: { annual, sick, long_service: lsl } })
+        if (net > 0) {
+          const exists = incomeStreams.some(i => i.name === 'Salary (from payslip)')
+          if (!exists) setIncomeStreams(prev => [...prev, { id: Date.now(), name: 'Salary (from payslip)', amount: String(net), frequency: 'fortnightly', type: 'active' }])
+        }
+      }
+    }
+    reader.readAsText(file)
+    event.target.value = ''
+  }
   
   const [expenses, setExpenses] = useState<any[]>([])
   const [newExpense, setNewExpense] = useState({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: new Date().toISOString().split('T')[0] })
@@ -140,11 +206,6 @@ export default function Dashboard() {
   const [achievements, setAchievements] = useState<string[]>([])
   const [newAchievement, setNewAchievement] = useState<string | null>(null)
 
-  // What-If Scenario state
-  const [showWhatIf, setShowWhatIf] = useState(false)
-  const [whatIfExtra, setWhatIfExtra] = useState('500')
-  const [whatIfReturn, setWhatIfReturn] = useState('7')
-  const [whatIfYears, setWhatIfYears] = useState('10')
 
   // Quest Board state
   const [expandedQuestId, setExpandedQuestId] = useState<string | null>(null)
@@ -835,10 +896,52 @@ export default function Dashboard() {
 
             {/* Income */}
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 16px 0', color: theme.success, fontSize: '18px' }}>💰 Income Streams</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, color: theme.success, fontSize: '18px' }}>💰 Income Streams</h3>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => setShowIncomePresets(!showIncomePresets)} style={{ padding: '6px 14px', background: showIncomePresets ? theme.success : 'transparent', color: showIncomePresets ? 'white' : theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>📋 Presets</button>
+                  <input type="file" accept=".csv" id="payslipInput" onChange={handlePayslipCsv} style={{ display: 'none' }} />
+                  <button onClick={() => (document.getElementById('payslipInput') as HTMLInputElement)?.click()} style={{ padding: '6px 14px', background: 'transparent', color: theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }} title="Upload a payslip CSV to auto-extract salary, super, tax, and leave">📄 Payslip</button>
+                  <button onClick={() => setTradingPayoutsAsIncome(!tradingPayoutsAsIncome)} style={{ padding: '6px 14px', background: tradingPayoutsAsIncome ? theme.warning : 'transparent', color: tradingPayoutsAsIncome ? 'white' : theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }} title="Include trading payouts as passive income">📈 {tradingPayoutsAsIncome ? 'Payouts ON' : 'Payouts OFF'}</button>
+                </div>
+              </div>
+              {showIncomePresets && (
+                <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '16px', maxHeight: '300px', overflowY: 'auto' as const }}>
+                  <div style={{ fontSize: '12px', color: theme.textMuted, marginBottom: '8px', fontWeight: 600 }}>🏃 Active Income</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '6px', marginBottom: '12px' }}>
+                    {incomePresets.filter(p => p.type === 'active').map((p, i) => (<button key={i} onClick={() => addIncomePreset(p)} style={{ padding: '6px 12px', background: darkMode ? '#1e293b' : 'white', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text, fontSize: '12px' }} title={'Add ' + p.name + ' as ' + p.frequency + ' income'}>{p.name}</button>))}
+                  </div>
+                  <div style={{ fontSize: '12px', color: theme.success, marginBottom: '8px', fontWeight: 600 }}>🌴 Passive Income (from Quest Board)</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '6px' }}>
+                    {incomePresets.filter(p => p.type === 'passive').map((p, i) => (<button key={i} onClick={() => addIncomePreset(p)} style={{ padding: '6px 12px', background: darkMode ? '#1e3a32' : '#f0fdf4', border: '1px solid ' + theme.success + '30', borderRadius: '8px', cursor: 'pointer', color: theme.success, fontSize: '12px' }} title={'Add ' + p.name + ' — ' + p.frequency}>🌴 {p.name}</button>))}
+                  </div>
+                </div>
+              )}
+              {payslipData && (
+                <div style={{ padding: '12px 16px', background: 'linear-gradient(135deg, '+theme.success+'15, '+theme.accent+'15)', borderRadius: '12px', marginBottom: '16px', border: '1px solid '+theme.success+'30' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}><span style={{ color: theme.text, fontWeight: 700, fontSize: '14px' }}>📄 Payslip Summary</span><button onClick={() => setPayslipData(null)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>✕</button></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '8px' }}>
+                    <div style={{ textAlign: 'center' as const }}><div style={{ fontSize: '10px', color: theme.textMuted }}>Gross</div><div style={{ color: theme.text, fontWeight: 700 }}>${payslipData.gross.toFixed(0)}</div></div>
+                    <div style={{ textAlign: 'center' as const }}><div style={{ fontSize: '10px', color: theme.textMuted }}>Tax</div><div style={{ color: theme.danger, fontWeight: 700 }}>${payslipData.tax.toFixed(0)}</div></div>
+                    <div style={{ textAlign: 'center' as const }}><div style={{ fontSize: '10px', color: theme.textMuted }}>Super</div><div style={{ color: theme.purple, fontWeight: 700 }}>${payslipData.super_.toFixed(0)}</div></div>
+                    <div style={{ textAlign: 'center' as const }}><div style={{ fontSize: '10px', color: theme.textMuted }}>Net</div><div style={{ color: theme.success, fontWeight: 700 }}>${payslipData.net.toFixed(0)}</div></div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', fontSize: '11px' }}>
+                    <span style={{ color: theme.textMuted }}>Annual Leave: <span style={{ color: theme.success, fontWeight: 600 }}>{payslipData.leave.annual}h</span></span>
+                    <span style={{ color: theme.textMuted }}>Sick Leave: <span style={{ color: theme.warning, fontWeight: 600 }}>{payslipData.leave.sick}h</span></span>
+                    <span style={{ color: theme.textMuted }}>LSL: <span style={{ color: theme.purple, fontWeight: 600 }}>{payslipData.leave.long_service}h</span></span>
+                  </div>
+                </div>
+              )}
+              {tradingPayoutsAsIncome && propPayouts.length > 0 && (
+                <div style={{ padding: '10px 14px', background: theme.warning+'15', borderRadius: '8px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid '+theme.warning+'30' }}>
+                  <span style={{ color: theme.warning, fontSize: '13px', fontWeight: 600 }}>📈 Trading Payouts included as passive income</span>
+                  <span style={{ color: theme.success, fontWeight: 700 }}>${propPayouts.reduce((s: number, p: any) => s + parseFloat(p.amount||'0'), 0).toFixed(0)} total</span>
+                </div>
+              )}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' as const }}>
-                <input type="text" placeholder="Name" value={newIncome.name} onChange={(e) => setNewIncome({ ...newIncome, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
-                <input type="number" placeholder="Amount $" value={newIncome.amount} onChange={(e) => setNewIncome({ ...newIncome, amount: e.target.value })} style={{ ...inputStyle, width: '90px' }} />
+                <input type="text" placeholder="Name" title="Name of income source (e.g. 'Salary', 'Dividends', 'Rental Income')" value={newIncome.name} onChange={(e) => setNewIncome({ ...newIncome, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
+                <input type="number" placeholder="Amount $" title="Amount per payment in AUD" value={newIncome.amount} onChange={(e) => setNewIncome({ ...newIncome, amount: e.target.value })} style={{ ...inputStyle, width: '90px' }} />
                 <select value={newIncome.frequency} onChange={(e) => setNewIncome({ ...newIncome, frequency: e.target.value })} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
                 <select value={newIncome.type} onChange={(e) => setNewIncome({ ...newIncome, type: e.target.value })} style={inputStyle}><option value="active">🏃 Active</option><option value="passive">🌴 Passive</option></select>
                 <input type="date" value={newIncome.startDate} onChange={(e) => setNewIncome({ ...newIncome, startDate: e.target.value })} style={inputStyle} />
@@ -878,8 +981,8 @@ export default function Dashboard() {
                 </div>
               )}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' as const }}>
-                <input type="text" placeholder="Expense name" value={newExpense.name} onChange={(e) => setNewExpense({ ...newExpense, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
-                <input type="number" placeholder="Amount $" value={newExpense.amount} onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })} style={{ ...inputStyle, width: '90px' }} />
+                <input type="text" placeholder="Expense name" title="Name of bill or expense (e.g. 'Rent', 'Netflix', 'Groceries')" value={newExpense.name} onChange={(e) => setNewExpense({ ...newExpense, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
+                <input type="number" placeholder="Amount $" title="Amount per payment in AUD" value={newExpense.amount} onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })} style={{ ...inputStyle, width: '90px' }} />
                 <select value={newExpense.category} onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })} style={inputStyle}>{expenseCategories.filter(c => c !== 'income' && c !== 'transfer').map(c => <option key={c} value={c}>{c}</option>)}</select>
                 <select value={newExpense.frequency} onChange={(e) => setNewExpense({ ...newExpense, frequency: e.target.value })} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select>
                 <input type="date" value={newExpense.dueDate} onChange={(e) => setNewExpense({ ...newExpense, dueDate: e.target.value })} style={inputStyle} />
@@ -930,10 +1033,10 @@ export default function Dashboard() {
                 {debts.length > 0 && (<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: theme.textMuted, fontSize: '12px' }}>Strategy:</span><button onClick={() => setPayoffMethod('avalanche')} style={{ padding: '4px 10px', background: payoffMethod === 'avalanche' ? theme.danger : 'transparent', color: payoffMethod === 'avalanche' ? 'white' : theme.text, border: '1px solid '+theme.border, borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>🏔️ Avalanche</button><button onClick={() => setPayoffMethod('snowball')} style={{ padding: '4px 10px', background: payoffMethod === 'snowball' ? theme.accent : 'transparent', color: payoffMethod === 'snowball' ? 'white' : theme.text, border: '1px solid '+theme.border, borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>⛄ Snowball</button></div>)}
               </div>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' as const, padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
-                <input type="text" placeholder="Boss name" value={newDebt.name} onChange={(e) => setNewDebt({ ...newDebt, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
-                <input type="number" placeholder="HP $" value={newDebt.balance} onChange={(e) => setNewDebt({ ...newDebt, balance: e.target.value })} style={{ ...inputStyle, width: '90px' }} />
-                <input type="number" placeholder="%" value={newDebt.interestRate} onChange={(e) => setNewDebt({ ...newDebt, interestRate: e.target.value })} style={{ ...inputStyle, width: '60px' }} />
-                <input type="number" placeholder="Min hit" value={newDebt.minPayment} onChange={(e) => setNewDebt({ ...newDebt, minPayment: e.target.value })} style={{ ...inputStyle, width: '70px' }} />
+                <input type="text" placeholder="Boss name" title="Name of debt (e.g. 'Credit Card', 'Car Loan', 'HECS')" value={newDebt.name} onChange={(e) => setNewDebt({ ...newDebt, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
+                <input type="number" placeholder="HP $" title="Total balance remaining on this debt" value={newDebt.balance} onChange={(e) => setNewDebt({ ...newDebt, balance: e.target.value })} style={{ ...inputStyle, width: '90px' }} />
+                <input type="number" placeholder="%" title="Annual interest rate (e.g. 5.5 for 5.5%)" value={newDebt.interestRate} onChange={(e) => setNewDebt({ ...newDebt, interestRate: e.target.value })} style={{ ...inputStyle, width: '60px' }} />
+                <input type="number" placeholder="Min hit" title="Minimum payment amount per period" value={newDebt.minPayment} onChange={(e) => setNewDebt({ ...newDebt, minPayment: e.target.value })} style={{ ...inputStyle, width: '70px' }} />
                 <input type="date" value={newDebt.paymentDate} onChange={(e) => setNewDebt({ ...newDebt, paymentDate: e.target.value })} style={inputStyle} />
                 <select value={newDebt.frequency} onChange={(e) => setNewDebt({ ...newDebt, frequency: e.target.value })} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
                 <button onClick={addDebt} style={btnDanger}>⚔️ Add Boss</button>
@@ -966,10 +1069,10 @@ export default function Dashboard() {
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>🎯 Savings Quests</h2>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' as const, padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
-                <input type="text" placeholder="Quest name" value={newGoal.name} onChange={(e) => setNewGoal({ ...newGoal, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
-                <input type="number" placeholder="Target $" value={newGoal.target} onChange={(e) => setNewGoal({ ...newGoal, target: e.target.value })} style={{ ...inputStyle, width: '90px' }} />
-                <input type="number" placeholder="Saved $" value={newGoal.saved} onChange={(e) => setNewGoal({ ...newGoal, saved: e.target.value })} style={{ ...inputStyle, width: '80px' }} />
-                <input type="number" placeholder="Per payment $" value={newGoal.paymentAmount} onChange={(e) => setNewGoal({ ...newGoal, paymentAmount: e.target.value })} style={{ ...inputStyle, width: '100px' }} />
+                <input type="text" placeholder="Quest name" title="What are you saving for? (e.g. 'Emergency Fund', 'Holiday', 'Car')" value={newGoal.name} onChange={(e) => setNewGoal({ ...newGoal, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
+                <input type="number" placeholder="Target $" title="Total amount you want to save" value={newGoal.target} onChange={(e) => setNewGoal({ ...newGoal, target: e.target.value })} style={{ ...inputStyle, width: '90px' }} />
+                <input type="number" placeholder="Saved $" title="How much you've already saved towards this goal" value={newGoal.saved} onChange={(e) => setNewGoal({ ...newGoal, saved: e.target.value })} style={{ ...inputStyle, width: '80px' }} />
+                <input type="number" placeholder="Per payment $" title="How much you'll add each payment period" value={newGoal.paymentAmount} onChange={(e) => setNewGoal({ ...newGoal, paymentAmount: e.target.value })} style={{ ...inputStyle, width: '100px' }} />
                 <select value={newGoal.savingsFrequency} onChange={(e) => setNewGoal({ ...newGoal, savingsFrequency: e.target.value })} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
                 <input type="date" placeholder="Deadline" value={newGoal.deadline} onChange={(e) => setNewGoal({ ...newGoal, deadline: e.target.value })} style={inputStyle} />
                 <input type="date" value={newGoal.startDate} onChange={(e) => setNewGoal({ ...newGoal, startDate: e.target.value })} style={inputStyle} />
@@ -1054,7 +1157,7 @@ export default function Dashboard() {
               const otherPassive = passiveIncome - businessIncome - investorIncome
               const totalAll = employeeIncome + selfEmployedIncome + businessIncome + investorIncome + otherPassive
               const leftSide = employeeIncome + selfEmployedIncome; const rightSide = businessIncome + investorIncome + otherPassive
-              const quadrants = [{ key: 'E', label: 'Employee', desc: 'You work for money', amount: employeeIncome, color: '#ef4444', icon: '👔' }, { key: 'S', label: 'Self-Employed', desc: 'You own a job', amount: selfEmployedIncome, color: '#f59e0b', icon: '🔧' }, { key: 'B', label: 'Business Owner', desc: 'Systems work for you', amount: businessIncome + otherPassive, color: '#10b981', icon: '🏢' }, { key: 'I', label: 'Investor', desc: 'Money works for you', amount: investorIncome, color: '#8b5cf6', icon: '📈' }]
+              const quadrants = [{ key: 'E', label: 'Employee', desc: 'You work for money', amount: employeeIncome, color: '#ef4444', icon: '👔' }, { key: 'B', label: 'Business Owner', desc: 'Systems work for you', amount: businessIncome + otherPassive, color: '#10b981', icon: '🏢' }, { key: 'S', label: 'Self-Employed', desc: 'You own a job', amount: selfEmployedIncome, color: '#f59e0b', icon: '🔧' }, { key: 'I', label: 'Investor', desc: 'Money works for you', amount: investorIncome, color: '#8b5cf6', icon: '📈' }]
               return (
                 <div style={cardStyle}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}><div><h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>💡 Cash Flow Quadrant</h2><p style={{ margin: '4px 0 0', color: theme.textMuted, fontSize: '13px' }}>Move income from left → right to build freedom</p></div><div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}><div style={{ textAlign: 'center' as const }}><div style={{ fontSize: '10px', color: theme.danger }}>⬅️ You work</div><div style={{ color: theme.danger, fontWeight: 800, fontSize: '18px' }}>${leftSide.toFixed(0)}</div></div><div style={{ width: '2px', height: '30px', background: theme.border }} /><div style={{ textAlign: 'center' as const }}><div style={{ fontSize: '10px', color: theme.success }}>Money works ➡️</div><div style={{ color: theme.success, fontWeight: 800, fontSize: '18px' }}>${rightSide.toFixed(0)}</div></div></div></div>
@@ -1181,31 +1284,6 @@ export default function Dashboard() {
               })()}
             </div>
 
-            {/* WHAT-IF SCENARIOS */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowWhatIf(!showWhatIf)}><div><h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🔮 What-If Scenarios</h2><p style={{ margin: '4px 0 0', color: theme.textMuted, fontSize: '13px' }}>See how investing accelerates your freedom date</p></div><div style={{ fontSize: '24px', color: theme.textMuted, transition: 'transform 0.3s', transform: showWhatIf ? 'rotate(180deg)' : 'rotate(0)' }}>▼</div></div>
-              {showWhatIf && (() => {
-                const extra = parseFloat(whatIfExtra || '0'); const ret = parseFloat(whatIfReturn || '0') / 100; const yrs = parseInt(whatIfYears || '0')
-                const monthlyRet = ret / 12; const curInv = assets.filter(a => a.type === 'investment' || a.type === 'crypto').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
-                let fv = curInv; for (let m = 0; m < yrs * 12; m++) fv = fv * (1 + monthlyRet) + extra
-                const projPassive = passiveIncome + ((fv * 0.04) / 12); const projEscape = totalOutgoing > 0 ? Math.min((projPassive / totalOutgoing) * 100, 100) : 0
-                let mte = 0; if (passiveIncome < totalOutgoing) { let b = curInv; while (mte < 600) { b = b * (1 + monthlyRet) + extra; if (passiveIncome + ((b * 0.04) / 12) >= totalOutgoing) break; mte++ } }
-                return (<div style={{ marginTop: '24px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '28px' }}>
-                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '8px' }}>💰 Monthly Investment</label><input type="range" min="0" max="5000" step="50" value={whatIfExtra} onChange={(e) => setWhatIfExtra(e.target.value)} style={{ width: '100%', accentColor: theme.purple }} /><div style={{ textAlign: 'center' as const, marginTop: '4px' }}><span style={{ color: theme.purple, fontWeight: 800, fontSize: '22px' }}>${whatIfExtra}</span><span style={{ color: theme.textMuted, fontSize: '12px' }}>/mo</span></div></div>
-                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '8px' }}>📈 Annual Return</label><input type="range" min="1" max="20" step="0.5" value={whatIfReturn} onChange={(e) => setWhatIfReturn(e.target.value)} style={{ width: '100%', accentColor: theme.success }} /><div style={{ textAlign: 'center' as const, marginTop: '4px' }}><span style={{ color: theme.success, fontWeight: 800, fontSize: '22px' }}>{whatIfReturn}%</span></div></div>
-                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '8px' }}>⏰ Years</label><input type="range" min="1" max="30" step="1" value={whatIfYears} onChange={(e) => setWhatIfYears(e.target.value)} style={{ width: '100%', accentColor: theme.accent }} /><div style={{ textAlign: 'center' as const, marginTop: '4px' }}><span style={{ color: theme.accent, fontWeight: 800, fontSize: '22px' }}>{whatIfYears}</span><span style={{ color: theme.textMuted, fontSize: '12px' }}> years</span></div></div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-                    <div style={{ padding: '20px', background: theme.success + '15', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.success + '30' }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, marginBottom: '6px' }}>Portfolio</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 900 }}>${fv >= 1e6 ? (fv/1e6).toFixed(1)+'M' : fv.toFixed(0)}</div></div>
-                    <div style={{ padding: '20px', background: theme.purple + '15', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.purple + '30' }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, marginBottom: '6px' }}>Passive Income</div><div style={{ color: theme.purple, fontSize: '28px', fontWeight: 900 }}>${projPassive.toFixed(0)}</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>/month</div></div>
-                    <div style={{ padding: '20px', background: theme.accent + '15', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + theme.accent + '30' }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, marginBottom: '6px' }}>Escape %</div><div style={{ color: projEscape >= 100 ? '#fbbf24' : theme.accent, fontSize: '28px', fontWeight: 900 }}>{projEscape.toFixed(0)}%</div></div>
-                    <div style={{ padding: '20px', background: (mte < 600 ? '#fbbf24' : theme.danger) + '15', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid ' + (mte < 600 ? '#fbbf24' : theme.danger) + '30' }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, marginBottom: '6px' }}>Freedom Date</div><div style={{ color: mte < 600 ? '#fbbf24' : theme.danger, fontSize: '28px', fontWeight: 900 }}>{mte === 0 ? 'NOW!' : mte < 600 ? Math.floor(mte/12)+'y '+mte%12+'m' : '∞'}</div></div>
-                  </div>
-                </div>)
-              })()}
-            </div>
-
             {/* GOAL CALCULATOR */}
             <div style={cardStyle}>
               <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🧮 Goal Calculator</h3>
@@ -1242,7 +1320,61 @@ export default function Dashboard() {
                 <div style={{ padding: '20px', background: darkMode ? '#2d1e3a' : '#faf5ff', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '14px', marginBottom: '8px' }}>🌴 Passive Income</div><div style={{ color: theme.purple, fontSize: '28px', fontWeight: 700 }}>${passiveIncome.toFixed(0)}/mo</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{passiveIncomePercentage.toFixed(0)}%</div></div>
               </div>
             </div>
+            {/* BABY STEPS TO FINANCIAL FREEDOM */}
             <div style={cardStyle}>
+              <h3 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>👶 Baby Steps to Financial Freedom</h3>
+              <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>Inspired by Dave Ramsey, adapted for Australia</p>
+              {(() => {
+                const emergencyFund = goals.find(g => g.name.toLowerCase().match(/emergency|rainy|starter/))
+                const emergencyPct = emergencyFund ? (parseFloat(emergencyFund.saved||'0') / parseFloat(emergencyFund.target||'1')) * 100 : 0
+                const allDebtsExMortgage = debts.filter(d => !d.name.toLowerCase().match(/mortgage|home loan/))
+                const allDebtsCleared = allDebtsExMortgage.length === 0 || allDebtsExMortgage.every(d => parseFloat(d.balance||'0') <= 0)
+                const fullEmergency = goals.find(g => g.name.toLowerCase().match(/full emergency|3.month|6.month/))
+                const fullEmPct = fullEmergency ? (parseFloat(fullEmergency.saved||'0') / parseFloat(fullEmergency.target||'1')) * 100 : 0
+                const investPct = passiveIncomePercentage
+                const mortgage = debts.find(d => d.name.toLowerCase().match(/mortgage|home loan/))
+                const mortgagePaid = !mortgage || parseFloat(mortgage.balance||'0') <= 0
+                const steps = [
+                  { num: 1, title: '$1,000 Starter Emergency Fund', desc: 'Save $1,000 as fast as possible. Sell stuff, pick up extra shifts, cut expenses.', icon: '🏦', done: emergencyPct >= 100, progress: Math.min(emergencyPct, 100), tip: 'This protects you from small emergencies so you don\'t need credit cards.' },
+                  { num: 2, title: 'Pay Off All Debt (except mortgage)', desc: 'Use ' + payoffMethod + ' method. List debts smallest to largest (snowball) or highest interest first (avalanche). Attack!', icon: '⚔️', done: allDebtsCleared, progress: allDebtsExMortgage.length > 0 ? Math.max(0, allDebtsExMortgage.reduce((s,d) => { const o=parseFloat(d.originalBalance||d.balance||'0'); const c=parseFloat(d.balance||'0'); return s + ((o-c)/o)*100 }, 0) / allDebtsExMortgage.length) : 100, tip: 'Every dollar freed from debt becomes a dollar building wealth.' },
+                  { num: 3, title: '3-6 Months Full Emergency Fund', desc: 'Save 3-6 months of expenses ($' + (totalOutgoing * 3).toFixed(0) + ' - $' + (totalOutgoing * 6).toFixed(0) + '). This is your "sleep at night" fund.', icon: '🛡️', done: fullEmPct >= 100, progress: Math.min(fullEmPct, 100), tip: 'Keep in a high-interest savings account (ING, UBank, Up).' },
+                  { num: 4, title: 'Invest 15% Into Super + Shares', desc: 'Maximise super salary sacrifice + invest in low-cost index funds (VAS, VGS, VDHG). Let compound interest work.', icon: '📈', done: investPct >= 15, progress: Math.min((investPct / 15) * 100, 100), tip: 'Super contributions are taxed at only 15% — free money via tax savings!' },
+                  { num: 5, title: 'Save for Property Deposit (Optional)', desc: 'Save for your first home or investment property deposit. Use the First Home Super Saver Scheme to boost savings.', icon: '🏠', done: false, progress: 0, tip: 'Optional: Skip if you\'re happy renting and investing the difference. Both paths work!' },
+                  { num: 6, title: 'Pay Off Mortgage Early', desc: 'Every extra dollar on your mortgage saves years of interest. Use an offset account to keep liquidity.', icon: '🏡', done: mortgagePaid, progress: mortgage ? Math.max(0, 100 - (parseFloat(mortgage.balance||'0') / parseFloat(mortgage.originalBalance||mortgage.balance||'1')) * 100) : 0, tip: 'Even $50/week extra can cut years off your mortgage.' },
+                  { num: 7, title: 'Build Wealth & Give Generously', desc: 'Passive income covers expenses. You\'re financially free! Continue investing, help others, live life on your terms.', icon: '🏆', done: fiPath.passiveCoverage >= 100, progress: Math.min(fiPath.passiveCoverage, 100), tip: 'This is the goal. Your money works harder than you ever could.' },
+                ]
+                const currentStep = steps.findIndex(s => !s.done) + 1 || steps.length
+                return (<>
+                  <div style={{ display: 'flex', gap: '6px', marginBottom: '20px' }}>{steps.map((s,i) => (<div key={i} style={{ flex: 1, height: '8px', borderRadius: '4px', background: s.done ? theme.success : i === currentStep - 1 ? theme.warning : (darkMode ? '#334155' : '#e2e8f0') }} />))}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                    {steps.map((step, i) => {
+                      const isCurrent = i === currentStep - 1
+                      return (
+                        <div key={step.num} style={{ padding: isCurrent ? '20px' : '14px 16px', background: step.done ? theme.success+'10' : isCurrent ? (darkMode ? '#334155' : '#fffbeb') : (darkMode ? '#1e293b' : '#fafafa'), borderRadius: '14px', border: step.done ? '2px solid '+theme.success+'40' : isCurrent ? '2px solid '+theme.warning : '1px solid '+theme.border, opacity: !step.done && !isCurrent ? 0.6 : 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                            <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: step.done ? theme.success : isCurrent ? theme.warning : (darkMode ? '#334155' : '#e2e8f0'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: step.done ? '20px' : '16px', color: step.done || isCurrent ? 'white' : theme.textMuted, fontWeight: 900, flexShrink: 0 }}>{step.done ? '✓' : step.num}</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: step.done ? theme.success : theme.text, fontWeight: 700, fontSize: isCurrent ? '16px' : '14px' }}>{step.icon} {step.title}</span>
+                                {step.done && <span style={{ padding: '2px 10px', background: theme.success+'20', color: theme.success, borderRadius: '6px', fontSize: '11px', fontWeight: 700 }}>DONE ✓</span>}
+                              </div>
+                              {isCurrent && <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px', lineHeight: 1.5 }}>{step.desc}</div>}
+                              {(isCurrent || step.done) && step.progress > 0 && step.progress < 100 && (
+                                <div style={{ marginTop: '8px' }}><div style={{ width: '100%', height: '8px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}><div style={{ width: step.progress+'%', height: '100%', background: step.done ? theme.success : theme.warning, borderRadius: '4px' }} /></div><div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '2px' }}>{step.progress.toFixed(0)}% complete</div></div>
+                              )}
+                              {isCurrent && <div style={{ marginTop: '8px', padding: '8px 12px', background: theme.warning+'10', borderRadius: '8px', borderLeft: '3px solid '+theme.warning }}><div style={{ color: theme.warning, fontSize: '12px', fontWeight: 700 }}>💡 {step.tip}</div></div>}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div style={{ marginTop: '16px', padding: '14px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><span style={{ color: theme.text, fontWeight: 700 }}>Currently on Step {currentStep} of 7</span><span style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginTop: '4px' }}>Each step builds on the last. Don't skip ahead!</span></div>
+                </>)
+              })()}
+            </div>
+
+                        <div style={cardStyle}>
               <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '20px' }}>📊 Spending Breakdown</h3>
               {(() => { const cats:{[k:string]:number}={}; expenses.filter(e=>!e.targetDebtId&&!e.targetGoalId).forEach(exp=>{const c=exp.category||'other';cats[c]=(cats[c]||0)+convertToMonthly(parseFloat(exp.amount||'0'),exp.frequency)}); const sorted=Object.entries(cats).sort((a,b)=>b[1]-a[1]); const total=sorted.reduce((s,[,v])=>s+v,0); const cc:{[k:string]:string}={housing:'#8b5cf6',utilities:'#3b82f6',food:'#f59e0b',transport:'#10b981',entertainment:'#f472b6',shopping:'#ef4444',health:'#14b8a6',subscriptions:'#6366f1',other:'#94a3b8'}; return sorted.map(([cat,amt]) => (<div key={cat} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}><span style={{ width: '100px', color: theme.text, fontWeight: 600, fontSize: '13px', textTransform: 'capitalize' as const }}>{cat}</span><div style={{ flex: 1, height: '24px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '12px', overflow: 'hidden' }}><div style={{ width: (total>0?(amt/total)*100:0)+'%', height: '100%', background: cc[cat]||'#94a3b8', borderRadius: '12px' }} /></div><span style={{ color: theme.text, fontWeight: 700, fontSize: '13px', width: '70px', textAlign: 'right' as const }}>${amt.toFixed(0)}</span></div>)) })()}
             </div>
@@ -1305,22 +1437,29 @@ export default function Dashboard() {
                     <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '16px' }}>
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
                         <input type="date" value={newTrade.date} onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }} />
-                        <input type="text" placeholder="Instrument (e.g. EURUSD)" value={newTrade.instrument} onChange={(e) => setNewTrade({ ...newTrade, instrument: e.target.value })} style={{ ...inputStyle, flex: '1 1 120px', fontSize: '12px' }} />
+                        <input type="text" placeholder="Instrument (e.g. EURUSD)" title="What you traded: currency pair, stock, futures contract" value={newTrade.instrument} onChange={(e) => setNewTrade({ ...newTrade, instrument: e.target.value })} style={{ ...inputStyle, flex: '1 1 120px', fontSize: '12px' }} />
                         <select value={newTrade.direction} onChange={(e) => setNewTrade({ ...newTrade, direction: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }}><option value="long">📈 Long</option><option value="short">📉 Short</option></select>
                         <input type="number" placeholder="Entry $" value={newTrade.entryPrice} onChange={(e) => setNewTrade({ ...newTrade, entryPrice: e.target.value })} style={{ ...inputStyle, width: '80px', fontSize: '12px' }} />
                         <input type="number" placeholder="Exit $" value={newTrade.exitPrice} onChange={(e) => setNewTrade({ ...newTrade, exitPrice: e.target.value })} style={{ ...inputStyle, width: '80px', fontSize: '12px' }} />
-                        <input type="number" placeholder="P/L $" value={newTrade.profitLoss} onChange={(e) => setNewTrade({ ...newTrade, profitLoss: e.target.value })} style={{ ...inputStyle, width: '80px', fontSize: '12px' }} />
+                        <input type="number" placeholder="P/L $" title="Profit or loss in dollars (negative for loss)" value={newTrade.profitLoss} onChange={(e) => setNewTrade({ ...newTrade, profitLoss: e.target.value })} style={{ ...inputStyle, width: '80px', fontSize: '12px' }} />
                       </div>
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
                         <select value={newTradeExtra.emotion} onChange={(e) => setNewTradeExtra({ ...newTradeExtra, emotion: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }}><option value="disciplined">🎯 Disciplined</option><option value="confident">💪 Confident</option><option value="neutral">😐 Neutral</option><option value="anxious">😰 Anxious</option><option value="fomo">🤯 FOMO</option><option value="revenge">😤 Revenge</option><option value="greedy">🤑 Greedy</option><option value="fearful">😨 Fearful</option></select>
                         <select value={newTradeExtra.session} onChange={(e) => setNewTradeExtra({ ...newTradeExtra, session: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }}><option value="asian">🌏 Asian</option><option value="london">🇬🇧 London</option><option value="newyork">🇺🇸 New York</option><option value="overlap">🔄 Overlap</option></select>
-                        <input type="text" placeholder="R-Multiple (e.g. 2.5)" value={newTradeExtra.rMultiple} onChange={(e) => setNewTradeExtra({ ...newTradeExtra, rMultiple: e.target.value })} style={{ ...inputStyle, width: '120px', fontSize: '12px' }} />
-                        <input type="text" placeholder="Setup type (e.g. breakout, pullback)" value={newTradeExtra.setup} onChange={(e) => setNewTradeExtra({ ...newTradeExtra, setup: e.target.value })} style={{ ...inputStyle, flex: 1, fontSize: '12px' }} />
+                        <input type="text" placeholder="R-Multiple (e.g. 2.5)" title="How many R did you make? 1R = your risk amount. 2.5R = 2.5x your risk" value={newTradeExtra.rMultiple} onChange={(e) => setNewTradeExtra({ ...newTradeExtra, rMultiple: e.target.value })} style={{ ...inputStyle, width: '120px', fontSize: '12px' }} />
+                        <input type="text" placeholder="Setup type (e.g. breakout, pullback)" title="Your trade setup: breakout, pullback, range, trend continuation, reversal, etc." value={newTradeExtra.setup} onChange={(e) => setNewTradeExtra({ ...newTradeExtra, setup: e.target.value })} style={{ ...inputStyle, flex: 1, fontSize: '12px' }} />
                       </div>
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
                         <input type="text" placeholder="Notes / Trade thesis" value={newTrade.notes} onChange={(e) => setNewTrade({ ...newTrade, notes: e.target.value })} style={{ ...inputStyle, flex: 1, fontSize: '12px' }} />
-                        <input type="text" placeholder="Rules broken? (leave empty if clean)" value={newTradeExtra.rulesBroken} onChange={(e) => setNewTradeExtra({ ...newTradeExtra, rulesBroken: e.target.value })} style={{ ...inputStyle, flex: 1, fontSize: '12px', borderColor: newTradeExtra.rulesBroken ? theme.danger : theme.inputBorder }} />
+                        <input type="text" placeholder="Rules broken? (leave empty if clean)" title="Did you break any trading rules? Leave empty if you followed your plan" value={newTradeExtra.rulesBroken} onChange={(e) => setNewTradeExtra({ ...newTradeExtra, rulesBroken: e.target.value })} style={{ ...inputStyle, flex: 1, fontSize: '12px', borderColor: newTradeExtra.rulesBroken ? theme.danger : theme.inputBorder }} />
                         <button onClick={addEnhancedTrade} style={{ ...btnWarning, fontSize: '12px' }}>📝 Log Trade</button>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center' }}>
+                        <div style={{ flex: 1, padding: '12px', border: '2px dashed '+theme.border, borderRadius: '10px', textAlign: 'center' as const, cursor: 'pointer', background: darkMode ? '#1e293b' : '#fafafa' }} onClick={() => { const desc = prompt('Describe your trade setup (the AI will log it):\n\nExample: "EURUSD long from 1.0850 support, targeting 1.0920. Hit TP for 70 pips. London session, felt confident."'); if (desc) { const parts: any = {}; const d = desc.toLowerCase(); if (d.match(/eur|gbp|usd|jpy|aud|nzd|chf|xau|gold|nas|us30|spx/)) { const m = d.match(/(eur|gbp|aud|nzd|usd|chf|jpy|xau|gold|nas|us30|spx)\s*\/?\s*(usd|jpy|aud|chf|gbp|nzd|eur|100|500)?/i); if (m) parts.instrument = m[0].toUpperCase().replace(/\s/g,'') } if (d.match(/long|buy|bought/)) parts.direction = 'long'; if (d.match(/short|sell|sold/)) parts.direction = 'short'; if (d.match(/london/)) parts.session = 'london'; if (d.match(/new york|ny |us /)) parts.session = 'newyork'; if (d.match(/asian|asia|tokyo/)) parts.session = 'asian'; if (d.match(/confident/)) parts.emotion = 'confident'; if (d.match(/fomo/)) parts.emotion = 'fomo'; if (d.match(/revenge/)) parts.emotion = 'revenge'; if (d.match(/disciplined|plan/)) parts.emotion = 'disciplined'; const plMatch = d.match(/(\+|-|profit|loss|won|lost)\s*\$?\s*(\d+\.?\d*)/); if (plMatch) parts.profitLoss = (d.match(/loss|lost|-/) ? '-' : '') + plMatch[2]; setNewTrade(prev => ({...prev, ...parts, notes: desc})); if (parts.session || parts.emotion) setNewTradeExtra(prev => ({...prev, ...(parts.session ? {session:parts.session} : {}), ...(parts.emotion ? {emotion:parts.emotion} : {})})) } }}>
+                          <div style={{ fontSize: '20px', marginBottom: '4px' }}>🤖📸</div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Click to describe your trade — AI will parse & fill the form</div>
+                          <div style={{ color: theme.purple, fontSize: '10px', marginTop: '2px' }}>Tip: Mention the pair, direction, P/L, session & emotion</div>
+                        </div>
                       </div>
                     </div>
                     <div style={{ maxHeight: '400px', overflowY: 'auto' as const }}>
@@ -1376,6 +1515,7 @@ export default function Dashboard() {
                           <div><h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>🎯 By Instrument</h4>{Object.entries(instruments).sort((a,b) => b[1].pl - a[1].pl).map(([inst,data]) => (<div key={inst} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '8px', marginBottom: '4px' }}><div><span style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{inst}</span><span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '8px' }}>{data.count} trades • {((data.wins/data.count)*100).toFixed(0)}% WR</span></div><span style={{ color: data.pl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '13px' }}>{data.pl >= 0 ? '+' : ''}${data.pl.toFixed(0)}</span></div>))}</div>
                           <div><h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>🧠 By Emotion</h4>{Object.entries(emotions).sort((a,b) => b[1].pl - a[1].pl).map(([em,data]) => { const emIcons: {[k:string]:string} = {disciplined:'🎯',confident:'💪',neutral:'😐',anxious:'😰',fomo:'🤯',revenge:'😤',greedy:'🤑',fearful:'😨'}; return (<div key={em} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '8px', marginBottom: '4px' }}><div><span style={{ fontSize: '14px' }}>{emIcons[em]||''}</span><span style={{ color: theme.text, fontWeight: 600, fontSize: '13px', marginLeft: '6px', textTransform: 'capitalize' as const }}>{em}</span><span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '8px' }}>{data.count} • {((data.wins/data.count)*100).toFixed(0)}% WR</span></div><span style={{ color: data.pl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '13px' }}>{data.pl >= 0 ? '+' : ''}${data.pl.toFixed(0)}</span></div>) })}</div>
                         </div>
+                        <div style={{ marginTop: '16px', marginBottom: '16px' }}><h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📅 Trading Calendar</h4><div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px' }}>{['S','M','T','W','T','F','S'].map((d,i) => <div key={i} style={{ textAlign: 'center' as const, color: theme.textMuted, fontSize: '10px', fontWeight: 700, padding: '4px' }}>{d}</div>)}{(() => { const now = new Date(); const first = new Date(now.getFullYear(), now.getMonth(), 1); const daysInMo = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate(); const cells: any[] = []; for(let i=0;i<first.getDay();i++) cells.push(<div key={'e'+i} />); for(let d=1;d<=daysInMo;d++) { const dateStr = now.getFullYear()+'-'+(String(now.getMonth()+1).padStart(2,'0'))+'-'+(String(d).padStart(2,'0')); const dayTrades = trades.filter(t => t.date === dateStr); const dayPL = dayTrades.reduce((s: number,t: any) => s+parseFloat(t.profitLoss||'0'),0); const isToday = d === now.getDate(); cells.push(<div key={d} style={{ padding: '6px 2px', textAlign: 'center' as const, borderRadius: '6px', background: dayTrades.length === 0 ? 'transparent' : dayPL > 0 ? theme.success+'20' : dayPL < 0 ? theme.danger+'20' : (darkMode?'#334155':'#f1f5f9'), border: isToday ? '2px solid '+theme.accent : '1px solid transparent', minHeight: '36px' }}><div style={{ fontSize: '10px', color: isToday ? theme.accent : theme.textMuted, fontWeight: isToday ? 700 : 400 }}>{d}</div>{dayTrades.length > 0 && <div style={{ fontSize: '10px', color: dayPL > 0 ? theme.success : theme.danger, fontWeight: 700 }}>{dayPL > 0 ? '+' : ''}${dayPL.toFixed(0)}</div>}</div>) } return cells })()}</div></div>
                         <div style={{ marginTop: '16px' }}><h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>🕐 By Session</h4><div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>{Object.entries(sessions).map(([s,data]) => { const sIcons: {[k:string]:string} = {asian:'🌏',london:'🇬🇧',newyork:'🇺🇸',overlap:'🔄'}; return (<div key={s} style={{ padding: '14px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const, border: '1px solid ' + theme.border }}><div style={{ fontSize: '20px', marginBottom: '4px' }}>{sIcons[s]||'🕐'}</div><div style={{ color: theme.text, fontWeight: 700, fontSize: '14px', textTransform: 'capitalize' as const }}>{s}</div><div style={{ color: data.pl >= 0 ? theme.success : theme.danger, fontWeight: 800, fontSize: '18px', marginTop: '4px' }}>{data.pl >= 0 ? '+' : ''}${data.pl.toFixed(0)}</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{data.count} trades • {((data.wins/data.count)*100).toFixed(0)}%</div></div>) })}</div></div>
                       </>)
                     })()}
@@ -1404,9 +1544,14 @@ export default function Dashboard() {
                 {/* PROP FIRM DASHBOARD */}
                 {tradingSections[sec.id] && sec.id === 'props' && (
                   <div style={{ marginTop: '20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+                      <div style={{ padding: '16px', background: theme.success+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Active Accounts</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 900 }}>{propAccounts.filter(a => a.status === 'active').length}</div></div>
+                      <div style={{ padding: '16px', background: theme.warning+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Total Invested</div><div style={{ color: theme.warning, fontSize: '28px', fontWeight: 900 }}>${propAccounts.reduce((s: number, a: any) => s + parseFloat(a.accountSize||'0'), 0).toFixed(0)}</div></div>
+                      <div style={{ padding: '16px', background: theme.accent+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Total P/L</div><div style={{ color: propAccounts.reduce((s: number, a: any) => s + parseFloat(a.currentBalance||'0') - parseFloat(a.accountSize||'0'), 0) >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 900 }}>${propAccounts.reduce((s: number, a: any) => s + parseFloat(a.currentBalance||'0') - parseFloat(a.accountSize||'0'), 0).toFixed(0)}</div></div>
+                    </div>
                     <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '20px' }}>
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
-                        <select value={newPropAccount.firm} onChange={(e) => setNewPropAccount({ ...newPropAccount, firm: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }}><option value="FTMO">FTMO</option><option value="MyForexFunds">MyForexFunds</option><option value="TFT">The Funded Trader</option><option value="Apex">Apex Trader</option><option value="TopStep">TopStep</option><option value="E8">E8 Funding</option><option value="Custom">Custom</option></select>
+                        <select value={newPropAccount.firm} onChange={(e) => setNewPropAccount({ ...newPropAccount, firm: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }}><option value="FTMO">FTMO</option><option value="MyForexFunds">MyForexFunds</option><option value="TFT">The Funded Trader</option><option value="Apex">Apex Trader</option><option value="TopStep">TopStep</option><option value="E8">E8 Funding</option><option value="5ers">The 5%ers</option><option value="FundedNext">Funded Next</option><option value="Custom">Custom</option></select>
                         <select value={newPropAccount.type} onChange={(e) => setNewPropAccount({ ...newPropAccount, type: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }}><option value="forex">Forex</option><option value="futures">Futures</option></select>
                         <select value={newPropAccount.phase} onChange={(e) => setNewPropAccount({ ...newPropAccount, phase: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }}><option value="phase1">Phase 1</option><option value="phase2">Phase 2</option><option value="funded">Funded</option></select>
                         <input type="number" placeholder="Account $" value={newPropAccount.accountSize} onChange={(e) => setNewPropAccount({ ...newPropAccount, accountSize: e.target.value })} style={{ ...inputStyle, width: '100px', fontSize: '12px' }} />
@@ -1496,12 +1641,31 @@ export default function Dashboard() {
               </div>
             ))}
 
-            {/* COMPOUNDING CALCULATOR - always visible */}
+            {/* DAILY COMPOUND INTEREST CALCULATOR */}
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 16px 0', color: theme.success, fontSize: '18px' }}>📈 Compounding Calculator</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' }}>{[{l:'Starting $',v:tradingCalculator.startingCapital,k:'startingCapital'},{l:'Monthly Add',v:tradingCalculator.monthlyContribution,k:'monthlyContribution'},{l:'Return %',v:tradingCalculator.returnRate,k:'returnRate'},{l:'Years',v:tradingCalculator.years,k:'years'},{l:'Months',v:tradingCalculator.months,k:'months'},{l:'Days',v:tradingCalculator.days,k:'days'},{l:'Reinvest %',v:tradingCalculator.reinvestRate,k:'reinvestRate'}].map((f,i) => (<div key={i}><label style={{color:theme.textMuted,fontSize:'11px',display:'block',marginBottom:'4px'}}>{f.l}</label><input type="number" value={f.v} onChange={(e) => setTradingCalculator({...tradingCalculator, [f.k]: e.target.value})} style={{...inputStyle,width:'100%'}} /></div>))}<div><label style={{color:theme.textMuted,fontSize:'11px',display:'block',marginBottom:'4px'}}>Period</label><select value={tradingCalculator.returnPeriod} onChange={(e) => setTradingCalculator({...tradingCalculator, returnPeriod: e.target.value})} style={{...inputStyle,width:'100%'}}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div></div>
-              <button onClick={calculateTradingCompounding} disabled={calculatingTrading} style={{...btnSuccess,width:'100%',marginBottom:'16px'}}>{calculatingTrading ? 'Calculating...' : 'Calculate'}</button>
-              {tradingResults && (<div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}><div style={{padding:'16px',background:'linear-gradient(135deg,#10b981,#059669)',borderRadius:'12px',textAlign:'center' as const}}><div style={{color:'rgba(255,255,255,0.8)',fontSize:'12px'}}>Future Value</div><div style={{color:'white',fontSize:'24px',fontWeight:800}}>${tradingResults.futureValue.toFixed(0)}</div></div><div style={{padding:'16px',background:'linear-gradient(135deg,#8b5cf6,#7c3aed)',borderRadius:'12px',textAlign:'center' as const}}><div style={{color:'rgba(255,255,255,0.8)',fontSize:'12px'}}>Profit</div><div style={{color:'white',fontSize:'24px',fontWeight:800}}>${tradingResults.profit.toFixed(0)}</div></div><div style={{padding:'16px',background:'linear-gradient(135deg,#3b82f6,#2563eb)',borderRadius:'12px',textAlign:'center' as const}}><div style={{color:'rgba(255,255,255,0.8)',fontSize:'12px'}}>Trading Days</div><div style={{color:'white',fontSize:'24px',fontWeight:800}}>{tradingResults.totalTradingDays}</div></div></div>)}
+              <h3 style={{ margin: '0 0 8px 0', color: theme.success, fontSize: '18px' }}>📈 Daily Compound Interest Calculator</h3>
+              <p style={{ margin: '0 0 16px 0', color: theme.textMuted, fontSize: '12px' }}>Calculate compound growth with daily, weekly, or monthly compounding</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>💰 Principal Amount</label><div style={{ display: 'flex', alignItems: 'center' }}><span style={{ padding: '8px 10px', background: theme.warning, color: 'white', borderRadius: '6px 0 0 6px', fontWeight: 700, fontSize: '13px' }}>$</span><input type="number" value={tradingCalculator.startingCapital} onChange={(e) => setTradingCalculator({...tradingCalculator, startingCapital: e.target.value})} style={{...inputStyle, width: '100%', borderRadius: '0 6px 6px 0'}} title="Starting balance / investment amount" /></div></div>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>📊 Interest Rate</label><div style={{ display: 'flex', alignItems: 'center' }}><input type="number" value={tradingCalculator.returnRate} onChange={(e) => setTradingCalculator({...tradingCalculator, returnRate: e.target.value})} style={{...inputStyle, width: '70px', borderRadius: '6px 0 0 6px'}} title="Interest rate per period" /><span style={{ padding: '8px 10px', background: theme.textMuted, color: 'white', borderRadius: '0', fontWeight: 700, fontSize: '13px' }}>%</span><select value={tradingCalculator.returnPeriod} onChange={(e) => setTradingCalculator({...tradingCalculator, returnPeriod: e.target.value})} style={{...inputStyle, borderRadius: '0 6px 6px 0'}} title="Compounding period"><option value="daily">daily</option><option value="weekly">weekly</option><option value="monthly">monthly</option><option value="yearly">yearly</option></select></div></div>
+                <div style={{ gridColumn: 'span 2' }}><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>⏰ Time Period</label><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}><div><div style={{ fontSize: '10px', color: theme.textMuted, marginBottom: '2px' }}>Years:</div><input type="number" value={tradingCalculator.years} onChange={(e) => setTradingCalculator({...tradingCalculator, years: e.target.value})} style={{...inputStyle, width: '100%'}} title="Number of years" /></div><div><div style={{ fontSize: '10px', color: theme.textMuted, marginBottom: '2px' }}>Months:</div><input type="number" value={tradingCalculator.months} onChange={(e) => setTradingCalculator({...tradingCalculator, months: e.target.value})} style={{...inputStyle, width: '100%'}} title="Additional months" /></div><div><div style={{ fontSize: '10px', color: theme.textMuted, marginBottom: '2px' }}>Days:</div><input type="number" value={tradingCalculator.days} onChange={(e) => setTradingCalculator({...tradingCalculator, days: e.target.value})} style={{...inputStyle, width: '100%'}} title="Additional days" /></div></div></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>📅 Include All Days?</label><div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid ' + theme.border }}><button onClick={() => setTradingCalculator({...tradingCalculator, includeWeekends: 'yes'})} style={{ flex: 1, padding: '8px', background: (tradingCalculator as any).includeWeekends !== 'no' ? theme.success : 'transparent', color: (tradingCalculator as any).includeWeekends !== 'no' ? 'white' : theme.textMuted, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>Yes</button><button onClick={() => setTradingCalculator({...tradingCalculator, includeWeekends: 'no'})} style={{ flex: 1, padding: '8px', background: (tradingCalculator as any).includeWeekends === 'no' ? theme.warning : 'transparent', color: (tradingCalculator as any).includeWeekends === 'no' ? 'white' : theme.textMuted, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>No</button></div></div>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>💸 Monthly Add</label><input type="number" value={tradingCalculator.monthlyContribution} onChange={(e) => setTradingCalculator({...tradingCalculator, monthlyContribution: e.target.value})} style={{...inputStyle, width: '100%'}} title="Additional monthly contribution" /></div>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>🔄 Reinvest Rate</label><select value={tradingCalculator.reinvestRate} onChange={(e) => setTradingCalculator({...tradingCalculator, reinvestRate: e.target.value})} style={{...inputStyle, width: '100%'}} title="Percentage of profits to reinvest"><option value="100">100%</option><option value="90">90%</option><option value="80">80%</option><option value="75">75%</option><option value="50">50%</option><option value="25">25%</option></select></div>
+              </div>
+              <button onClick={calculateTradingCompounding} disabled={calculatingTrading} style={{...btnSuccess,width:'100%',marginBottom:'16px',padding:'12px',fontSize:'15px',fontWeight:700}}>{calculatingTrading ? 'Calculating...' : '🧮 Calculate Compound Growth'}</button>
+              {tradingResults && (<>
+                <div style={{ padding: '24px', background: darkMode ? 'linear-gradient(135deg, #1e293b, #1e1b4b)' : 'linear-gradient(135deg, #f0f9ff, #faf5ff)', borderRadius: '16px', border: '2px solid ' + theme.border, marginBottom: '16px' }}>
+                  <div style={{ textAlign: 'center' as const, marginBottom: '4px', fontSize: '12px', color: theme.textMuted }}>Projection for {tradingCalculator.years || 0}y {tradingCalculator.months || 0}m {tradingCalculator.days || 0}d</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+                    <div><div style={{ color: theme.textMuted, fontSize: '12px' }}>Investment Value</div><div style={{ color: theme.success, fontSize: '36px', fontWeight: 900 }}>${tradingResults.futureValue >= 1e6 ? (tradingResults.futureValue/1e6).toFixed(2)+'M' : tradingResults.futureValue.toFixed(2)}</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '8px' }}>Total Interest / Earnings</div><div style={{ color: theme.accent, fontSize: '24px', fontWeight: 800 }}>${tradingResults.profit.toFixed(2)}</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '8px' }}>Percentage Profit</div><div style={{ color: theme.warning, fontSize: '24px', fontWeight: 800 }}>{((tradingResults.profit / Math.max(parseFloat(tradingCalculator.startingCapital || '1'), 1)) * 100).toFixed(0)}%</div></div>
+                    <div><div style={{ color: theme.textMuted, fontSize: '12px' }}>Total Days / Business Days</div><div style={{ color: theme.text, fontSize: '24px', fontWeight: 800 }}>{tradingResults.totalTradingDays} / {Math.round(tradingResults.totalTradingDays * 5/7)}</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '8px' }}>Daily Interest Rate</div><div style={{ color: theme.purple, fontSize: '24px', fontWeight: 800 }}>{tradingCalculator.returnPeriod === 'daily' ? tradingCalculator.returnRate : (parseFloat(tradingCalculator.returnRate||'0') / (tradingCalculator.returnPeriod === 'weekly' ? 5 : tradingCalculator.returnPeriod === 'monthly' ? 21 : 252)).toFixed(4)}%</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '8px' }}>Initial Balance</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 800 }}>${parseFloat(tradingCalculator.startingCapital || '0').toFixed(2)}</div></div>
+                  </div>
+                </div>
+                <div style={{ padding: '12px 16px', background: darkMode ? '#334155' : '#fff7ed', borderRadius: '10px', border: '1px solid ' + theme.warning + '30', fontSize: '11px', color: theme.textMuted, lineHeight: 1.5 }}>⚠️ This calculator is for illustrative purposes only and does not constitute financial advice.</div>
+              </>)}
             </div>
           </div>
         )}
@@ -1522,7 +1686,7 @@ export default function Dashboard() {
               { id:'calendar',icon:'📅',title:'Calendar',color:'#3b82f6',items:[{q:'What does PAY do?',a:'Marks an item as paid. For debts: reduces balance. For goals: increases saved amount. For power-ups: applies to linked debt/goal. Click ✓ to undo.'},{q:'Color coding?',a:'💰 Green = Income\n💸 Blue = Expenses\n💳 Red = Debt payments\n🎯 Purple = Goal savings\n⚡ Light purple = Power-ups'}]},
               { id:'overview',icon:'💎',title:'Overview Tab',color:'#a78bfa',items:[{q:'What is the Rat Race Escape Tracker?',a:'Shows what % of your expenses are covered by passive income. 100% = escaped! Milestones at 25%, 50%, 75%, 100%.'},{q:'Cash Flow Quadrant?',a:'Kiyosaki\'s E/S/B/I framework:\n👔 Employee → 🔧 Self-Employed → 🏢 Business Owner → 📈 Investor\nGoal: Move income from left (you work) to right (money works).'},{q:'What is the 4% rule?',a:'Withdraw 4% of investments per year without running out. $1M = $40K/year = $3,333/month passive income.'}]},
               { id:'xp',icon:'🎮',title:'XP & Gamification',color:'#f472b6',items:[{q:'How do I earn XP?',a:'+10 Marking paid | +10 Add expense | +15 Add income | +20 Add debt | +25 Add goal | +30 Debt power-up | +50 Achievement'},{q:'What are the levels?',a:'🐣 Lv1 (0) → 🌱 Lv2 (100) → 📈 Lv3 (250) → 💪 Lv4 (500) → 🎯 Lv5 (800) → 🌟 Lv6 (1200) → ⚡ Lv7 (1800) → 🔥 Lv8 (2500) → 💎 Lv9 (3500) → 🏆 Lv10 (5000)'},{q:'Achievements?',a:'🎯 First Goal | 🏅 5 Goals | 💳 Debt Tracked | ✅ Goal Complete | 🎉 Debt Destroyed | 💸 5 Payments | ⚡ 20 Payments | 💰 3+ Income Streams'}]},
-              { id:'tips',icon:'💡',title:'Tips & Best Practices',color:'#fbbf24',items:[{q:'Best workflow?',a:'1. Set up income & expenses\n2. Add debts with power-ups\n3. Create goals, add to calendar\n4. Every payday: open calendar, mark items paid\n5. Check Overview weekly\n6. Review spending monthly\n7. Use What-If scenarios for motivation'},{q:'Is data saved?',a:'Currently data resets on page refresh. Persistent storage is a planned feature. Screenshot your progress regularly!'}]}
+              { id:'tips',icon:'💡',title:'Tips & Best Practices',color:'#fbbf24',items:[{q:'Best workflow?',a:'1. Set up income & expenses\n2. Add debts with power-ups\n3. Create goals, add to calendar\n4. Every payday: open calendar, mark items paid\n5. Check Overview weekly\n6. Review spending monthly\n7. Check the Quest Board for passive income ideas'},{q:'Is data saved?',a:'Currently data resets on page refresh. Persistent storage is a planned feature. Screenshot your progress regularly!'}]}
             ].map(section => (
               <div key={section.id} style={cardStyle}>
                 <div onClick={() => setExpandedGuideSection(expandedGuideSection === section.id ? null : section.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
