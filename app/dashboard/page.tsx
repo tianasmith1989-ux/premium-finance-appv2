@@ -98,6 +98,34 @@ export default function Dashboard() {
   
   const [assets, setAssets] = useState<any[]>([])
   const [newAsset, setNewAsset] = useState({ name: '', value: '', type: 'savings' })
+  const [showAssetPresets, setShowAssetPresets] = useState(false)
+  const [showLiabilityPresets, setShowLiabilityPresets] = useState(false)
+  const assetPresets = [
+    { name: 'Emergency Fund', type: 'savings' }, { name: 'Savings Account', type: 'savings' },
+    { name: 'Term Deposit', type: 'savings' }, { name: 'Offset Account', type: 'savings' },
+    { name: 'Share Portfolio', type: 'investment' }, { name: 'ETF Portfolio (VAS/VGS)', type: 'investment' },
+    { name: 'Super Balance', type: 'investment' }, { name: 'Managed Fund', type: 'investment' },
+    { name: 'Crypto Holdings', type: 'crypto' }, { name: 'Investment Property', type: 'property' },
+    { name: 'Home (Owner-Occupied)', type: 'property' }, { name: 'Vehicle (if appreciating)', type: 'other' },
+    { name: 'Business Equity', type: 'business' }, { name: 'Gold/Precious Metals', type: 'other' },
+    { name: 'Collectibles/Art', type: 'other' }, { name: 'Domain Names / IP', type: 'business' },
+  ]
+  const liabilityPresets = [
+    { name: 'Home Loan / Mortgage', type: 'mortgage' }, { name: 'Investment Property Loan', type: 'mortgage' },
+    { name: 'Car Loan', type: 'loan' }, { name: 'Personal Loan', type: 'loan' },
+    { name: 'Credit Card', type: 'credit' }, { name: 'Afterpay / BNPL', type: 'credit' },
+    { name: 'HECS-HELP Debt', type: 'loan' }, { name: 'Student Loan', type: 'loan' },
+    { name: 'Tax Debt (ATO)', type: 'loan' }, { name: 'Family Loan', type: 'loan' },
+    { name: 'Business Loan', type: 'loan' }, { name: 'Margin Loan', type: 'loan' },
+  ]
+  const addAssetPreset = (preset: any) => {
+    const amount = prompt('Enter value for ' + preset.name + ':')
+    if (amount && parseFloat(amount) > 0) { setAssets(prev => [...prev, { id: Date.now(), name: preset.name, value: amount, type: preset.type }]) }
+  }
+  const addLiabilityPreset = (preset: any) => {
+    const amount = prompt('Enter amount owed for ' + preset.name + ':')
+    if (amount && parseFloat(amount) > 0) { setLiabilities(prev => [...prev, { id: Date.now(), name: preset.name, value: amount, type: preset.type }]) }
+  }
   const [liabilities, setLiabilities] = useState<any[]>([])
   const [newLiability, setNewLiability] = useState({ name: '', value: '', type: 'loan' })
   
@@ -221,10 +249,26 @@ export default function Dashboard() {
 
   // Enhanced trade fields
   const [newTradeExtra, setNewTradeExtra] = useState({ emotion: 'disciplined', setup: '', rMultiple: '', session: 'london', rulesBroken: '' })
+  const [tradeImages, setTradeImages] = useState<{[tradeId:number]:string}>({})
+  const handleTradeImageUpload = (tradeId: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string
+      setTradeImages(prev => ({ ...prev, [tradeId]: dataUrl }))
+    }
+    reader.readAsDataURL(file)
+    event.target.value = ''
+  }
+  const deleteTrade = (id: number) => {
+    setTrades(prev => prev.filter(t => t.id !== id))
+    setTradeImages(prev => { const next = { ...prev }; delete next[id]; return next })
+  }
 
   // Prop accounts tracker
   const [propAccounts, setPropAccounts] = useState<any[]>([])
-  const [newPropAccount, setNewPropAccount] = useState({ firm: 'FTMO', type: 'forex', phase: 'phase1', accountSize: '100000', currentBalance: '100000', maxDrawdown: '10000', profitTarget: '10000', startDate: new Date().toISOString().split('T')[0], status: 'active' })
+  const [newPropAccount, setNewPropAccount] = useState({ firm: 'FTMO', type: 'forex', phase: 'phase1', accountSize: '100000', currentBalance: '100000', maxDrawdown: '10000', profitTarget: '10000', startDate: new Date().toISOString().split('T')[0], status: 'active', cost: '0', monthlyCost: '0' })
   const [propPayouts, setPropPayouts] = useState<any[]>([])
   const [newPayout, setNewPayout] = useState({ accountId: '', amount: '', date: new Date().toISOString().split('T')[0] })
 
@@ -290,7 +334,7 @@ export default function Dashboard() {
   const addPropAccount = () => {
     if (!newPropAccount.firm) return
     setPropAccounts(prev => [...prev, { ...newPropAccount, id: Date.now() }])
-    setNewPropAccount({ firm: 'FTMO', type: 'forex', phase: 'phase1', accountSize: '100000', currentBalance: '100000', maxDrawdown: '10000', profitTarget: '10000', startDate: new Date().toISOString().split('T')[0], status: 'active' })
+    setNewPropAccount({ firm: 'FTMO', type: 'forex', phase: 'phase1', accountSize: '100000', currentBalance: '100000', maxDrawdown: '10000', profitTarget: '10000', startDate: new Date().toISOString().split('T')[0], status: 'active', cost: '0', monthlyCost: '0' })
   }
 
   const addPropPayout = () => {
@@ -424,9 +468,10 @@ export default function Dashboard() {
     return amount
   }
   
-  const monthlyIncome = incomeStreams.reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0)
+  const monthlyIncome = incomeStreams.reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0) + tradingPayoutMonthly
   const activeIncome = incomeStreams.filter(inc => inc.type === 'active').reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0)
-  const passiveIncome = incomeStreams.filter(inc => inc.type === 'passive').reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0)
+  const tradingPayoutMonthly = tradingPayoutsAsIncome ? propPayouts.reduce((s: number, p: any) => s + parseFloat(p.amount || '0'), 0) / Math.max(1, Math.ceil((Date.now() - Math.min(...propPayouts.map((p: any) => new Date(p.date).getTime()), Date.now())) / (30 * 86400000))) : 0
+  const passiveIncome = incomeStreams.filter(inc => inc.type === 'passive').reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0) + tradingPayoutMonthly
   const passiveIncomePercentage = monthlyIncome > 0 ? (passiveIncome / monthlyIncome) * 100 : 0
   const monthlyExpenses = expenses.filter(e => !e.targetDebtId && !e.targetGoalId).reduce((sum, exp) => sum + convertToMonthly(parseFloat(exp.amount || '0'), exp.frequency), 0)
   const monthlyDebtPayments = debts.reduce((sum, debt) => sum + convertToMonthly(parseFloat(debt.minPayment || '0'), debt.frequency), 0)
@@ -478,6 +523,11 @@ export default function Dashboard() {
     return Math.ceil(remaining / monthlyPayment)
   }
   const getCalendarItemsForDay = (day: number) => {
+    // Add trading payouts to calendar
+    const payoutItems = tradingPayoutsAsIncome ? propPayouts.filter((p: any) => {
+      const d = new Date(p.date)
+      return d.getDate() === day && d.getMonth() === calendarMonth.getMonth() && d.getFullYear() === calendarMonth.getFullYear()
+    }).map((p: any) => ({ id: 'payout-'+p.id, name: '📈 Trading Payout', amount: p.amount, type: 'income', isPaid: true, frequency: 'once' })) : []
     const { month, year } = getDaysInMonth()
     const items: any[] = []
     const allItems = [
@@ -1268,13 +1318,15 @@ export default function Dashboard() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                     <div>
-                      <h3 style={{ margin: '0 0 12px 0', color: theme.success }}>✅ Real Assets</h3>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}><h3 style={{ margin: 0, color: theme.success }}>✅ Real Assets</h3><button onClick={() => setShowAssetPresets(!showAssetPresets)} style={{ padding: '4px 10px', background: showAssetPresets ? theme.success : 'transparent', color: showAssetPresets ? 'white' : theme.textMuted, border: '1px solid '+theme.border, borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>📋 Presets</button></div>
+                      {showAssetPresets && <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '4px', marginBottom: '12px' }}>{assetPresets.map((p,i) => <button key={i} onClick={() => addAssetPreset(p)} style={{ padding: '4px 10px', background: darkMode ? '#1e293b' : 'white', border: '1px solid '+theme.border, borderRadius: '6px', cursor: 'pointer', color: theme.text, fontSize: '11px' }}>{p.name}</button>)}</div>}
                       <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' as const }}><input type="text" placeholder="Asset" value={newAsset.name} onChange={(e) => setNewAsset({ ...newAsset, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 80px', padding: '8px 12px', fontSize: '13px' }} /><input type="number" placeholder="$" value={newAsset.value} onChange={(e) => setNewAsset({ ...newAsset, value: e.target.value })} style={{ ...inputStyle, width: '80px', padding: '8px 12px', fontSize: '13px' }} /><select value={newAsset.type} onChange={(e) => setNewAsset({ ...newAsset, type: e.target.value })} style={{ ...inputStyle, padding: '8px', fontSize: '13px' }}><option value="savings">💵 Savings</option><option value="investment">📈 Investment</option><option value="property">🏠 Property</option><option value="business">🏢 Business</option><option value="crypto">🪙 Crypto</option><option value="other">📦 Other</option></select><button onClick={addAsset} style={{ ...btnSuccess, padding: '8px 14px', fontSize: '12px' }}>+</button></div>
                       {assets.map(a => (<div key={a.id} style={{ padding: '10px 14px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', border: '1px solid ' + theme.success + '20' }}><span style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{a.name}</span><div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}><span style={{ color: theme.success, fontWeight: 700 }}>${parseFloat(a.value).toFixed(0)}</span><button onClick={() => deleteAsset(a.id)} style={{ padding: '4px 8px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>✕</button></div></div>))}
                       {assets.length > 0 && <div style={{ marginTop: '8px', padding: '8px', background: theme.success + '10', borderRadius: '8px', textAlign: 'center' as const }}><span style={{ color: theme.success, fontWeight: 700 }}>Total: ${totalAssets.toFixed(0)}</span></div>}
                     </div>
                     <div>
-                      <h3 style={{ margin: '0 0 12px 0', color: theme.danger }}>❌ Liabilities</h3>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}><h3 style={{ margin: 0, color: theme.danger }}>❌ Liabilities</h3><button onClick={() => setShowLiabilityPresets(!showLiabilityPresets)} style={{ padding: '4px 10px', background: showLiabilityPresets ? theme.danger : 'transparent', color: showLiabilityPresets ? 'white' : theme.textMuted, border: '1px solid '+theme.border, borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>📋 Presets</button></div>
+                      {showLiabilityPresets && <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '4px', marginBottom: '12px' }}>{liabilityPresets.map((p,i) => <button key={i} onClick={() => addLiabilityPreset(p)} style={{ padding: '4px 10px', background: darkMode ? '#2d1e1e' : '#fef2f2', border: '1px solid '+theme.danger+'30', borderRadius: '6px', cursor: 'pointer', color: theme.danger, fontSize: '11px' }}>{p.name}</button>)}</div>}
                       <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' as const }}><input type="text" placeholder="Liability" value={newLiability.name} onChange={(e) => setNewLiability({ ...newLiability, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 80px', padding: '8px 12px', fontSize: '13px' }} /><input type="number" placeholder="$" value={newLiability.value} onChange={(e) => setNewLiability({ ...newLiability, value: e.target.value })} style={{ ...inputStyle, width: '80px', padding: '8px 12px', fontSize: '13px' }} /><select value={newLiability.type} onChange={(e) => setNewLiability({ ...newLiability, type: e.target.value })} style={{ ...inputStyle, padding: '8px', fontSize: '13px' }}><option value="loan">🏦 Loan</option><option value="credit">💳 Credit</option><option value="mortgage">🏠 Mortgage</option><option value="other">📋 Other</option></select><button onClick={addLiability} style={{ ...btnDanger, padding: '8px 14px', fontSize: '12px' }}>+</button></div>
                       {debts.map(d => (<div key={'dl-'+d.id} style={{ padding: '10px 14px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', border: '1px solid ' + theme.danger + '20' }}><span style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>💳 {d.name}</span><span style={{ color: theme.danger, fontWeight: 700 }}>${parseFloat(d.balance).toFixed(0)}</span></div>))}
                       {liabilities.map(l => (<div key={l.id} style={{ padding: '10px 14px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', border: '1px solid ' + theme.danger + '20' }}><span style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{l.name}</span><div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}><span style={{ color: theme.danger, fontWeight: 700 }}>${parseFloat(l.value).toFixed(0)}</span><button onClick={() => deleteLiability(l.id)} style={{ padding: '4px 8px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>✕</button></div></div>))}
@@ -1480,8 +1532,16 @@ export default function Dashboard() {
                               </div>
                               <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>{t.date}{t.entryPrice && t.exitPrice ? ' • '+t.entryPrice+'→'+t.exitPrice : ''}{t.rMultiple ? ' • '+t.rMultiple+'R' : ''}{t.notes ? ' • '+t.notes : ''}</div>
                             </div>
-                            <div style={{ textAlign: 'right' as const, flexShrink: 0 }}><div style={{ color: isWin ? theme.success : theme.danger, fontWeight: 800, fontSize: '16px' }}>{isWin ? '+' : ''}${pl.toFixed(2)}</div></div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                              <div style={{ textAlign: 'right' as const }}><div style={{ color: isWin ? theme.success : theme.danger, fontWeight: 800, fontSize: '16px' }}>{isWin ? '+' : ''}${pl.toFixed(2)}</div></div>
+                              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '2px' }}>
+                                <label style={{ padding: '4px 6px', background: tradeImages[t.id] ? theme.success+'20' : (darkMode ? '#334155' : '#f1f5f9'), border: '1px solid '+(tradeImages[t.id] ? theme.success+'40' : theme.border), borderRadius: '4px', cursor: 'pointer', fontSize: '10px', color: tradeImages[t.id] ? theme.success : theme.textMuted, textAlign: 'center' as const }}>{tradeImages[t.id] ? '✅📸' : '📸'}<input type="file" accept="image/*" onChange={(e) => handleTradeImageUpload(t.id, e)} style={{ display: 'none' }} /></label>
+                                <button onClick={() => deleteTrade(t.id)} style={{ padding: '4px 6px', background: theme.danger+'15', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>🗑️</button>
+                              </div>
+                            </div>
                           </div>
+                          {tradeImages[t.id] && <div style={{ marginTop: '4px', padding: '4px' }}><img src={tradeImages[t.id]} alt="Trade screenshot" style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px', border: '1px solid '+theme.border }} /></div>}
+                        </div>
                         )
                       })}
                     </div>
@@ -1545,10 +1605,11 @@ export default function Dashboard() {
                 {/* PROP FIRM DASHBOARD */}
                 {tradingSections[sec.id] && sec.id === 'props' && (
                   <div style={{ marginTop: '20px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
                       <div style={{ padding: '16px', background: theme.success+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Active Accounts</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 900 }}>{propAccounts.filter(a => a.status === 'active').length}</div></div>
                       <div style={{ padding: '16px', background: theme.warning+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Total Invested</div><div style={{ color: theme.warning, fontSize: '28px', fontWeight: 900 }}>${propAccounts.reduce((s: number, a: any) => s + parseFloat(a.accountSize||'0'), 0).toFixed(0)}</div></div>
                       <div style={{ padding: '16px', background: theme.accent+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Total P/L</div><div style={{ color: propAccounts.reduce((s: number, a: any) => s + parseFloat(a.currentBalance||'0') - parseFloat(a.accountSize||'0'), 0) >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 900 }}>${propAccounts.reduce((s: number, a: any) => s + parseFloat(a.currentBalance||'0') - parseFloat(a.accountSize||'0'), 0).toFixed(0)}</div></div>
+                      <div style={{ padding: '16px', background: theme.danger+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Total Costs</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 900 }}>${propAccounts.reduce((s: number, a: any) => s + parseFloat(a.cost||'0') + parseFloat(a.monthlyCost||'0'), 0).toFixed(0)}</div></div>
                     </div>
                     <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '20px' }}>
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
@@ -1559,6 +1620,8 @@ export default function Dashboard() {
                         <input type="number" placeholder="Balance $" value={newPropAccount.currentBalance} onChange={(e) => setNewPropAccount({ ...newPropAccount, currentBalance: e.target.value })} style={{ ...inputStyle, width: '100px', fontSize: '12px' }} />
                       </div>
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                        <input type="number" placeholder="Challenge Fee $" value={newPropAccount.cost} onChange={(e) => setNewPropAccount({ ...newPropAccount, cost: e.target.value })} style={{ ...inputStyle, width: '100px', fontSize: '12px' }} title="One-time challenge/evaluation fee" />
+                        <input type="number" placeholder="Monthly Fee $" value={newPropAccount.monthlyCost} onChange={(e) => setNewPropAccount({ ...newPropAccount, monthlyCost: e.target.value })} style={{ ...inputStyle, width: '100px', fontSize: '12px' }} title="Monthly platform/data fee" />
                         <input type="number" placeholder="Max DD $" value={newPropAccount.maxDrawdown} onChange={(e) => setNewPropAccount({ ...newPropAccount, maxDrawdown: e.target.value })} style={{ ...inputStyle, width: '100px', fontSize: '12px' }} />
                         <input type="number" placeholder="Profit Target $" value={newPropAccount.profitTarget} onChange={(e) => setNewPropAccount({ ...newPropAccount, profitTarget: e.target.value })} style={{ ...inputStyle, width: '120px', fontSize: '12px' }} />
                         <input type="date" value={newPropAccount.startDate} onChange={(e) => setNewPropAccount({ ...newPropAccount, startDate: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }} />
@@ -1576,7 +1639,7 @@ export default function Dashboard() {
                         <div key={acc.id} style={{ padding: '20px', background: darkMode ? '#1e293b' : 'white', borderRadius: '16px', border: '2px solid ' + (isHealthy ? theme.success + '40' : theme.danger + '40') }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                             <div><div style={{ color: theme.text, fontWeight: 700, fontSize: '16px' }}>{acc.firm}</div><div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}><span style={{ padding: '2px 8px', background: (phaseColors[acc.phase]||theme.accent)+'20', color: phaseColors[acc.phase]||theme.accent, borderRadius: '4px', fontSize: '10px', fontWeight: 700, textTransform: 'capitalize' as const }}>{acc.phase}</span><span style={{ padding: '2px 8px', background: darkMode ? '#334155' : '#f1f5f9', borderRadius: '4px', fontSize: '10px', color: theme.textMuted }}>{acc.type}</span><span style={{ padding: '2px 8px', background: darkMode ? '#334155' : '#f1f5f9', borderRadius: '4px', fontSize: '10px', color: theme.textMuted }}>${parseFloat(acc.accountSize).toFixed(0)}</span></div></div>
-                            <div style={{ textAlign: 'right' as const }}><div style={{ color: profit >= 0 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 800 }}>{profit >= 0 ? '+' : ''}${profit.toFixed(0)}</div><button onClick={() => setPropAccounts(prev => prev.filter(a => a.id !== acc.id))} style={{ padding: '4px 8px', background: theme.danger+'20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px', marginTop: '4px' }}>Remove</button></div>
+                            <div style={{ textAlign: 'right' as const }}><div style={{ color: profit >= 0 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 800 }}>{profit >= 0 ? '+' : ''}${profit.toFixed(0)}</div>{(parseFloat(acc.cost||'0') > 0 || parseFloat(acc.monthlyCost||'0') > 0) && <div style={{ fontSize: '10px', color: theme.danger }}>Cost: ${parseFloat(acc.cost||'0').toFixed(0)}{parseFloat(acc.monthlyCost||'0') > 0 ? ' + $'+parseFloat(acc.monthlyCost||'0').toFixed(0)+'/mo' : ''}</div>}<button onClick={() => setPropAccounts(prev => prev.filter(a => a.id !== acc.id))} style={{ padding: '4px 8px', background: theme.danger+'20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px', marginTop: '4px' }}>Remove</button></div>
                           </div>
                           <div style={{ marginBottom: '10px' }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><span style={{ color: theme.textMuted, fontSize: '11px' }}>Profit Target</span><span style={{ color: theme.success, fontSize: '11px', fontWeight: 700 }}>{Math.min(profitPct, 100).toFixed(0)}%</span></div><div style={{ width: '100%', height: '8px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}><div style={{ width: Math.min(Math.max(profitPct, 0), 100) + '%', height: '100%', background: 'linear-gradient(90deg, '+theme.success+', #34d399)', borderRadius: '4px' }} /></div></div>
                           <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}><span style={{ color: theme.textMuted, fontSize: '11px' }}>Drawdown Used</span><span style={{ color: ddPct > 70 ? theme.danger : ddPct > 40 ? theme.warning : theme.success, fontSize: '11px', fontWeight: 700 }}>{ddPct.toFixed(0)}%</span></div><div style={{ width: '100%', height: '8px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}><div style={{ width: Math.min(ddPct, 100) + '%', height: '100%', background: ddPct > 70 ? theme.danger : ddPct > 40 ? theme.warning : theme.success, borderRadius: '4px' }} /></div></div>
@@ -1651,8 +1714,8 @@ export default function Dashboard() {
                 <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>📊 Interest Rate</label><div style={{ display: 'flex', alignItems: 'center' }}><input type="number" value={tradingCalculator.returnRate} onChange={(e) => setTradingCalculator({...tradingCalculator, returnRate: e.target.value})} style={{...inputStyle, width: '70px', borderRadius: '6px 0 0 6px'}} title="Interest rate per period" /><span style={{ padding: '8px 10px', background: theme.textMuted, color: 'white', borderRadius: '0', fontWeight: 700, fontSize: '13px' }}>%</span><select value={tradingCalculator.returnPeriod} onChange={(e) => setTradingCalculator({...tradingCalculator, returnPeriod: e.target.value})} style={{...inputStyle, borderRadius: '0 6px 6px 0'}} title="Compounding period"><option value="daily">daily</option><option value="weekly">weekly</option><option value="monthly">monthly</option><option value="yearly">yearly</option></select></div></div>
                 <div style={{ gridColumn: 'span 2' }}><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>⏰ Time Period</label><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}><div><div style={{ fontSize: '10px', color: theme.textMuted, marginBottom: '2px' }}>Years:</div><input type="number" value={tradingCalculator.years} onChange={(e) => setTradingCalculator({...tradingCalculator, years: e.target.value})} style={{...inputStyle, width: '100%'}} title="Number of years" /></div><div><div style={{ fontSize: '10px', color: theme.textMuted, marginBottom: '2px' }}>Months:</div><input type="number" value={tradingCalculator.months} onChange={(e) => setTradingCalculator({...tradingCalculator, months: e.target.value})} style={{...inputStyle, width: '100%'}} title="Additional months" /></div><div><div style={{ fontSize: '10px', color: theme.textMuted, marginBottom: '2px' }}>Days:</div><input type="number" value={tradingCalculator.days} onChange={(e) => setTradingCalculator({...tradingCalculator, days: e.target.value})} style={{...inputStyle, width: '100%'}} title="Additional days" /></div></div></div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>📅 Include All Days?</label><div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid ' + theme.border }}><button onClick={() => setTradingCalculator({...tradingCalculator, includeWeekends: 'yes'})} style={{ flex: 1, padding: '8px', background: tradingCalculator.includeWeekends !== 'no' ? theme.success : 'transparent', color: tradingCalculator.includeWeekends !== 'no' ? 'white' : theme.textMuted, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>Yes</button><button onClick={() => setTradingCalculator({...tradingCalculator, includeWeekends: 'no'})} style={{ flex: 1, padding: '8px', background: tradingCalculator.includeWeekends === 'no' ? theme.warning : 'transparent', color: tradingCalculator.includeWeekends === 'no' ? 'white' : theme.textMuted, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>No</button></div></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ gridColumn: 'span 2' }}><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>📅 Days to Include</label><div style={{ display: 'flex', gap: '4px' }}>{[{key:'M',label:'M'},{key:'T',label:'T'},{key:'W',label:'W'},{key:'T2',label:'T'},{key:'F',label:'F'},{key:'S',label:'S'},{key:'S2',label:'S'}].map(d => { const isActive = tradingCalculator.includeDays.includes(d.key); return <button key={d.key} onClick={() => setTradingCalculator({...tradingCalculator, includeDays: isActive ? tradingCalculator.includeDays.filter(x => x !== d.key) : [...tradingCalculator.includeDays, d.key]})} style={{ flex: 1, padding: '10px 0', background: isActive ? theme.warning : 'transparent', color: isActive ? 'white' : theme.textMuted, border: '1px solid '+(isActive ? theme.warning : theme.border), borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>{d.label}</button> })}</div><div style={{ fontSize: '10px', color: theme.textMuted, marginTop: '4px', textAlign: 'center' as const }}>{tradingCalculator.includeDays.length} days/week selected{tradingCalculator.includeDays.length < 7 ? ' (excludes '+(7-tradingCalculator.includeDays.length)+' days)' : ' (all days)'}</div></div>
                 <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>💸 Monthly Add</label><input type="number" value={tradingCalculator.monthlyContribution} onChange={(e) => setTradingCalculator({...tradingCalculator, monthlyContribution: e.target.value})} style={{...inputStyle, width: '100%'}} title="Additional monthly contribution" /></div>
                 <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>🔄 Reinvest Rate</label><select value={tradingCalculator.reinvestRate} onChange={(e) => setTradingCalculator({...tradingCalculator, reinvestRate: e.target.value})} style={{...inputStyle, width: '100%'}} title="Percentage of profits to reinvest"><option value="100">100%</option><option value="90">90%</option><option value="80">80%</option><option value="75">75%</option><option value="50">50%</option><option value="25">25%</option></select></div>
               </div>
@@ -1665,7 +1728,29 @@ export default function Dashboard() {
                     <div><div style={{ color: theme.textMuted, fontSize: '12px' }}>Total Days / Business Days</div><div style={{ color: theme.text, fontSize: '24px', fontWeight: 800 }}>{tradingResults.totalTradingDays} / {Math.round(tradingResults.totalTradingDays * 5/7)}</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '8px' }}>Daily Interest Rate</div><div style={{ color: theme.purple, fontSize: '24px', fontWeight: 800 }}>{tradingCalculator.returnPeriod === 'daily' ? tradingCalculator.returnRate : (parseFloat(tradingCalculator.returnRate||'0') / (tradingCalculator.returnPeriod === 'weekly' ? 5 : tradingCalculator.returnPeriod === 'monthly' ? 21 : 252)).toFixed(4)}%</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '8px' }}>Initial Balance</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 800 }}>${parseFloat(tradingCalculator.startingCapital || '0').toFixed(2)}</div></div>
                   </div>
                 </div>
-                <div style={{ padding: '12px 16px', background: darkMode ? '#334155' : '#fff7ed', borderRadius: '10px', border: '1px solid ' + theme.warning + '30', fontSize: '11px', color: theme.textMuted, lineHeight: 1.5 }}>⚠️ This calculator is for illustrative purposes only and does not constitute financial advice.</div>
+                <div style={{ marginTop: '16px' }}>
+                  <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📊 Earnings Breakdown</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                    {(() => {
+                      const principal = parseFloat(tradingCalculator.startingCapital || '0')
+                      const rate = parseFloat(tradingCalculator.returnRate || '0') / 100
+                      const daysPerWeek = tradingCalculator.includeDays.length
+                      const dailyRate = tradingCalculator.returnPeriod === 'daily' ? rate : tradingCalculator.returnPeriod === 'weekly' ? rate / daysPerWeek : tradingCalculator.returnPeriod === 'monthly' ? rate / (daysPerWeek * 4.33) : rate / (daysPerWeek * 52)
+                      const dailyEarning = principal * dailyRate
+                      const weeklyEarning = dailyEarning * daysPerWeek
+                      const monthlyEarning = weeklyEarning * 4.33
+                      const yearlyEarning = monthlyEarning * 12
+                      return [{l:'Daily',v:dailyEarning,c:theme.success},{l:'Weekly',v:weeklyEarning,c:theme.accent},{l:'Monthly',v:monthlyEarning,c:theme.purple},{l:'Yearly',v:yearlyEarning,c:theme.warning}].map((s,i) => (
+                        <div key={i} style={{ padding: '16px', background: s.c+'15', borderRadius: '12px', textAlign: 'center' as const, border: '1px solid '+s.c+'30' }}>
+                          <div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const, marginBottom: '4px' }}>{s.l}</div>
+                          <div style={{ color: s.c, fontSize: '22px', fontWeight: 900 }}>${s.v.toFixed(2)}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '10px', marginTop: '2px' }}>on initial ${principal.toFixed(0)}</div>
+                        </div>
+                      ))
+                    })()}
+                  </div>
+                </div>
+                <div style={{ marginTop: '12px', padding: '12px 16px', background: darkMode ? '#334155' : '#fff7ed', borderRadius: '10px', border: '1px solid ' + theme.warning + '30', fontSize: '11px', color: theme.textMuted, lineHeight: 1.5 }}>⚠️ This calculator is for illustrative purposes only and does not constitute financial advice.</div>
               </>)}
             </div>
           </div>
