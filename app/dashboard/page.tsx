@@ -468,7 +468,7 @@ export default function Dashboard() {
     return amount
   }
   
-  const tradingPayoutMonthly = tradingPayoutsAsIncome ? propPayouts.reduce((s: number, p: any) => s + parseFloat(p.amount || '0'), 0) / Math.max(1, Math.ceil((Date.now() - Math.min(...propPayouts.map((p: any) => new Date(p.date).getTime()), Date.now())) / (30 * 86400000))) : 0
+  const tradingPayoutMonthly = tradingPayoutsAsIncome && propPayouts.length > 0 ? propPayouts.reduce((s: number, p: any) => s + parseFloat(p.amount || '0'), 0) : 0
   const monthlyIncome = incomeStreams.reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0) + tradingPayoutMonthly
   const activeIncome = incomeStreams.filter(inc => inc.type === 'active').reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0)
   const passiveIncome = incomeStreams.filter(inc => inc.type === 'passive').reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0) + tradingPayoutMonthly
@@ -567,7 +567,7 @@ export default function Dashboard() {
         items.push({ ...item, id: uniqueId, originalId: item.id, occurrenceDate, isPaid: paidOccurrences.has(uniqueId) })
       }
     })
-    return items
+    return [...items, ...payoutItems]
   }
 
   const togglePaid = (itemId: string, sourceType: string, sourceId: number, amount: number, targetDebtId?: number, targetGoalId?: number) => {
@@ -1654,7 +1654,7 @@ export default function Dashboard() {
                         <input type="date" value={newPayout.date} onChange={(e) => setNewPayout({ ...newPayout, date: e.target.value })} style={{ ...inputStyle, fontSize: '12px' }} />
                         <button onClick={addPropPayout} style={{ ...btnSuccess, fontSize: '12px' }}>💰 Log Payout</button>
                       </div>
-                      {propPayouts.length > 0 && <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>{propPayouts.map(p => (<div key={p.id} style={{ padding: '8px 14px', background: theme.success+'15', borderRadius: '8px', border: '1px solid '+theme.success+'30' }}><span style={{ color: theme.success, fontWeight: 700 }}>+${parseFloat(p.amount).toFixed(0)}</span><span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '8px' }}>{p.date}</span></div>))}</div>}
+                      {propPayouts.length > 0 && <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>{propPayouts.map(p => (<div key={p.id} style={{ padding: '8px 14px', background: theme.success+'15', borderRadius: '8px', border: '1px solid '+theme.success+'30', display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: theme.success, fontWeight: 700 }}>+${parseFloat(p.amount).toFixed(0)}</span><span style={{ color: theme.textMuted, fontSize: '11px' }}>{p.date}</span><button onClick={() => setPropPayouts(prev => prev.filter(x => x.id !== p.id))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '12px', padding: '0 2px' }}>✕</button></div>))}</div>}
                       <div style={{ marginTop: '12px', padding: '12px', background: 'linear-gradient(135deg, '+theme.success+'15, #fbbf2415)', borderRadius: '10px', textAlign: 'center' as const }}><span style={{ color: theme.success, fontWeight: 800, fontSize: '20px' }}>Total Payouts: ${propPayouts.reduce((s,p) => s + parseFloat(p.amount||'0'), 0).toFixed(0)}</span></div>
                     </div>
                   </div>
