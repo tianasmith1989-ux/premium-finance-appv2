@@ -1520,7 +1520,8 @@ export default function Dashboard() {
                         const pl = parseFloat(t.profitLoss || '0'); const isWin = pl > 0
                         const emotionIcons: {[k:string]:string} = { disciplined:'🎯', confident:'💪', neutral:'😐', anxious:'😰', fomo:'🤯', revenge:'😤', greedy:'🤑', fearful:'😨' }
                         return (
-                          <div key={t.id} style={{ padding: '12px 16px', borderBottom: '1px solid ' + theme.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                          <div key={t.id} style={{ borderBottom: '1px solid ' + theme.border }}>
+                          <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' as const }}>
                                 <span style={{ color: theme.text, fontWeight: 700 }}>{t.instrument}</span>
