@@ -468,9 +468,9 @@ export default function Dashboard() {
     return amount
   }
   
+  const tradingPayoutMonthly = tradingPayoutsAsIncome ? propPayouts.reduce((s: number, p: any) => s + parseFloat(p.amount || '0'), 0) / Math.max(1, Math.ceil((Date.now() - Math.min(...propPayouts.map((p: any) => new Date(p.date).getTime()), Date.now())) / (30 * 86400000))) : 0
   const monthlyIncome = incomeStreams.reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0) + tradingPayoutMonthly
   const activeIncome = incomeStreams.filter(inc => inc.type === 'active').reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0)
-  const tradingPayoutMonthly = tradingPayoutsAsIncome ? propPayouts.reduce((s: number, p: any) => s + parseFloat(p.amount || '0'), 0) / Math.max(1, Math.ceil((Date.now() - Math.min(...propPayouts.map((p: any) => new Date(p.date).getTime()), Date.now())) / (30 * 86400000))) : 0
   const passiveIncome = incomeStreams.filter(inc => inc.type === 'passive').reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0) + tradingPayoutMonthly
   const passiveIncomePercentage = monthlyIncome > 0 ? (passiveIncome / monthlyIncome) * 100 : 0
   const monthlyExpenses = expenses.filter(e => !e.targetDebtId && !e.targetGoalId).reduce((sum, exp) => sum + convertToMonthly(parseFloat(exp.amount || '0'), exp.frequency), 0)
