@@ -868,8 +868,11 @@ export default function Dashboard() {
           </div>
         )}
         <div style={{ textAlign: 'center' as const, marginBottom: '48px' }}>
-          <h1 style={{ fontSize: '42px', fontWeight: 800, color: theme.text, margin: '0 0 16px 0' }}>Welcome{user?.firstName ? `, ${user.firstName}` : ''}! 👋</h1>
-          <p style={{ fontSize: '20px', color: theme.textMuted, margin: 0 }}>What are we working on today?</p>
+          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706, #fbbf24)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px', boxShadow: '0 4px 20px rgba(251,191,36,0.5), inset 0 2px 4px rgba(255,255,255,0.3)', border: '3px solid #f59e0b', margin: '0 auto 20px' }}>⚜</div>
+          <h1 style={{ fontSize: '48px', fontWeight: 900, margin: '0 0 8px 0', letterSpacing: '3px' }}><span style={{ background: 'linear-gradient(135deg, #fbbf24, #f59e0b, #d97706)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>AUREUS</span></h1>
+          <p style={{ fontSize: '16px', color: theme.textMuted, margin: '0 0 24px 0', letterSpacing: '2px', textTransform: 'uppercase' as const }}>Your Wealth. Your Way.</p>
+          <h2 style={{ fontSize: '24px', fontWeight: 600, color: theme.text, margin: '0 0 8px 0' }}>Welcome{user?.firstName ? `, ${user.firstName}` : ''}! 👋</h2>
+          <p style={{ fontSize: '16px', color: theme.textMuted, margin: 0 }}>What are we working on today?</p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px', maxWidth: '800px', width: '100%' }}>
           <button onClick={() => { setAppMode('budget'); setShowModeSelector(false); setActiveTab('dashboard') }} style={{ padding: '40px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left' as const, boxShadow: '0 10px 40px rgba(16, 185, 129, 0.3)' }}>
@@ -882,7 +885,7 @@ export default function Dashboard() {
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>📈</div>
             <h2 style={{ color: 'white', fontSize: '28px', fontWeight: 700, margin: '0 0 12px 0' }}>Trading Mode</h2>
             <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '16px', margin: 0, lineHeight: 1.5 }}>Plan prop challenges, track performance, and execute your trading strategy</p>
-            <div style={{ marginTop: '20px', display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>{['Forex Props', 'Futures Props', 'Journal', 'Calculator'].map(t => <span key={t} style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.2)', borderRadius: '20px', fontSize: '12px', color: 'white' }}>{t}</span>)}</div>
+            <div style={{ marginTop: '20px', display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>{['Journal', 'Props', 'Analytics', 'Psychology', 'Risk', 'Compounding'].map(t => <span key={t} style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.2)', borderRadius: '20px', fontSize: '12px', color: 'white' }}>{t}</span>)}</div>
           </button>
         </div>
         <button onClick={() => setDarkMode(!darkMode)} style={{ marginTop: '32px', padding: '12px 24px', background: 'transparent', border: '2px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>{darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}</button>
@@ -904,7 +907,7 @@ export default function Dashboard() {
         <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button onClick={() => setShowModeSelector(true)} style={{ padding: '10px 16px', background: appMode === 'budget' ? theme.success : theme.warning, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }}>{appMode === 'budget' ? '💰' : '📈'} {appMode === 'budget' ? 'Budget' : 'Trading'} ▼</button>
-            <h1 style={{ margin: 0, color: theme.text, fontSize: '24px', fontWeight: 'bold' }}>Premium Finance</h1>
+            <h1 style={{ margin: 0, color: theme.text, fontSize: '24px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}><div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706, #fbbf24)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', boxShadow: '0 2px 8px rgba(251,191,36,0.4), inset 0 1px 2px rgba(255,255,255,0.3)', border: '2px solid #f59e0b' }}>⚜</div><span style={{ background: 'linear-gradient(135deg, #fbbf24, #f59e0b, #d97706)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '1px' }}>AUREUS</span></h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 14px', background: darkMode ? '#334155' : '#f1f5f9', borderRadius: '10px', border: '2px solid ' + currentLevel.color }}>
             <span style={{ fontSize: '13px' }}>{currentLevel.title}</span>
