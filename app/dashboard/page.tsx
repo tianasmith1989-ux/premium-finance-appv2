@@ -47,7 +47,9 @@ export default function Dashboard() {
   const addIncomePreset = (preset: any) => {
     const amount = prompt('Enter amount for ' + preset.name + ':')
     if (!amount || parseFloat(amount) <= 0) return
-    const freqChoice = prompt('How often do you receive this?\n\n1 = Weekly\n2 = Fortnightly\n3 = Monthly\n4 = Quarterly\n5 = One-time\n\nEnter number (default: ' + ({'weekly':'1','fortnightly':'2','monthly':'3','quarterly':'4','once':'5'}[preset.frequency] || '3') + '):', ({'weekly':'1','fortnightly':'2','monthly':'3','quarterly':'4','once':'5'}[preset.frequency] || '3'))
+    const freqToNum: {[k:string]:string} = {'weekly':'1','fortnightly':'2','monthly':'3','quarterly':'4','once':'5'}
+    const defaultNum = freqToNum[preset.frequency] || '3'
+    const freqChoice = prompt('How often do you receive this?\n\n1 = Weekly\n2 = Fortnightly\n3 = Monthly\n4 = Quarterly\n5 = One-time\n\nEnter number (default: ' + defaultNum + '):', defaultNum)
     const freqMap: {[k:string]:string} = {'1':'weekly','2':'fortnightly','3':'monthly','4':'quarterly','5':'once'}
     const frequency = freqMap[freqChoice || '3'] || preset.frequency
     setIncomeStreams(prev => [...prev, { ...preset, id: Date.now(), amount, frequency }])
