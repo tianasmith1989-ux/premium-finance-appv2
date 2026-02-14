@@ -101,16 +101,21 @@ export default function Dashboard() {
   const [showAssetPresets, setShowAssetPresets] = useState(false)
   const [expandedStep, setExpandedStep] = useState<number|null>(null)
   const [showHomeBuyingGuide, setShowHomeBuyingGuide] = useState(false)
-  const createGoalFromStep = (name: string, target: string, frequency: string = 'monthly') => {
+  const createGoalFromStep = (name: string, target: string, frequency: string = 'monthly', suggestedPayment?: string) => {
     const exists = goals.find(g => g.name === name)
     if (exists) { alert(name + ' already exists in your goals!'); return }
-    const paymentAmount = prompt('How much can you save per ' + frequency + ' towards "' + name + '"?')
+    const defaultPay = suggestedPayment || ''
+    const paymentAmount = prompt('How much can you save per ' + frequency + ' towards "' + name + '"?\n\nTarget: $' + parseFloat(target).toLocaleString() + (defaultPay ? '\nSuggested: $' + defaultPay + '/' + frequency : ''), defaultPay)
     if (!paymentAmount || parseFloat(paymentAmount) <= 0) return
-    const newGoalItem = { id: Date.now(), name, target, saved: '0', deadline: '', savingsFrequency: frequency, startDate: new Date().toISOString().split('T')[0], paymentAmount }
+    const goalId = Date.now()
+    const startDate = new Date().toISOString().split('T')[0]
+    const newGoalItem = { id: goalId, name, target, saved: '0', deadline: '', savingsFrequency: frequency, startDate, paymentAmount }
     setGoals(prev => [...prev, newGoalItem])
+    // Also create a linked expense so it shows in budget tracking
+    const expenseId = goalId + 1
+    setExpenses(prev => [...prev, { id: expenseId, name: '🎯 ' + name, amount: paymentAmount, frequency, category: 'savings', dueDate: startDate, targetGoalId: goalId }])
     awardXP(25); triggerConfetti()
-    const addToCal = confirm(name + ' created!\n\n$' + paymentAmount + ' per ' + frequency + '\n\nAdd to calendar?')
-    if (addToCal) { addGoalAndPlanToCalendar(newGoalItem) }
+    alert(name + ' created!\n\n✅ Goal: $' + parseFloat(target).toLocaleString() + ' target\n✅ Payment: $' + paymentAmount + ' per ' + frequency + '\n✅ Added to calendar automatically\n✅ Added to expenses for budget tracking\n\nMark payments as PAY on the calendar!')
   }
   const [showLiabilityPresets, setShowLiabilityPresets] = useState(false)
   const assetPresets = [
@@ -1412,7 +1417,7 @@ export default function Dashboard() {
                     desc: 'Save $1,000 as fast as possible. Sell stuff, pick up extra shifts, cut expenses. This protects you from small emergencies so you don\'t need credit cards.',
                     tip: 'Keep it in a separate high-interest savings account so you\'re not tempted to touch it.',
                     actions: [
-                      { label: '🎯 Create $1K Emergency Goal', action: () => createGoalFromStep('Starter Emergency Fund', '1000', 'weekly'), disabled: !!emergencyFund },
+                      { label: '🎯 Create $1K Emergency Goal', action: () => createGoalFromStep('Starter Emergency Fund', '1000', 'weekly', '50'), disabled: !!emergencyFund },
                       { label: '📅 View Calendar', action: () => { setActiveTab('dashboard' as any) }, disabled: false },
                     ],
                     linkedGoal: emergencyFund,
@@ -1428,19 +1433,19 @@ export default function Dashboard() {
                     linkedGoal: null,
                     auTips: ['Consolidate credit cards to a 0% balance transfer', 'Call providers to negotiate lower rates', 'HECS-HELP is indexed, not interest — prioritise higher-rate debts first'] },
                   { num: 3, title: '3-6 Months Full Emergency Fund', icon: '🛡️', done: fullEmPct >= 100, progress: Math.min(fullEmPct, 100),
-                    desc: 'Save 3-6 months of expenses ($' + (totalOutgoing * 3).toFixed(0) + ' - $' + (totalOutgoing * 6).toFixed(0) + '). This is your "sleep at night" fund that covers you if you lose your job.',
+                    desc: totalOutgoing > 0 ? 'Your monthly expenses are $' + totalOutgoing.toFixed(0) + '/mo. You need $' + (totalOutgoing * 3).toFixed(0) + ' (3 months) to $' + (totalOutgoing * 6).toFixed(0) + ' (6 months). This covers you if you lose your job or have a major expense.' : 'Add your expenses in the Dashboard first so we can calculate your 3-6 month target. This fund covers you if you lose your job.',
                     tip: 'This should be boring money — safe, accessible, earning some interest.',
                     actions: [
-                      { label: '🎯 Create 3-Month Fund Goal ($' + (totalOutgoing * 3).toFixed(0) + ')', action: () => createGoalFromStep('Full Emergency Fund (3 months)', String(Math.round(totalOutgoing * 3)), 'monthly'), disabled: !!fullEmergency },
-                      { label: '🎯 Create 6-Month Fund Goal ($' + (totalOutgoing * 6).toFixed(0) + ')', action: () => createGoalFromStep('Full Emergency Fund (6 months)', String(Math.round(totalOutgoing * 6)), 'monthly'), disabled: !!fullEmergency },
+                      { label: '🎯 3-Month Fund ($' + (totalOutgoing * 3).toFixed(0) + ')', action: () => createGoalFromStep('Full Emergency Fund (3 months)', String(Math.round(totalOutgoing * 3)), 'monthly', String(Math.round(totalOutgoing * 3 / 12))), disabled: !!fullEmergency },
+                      { label: '🎯 6-Month Fund ($' + (totalOutgoing * 6).toFixed(0) + ')', action: () => createGoalFromStep('Full Emergency Fund (6 months)', String(Math.round(totalOutgoing * 6)), 'monthly', String(Math.round(totalOutgoing * 6 / 12))), disabled: !!fullEmergency },
                     ],
                     linkedGoal: fullEmergency,
                     auTips: ['ING Savings Maximiser (high rate with conditions)', 'UBank USaver (no conditions, decent rate)', 'Keep in offset account if you have a mortgage later'] },
                   { num: 4, title: 'Invest 15% Into Super + Shares', icon: '📈', done: investPct >= 15, progress: Math.min((investPct / 15) * 100, 100),
-                    desc: 'Invest 15% of your income into wealth-building assets. Salary sacrifice into super (taxed at only 15%!) and invest in low-cost index funds.',
+                    desc: monthlyIncome > 0 ? 'Your monthly income is $' + monthlyIncome.toFixed(0) + '. 15% = $' + (monthlyIncome * 0.15).toFixed(0) + '/month ($' + (monthlyIncome * 0.15 * 12).toFixed(0) + '/year). Split between super salary sacrifice and index funds (VAS, VGS, VDHG).' : 'Add your income streams in the Dashboard first so we can calculate your 15% target. Then invest in super salary sacrifice + low-cost index funds.',
                     tip: 'Target: $' + (monthlyIncome * 0.15).toFixed(0) + '/month (15% of your income).',
                     actions: [
-                      { label: '🎯 Create Investment Goal ($' + (monthlyIncome * 0.15 * 12).toFixed(0) + '/yr)', action: () => createGoalFromStep('Annual Investment Target', String(Math.round(monthlyIncome * 0.15 * 12)), 'monthly'), disabled: !!investGoal },
+                      { label: '🎯 Invest 15% ($' + (monthlyIncome * 0.15).toFixed(0) + '/mo)', action: () => createGoalFromStep('Monthly Investment (15%)', String(Math.round(monthlyIncome * 0.15 * 12)), 'monthly', String(Math.round(monthlyIncome * 0.15))), disabled: !!investGoal },
                       { label: '💎 View Passive Income Quest Board', action: () => setActiveTab('overview' as any), disabled: false },
                     ],
                     linkedGoal: investGoal,
@@ -1449,7 +1454,7 @@ export default function Dashboard() {
                     desc: 'Save for your first home or investment property. In Australia, aim for 20% deposit to avoid LMI, or use government schemes for 5% deposit.',
                     tip: 'Click "Home Buying Guide" below for a complete Australian property roadmap!',
                     actions: [
-                      { label: '🎯 Create Home Deposit Goal', action: () => { const price = prompt('What property price are you targeting? (e.g. 600000)'); if (price) { const deposit = Math.round(parseFloat(price) * 0.2); createGoalFromStep('Home Deposit (20% of $' + parseInt(price).toLocaleString() + ')', String(deposit), 'monthly') } }, disabled: !!propertyGoal },
+                      { label: '🎯 Create Home Deposit Goal', action: () => { const price = prompt('What property price are you targeting? (e.g. 600000)'); if (price) { const p = parseFloat(price); const deposit = Math.round(p * 0.2); const extras = 3700; const total = deposit + extras; const monthly = Math.round(total / 24); createGoalFromStep('Home Deposit (20% of $' + p.toLocaleString() + ' + costs)', String(total), 'monthly', String(monthly)) } }, disabled: !!propertyGoal },
                       { label: '🏡 Open Home Buying Guide', action: () => setShowHomeBuyingGuide(!showHomeBuyingGuide), disabled: false },
                     ],
                     linkedGoal: propertyGoal,
@@ -1595,11 +1600,39 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ))}
+                  <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#fffbeb', borderRadius: '16px', border: '2px solid '+theme.warning+'40', marginBottom: '20px' }}>
+                    <h4 style={{ margin: '0 0 16px 0', color: theme.warning, fontSize: '18px' }}>🧮 Home Buying Cost Calculator</h4>
+                    <p style={{ color: theme.textMuted, fontSize: '12px', margin: '0 0 16px 0' }}>Enter a property price to see all the costs involved</p>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', alignItems: 'center' }}>
+                      <span style={{ color: theme.warning, fontWeight: 700, fontSize: '16px' }}>$</span>
+                      <input type="number" placeholder="Property price (e.g. 600000)" id="homePriceCalc" style={{ ...inputStyle, flex: 1, fontSize: '16px', fontWeight: 700, padding: '12px 16px' }} title="Enter your target property price" onChange={(e) => {
+                        const price = parseFloat(e.target.value || '0')
+                        const el = document.getElementById('homeCostResults')
+                        if (el && price > 0) {
+                          const deposit20 = price * 0.20
+                          const deposit5 = price * 0.05
+                          const stampDutyQLD = price <= 500000 ? 0 : price <= 1000000 ? (price - 500000) * 0.0375 : (price - 500000) * 0.045
+                          const stampDutyNSW = price <= 800000 ? 0 : price <= 1000000 ? (price - 800000) * 0.04 : (price - 800000) * 0.045 + 8000
+                          const stampDutyVIC = price <= 600000 ? 0 : price <= 750000 ? (price - 600000) * 0.05 : (price - 600000) * 0.055
+                          const lmi5pct = price * 0.032
+                          const lmi10pct = price * 0.018
+                          const conveyancing = 2500
+                          const inspections = 700
+                          const loanCosts = 500
+                          const total20 = deposit20 + conveyancing + inspections + loanCosts
+                          const total5 = deposit5 + lmi5pct + conveyancing + inspections + loanCosts
+                          const monthlyRepay = (price * 0.8 * (0.065/12)) / (1 - Math.pow(1 + 0.065/12, -360))
+                          el.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><div style="padding:16px;background:'+(darkMode?'#0f172a':'white')+';border-radius:12px;border:2px solid #10b98140"><div style="color:#10b981;font-weight:800;font-size:14px;margin-bottom:12px">💪 With 20% Deposit</div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid '+(darkMode?'#334155':'#e2e8f0')+'"><span style="color:'+(darkMode?'#94a3b8':'#64748b')+';font-size:13px">Deposit (20%)</span><span style="color:'+(darkMode?'#f1f5f9':'#1e293b')+';font-weight:700">$'+deposit20.toLocaleString()+'</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid '+(darkMode?'#334155':'#e2e8f0')+'"><span style="color:'+(darkMode?'#94a3b8':'#64748b')+';font-size:13px">LMI</span><span style="color:#10b981;font-weight:700">$0 (avoided!)</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid '+(darkMode?'#334155':'#e2e8f0')+'"><span style="color:'+(darkMode?'#94a3b8':'#64748b')+';font-size:13px">Conveyancing</span><span style="color:'+(darkMode?'#f1f5f9':'#1e293b')+';font-weight:700">$'+conveyancing.toLocaleString()+'</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid '+(darkMode?'#334155':'#e2e8f0')+'"><span style="color:'+(darkMode?'#94a3b8':'#64748b')+';font-size:13px">Inspections</span><span style="color:'+(darkMode?'#f1f5f9':'#1e293b')+';font-weight:700">$'+inspections.toLocaleString()+'</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;margin-top:4px"><span style="color:#10b981;font-weight:800;font-size:15px">TOTAL NEEDED</span><span style="color:#10b981;font-weight:900;font-size:18px">$'+Math.round(total20).toLocaleString()+'</span></div></div><div style="padding:16px;background:'+(darkMode?'#0f172a':'white')+';border-radius:12px;border:2px solid #f59e0b40"><div style="color:#f59e0b;font-weight:800;font-size:14px;margin-bottom:12px">⚡ With 5% Deposit (Gov Scheme)</div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid '+(darkMode?'#334155':'#e2e8f0')+'"><span style="color:'+(darkMode?'#94a3b8':'#64748b')+';font-size:13px">Deposit (5%)</span><span style="color:'+(darkMode?'#f1f5f9':'#1e293b')+';font-weight:700">$'+deposit5.toLocaleString()+'</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid '+(darkMode?'#334155':'#e2e8f0')+'"><span style="color:'+(darkMode?'#94a3b8':'#64748b')+';font-size:13px">LMI (if no guarantee)</span><span style="color:#ef4444;font-weight:700">~$'+Math.round(lmi5pct).toLocaleString()+'</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid '+(darkMode?'#334155':'#e2e8f0')+'"><span style="color:'+(darkMode?'#94a3b8':'#64748b')+';font-size:13px">LMI with FHG</span><span style="color:#10b981;font-weight:700">$0 (waived!)</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid '+(darkMode?'#334155':'#e2e8f0')+'"><span style="color:'+(darkMode?'#94a3b8':'#64748b')+';font-size:13px">Other costs</span><span style="color:'+(darkMode?'#f1f5f9':'#1e293b')+';font-weight:700">$'+(conveyancing+inspections+loanCosts).toLocaleString()+'</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;margin-top:4px"><span style="color:#f59e0b;font-weight:800;font-size:15px">TOTAL (with FHG)</span><span style="color:#f59e0b;font-weight:900;font-size:18px">$'+Math.round(deposit5+conveyancing+inspections+loanCosts).toLocaleString()+'</span></div></div></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px"><div style="padding:12px;background:'+(darkMode?'#0f172a':'#fafafa')+';border-radius:10px;text-align:center;border:1px solid '+(darkMode?'#334155':'#e2e8f0')+'"><div style="color:'+(darkMode?'#94a3b8':'#64748b')+';font-size:10px;text-transform:uppercase">Stamp Duty (QLD 1st Home)</div><div style="color:'+(stampDutyQLD===0?'#10b981':(darkMode?'#f1f5f9':'#1e293b'))+';font-size:20px;font-weight:800">'+(stampDutyQLD===0?'$0 ✓':'$'+Math.round(stampDutyQLD).toLocaleString())+'</div></div><div style="padding:12px;background:'+(darkMode?'#0f172a':'#fafafa')+';border-radius:10px;text-align:center;border:1px solid '+(darkMode?'#334155':'#e2e8f0')+'"><div style="color:'+(darkMode?'#94a3b8':'#64748b')+';font-size:10px;text-transform:uppercase">Monthly Repayment (6.5%)</div><div style="color:'+(darkMode?'#f1f5f9':'#1e293b')+';font-size:20px;font-weight:800">$'+Math.round(monthlyRepay).toLocaleString()+'</div></div><div style="padding:12px;background:'+(darkMode?'#0f172a':'#fafafa')+';border-radius:10px;text-align:center;border:1px solid '+(darkMode?'#334155':'#e2e8f0')+'"><div style="color:'+(darkMode?'#94a3b8':'#64748b')+';font-size:10px;text-transform:uppercase">You Save with FHG</div><div style="color:#10b981;font-size:20px;font-weight:800">$'+Math.round(deposit20-deposit5+lmi5pct).toLocaleString()+'</div></div></div>'
+                        } else if (el) { el.innerHTML = '' }
+                      }} />
+                    </div>
+                    <div id="homeCostResults"></div>
+                  </div>
                   <div style={{ padding: '16px', background: 'linear-gradient(135deg, '+theme.warning+'15, '+theme.success+'15)', borderRadius: '12px', textAlign: 'center' as const, border: '1px solid '+theme.warning+'30' }}>
                     <div style={{ fontSize: '20px', marginBottom: '8px' }}>🎯</div>
                     <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px' }}>Ready to start?</div>
                     <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px', marginBottom: '12px' }}>Create a home deposit goal and add it to your calendar</div>
-                    <button onClick={() => { const price = prompt('What property price are you targeting? (e.g. 600000)'); if (price) { const deposit = Math.round(parseFloat(price) * 0.2); createGoalFromStep('Home Deposit (20% of $' + parseInt(price).toLocaleString() + ')', String(deposit), 'monthly') } }} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #fbbf24, #d97706)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }}>🏠 Create Home Deposit Goal</button>
+                    <button onClick={() => { const price = prompt('What property price are you targeting? (e.g. 600000)'); if (price) { const p = parseFloat(price); const deposit = Math.round(p * 0.2); const extras = 3700; const total = deposit + extras; const monthly = Math.round(total / 24); createGoalFromStep('Home Deposit (20% of $' + p.toLocaleString() + ' + costs)', String(total), 'monthly', String(monthly)) } }} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #fbbf24, #d97706)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }}>🏠 Create Home Deposit Goal</button>
                   </div>
                 </div>
               )}
