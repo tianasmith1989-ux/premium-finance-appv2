@@ -178,7 +178,7 @@ export default function Dashboard() {
   const [isAskingCoach, setIsAskingCoach] = useState(false)
   
   const [trades, setTrades] = useState<any[]>([])
-  const [newTrade, setNewTrade] = useState({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '' })
+  const [newTrade, setNewTrade] = useState({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '', linkedAccount: '' })
 
   const [expandedDay, setExpandedDay] = useState<{day: number, items: any[]} | null>(null)
   
@@ -413,7 +413,7 @@ export default function Dashboard() {
         setPropAccounts(prev => prev.map(a => a.id === parseInt(newTrade.linkedAccount) ? { ...a, currentBalance: String(parseFloat(a.currentBalance||'0') + pl) } : a))
       }
     }
-    setNewTrade({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '' })
+    setNewTrade({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '', linkedAccount: '' })
     setNewTradeExtra({ emotion: 'disciplined', setup: '', rMultiple: '', session: 'london', rulesBroken: '', tags: '', confidence: '3', reflection: '' })
     awardXP(15)
   }
@@ -703,7 +703,7 @@ export default function Dashboard() {
   const deleteAsset = (id: number) => setAssets(assets.filter(a => a.id !== id))
   const addLiability = () => { if (!newLiability.name || !newLiability.value) return; setLiabilities([...liabilities, { ...newLiability, id: Date.now() }]); setNewLiability({ name: '', value: '', type: 'loan' }) }
   const deleteLiability = (id: number) => setLiabilities(liabilities.filter(l => l.id !== id))
-  const addTrade = () => { if (!newTrade.instrument) return; setTrades([...trades, { ...newTrade, id: Date.now() }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())); setNewTrade({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '' }) }
+  const addTrade = () => { if (!newTrade.instrument) return; setTrades([...trades, { ...newTrade, id: Date.now() }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())); setNewTrade({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '', linkedAccount: '' }) }
 
   const addPresetBill = (preset: any) => {
     const frequency = presetFrequencyOverrides[preset.name] || preset.frequency
