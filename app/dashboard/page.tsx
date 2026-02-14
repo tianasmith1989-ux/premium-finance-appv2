@@ -317,7 +317,7 @@ export default function Dashboard() {
   const toggleTradingSection = (id: string) => setTradingSections(prev => ({ ...prev, [id]: !prev[id] }))
 
   // Enhanced trade fields
-  const [newTradeExtra, setNewTradeExtra] = useState({ emotion: 'disciplined', setup: '', rMultiple: '', session: 'london', rulesBroken: '' })
+  const [newTradeExtra, setNewTradeExtra] = useState({ emotion: 'disciplined', setup: '', rMultiple: '', session: 'london', rulesBroken: '', tags: '', confidence: '3', reflection: '' })
   const [tradeImages, setTradeImages] = useState<{[tradeId:number]:string}>({})
   const handleTradeImageUpload = (tradeId: number, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
