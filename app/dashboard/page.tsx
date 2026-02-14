@@ -286,6 +286,31 @@ export default function Dashboard() {
   // Guide tab state
   const [expandedGuideSection, setExpandedGuideSection] = useState<string | null>(null)
   const [expandedGuideItem, setExpandedGuideItem] = useState<string | null>(null)
+  // Interactive Tour state
+  const [tourActive, setTourActive] = useState(false)
+  const [tourStep, setTourStep] = useState(0)
+  const tourSteps = [
+    { title: 'Welcome to Aureus! ⚜', body: 'This guided tour will walk you through every feature of your personal finance command centre. Let\'s get you set up for financial success!', tab: null, icon: '👋' },
+    { title: 'Choose Your Mode', body: 'Aureus has two modes:\n\n💰 Budget Mode — Track income, expenses, debts, and savings goals\n📈 Trading Mode — Journal trades, manage prop firm accounts, run calculators\n\nYou can switch anytime using the mode button in the header.', tab: null, icon: '🎮' },
+    { title: 'Step 1: Add Your Income', body: 'Start by adding your income streams. Click "Presets" to quickly add common income types like salary, freelancing, or dividends.\n\nFor each income you can set:\n• Amount and frequency (weekly/fortnightly/monthly)\n• Before or after tax (we\'ll calculate the net for you!)\n• Start date for calendar tracking\n\nThe Tax Estimator button shows your full ATO tax breakdown.', tab: 'dashboard', icon: '💰' },
+    { title: 'Step 2: Add Your Expenses', body: 'Add your regular expenses and bills. Use "Presets" for common bills or "CSV" to import your bank statement.\n\nThe app auto-categorises transactions from CSV imports (e.g. Woolworths → Food, Telstra → Utilities).\n\nEach expense appears on your calendar so you never miss a payment.', tab: 'dashboard', icon: '💸' },
+    { title: 'Step 3: Debt Boss Battles', body: 'Add your debts and watch them transform into boss monsters to defeat!\n\nEach debt shows HP (hit points) that decrease as you pay it off. Choose your strategy:\n🏔️ Avalanche — Highest interest first (saves money)\n⛄ Snowball — Smallest balance first (quick wins)\n\nAdd Power-Ups (extra payments) to defeat bosses faster!', tab: 'dashboard', icon: '⚔️' },
+    { title: 'Step 4: Savings Quests', body: 'Create savings goals and turn them into quests with progress ranks:\n🚀 Just Started → 🌟 Making Progress → ⚡ Halfway Hero → 🔥 Almost There → 👑 COMPLETE!\n\nClick "Add to Calendar" to schedule automatic savings. When you mark "PAY" on the calendar, your saved amount increases automatically.', tab: 'dashboard', icon: '🎯' },
+    { title: 'Step 5: The Calendar', body: 'Your financial command centre! Every income, expense, debt payment, and savings contribution shows here.\n\nClick any day to expand it. Hit "PAY" to:\n✅ Mark income as received\n✅ Mark bills as paid\n✅ Reduce debt balances\n✅ Add to savings goals\n\nColour coding: 💚 Income, 💙 Expenses, ❤️ Debts, 💜 Goals', tab: 'dashboard', icon: '📅' },
+    { title: 'Overview: Escape the Rat Race', body: 'The Overview tab shows your big picture:\n\n🐀 Rat Race Tracker — How close passive income is to covering expenses\n📊 Cash Flow Quadrant — Kiyosaki\'s E/S/B/I framework\n🗺️ Passive Income Quest Board — 10 paths to passive income with difficulty ratings\n🧮 Goal Calculator — See how compound interest grows your money', tab: 'overview', icon: '💎' },
+    { title: 'Path: Baby Steps to Freedom', body: 'Your step-by-step roadmap to financial independence:\n\n1️⃣ $1K Emergency Fund\n2️⃣ Pay Off All Debt\n3️⃣ 3-6 Month Emergency Fund\n4️⃣ Invest 15%\n5️⃣ Save for Property\n6️⃣ Pay Off Mortgage\n7️⃣ Build Wealth\n8️⃣ Reach Your FIRE Number\n\nEach step has action buttons to create goals and add them to your calendar. Plus a complete Australian Home Buying Guide!', tab: 'path', icon: '🎯' },
+    { title: 'Trading Mode', body: 'Switch to Trading Mode for powerful tools:\n\n📝 Trade Journal — Log trades with AI text or screenshot upload\n📊 Analytics — Equity curve, win rate, P/L by session and emotion\n🧠 Psychology — Pre-trade checklist and rule violation tracking\n💼 Prop Firm Dashboard — Track multiple funded accounts\n🧮 Compound Calculator — Project earnings with day selection\n📅 Trading Calendar — See daily P/L at a glance', tab: 'trading', icon: '📈' },
+    { title: 'XP & Achievements', body: 'Everything you do earns XP! Add income (+15), track debt (+20), create goals (+25), mark payments (+10).\n\nLevel up from 🐣 Hatchling to 🏆 Money Master!\n\nUnlock achievements like 🎯 First Goal, 💳 Debt Tracked, and 🎉 Debt Destroyed. Confetti included! 🎊', tab: null, icon: '🎮' },
+    { title: 'You\'re Ready! 🚀', body: 'That\'s everything! Here\'s the best workflow:\n\n1. Add income and expenses\n2. Set up debts as boss battles\n3. Create savings goals\n4. Check your calendar every payday\n5. Review the Overview weekly\n6. Follow the Baby Steps on the Path tab\n\nYour financial freedom journey starts now. Let\'s go! ⚜', tab: null, icon: '🏆' },
+  ]
+  const nextTourStep = () => { 
+    if (tourStep < tourSteps.length - 1) { 
+      const next = tourStep + 1
+      setTourStep(next)
+      if (tourSteps[next].tab) setActiveTab(tourSteps[next].tab as any)
+    } else { setTourActive(false); setTourStep(0); awardXP(50) }
+  }
+  const prevTourStep = () => { if (tourStep > 0) { const prev = tourStep - 1; setTourStep(prev); if (tourSteps[prev].tab) setActiveTab(tourSteps[prev].tab as any) } }
   // === ENHANCED TRADING STATE ===
   // Collapsible sections
   const [tradingSections, setTradingSections] = useState<{[key:string]:boolean}>({ journal: true, analytics: false, psychology: false, props: false, risk: false, session: false, rank: false })
@@ -944,7 +969,10 @@ export default function Dashboard() {
             <div style={{ marginTop: '20px', display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>{['Journal', 'Props', 'Analytics', 'Psychology', 'Risk', 'Compounding'].map(t => <span key={t} style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.2)', borderRadius: '20px', fontSize: '12px', color: 'white' }}>{t}</span>)}</div>
           </button>
         </div>
-        <button onClick={() => setDarkMode(!darkMode)} style={{ marginTop: '32px', padding: '12px 24px', background: 'transparent', border: '2px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>{darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}</button>
+        <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
+          <button onClick={() => { setTourActive(true); setTourStep(0); setShowModeSelector(false); setActiveTab('dashboard') }} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #fbbf24, #d97706)', color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '14px', fontWeight: 600, boxShadow: '0 4px 12px rgba(251,191,36,0.2)' }}>🎬 Take the Tour</button>
+          <button onClick={() => setDarkMode(!darkMode)} style={{ padding: '12px 24px', background: 'transparent', border: '2px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>{darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}</button>
+        </div>
       </div>
     )
   }
@@ -952,6 +980,29 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
       {showConfetti && (<div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' as const, zIndex: 9999 }}>{Array.from({ length: 50 }).map((_, i) => (<div key={i} style={{ position: 'absolute' as const, left: Math.random()*100+'%', top: '-10px', width: Math.random()*10+5+'px', height: Math.random()*10+5+'px', background: ['#f59e0b','#10b981','#8b5cf6','#ef4444','#3b82f6','#f472b6'][Math.floor(Math.random()*6)], borderRadius: Math.random()>0.5?'50%':'2px', animation: `confettiFall ${Math.random()*2+1.5}s ease-in forwards`, animationDelay: Math.random()*0.5+'s' }} />))}<style>{`@keyframes confettiFall { 0%{transform:translateY(-10px) rotate(0deg);opacity:1} 100%{transform:translateY(100vh) rotate(720deg);opacity:0} }`}</style></div>)}
+      {tourActive && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: darkMode ? 'linear-gradient(135deg, #1e293b, #1e1b4b)' : 'white', borderRadius: '24px', padding: '32px', maxWidth: '560px', width: '100%', boxShadow: '0 25px 80px rgba(0,0,0,0.4)', border: '2px solid ' + theme.accent + '40', position: 'relative' as const }}>
+            <div style={{ position: 'absolute' as const, top: '16px', right: '16px' }}>
+              <button onClick={() => { setTourActive(false); setTourStep(0) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '20px' }}>✕</button>
+            </div>
+            <div style={{ display: 'flex', gap: '4px', marginBottom: '24px' }}>
+              {tourSteps.map((_, i) => (<div key={i} style={{ flex: 1, height: '4px', borderRadius: '2px', background: i <= tourStep ? 'linear-gradient(135deg, #fbbf24, #d97706)' : (darkMode ? '#334155' : '#e2e8f0'), transition: 'all 0.3s' }} />))}
+            </div>
+            <div style={{ textAlign: 'center' as const, marginBottom: '20px' }}>
+              <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', margin: '0 auto 16px', boxShadow: '0 4px 20px rgba(251,191,36,0.3)' }}>{tourSteps[tourStep].icon}</div>
+              <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px', fontWeight: 800 }}>{tourSteps[tourStep].title}</h2>
+              <div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Step {tourStep + 1} of {tourSteps.length}</div>
+            </div>
+            <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.8, whiteSpace: 'pre-line' as const, marginBottom: '28px', padding: '0 8px', maxHeight: '300px', overflowY: 'auto' as const }}>{tourSteps[tourStep].body}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button onClick={prevTourStep} disabled={tourStep === 0} style={{ padding: '10px 20px', background: 'transparent', color: tourStep === 0 ? theme.textMuted + '40' : theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '10px', cursor: tourStep === 0 ? 'default' : 'pointer', fontSize: '13px', fontWeight: 600 }}>← Back</button>
+              <button onClick={() => { setTourActive(false); setTourStep(0) }} style={{ padding: '8px 16px', background: 'transparent', color: theme.textMuted, border: 'none', cursor: 'pointer', fontSize: '12px' }}>Skip Tour</button>
+              <button onClick={nextTourStep} style={{ padding: '10px 24px', background: 'linear-gradient(135deg, #fbbf24, #d97706)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, boxShadow: '0 4px 12px rgba(251,191,36,0.3)' }}>{tourStep === tourSteps.length - 1 ? '🎉 Finish Tour (+50 XP)' : 'Next →'}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {showLevelUp && (<div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9998, pointerEvents: 'none' as const }}><div style={{ padding: '32px 48px', background: 'linear-gradient(135deg, '+currentLevel.color+', '+theme.purple+')', borderRadius: '24px', textAlign: 'center' as const, animation: 'levelUp 3s ease forwards', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}><div style={{ fontSize: '64px', marginBottom: '12px' }}>🎉</div><div style={{ color: 'white', fontSize: '28px', fontWeight: 800 }}>LEVEL UP!</div><div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '22px', fontWeight: 600, marginTop: '8px' }}>{currentLevel.title}</div></div><style>{`@keyframes levelUp { 0%{transform:scale(.5);opacity:0} 20%{transform:scale(1.1);opacity:1} 80%{transform:scale(1);opacity:1} 100%{transform:scale(.8);opacity:0} }`}</style></div>)}
       {newAchievement && (<div style={{ position: 'fixed' as const, top: '80px', right: '20px', zIndex: 9997, padding: '16px 24px', background: 'linear-gradient(135deg, #fbbf24, #f59e0b)', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.3)', animation: 'slideIn 0.3s ease' }}><div style={{ color: '#1e293b', fontWeight: 700, fontSize: '14px' }}>🏆 Achievement Unlocked!</div><div style={{ color: '#1e293b', fontSize: '16px', fontWeight: 600, marginTop: '4px' }}>{newAchievement}</div><div style={{ color: '#92400e', fontSize: '11px', marginTop: '2px' }}>+50 XP</div><style>{`@keyframes slideIn { 0%{transform:translateX(100px);opacity:0} 100%{transform:translateX(0);opacity:1} }`}</style></div>)}
 
@@ -2120,7 +2171,8 @@ export default function Dashboard() {
             <div style={{ padding: '32px', background: darkMode ? 'linear-gradient(135deg, #1e293b, #1e1b4b)' : 'linear-gradient(135deg, #f0f9ff, #faf5ff)', borderRadius: '24px', border: '2px solid ' + theme.border, textAlign: 'center' as const }}>
               <div style={{ fontSize: '48px', marginBottom: '12px' }}>📖</div>
               <h1 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '32px', fontWeight: 900 }}>App Guide</h1>
-              <p style={{ margin: 0, color: theme.textMuted, fontSize: '16px' }}>Everything you need to know. Click any section to expand.</p>
+              <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '16px' }}>Everything you need to know. Click any section to expand.</p>
+              <button onClick={() => { setTourActive(true); setTourStep(0) }} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #fbbf24, #d97706)', color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700, boxShadow: '0 4px 20px rgba(251,191,36,0.3)' }}>🎬 Start Interactive Tour</button>
             </div>
             {[
               { id:'quickstart',icon:'🚀',title:'Quick Start',color:'#fbbf24',items:[{q:'How do I get started?',a:'Choose Budget Mode or Trading Mode from the mode selector. Budget Mode tracks finances, Trading Mode has prop calculators and journals.'},{q:'What should I set up first?',a:'1. Add income streams (salary, side hustles)\n2. Add expenses (use Presets for quick setup!)\n3. Add debts\n4. Set savings goals\n5. Check your calendar'},{q:'What are the tabs?',a:'📊 Dashboard — Income, expenses, debts, goals, calendar\n💎 Overview — Rat Race tracker, Cash Flow Quadrant, Quest Board\n🎯 Path — FIRE number, income breakdown, spending\n📈 Trading — Journal, prop calculators\n📖 Guide — You are here!'}]},
