@@ -14,7 +14,7 @@ export default function Dashboard() {
   const [tradingCalendarMonth, setTradingCalendarMonth] = useState(new Date())
   
   const [incomeStreams, setIncomeStreams] = useState<any[]>([])
-  const [newIncome, setNewIncome] = useState({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0] })
+  const [newIncome, setNewIncome] = useState({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0], isGross: false })
   const [showIncomePresets, setShowIncomePresets] = useState(false)
   const [tradingPayoutsAsIncome, setTradingPayoutsAsIncome] = useState(false)
   const [payslipData, setPayslipData] = useState<{gross:number,net:number,super_:number,tax:number,leave:{annual:number,sick:number,long_service:number}}|null>(null)
@@ -45,14 +45,9 @@ export default function Dashboard() {
     { name: 'Trading Payouts', amount: '', frequency: 'monthly', type: 'passive', category: 'trading' },
   ]
   const addIncomePreset = (preset: any) => {
-    const amount = prompt('Enter amount for ' + preset.name + ':')
+    const amount = prompt('Enter amount for ' + preset.name + ':\n\n(You can change the frequency after adding)')
     if (!amount || parseFloat(amount) <= 0) return
-    const freqToNum: {[k:string]:string} = {'weekly':'1','fortnightly':'2','monthly':'3','quarterly':'4','once':'5'}
-    const defaultNum = freqToNum[preset.frequency] || '3'
-    const freqChoice = prompt('How often do you receive this?\n\n1 = Weekly\n2 = Fortnightly\n3 = Monthly\n4 = Quarterly\n5 = One-time\n\nEnter number (default: ' + defaultNum + '):', defaultNum)
-    const freqMap: {[k:string]:string} = {'1':'weekly','2':'fortnightly','3':'monthly','4':'quarterly','5':'once'}
-    const frequency = freqMap[freqChoice || '3'] || preset.frequency
-    setIncomeStreams(prev => [...prev, { ...preset, id: Date.now(), amount, frequency }])
+    setIncomeStreams(prev => [...prev, { id: Date.now(), name: preset.name, amount, frequency: preset.frequency, type: preset.type, startDate: new Date().toISOString().split('T')[0], isGross: false }])
     awardXP(15)
   }
   const [showTaxEstimator, setShowTaxEstimator] = useState(false)
@@ -628,7 +623,19 @@ export default function Dashboard() {
     setPaidOccurrences(newPaid)
   }
 
-  const addIncome = () => { if (!newIncome.name || !newIncome.amount) return; setIncomeStreams([...incomeStreams, { ...newIncome, id: Date.now() }]); setNewIncome({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0] }); awardXP(15) }
+  const addIncome = () => { 
+    if (!newIncome.name || !newIncome.amount) return
+    let finalAmount = newIncome.amount
+    if (newIncome.isGross) {
+      const annualGross = convertToMonthly(parseFloat(newIncome.amount), newIncome.frequency) * 12
+      const tax = estimateAUTax(annualGross)
+      const netRatio = tax.net / annualGross
+      finalAmount = String(Math.round(parseFloat(newIncome.amount) * netRatio * 100) / 100)
+    }
+    setIncomeStreams([...incomeStreams, { ...newIncome, id: Date.now(), amount: finalAmount }])
+    setNewIncome({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0], isGross: false })
+    awardXP(15)
+  }
   const deleteIncome = (id: number) => setIncomeStreams(incomeStreams.filter(i => i.id !== id))
   const addExpense = () => { if (!newExpense.name || !newExpense.amount) return; setExpenses([...expenses, { ...newExpense, id: Date.now() }]); setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: new Date().toISOString().split('T')[0] }); awardXP(10) }
   const deleteExpense = (id: number) => setExpenses(expenses.filter(e => e.id !== id))
@@ -1061,6 +1068,7 @@ export default function Dashboard() {
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' as const }}>
                 <input type="text" placeholder="Name" title="Name of income source (e.g. 'Salary', 'Dividends', 'Rental Income')" value={newIncome.name} onChange={(e) => setNewIncome({ ...newIncome, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 100px' }} />
                 <input type="number" placeholder="Amount $" title="Amount per payment in AUD" value={newIncome.amount} onChange={(e) => setNewIncome({ ...newIncome, amount: e.target.value })} style={{ ...inputStyle, width: '90px' }} />
+                <button onClick={() => setNewIncome({ ...newIncome, isGross: !newIncome.isGross })} style={{ padding: '6px 10px', background: newIncome.isGross ? theme.warning : theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '10px', fontWeight: 700, whiteSpace: 'nowrap' as const }} title={newIncome.isGross ? 'Amount is BEFORE tax — we\'ll calculate net for you' : 'Amount is AFTER tax (take-home pay)'}>{newIncome.isGross ? '💰 Gross' : '✅ Net'}</button>
                 <select value={newIncome.frequency} onChange={(e) => setNewIncome({ ...newIncome, frequency: e.target.value })} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
                 <select value={newIncome.type} onChange={(e) => setNewIncome({ ...newIncome, type: e.target.value })} style={inputStyle}><option value="active">🏃 Active</option><option value="passive">🌴 Passive</option></select>
                 <input type="date" value={newIncome.startDate} onChange={(e) => setNewIncome({ ...newIncome, startDate: e.target.value })} style={inputStyle} />
