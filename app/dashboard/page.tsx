@@ -44,11 +44,24 @@ export default function Dashboard() {
     { name: 'Vending Machine Income', amount: '', frequency: 'monthly', type: 'passive', category: 'business' },
     { name: 'Trading Payouts', amount: '', frequency: 'monthly', type: 'passive', category: 'trading' },
   ]
+  const [pendingPreset, setPendingPreset] = useState<any>(null)
+  const [presetForm, setPresetForm] = useState({ amount: '', frequency: 'monthly', isGross: false, startDate: new Date().toISOString().split('T')[0] })
   const addIncomePreset = (preset: any) => {
-    const amount = prompt('Enter amount for ' + preset.name + ':\n\n(You can change the frequency after adding)')
-    if (!amount || parseFloat(amount) <= 0) return
-    setIncomeStreams(prev => [...prev, { id: Date.now(), name: preset.name, amount, frequency: preset.frequency, type: preset.type, startDate: new Date().toISOString().split('T')[0], isGross: false }])
+    setPendingPreset(preset)
+    setPresetForm({ amount: '', frequency: preset.frequency, isGross: false, startDate: new Date().toISOString().split('T')[0] })
+  }
+  const confirmIncomePreset = () => {
+    if (!pendingPreset || !presetForm.amount || parseFloat(presetForm.amount) <= 0) return
+    let finalAmount = presetForm.amount
+    if (presetForm.isGross) {
+      const annualGross = convertToMonthly(parseFloat(presetForm.amount), presetForm.frequency) * 12
+      const tax = estimateAUTax(annualGross)
+      const netRatio = annualGross > 0 ? tax.net / annualGross : 1
+      finalAmount = String(Math.round(parseFloat(presetForm.amount) * netRatio * 100) / 100)
+    }
+    setIncomeStreams(prev => [...prev, { id: Date.now(), name: pendingPreset.name, amount: finalAmount, frequency: presetForm.frequency, type: pendingPreset.type, startDate: presetForm.startDate || new Date().toISOString().split('T')[0] }])
     awardXP(15)
+    setPendingPreset(null)
   }
   const [showTaxEstimator, setShowTaxEstimator] = useState(false)
   const estimateAUTax = (gross: number): { tax: number, medicare: number, net: number, effectiveRate: number, super_: number } => {
@@ -1004,14 +1017,62 @@ export default function Dashboard() {
                 </div>
               </div>
               {showIncomePresets && (
-                <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '16px', maxHeight: '300px', overflowY: 'auto' as const }}>
+                <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '16px', maxHeight: '400px', overflowY: 'auto' as const }}>
+                  {pendingPreset && (
+                    <div style={{ padding: '16px', background: darkMode ? '#1e293b' : 'white', borderRadius: '12px', marginBottom: '16px', border: '2px solid ' + theme.accent }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <span style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>{pendingPreset.type === 'passive' ? '🌴' : '🏃'} {pendingPreset.name}</span>
+                        <button onClick={() => setPendingPreset(null)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '18px' }}>✕</button>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, alignItems: 'end' }}>
+                        <div style={{ flex: 1, minWidth: '100px' }}>
+                          <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '4px' }}>Amount ($)</label>
+                          <input type="number" placeholder="0.00" value={presetForm.amount} onChange={(e) => setPresetForm({ ...presetForm, amount: e.target.value })} style={{ ...inputStyle, width: '100%' }} autoFocus />
+                        </div>
+                        <div>
+                          <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '4px' }}>Tax</label>
+                          <button onClick={() => setPresetForm({ ...presetForm, isGross: !presetForm.isGross })} style={{ padding: '8px 12px', background: presetForm.isGross ? theme.warning : theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap' as const }}>{presetForm.isGross ? '💰 Before Tax' : '✅ After Tax'}</button>
+                        </div>
+                        <div>
+                          <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '4px' }}>Frequency</label>
+                          <select value={presetForm.frequency} onChange={(e) => setPresetForm({ ...presetForm, frequency: e.target.value })} style={{ ...inputStyle, padding: '8px' }}>
+                            <option value="weekly">Weekly</option>
+                            <option value="fortnightly">Fortnightly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="yearly">Yearly</option>
+                            <option value="once">One-time</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '4px' }}>Start Date (optional)</label>
+                          <input type="date" value={presetForm.startDate} onChange={(e) => setPresetForm({ ...presetForm, startDate: e.target.value })} style={{ ...inputStyle, padding: '7px 8px' }} />
+                        </div>
+                        <button onClick={confirmIncomePreset} style={{ padding: '8px 20px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>Add ✓</button>
+                      </div>
+                      {presetForm.isGross && presetForm.amount && parseFloat(presetForm.amount) > 0 && (() => {
+                        const annualGross = convertToMonthly(parseFloat(presetForm.amount), presetForm.frequency) * 12
+                        const tax = estimateAUTax(annualGross)
+                        const netRatio = annualGross > 0 ? tax.net / annualGross : 1
+                        const netAmount = parseFloat(presetForm.amount) * netRatio
+                        return (
+                          <div style={{ marginTop: '10px', padding: '10px 14px', background: theme.warning + '10', borderRadius: '8px', border: '1px solid ' + theme.warning + '30', fontSize: '12px' }}>
+                            <span style={{ color: theme.warning, fontWeight: 700 }}>Tax estimate: </span>
+                            <span style={{ color: theme.text }}>${parseFloat(presetForm.amount).toFixed(2)} gross → </span>
+                            <span style={{ color: theme.success, fontWeight: 700 }}>${netAmount.toFixed(2)} net</span>
+                            <span style={{ color: theme.textMuted }}> per {presetForm.frequency} ({tax.effectiveRate.toFixed(1)}% effective rate)</span>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
                   <div style={{ fontSize: '12px', color: theme.textMuted, marginBottom: '8px', fontWeight: 600 }}>🏃 Active Income</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '6px', marginBottom: '12px' }}>
-                    {incomePresets.filter(p => p.type === 'active').map((p, i) => (<button key={i} onClick={() => addIncomePreset(p)} style={{ padding: '6px 12px', background: darkMode ? '#1e293b' : 'white', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text, fontSize: '12px' }} title={'Add ' + p.name + ' as ' + p.frequency + ' income'}>{p.name}</button>))}
+                    {incomePresets.filter(p => p.type === 'active').map((p, i) => (<button key={i} onClick={() => addIncomePreset(p)} style={{ padding: '6px 12px', background: pendingPreset?.name === p.name ? theme.accent : darkMode ? '#1e293b' : 'white', border: '1px solid ' + (pendingPreset?.name === p.name ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', color: pendingPreset?.name === p.name ? 'white' : theme.text, fontSize: '12px' }} title={'Add ' + p.name + ' as ' + p.frequency + ' income'}>{p.name}</button>))}
                   </div>
                   <div style={{ fontSize: '12px', color: theme.success, marginBottom: '8px', fontWeight: 600 }}>🌴 Passive Income (from Quest Board)</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '6px' }}>
-                    {incomePresets.filter(p => p.type === 'passive').map((p, i) => (<button key={i} onClick={() => addIncomePreset(p)} style={{ padding: '6px 12px', background: darkMode ? '#1e3a32' : '#f0fdf4', border: '1px solid ' + theme.success + '30', borderRadius: '8px', cursor: 'pointer', color: theme.success, fontSize: '12px' }} title={'Add ' + p.name + ' — ' + p.frequency}>🌴 {p.name}</button>))}
+                    {incomePresets.filter(p => p.type === 'passive').map((p, i) => (<button key={i} onClick={() => addIncomePreset(p)} style={{ padding: '6px 12px', background: pendingPreset?.name === p.name ? theme.success : darkMode ? '#1e3a32' : '#f0fdf4', border: '1px solid ' + (pendingPreset?.name === p.name ? theme.success : theme.success + '30'), borderRadius: '8px', cursor: 'pointer', color: pendingPreset?.name === p.name ? 'white' : theme.success, fontSize: '12px' }} title={'Add ' + p.name + ' — ' + p.frequency}>🌴 {p.name}</button>))}
                   </div>
                 </div>
               )}
