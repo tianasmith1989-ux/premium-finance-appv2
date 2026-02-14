@@ -99,6 +99,19 @@ export default function Dashboard() {
   const [assets, setAssets] = useState<any[]>([])
   const [newAsset, setNewAsset] = useState({ name: '', value: '', type: 'savings' })
   const [showAssetPresets, setShowAssetPresets] = useState(false)
+  const [expandedStep, setExpandedStep] = useState<number|null>(null)
+  const [showHomeBuyingGuide, setShowHomeBuyingGuide] = useState(false)
+  const createGoalFromStep = (name: string, target: string, frequency: string = 'monthly') => {
+    const exists = goals.find(g => g.name === name)
+    if (exists) { alert(name + ' already exists in your goals!'); return }
+    const paymentAmount = prompt('How much can you save per ' + frequency + ' towards "' + name + '"?')
+    if (!paymentAmount || parseFloat(paymentAmount) <= 0) return
+    const newGoalItem = { id: Date.now(), name, target, saved: '0', deadline: '', savingsFrequency: frequency, startDate: new Date().toISOString().split('T')[0], paymentAmount }
+    setGoals(prev => [...prev, newGoalItem])
+    awardXP(25); triggerConfetti()
+    const addToCal = confirm(name + ' created!\n\n$' + paymentAmount + ' per ' + frequency + '\n\nAdd to calendar?')
+    if (addToCal) { addGoalAndPlanToCalendar(newGoalItem) }
+  }
   const [showLiabilityPresets, setShowLiabilityPresets] = useState(false)
   const assetPresets = [
     { name: 'Emergency Fund', type: 'savings' }, { name: 'Savings Account', type: 'savings' },
@@ -1380,7 +1393,7 @@ export default function Dashboard() {
             {/* BABY STEPS TO FINANCIAL FREEDOM */}
             <div style={cardStyle}>
               <h3 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>👶 Baby Steps to Financial Freedom</h3>
-              <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>Inspired by Dave Ramsey, adapted for Australia</p>
+              <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>Inspired by Dave Ramsey, adapted for Australia. Click each step to take action!</p>
               {(() => {
                 const emergencyFund = goals.find(g => g.name.toLowerCase().match(/emergency|rainy|starter/))
                 const emergencyPct = emergencyFund ? (parseFloat(emergencyFund.saved||'0') / parseFloat(emergencyFund.target||'1')) * 100 : 0
@@ -1388,50 +1401,211 @@ export default function Dashboard() {
                 const allDebtsCleared = allDebtsExMortgage.length === 0 || allDebtsExMortgage.every(d => parseFloat(d.balance||'0') <= 0)
                 const fullEmergency = goals.find(g => g.name.toLowerCase().match(/full emergency|3.month|6.month/))
                 const fullEmPct = fullEmergency ? (parseFloat(fullEmergency.saved||'0') / parseFloat(fullEmergency.target||'1')) * 100 : 0
+                const investGoal = goals.find(g => g.name.toLowerCase().match(/invest|etf|shares|super/))
                 const investPct = passiveIncomePercentage
+                const propertyGoal = goals.find(g => g.name.toLowerCase().match(/house|property|home deposit|deposit/))
+                const propertyPct = propertyGoal ? (parseFloat(propertyGoal.saved||'0') / parseFloat(propertyGoal.target||'1')) * 100 : 0
                 const mortgage = debts.find(d => d.name.toLowerCase().match(/mortgage|home loan/))
                 const mortgagePaid = !mortgage || parseFloat(mortgage.balance||'0') <= 0
                 const steps = [
-                  { num: 1, title: '$1,000 Starter Emergency Fund', desc: 'Save $1,000 as fast as possible. Sell stuff, pick up extra shifts, cut expenses.', icon: '🏦', done: emergencyPct >= 100, progress: Math.min(emergencyPct, 100), tip: 'This protects you from small emergencies so you don\'t need credit cards.' },
-                  { num: 2, title: 'Pay Off All Debt (except mortgage)', desc: 'Use ' + payoffMethod + ' method. List debts smallest to largest (snowball) or highest interest first (avalanche). Attack!', icon: '⚔️', done: allDebtsCleared, progress: allDebtsExMortgage.length > 0 ? Math.max(0, allDebtsExMortgage.reduce((s,d) => { const o=parseFloat(d.originalBalance||d.balance||'0'); const c=parseFloat(d.balance||'0'); return s + ((o-c)/o)*100 }, 0) / allDebtsExMortgage.length) : 100, tip: 'Every dollar freed from debt becomes a dollar building wealth.' },
-                  { num: 3, title: '3-6 Months Full Emergency Fund', desc: 'Save 3-6 months of expenses ($' + (totalOutgoing * 3).toFixed(0) + ' - $' + (totalOutgoing * 6).toFixed(0) + '). This is your "sleep at night" fund.', icon: '🛡️', done: fullEmPct >= 100, progress: Math.min(fullEmPct, 100), tip: 'Keep in a high-interest savings account (ING, UBank, Up).' },
-                  { num: 4, title: 'Invest 15% Into Super + Shares', desc: 'Maximise super salary sacrifice + invest in low-cost index funds (VAS, VGS, VDHG). Let compound interest work.', icon: '📈', done: investPct >= 15, progress: Math.min((investPct / 15) * 100, 100), tip: 'Super contributions are taxed at only 15% — free money via tax savings!' },
-                  { num: 5, title: 'Save for Property Deposit (Optional)', desc: 'Save for your first home or investment property deposit. Use the First Home Super Saver Scheme to boost savings.', icon: '🏠', done: false, progress: 0, tip: 'Optional: Skip if you\'re happy renting and investing the difference. Both paths work!' },
-                  { num: 6, title: 'Pay Off Mortgage Early', desc: 'Every extra dollar on your mortgage saves years of interest. Use an offset account to keep liquidity.', icon: '🏡', done: mortgagePaid, progress: mortgage ? Math.max(0, 100 - (parseFloat(mortgage.balance||'0') / parseFloat(mortgage.originalBalance||mortgage.balance||'1')) * 100) : 0, tip: 'Even $50/week extra can cut years off your mortgage.' },
-                  { num: 7, title: 'Build Wealth & Give Generously', desc: 'Passive income covers expenses. You\'re financially free! Continue investing, help others, live life on your terms.', icon: '🏆', done: fiPath.passiveCoverage >= 100, progress: Math.min(fiPath.passiveCoverage, 100), tip: 'This is the goal. Your money works harder than you ever could.' },
+                  { num: 1, title: '$1,000 Starter Emergency Fund', icon: '🏦', done: emergencyPct >= 100, progress: Math.min(emergencyPct, 100),
+                    desc: 'Save $1,000 as fast as possible. Sell stuff, pick up extra shifts, cut expenses. This protects you from small emergencies so you don\'t need credit cards.',
+                    tip: 'Keep it in a separate high-interest savings account so you\'re not tempted to touch it.',
+                    actions: [
+                      { label: '🎯 Create $1K Emergency Goal', action: () => createGoalFromStep('Starter Emergency Fund', '1000', 'weekly'), disabled: !!emergencyFund },
+                      { label: '📅 View Calendar', action: () => { setActiveTab('dashboard' as any) }, disabled: false },
+                    ],
+                    linkedGoal: emergencyFund,
+                    auTips: ['Open a fee-free HISA (ING, UBank, Up Bank)', 'Use round-up apps like Raiz to save spare change', 'Sell unused items on Facebook Marketplace or Gumtree'] },
+                  { num: 2, title: 'Pay Off All Debt (except mortgage)', icon: '⚔️', done: allDebtsCleared,
+                    progress: allDebtsExMortgage.length > 0 ? Math.max(0, allDebtsExMortgage.reduce((s: any,d: any) => { const o=parseFloat(d.originalBalance||d.balance||'0'); const c=parseFloat(d.balance||'0'); return s + ((o-c)/o)*100 }, 0) / allDebtsExMortgage.length) : 100,
+                    desc: 'Use the ' + payoffMethod + ' method. Attack your debts with everything you\'ve got! Every dollar freed from debt becomes a dollar building wealth.',
+                    tip: 'The ' + payoffMethod + ' method is already set up in your Debt Boss Battles section.',
+                    actions: [
+                      { label: '⚔️ Go to Debt Boss Battles', action: () => { setActiveTab('dashboard' as any); setTimeout(() => window.scrollTo({top: document.querySelector('[class*=debt]')?.getBoundingClientRect().top || 800, behavior: 'smooth'}), 100) }, disabled: false },
+                      { label: '🔄 Switch to ' + (payoffMethod === 'avalanche' ? 'Snowball' : 'Avalanche'), action: () => setPayoffMethod(payoffMethod === 'avalanche' ? 'snowball' : 'avalanche'), disabled: false },
+                    ],
+                    linkedGoal: null,
+                    auTips: ['Consolidate credit cards to a 0% balance transfer', 'Call providers to negotiate lower rates', 'HECS-HELP is indexed, not interest — prioritise higher-rate debts first'] },
+                  { num: 3, title: '3-6 Months Full Emergency Fund', icon: '🛡️', done: fullEmPct >= 100, progress: Math.min(fullEmPct, 100),
+                    desc: 'Save 3-6 months of expenses ($' + (totalOutgoing * 3).toFixed(0) + ' - $' + (totalOutgoing * 6).toFixed(0) + '). This is your "sleep at night" fund that covers you if you lose your job.',
+                    tip: 'This should be boring money — safe, accessible, earning some interest.',
+                    actions: [
+                      { label: '🎯 Create 3-Month Fund Goal ($' + (totalOutgoing * 3).toFixed(0) + ')', action: () => createGoalFromStep('Full Emergency Fund (3 months)', String(Math.round(totalOutgoing * 3)), 'monthly'), disabled: !!fullEmergency },
+                      { label: '🎯 Create 6-Month Fund Goal ($' + (totalOutgoing * 6).toFixed(0) + ')', action: () => createGoalFromStep('Full Emergency Fund (6 months)', String(Math.round(totalOutgoing * 6)), 'monthly'), disabled: !!fullEmergency },
+                    ],
+                    linkedGoal: fullEmergency,
+                    auTips: ['ING Savings Maximiser (high rate with conditions)', 'UBank USaver (no conditions, decent rate)', 'Keep in offset account if you have a mortgage later'] },
+                  { num: 4, title: 'Invest 15% Into Super + Shares', icon: '📈', done: investPct >= 15, progress: Math.min((investPct / 15) * 100, 100),
+                    desc: 'Invest 15% of your income into wealth-building assets. Salary sacrifice into super (taxed at only 15%!) and invest in low-cost index funds.',
+                    tip: 'Target: $' + (monthlyIncome * 0.15).toFixed(0) + '/month (15% of your income).',
+                    actions: [
+                      { label: '🎯 Create Investment Goal ($' + (monthlyIncome * 0.15 * 12).toFixed(0) + '/yr)', action: () => createGoalFromStep('Annual Investment Target', String(Math.round(monthlyIncome * 0.15 * 12)), 'monthly'), disabled: !!investGoal },
+                      { label: '💎 View Passive Income Quest Board', action: () => setActiveTab('overview' as any), disabled: false },
+                    ],
+                    linkedGoal: investGoal,
+                    auTips: ['Vanguard VAS (ASX 300), VGS (International), VDHG (Diversified)', 'Super salary sacrifice up to $30,000/year concessional cap', 'Use SelfWealth, CMC, or Stake for low brokerage', 'Consider FHSS scheme — withdraw $50K from super for first home'] },
+                  { num: 5, title: '🏠 Save for Property Deposit', icon: '🏠', done: propertyPct >= 100, progress: Math.min(propertyPct, 100),
+                    desc: 'Save for your first home or investment property. In Australia, aim for 20% deposit to avoid LMI, or use government schemes for 5% deposit.',
+                    tip: 'Click "Home Buying Guide" below for a complete Australian property roadmap!',
+                    actions: [
+                      { label: '🎯 Create Home Deposit Goal', action: () => { const price = prompt('What property price are you targeting? (e.g. 600000)'); if (price) { const deposit = Math.round(parseFloat(price) * 0.2); createGoalFromStep('Home Deposit (20% of $' + parseInt(price).toLocaleString() + ')', String(deposit), 'monthly') } }, disabled: !!propertyGoal },
+                      { label: '🏡 Open Home Buying Guide', action: () => setShowHomeBuyingGuide(!showHomeBuyingGuide), disabled: false },
+                    ],
+                    linkedGoal: propertyGoal,
+                    auTips: ['First Home Owner Grant (FHOG) varies by state', 'First Home Guarantee — buy with 5% deposit, no LMI', 'Stamp duty concessions for first home buyers', 'FHSS Scheme — salary sacrifice up to $50K into super then withdraw for deposit'] },
+                  { num: 6, title: 'Pay Off Mortgage Early', icon: '🏡', done: mortgagePaid,
+                    progress: mortgage ? Math.max(0, 100 - (parseFloat(mortgage.balance||'0') / parseFloat(mortgage.originalBalance||mortgage.balance||'1')) * 100) : 0,
+                    desc: 'Every extra dollar on your mortgage saves years of interest. Use an offset account for liquidity while reducing interest.',
+                    tip: 'Even $50/week extra can save tens of thousands in interest and cut years off your loan.',
+                    actions: [
+                      { label: '⚔️ Add Mortgage as Debt Boss', action: () => { const bal = prompt('Mortgage balance remaining?'); if (bal) { const rate = prompt('Interest rate? (e.g. 6.2)'); const minPay = prompt('Monthly repayment?'); if (rate && minPay) { setDebts(prev => [...prev, { id: Date.now(), name: 'Home Loan', balance: bal, originalBalance: bal, interestRate: rate, minPayment: minPay, frequency: 'monthly', paymentDate: new Date().toISOString().split('T')[0] }]); awardXP(20) } } }, disabled: !!mortgage },
+                      { label: '📅 View Calendar', action: () => setActiveTab('dashboard' as any), disabled: false },
+                    ],
+                    linkedGoal: null,
+                    auTips: ['Use 100% offset account to park emergency fund + savings', 'Make fortnightly payments instead of monthly (26 half-payments = 13 months)', 'Refinance every 2-3 years to get competitive rates', 'Consider splitting loan: fixed + variable for flexibility'] },
+                  { num: 7, title: 'Build Wealth & Give Generously', icon: '🏆', done: fiPath.passiveCoverage >= 100, progress: Math.min(fiPath.passiveCoverage, 100),
+                    desc: 'Passive income covers your expenses. You are financially free! Continue investing, diversify income, help others, and live on your terms.',
+                    tip: 'Passive income: $' + passiveIncome.toFixed(0) + '/mo vs Expenses: $' + totalOutgoing.toFixed(0) + '/mo (' + fiPath.passiveCoverage.toFixed(0) + '% covered)',
+                    actions: [
+                      { label: '🎯 View FIRE Path', action: () => setActiveTab('path' as any), disabled: false },
+                      { label: '💎 View Overview Dashboard', action: () => setActiveTab('overview' as any), disabled: false },
+                    ],
+                    linkedGoal: null,
+                    auTips: ['Franking credits on Australian dividends boost returns', 'Consider a family trust for asset protection', 'Transition to retirement (TTR) pension strategy in super', 'Give through tax-deductible DGR charities'] },
                 ]
                 const currentStep = steps.findIndex(s => !s.done) + 1 || steps.length
                 return (<>
-                  <div style={{ display: 'flex', gap: '6px', marginBottom: '20px' }}>{steps.map((s,i) => (<div key={i} style={{ flex: 1, height: '8px', borderRadius: '4px', background: s.done ? theme.success : i === currentStep - 1 ? theme.warning : (darkMode ? '#334155' : '#e2e8f0') }} />))}</div>
+                  <div style={{ display: 'flex', gap: '6px', marginBottom: '20px' }}>{steps.map((s,i) => (<div key={i} style={{ flex: 1, height: '8px', borderRadius: '4px', background: s.done ? theme.success : i === currentStep - 1 ? theme.warning : (darkMode ? '#334155' : '#e2e8f0'), cursor: 'pointer' }} onClick={() => setExpandedStep(expandedStep === s.num ? null : s.num)} />))}</div>
                   <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
                     {steps.map((step, i) => {
                       const isCurrent = i === currentStep - 1
+                      const isExpanded = expandedStep === step.num || isCurrent
                       return (
-                        <div key={step.num} style={{ padding: isCurrent ? '20px' : '14px 16px', background: step.done ? theme.success+'10' : isCurrent ? (darkMode ? '#334155' : '#fffbeb') : (darkMode ? '#1e293b' : '#fafafa'), borderRadius: '14px', border: step.done ? '2px solid '+theme.success+'40' : isCurrent ? '2px solid '+theme.warning : '1px solid '+theme.border, opacity: !step.done && !isCurrent ? 0.6 : 1 }}>
+                        <div key={step.num} style={{ padding: isExpanded ? '20px' : '14px 16px', background: step.done ? theme.success+'10' : isCurrent ? (darkMode ? '#334155' : '#fffbeb') : (darkMode ? '#1e293b' : '#fafafa'), borderRadius: '14px', border: step.done ? '2px solid '+theme.success+'40' : isCurrent ? '2px solid '+theme.warning : '1px solid '+theme.border, opacity: !step.done && !isCurrent && !isExpanded ? 0.6 : 1, cursor: 'pointer', transition: 'all 0.3s ease' }} onClick={() => setExpandedStep(expandedStep === step.num ? null : step.num)}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                             <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: step.done ? theme.success : isCurrent ? theme.warning : (darkMode ? '#334155' : '#e2e8f0'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: step.done ? '20px' : '16px', color: step.done || isCurrent ? 'white' : theme.textMuted, fontWeight: 900, flexShrink: 0 }}>{step.done ? '✓' : step.num}</div>
                             <div style={{ flex: 1 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ color: step.done ? theme.success : theme.text, fontWeight: 700, fontSize: isCurrent ? '16px' : '14px' }}>{step.icon} {step.title}</span>
-                                {step.done && <span style={{ padding: '2px 10px', background: theme.success+'20', color: theme.success, borderRadius: '6px', fontSize: '11px', fontWeight: 700 }}>DONE ✓</span>}
+                                <span style={{ color: step.done ? theme.success : theme.text, fontWeight: 700, fontSize: isExpanded ? '16px' : '14px' }}>{step.icon} {step.title}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  {step.done && <span style={{ padding: '2px 10px', background: theme.success+'20', color: theme.success, borderRadius: '6px', fontSize: '11px', fontWeight: 700 }}>DONE ✓</span>}
+                                  {step.linkedGoal && <span style={{ padding: '2px 10px', background: theme.accent+'20', color: theme.accent, borderRadius: '6px', fontSize: '11px', fontWeight: 700 }}>📊 Tracking</span>}
+                                  <span style={{ color: theme.textMuted, fontSize: '16px', transition: 'transform 0.3s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+                                </div>
                               </div>
-                              {isCurrent && <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px', lineHeight: 1.5 }}>{step.desc}</div>}
-                              {(isCurrent || step.done) && step.progress > 0 && step.progress < 100 && (
+                              {(isCurrent || step.done || isExpanded) && step.progress > 0 && step.progress < 100 && (
                                 <div style={{ marginTop: '8px' }}><div style={{ width: '100%', height: '8px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}><div style={{ width: step.progress+'%', height: '100%', background: step.done ? theme.success : theme.warning, borderRadius: '4px' }} /></div><div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '2px' }}>{step.progress.toFixed(0)}% complete</div></div>
                               )}
-                              {isCurrent && <div style={{ marginTop: '8px', padding: '8px 12px', background: theme.warning+'10', borderRadius: '8px', borderLeft: '3px solid '+theme.warning }}><div style={{ color: theme.warning, fontSize: '12px', fontWeight: 700 }}>💡 {step.tip}</div></div>}
                             </div>
                           </div>
+                          {isExpanded && (
+                            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid '+theme.border }} onClick={(e) => e.stopPropagation()}>
+                              <div style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, marginBottom: '16px' }}>{step.desc}</div>
+                              <div style={{ padding: '12px 16px', background: theme.warning+'10', borderRadius: '10px', borderLeft: '4px solid '+theme.warning, marginBottom: '16px' }}><div style={{ color: theme.warning, fontSize: '13px', fontWeight: 700 }}>💡 {step.tip}</div></div>
+                              {step.linkedGoal && (
+                                <div style={{ padding: '12px 16px', background: theme.accent+'10', borderRadius: '10px', marginBottom: '16px', border: '1px solid '+theme.accent+'30' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div><span style={{ color: theme.accent, fontWeight: 700, fontSize: '13px' }}>📊 Linked Goal: {step.linkedGoal.name}</span><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>${parseFloat(step.linkedGoal.saved||'0').toFixed(0)} of ${parseFloat(step.linkedGoal.target||'0').toFixed(0)} saved</div></div>
+                                    <div style={{ textAlign: 'right' as const }}><div style={{ color: theme.success, fontWeight: 800, fontSize: '18px' }}>{((parseFloat(step.linkedGoal.saved||'0')/parseFloat(step.linkedGoal.target||'1'))*100).toFixed(0)}%</div>{step.linkedGoal.paymentAmount && <div style={{ color: theme.textMuted, fontSize: '11px' }}>${step.linkedGoal.paymentAmount}/{step.linkedGoal.savingsFrequency}</div>}</div>
+                                  </div>
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '16px' }}>
+                                {step.actions.map((act, ai) => (
+                                  <button key={ai} onClick={(e) => { e.stopPropagation(); act.action() }} disabled={act.disabled} style={{ padding: '10px 16px', background: act.disabled ? (darkMode ? '#334155' : '#e2e8f0') : ai === 0 ? theme.success : theme.accent, color: act.disabled ? theme.textMuted : 'white', border: 'none', borderRadius: '10px', cursor: act.disabled ? 'default' : 'pointer', fontSize: '13px', fontWeight: 600, opacity: act.disabled ? 0.5 : 1 }}>{act.label}</button>
+                                ))}
+                              </div>
+                              <div style={{ padding: '12px 16px', background: darkMode ? '#1e293b' : '#f0f9ff', borderRadius: '10px', border: '1px solid '+theme.border }}>
+                                <div style={{ color: theme.accent, fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>🇦🇺 Australian Tips</div>
+                                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '4px' }}>
+                                  {step.auTips.map((tip: string, ti: number) => (<div key={ti} style={{ color: theme.textMuted, fontSize: '12px', paddingLeft: '12px', borderLeft: '2px solid '+theme.accent+'30' }}>{tip}</div>))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
                   </div>
-                  <div style={{ marginTop: '16px', padding: '14px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><span style={{ color: theme.text, fontWeight: 700 }}>Currently on Step {currentStep} of 7</span><span style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginTop: '4px' }}>Each step builds on the last. Don't skip ahead!</span></div>
+                  <div style={{ marginTop: '16px', padding: '14px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><span style={{ color: theme.text, fontWeight: 700 }}>Currently on Step {currentStep} of 7</span><span style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginTop: '4px' }}>Click any step to expand it and take action</span></div>
                 </>)
               })()}
             </div>
 
-                        <div style={cardStyle}>
+            {/* AUSTRALIAN HOME BUYING GUIDE */}
+            <div style={cardStyle}>
+              <div onClick={() => setShowHomeBuyingGuide(!showHomeBuyingGuide)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div style={{ width: '50px', height: '50px', borderRadius: '12px', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>🏡</div>
+                  <div><h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>Australian Home Buying Roadmap</h3><p style={{ margin: '4px 0 0', color: theme.textMuted, fontSize: '13px' }}>Complete step-by-step guide to buying property in Australia</p></div>
+                </div>
+                <div style={{ fontSize: '20px', color: theme.textMuted, transition: 'transform 0.3s', transform: showHomeBuyingGuide ? 'rotate(180deg)' : 'rotate(0)' }}>▼</div>
+              </div>
+              {showHomeBuyingGuide && (
+                <div style={{ marginTop: '24px' }}>
+                  {[
+                    { phase: 'Phase 1: Get Financially Ready', color: '#10b981', icon: '💰', steps: [
+                      { title: 'Check your credit score', detail: 'Get your free credit report from Equifax, Experian, or Illion. Score above 700 is good. Fix any errors before applying for a loan.' },
+                      { title: 'Save your deposit', detail: '20% deposit avoids Lenders Mortgage Insurance (LMI). On a $600K home = $120K. Use FHSS scheme to boost savings via super.' },
+                      { title: 'First Home Super Saver Scheme (FHSS)', detail: 'Salary sacrifice up to $15K/year (max $50K total) into super, then withdraw for your first home deposit. Saves tax and grows faster.' },
+                      { title: 'Reduce existing debts', detail: 'Lenders check your debt-to-income ratio. Pay off credit cards, BNPL, and personal loans. Close unused credit cards — even $0 balance counts against you.' },
+                      { title: 'Build genuine savings', detail: 'Lenders want to see 3+ months of consistent saving. Regular deposits into a dedicated savings account shows financial discipline.' },
+                    ]},
+                    { phase: 'Phase 2: Understand the Costs', color: '#3b82f6', icon: '📊', steps: [
+                      { title: 'Stamp duty', detail: 'Varies by state. QLD: $0 on first home under $500K (house) or $550K (land). NSW: $0 under $800K for first home. VIC: $0 under $600K. Use your state\'s calculator.' },
+                      { title: 'Lenders Mortgage Insurance (LMI)', detail: 'Charged when deposit is under 20%. Can add $10K-$30K+ to your loan. Avoid with 20% deposit, or use government guarantee schemes.' },
+                      { title: 'Legal/conveyancing fees', detail: 'Solicitor or conveyancer: $1,500-$3,000. They handle contracts, title searches, settlement. Essential — never skip this.' },
+                      { title: 'Building & pest inspections', detail: '$400-$800. Non-negotiable for houses. Finds structural issues, termites, and defects before you buy. Can save tens of thousands.' },
+                      { title: 'Ongoing costs', detail: 'Council rates ($1,500-$3,000/yr), insurance ($1,500-$3,000/yr), body corp/strata if unit ($2,000-$8,000/yr), maintenance (budget 1% of home value/yr).' },
+                    ]},
+                    { phase: 'Phase 3: Government Schemes', color: '#8b5cf6', icon: '🏛️', steps: [
+                      { title: 'First Home Owner Grant (FHOG)', detail: 'QLD: $30,000 for new homes under $750K. NSW: $10,000 new homes under $600K. VIC: $10,000 new homes under $750K. Must be new build or substantially renovated.' },
+                      { title: 'First Home Guarantee (FHG)', detail: 'Buy with 5% deposit, government guarantees the rest — NO LMI. 35,000 places/year. Income cap: $125K single, $200K couple. Price caps vary by region.' },
+                      { title: 'Regional First Home Buyer Guarantee', detail: '10,000 places/year for regional areas. Same benefits as FHG but for regional property purchases.' },
+                      { title: 'Family Home Guarantee', detail: 'For single parents. Buy with just 2% deposit, no LMI. 5,000 places/year.' },
+                      { title: 'Help to Buy (coming)', detail: 'Government co-owns up to 40% (new) or 30% (existing). You need just 2% deposit. 10,000 places/year when it launches.' },
+                    ]},
+                    { phase: 'Phase 4: Get Pre-Approved', color: '#f59e0b', icon: '🏦', steps: [
+                      { title: 'Gather your documents', detail: 'Last 2 payslips, 3 months bank statements, tax returns (if self-employed), ID, and details of all debts and expenses.' },
+                      { title: 'Use a mortgage broker', detail: 'Free for you (paid by lender). They compare 30+ lenders, know which ones suit your situation, and handle paperwork. Worth it.' },
+                      { title: 'Get pre-approval', detail: 'Shows sellers you\'re serious. Usually valid 3-6 months. Gives you a budget to house hunt within. Doesn\'t commit you to that lender.' },
+                      { title: 'Understand borrowing power', detail: 'Rule of thumb: 5-6x gross income. $100K income ≈ $500-600K borrowing. But consider if repayments work for YOUR budget, not just what the bank allows.' },
+                    ]},
+                    { phase: 'Phase 5: Buy Smart', color: '#ef4444', icon: '🎯', steps: [
+                      { title: 'Research areas thoroughly', detail: 'Check flood maps, future development plans, school zones, transport, crime stats. Use Domain, REA, SQM Research for price data.' },
+                      { title: 'Attend inspections', detail: 'Go to open homes. Take notes. Check water pressure, power points, storage, natural light, noise levels. Visit at different times of day.' },
+                      { title: 'Get building & pest inspection', detail: 'BEFORE making an offer or going to auction. $400-$800 can save you from a $50K+ nightmare.' },
+                      { title: 'Negotiate or bid smart', detail: 'Private treaty: always offer below asking. Auction: set your max and DO NOT go over. Emotion is expensive at auctions.' },
+                      { title: 'Settlement', detail: 'Usually 30-90 days after contract. Your conveyancer handles everything. Final inspection before settlement. Then you get the keys!' },
+                    ]},
+                  ].map((phase, pi) => (
+                    <div key={pi} style={{ marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: phase.color+'20', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>{phase.icon}</div>
+                        <h4 style={{ margin: 0, color: phase.color, fontSize: '16px', fontWeight: 700 }}>{phase.phase}</h4>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', paddingLeft: '16px', borderLeft: '3px solid '+phase.color+'30' }}>
+                        {phase.steps.map((s, si) => (
+                          <div key={si} style={{ padding: '12px 16px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '10px', border: '1px solid '+theme.border }}>
+                            <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>{s.title}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px', lineHeight: 1.6 }}>{s.detail}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ padding: '16px', background: 'linear-gradient(135deg, '+theme.warning+'15, '+theme.success+'15)', borderRadius: '12px', textAlign: 'center' as const, border: '1px solid '+theme.warning+'30' }}>
+                    <div style={{ fontSize: '20px', marginBottom: '8px' }}>🎯</div>
+                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px' }}>Ready to start?</div>
+                    <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px', marginBottom: '12px' }}>Create a home deposit goal and add it to your calendar</div>
+                    <button onClick={() => { const price = prompt('What property price are you targeting? (e.g. 600000)'); if (price) { const deposit = Math.round(parseFloat(price) * 0.2); createGoalFromStep('Home Deposit (20% of $' + parseInt(price).toLocaleString() + ')', String(deposit), 'monthly') } }} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #fbbf24, #d97706)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }}>🏠 Create Home Deposit Goal</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+                                    <div style={cardStyle}>
               <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '20px' }}>📊 Spending Breakdown</h3>
               {(() => { const cats:{[k:string]:number}={}; expenses.filter(e=>!e.targetDebtId&&!e.targetGoalId).forEach(exp=>{const c=exp.category||'other';cats[c]=(cats[c]||0)+convertToMonthly(parseFloat(exp.amount||'0'),exp.frequency)}); const sorted=Object.entries(cats).sort((a,b)=>b[1]-a[1]); const total=sorted.reduce((s,[,v])=>s+v,0); const cc:{[k:string]:string}={housing:'#8b5cf6',utilities:'#3b82f6',food:'#f59e0b',transport:'#10b981',entertainment:'#f472b6',shopping:'#ef4444',health:'#14b8a6',subscriptions:'#6366f1',other:'#94a3b8'}; return sorted.map(([cat,amt]) => (<div key={cat} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}><span style={{ width: '100px', color: theme.text, fontWeight: 600, fontSize: '13px', textTransform: 'capitalize' as const }}>{cat}</span><div style={{ flex: 1, height: '24px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '12px', overflow: 'hidden' }}><div style={{ width: (total>0?(amt/total)*100:0)+'%', height: '100%', background: cc[cat]||'#94a3b8', borderRadius: '12px' }} /></div><span style={{ color: theme.text, fontWeight: 700, fontSize: '13px', width: '70px', textAlign: 'right' as const }}>${amt.toFixed(0)}</span></div>)) })()}
             </div>
