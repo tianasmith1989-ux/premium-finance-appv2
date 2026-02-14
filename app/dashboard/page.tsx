@@ -318,6 +318,11 @@ export default function Dashboard() {
 
   // Enhanced trade fields
   const [newTradeExtra, setNewTradeExtra] = useState({ emotion: 'disciplined', setup: '', rMultiple: '', session: 'london', rulesBroken: '', tags: '', confidence: '3', reflection: '' })
+  const [monthlyPLGoal, setMonthlyPLGoal] = useState({ target: '', month: new Date().toISOString().slice(0, 7) })
+  const [tradePlans, setTradePlans] = useState<any[]>([])
+  const [newTradePlan, setNewTradePlan] = useState({ instrument: '', direction: 'long', entry: '', stopLoss: '', takeProfit: '', notes: '', date: new Date().toISOString().split('T')[0] })
+  const [dailyCheckIn, setDailyCheckIn] = useState<any[]>([])
+  const [todayCheckIn, setTodayCheckIn] = useState({ mood: 3, energy: 3, focus: 3, notes: '', date: new Date().toISOString().split('T')[0] })
   const [tradeImages, setTradeImages] = useState<{[tradeId:number]:string}>({})
   const handleTradeImageUpload = (tradeId: number, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
