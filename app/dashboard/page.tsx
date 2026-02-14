@@ -46,10 +46,26 @@ export default function Dashboard() {
   ]
   const addIncomePreset = (preset: any) => {
     const amount = prompt('Enter amount for ' + preset.name + ':')
-    if (amount && parseFloat(amount) > 0) {
-      setIncomeStreams(prev => [...prev, { ...preset, id: Date.now(), amount }])
-      awardXP(15)
-    }
+    if (!amount || parseFloat(amount) <= 0) return
+    const freqChoice = prompt('How often do you receive this?\n\n1 = Weekly\n2 = Fortnightly\n3 = Monthly\n4 = Quarterly\n5 = One-time\n\nEnter number (default: ' + ({'weekly':'1','fortnightly':'2','monthly':'3','quarterly':'4','once':'5'}[preset.frequency] || '3') + '):', ({'weekly':'1','fortnightly':'2','monthly':'3','quarterly':'4','once':'5'}[preset.frequency] || '3'))
+    const freqMap: {[k:string]:string} = {'1':'weekly','2':'fortnightly','3':'monthly','4':'quarterly','5':'once'}
+    const frequency = freqMap[freqChoice || '3'] || preset.frequency
+    setIncomeStreams(prev => [...prev, { ...preset, id: Date.now(), amount, frequency }])
+    awardXP(15)
+  }
+  const [showTaxEstimator, setShowTaxEstimator] = useState(false)
+  const estimateAUTax = (gross: number): { tax: number, medicare: number, net: number, effectiveRate: number, super_: number } => {
+    let tax = 0
+    if (gross <= 18200) tax = 0
+    else if (gross <= 45000) tax = (gross - 18200) * 0.16
+    else if (gross <= 135000) tax = 4288 + (gross - 45000) * 0.30
+    else if (gross <= 190000) tax = 31288 + (gross - 135000) * 0.37
+    else tax = 51638 + (gross - 190000) * 0.45
+    const medicare = gross * 0.02
+    const super_ = gross * 0.115
+    const net = gross - tax - medicare
+    const effectiveRate = gross > 0 ? ((tax + medicare) / gross) * 100 : 0
+    return { tax, medicare, net, effectiveRate, super_ }
   }
   const handlePayslipCsv = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -1006,6 +1022,34 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+                <button onClick={() => setShowTaxEstimator(!showTaxEstimator)} style={{ padding: '4px 10px', background: showTaxEstimator ? theme.purple : 'transparent', color: showTaxEstimator ? 'white' : theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>🧾 Tax Estimator</button>
+              </div>
+              {showTaxEstimator && (() => {
+                const annualGross = monthlyIncome * 12
+                const tax = estimateAUTax(annualGross)
+                return (
+                  <div style={{ padding: '16px', background: darkMode ? '#1e1b4b' : '#faf5ff', borderRadius: '12px', marginBottom: '12px', border: '1px solid ' + theme.purple + '30' }}>
+                    <div style={{ color: theme.purple, fontWeight: 700, fontSize: '14px', marginBottom: '12px' }}>🧾 Australian Tax Estimate ({new Date().getFullYear()}-{new Date().getFullYear()+1} FY)</div>
+                    {annualGross > 0 ? (<>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
+                        <div style={{ padding: '12px', background: darkMode ? '#0f172a' : 'white', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Gross Annual</div><div style={{ color: theme.text, fontSize: '20px', fontWeight: 800 }}>${annualGross.toLocaleString()}</div></div>
+                        <div style={{ padding: '12px', background: darkMode ? '#0f172a' : 'white', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Income Tax</div><div style={{ color: theme.danger, fontSize: '20px', fontWeight: 800 }}>-${Math.round(tax.tax).toLocaleString()}</div></div>
+                        <div style={{ padding: '12px', background: darkMode ? '#0f172a' : 'white', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Medicare Levy</div><div style={{ color: theme.warning, fontSize: '20px', fontWeight: 800 }}>-${Math.round(tax.medicare).toLocaleString()}</div></div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                        <div style={{ padding: '12px', background: darkMode ? '#0f172a' : 'white', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Take Home (Annual)</div><div style={{ color: theme.success, fontSize: '20px', fontWeight: 800 }}>${Math.round(tax.net).toLocaleString()}</div></div>
+                        <div style={{ padding: '12px', background: darkMode ? '#0f172a' : 'white', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Take Home (Monthly)</div><div style={{ color: theme.success, fontSize: '20px', fontWeight: 800 }}>${Math.round(tax.net/12).toLocaleString()}</div></div>
+                        <div style={{ padding: '12px', background: darkMode ? '#0f172a' : 'white', borderRadius: '10px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Effective Tax Rate</div><div style={{ color: theme.purple, fontSize: '20px', fontWeight: 800 }}>{tax.effectiveRate.toFixed(1)}%</div></div>
+                      </div>
+                      <div style={{ marginTop: '12px', padding: '10px 14px', background: theme.accent + '10', borderRadius: '8px', borderLeft: '3px solid ' + theme.accent }}>
+                        <div style={{ color: theme.accent, fontSize: '12px', fontWeight: 600 }}>💡 Super (11.5%): ${Math.round(tax.super_).toLocaleString()}/yr from your employer — check this is being paid!</div>
+                      </div>
+                      <div style={{ marginTop: '8px', fontSize: '10px', color: theme.textMuted }}>Based on 2024-25 ATO tax brackets. Estimate only — does not include HECS, offsets, or deductions.</div>
+                    </>) : (<div style={{ color: theme.textMuted, fontSize: '13px', textAlign: 'center' as const, padding: '16px' }}>Add income streams above to see your tax estimate</div>)}
+                  </div>
+                )
+              })()}
               {tradingPayoutsAsIncome && propPayouts.length > 0 && (
                 <div style={{ padding: '10px 14px', background: theme.warning+'15', borderRadius: '8px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid '+theme.warning+'30' }}>
                   <span style={{ color: theme.warning, fontSize: '13px', fontWeight: 600 }}>📈 Trading Payouts included as passive income</span>
@@ -1361,16 +1405,19 @@ export default function Dashboard() {
 
             {/* GOAL CALCULATOR */}
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🧮 Goal Calculator</h3>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' as const }}>
-                <input type="number" placeholder="Target $" value={goalCalculator.targetAmount} onChange={(e) => setGoalCalculator({ ...goalCalculator, targetAmount: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
-                <input type="number" placeholder="Current $" value={goalCalculator.currentAmount} onChange={(e) => setGoalCalculator({ ...goalCalculator, currentAmount: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
-                <input type="number" placeholder="Monthly $" value={goalCalculator.monthlyContribution} onChange={(e) => setGoalCalculator({ ...goalCalculator, monthlyContribution: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
-                <input type="number" placeholder="Interest %" value={goalCalculator.interestRate} onChange={(e) => setGoalCalculator({ ...goalCalculator, interestRate: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
-                <input type="number" placeholder="Years" value={goalCalculator.years} onChange={(e) => setGoalCalculator({ ...goalCalculator, years: e.target.value })} style={{ ...inputStyle, width: '80px' }} />
-                <button onClick={calculateGoal} disabled={calculating} style={btnPurple}>{calculating ? '...' : 'Calculate'}</button>
+              <h3 style={{ margin: '0 0 8px 0', color: theme.purple, fontSize: '18px' }}>🧮 Goal Calculator</h3>
+              <p style={{ margin: '0 0 16px 0', color: theme.textMuted, fontSize: '13px' }}>See how your savings will grow with compound interest over time</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>🎯 Target Amount</label><input type="number" placeholder="e.g. 100000" value={goalCalculator.targetAmount} onChange={(e) => setGoalCalculator({ ...goalCalculator, targetAmount: e.target.value })} style={{ ...inputStyle, width: '100%' }} title="How much do you want to reach? Leave blank to see growth over time." /></div>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>💰 Starting Amount</label><input type="number" placeholder="e.g. 5000" value={goalCalculator.currentAmount} onChange={(e) => setGoalCalculator({ ...goalCalculator, currentAmount: e.target.value })} style={{ ...inputStyle, width: '100%' }} title="How much do you already have saved?" /></div>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>📅 Monthly Saving</label><input type="number" placeholder="e.g. 500" value={goalCalculator.monthlyContribution} onChange={(e) => setGoalCalculator({ ...goalCalculator, monthlyContribution: e.target.value })} style={{ ...inputStyle, width: '100%' }} title="How much will you add each month?" /></div>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>📈 Return Rate %/yr</label><input type="number" placeholder="e.g. 7" value={goalCalculator.interestRate} onChange={(e) => setGoalCalculator({ ...goalCalculator, interestRate: e.target.value })} style={{ ...inputStyle, width: '100%' }} title="Expected annual return (HISA ~5%, ETFs ~7-10%, Super ~8%)" /></div>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>⏰ Years</label><div style={{ display: 'flex', gap: '4px' }}><input type="number" placeholder="10" value={goalCalculator.years} onChange={(e) => setGoalCalculator({ ...goalCalculator, years: e.target.value })} style={{ ...inputStyle, flex: 1 }} title="Time horizon in years" /><button onClick={calculateGoal} disabled={calculating} style={{ ...btnPurple, padding: '8px 14px', whiteSpace: 'nowrap' as const }}>{calculating ? '...' : '🧮 Calc'}</button></div></div>
               </div>
-              {calculatorResult && (<div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}><div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Time</div><div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>{Math.floor(calculatorResult.totalMonths/12)}y {calculatorResult.totalMonths%12}m</div></div><div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Future Value</div><div style={{ color: theme.success, fontSize: '20px', fontWeight: 700 }}>${calculatorResult.futureValue.toFixed(0)}</div></div><div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Contributed</div><div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>${calculatorResult.totalContributed.toFixed(0)}</div></div><div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Interest</div><div style={{ color: theme.purple, fontSize: '20px', fontWeight: 700 }}>${calculatorResult.interestEarned.toFixed(0)}</div></div></div>)}
+              <div style={{ padding: '10px 14px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px', marginBottom: '16px', fontSize: '12px', color: theme.textMuted }}>
+                <strong>How to use:</strong> Enter your target, what you have now, monthly savings, expected return rate, and timeframe. The calculator shows how compound interest grows your money. Try: $0 start, $500/mo, 8% return, 30 years = over $700K!
+              </div>
+              {calculatorResult && (<div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', padding: '20px', background: 'linear-gradient(135deg, '+theme.purple+'15, '+theme.accent+'15)', borderRadius: '16px', border: '1px solid '+theme.purple+'30' }}><div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>Time to Target</div><div style={{ color: theme.text, fontSize: '24px', fontWeight: 800 }}>{Math.floor(calculatorResult.totalMonths/12)}y {calculatorResult.totalMonths%12}m</div></div><div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>Future Value</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 800 }}>${calculatorResult.futureValue.toLocaleString()}</div></div><div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>You Contribute</div><div style={{ color: theme.text, fontSize: '24px', fontWeight: 800 }}>${calculatorResult.totalContributed.toLocaleString()}</div></div><div style={{ textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>Interest Earned</div><div style={{ color: theme.purple, fontSize: '24px', fontWeight: 800 }}>${calculatorResult.interestEarned.toLocaleString()}</div><div style={{ color: theme.success, fontSize: '11px', marginTop: '2px' }}>FREE money from compounding!</div></div></div>)}
             </div>
           </div>
         )}
@@ -1478,6 +1525,27 @@ export default function Dashboard() {
                     ],
                     linkedGoal: null,
                     auTips: ['Franking credits on Australian dividends boost returns', 'Consider a family trust for asset protection', 'Transition to retirement (TTR) pension strategy in super', 'Give through tax-deductible DGR charities'] },
+                  { num: 8, title: 'FIRE Number: $' + fiPath.fireNumber.toLocaleString(), icon: '🔥',
+                    done: assets.reduce((s: number, a: any) => s + parseFloat(a.value || '0'), 0) >= fiPath.fireNumber && fiPath.fireNumber > 0,
+                    progress: fiPath.fireNumber > 0 ? Math.min((assets.reduce((s: number, a: any) => s + parseFloat(a.value || '0'), 0) / fiPath.fireNumber) * 100, 100) : 0,
+                    desc: fiPath.fireNumber > 0 ? 'Your FIRE number is $' + fiPath.fireNumber.toLocaleString() + ' (25x your annual expenses of $' + (totalOutgoing * 12).toFixed(0) + '). At a 4% safe withdrawal rate, this invested amount provides $' + totalOutgoing.toFixed(0) + '/mo forever — enough to cover all your expenses without working.' : 'Add your expenses to calculate your FIRE number. It\'s 25x your annual expenses — the amount you need invested to live off the returns forever.',
+                    tip: fiPath.yearsToFI <= 100 ? 'At your current savings rate, you\'ll reach FIRE in approximately ' + fiPath.yearsToFI + ' years. Every extra $100/month invested can shave years off!' : 'Start by reducing expenses and increasing your savings rate. Even small changes compound over decades.',
+                    actions: [
+                      { label: '🎯 Create FIRE Number Goal', action: () => { if (fiPath.fireNumber <= 0) { alert('Add your expenses first so we can calculate your FIRE number!'); return } createGoalFromStep('FIRE Number Target', String(Math.round(fiPath.fireNumber)), 'monthly', String(Math.round(monthlySurplus > 0 ? monthlySurplus * 0.5 : 500))) }, disabled: !!goals.find(g => g.name.match(/FIRE|fire/)) },
+                      { label: '🧮 Open Goal Calculator', action: () => { setActiveTab('overview' as any) }, disabled: false },
+                      { label: '🎯 View FIRE Path', action: () => setActiveTab('path' as any), disabled: false },
+                    ],
+                    linkedGoal: goals.find(g => g.name.match(/FIRE|fire/)) || null,
+                    auTips: [
+                      'The 4% Rule: Invest 25x expenses, withdraw 4%/year, money lasts 30+ years (Trinity Study)',
+                      'Reduce expenses = double win: need less AND save more. $100/mo less = $30K less FIRE number',
+                      'Lean FIRE ($40K/yr) vs Fat FIRE ($100K/yr) — pick your lifestyle level',
+                      'Super counts! Your super balance is part of your FIRE number (accessible at preservation age 60)',
+                      'Geographic arbitrage: lower cost of living areas = lower FIRE number. Consider regional AU or part-time overseas',
+                      'The Barefoot Investor buckets: 60% Daily, 20% Splurge, 10% Smile, 10% Fire Extinguisher',
+                      'Sequence of returns risk: keep 2-3 years cash buffer when you first FIRE',
+                      'Consider "Coast FIRE": save enough early that compounding alone reaches your goal by 60'
+                    ] },
                 ]
                 const currentStep = steps.findIndex(s => !s.done) + 1 || steps.length
                 return (<>
@@ -1533,7 +1601,7 @@ export default function Dashboard() {
                       )
                     })}
                   </div>
-                  <div style={{ marginTop: '16px', padding: '14px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><span style={{ color: theme.text, fontWeight: 700 }}>Currently on Step {currentStep} of 7</span><span style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginTop: '4px' }}>Click any step to expand it and take action</span></div>
+                  <div style={{ marginTop: '16px', padding: '14px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><span style={{ color: theme.text, fontWeight: 700 }}>Currently on Step {currentStep} of 8</span><span style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginTop: '4px' }}>Click any step to expand it and take action</span></div>
                 </>)
               })()}
             </div>
