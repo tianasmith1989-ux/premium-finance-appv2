@@ -328,6 +328,25 @@ export default function Dashboard() {
   const [coachLoading, setCoachLoading] = useState(false)
   const [myStrategy, setMyStrategy] = useState('')
   const [showStrategyEditor, setShowStrategyEditor] = useState(false)
+  const [strategyBuilder, setStrategyBuilder] = useState<{[k:string]:string}>({ experience: '', markets: '', timeframes: '', style: '', entryRules: '', exitRules: '', riskPerTrade: '', sessionsTime: '', newsApproach: '', maxTrades: '', strengths: '', weaknesses: '', goals: '' })
+  const strategyFromBuilder = () => {
+    const s = strategyBuilder
+    const parts: string[] = []
+    if (s.experience) parts.push('Experience: ' + s.experience)
+    if (s.markets) parts.push('Markets: ' + s.markets)
+    if (s.timeframes) parts.push('Timeframes: ' + s.timeframes)
+    if (s.style) parts.push('Style: ' + s.style)
+    if (s.entryRules) parts.push('Entry Rules: ' + s.entryRules)
+    if (s.exitRules) parts.push('Exit Rules: ' + s.exitRules)
+    if (s.riskPerTrade) parts.push('Risk Per Trade: ' + s.riskPerTrade)
+    if (s.sessionsTime) parts.push('Trading Sessions: ' + s.sessionsTime)
+    if (s.newsApproach) parts.push('News Approach: ' + s.newsApproach)
+    if (s.maxTrades) parts.push('Max Trades/Day: ' + s.maxTrades)
+    if (s.strengths) parts.push('Strengths: ' + s.strengths)
+    if (s.weaknesses) parts.push('Working On: ' + s.weaknesses)
+    if (s.goals) parts.push('Goals: ' + s.goals)
+    return parts.join('\n')
+  }
   const coachChatRef = useRef<HTMLDivElement>(null)
 
   const buildCoachContext = () => {
@@ -1927,16 +1946,55 @@ export default function Dashboard() {
                       <button onClick={() => setShowStrategyEditor(!showStrategyEditor)} style={{ padding: '4px 12px', background: showStrategyEditor ? theme.accent : 'transparent', color: showStrategyEditor ? 'white' : theme.accent, border: '1px solid '+theme.accent, borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>{showStrategyEditor ? 'Save' : myStrategy ? 'Edit' : '+ Define Strategy'}</button>
                     </div>
                     {showStrategyEditor ? (
-                      <textarea value={myStrategy} onChange={(e) => setMyStrategy(e.target.value)} placeholder={"Describe your trading strategy here. Include:\n\n• What markets/instruments you trade\n• Your preferred timeframes\n• Entry criteria (what triggers a trade)\n• Exit criteria (TP and SL rules)\n• Position sizing rules\n• Times you trade (kill zones)\n• Rules you must follow\n• What you're working on improving"} style={{ ...inputStyle, width: '100%', minHeight: '150px', fontSize: '12px', lineHeight: 1.6, resize: 'vertical' as const }} />
+                      <div style={{ background: darkMode ? '#0f172a' : '#f0f9ff', borderRadius: '12px', padding: '16px', border: '1px solid '+theme.accent+'30' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span style={{ color: theme.accent, fontSize: '13px', fontWeight: 700 }}>🧩 Strategy Builder — answer what you can, skip what you don{"'"}t know yet</span>
+                          <button onClick={() => { setMyStrategy(strategyFromBuilder()); setShowStrategyEditor(false) }} style={{ padding: '6px 14px', background: theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}>✓ Save Strategy</button>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                          {[
+                            { key: 'experience', label: '📊 Trading Experience', placeholder: 'Brand new / 6 months / 2 years etc', icon: '🎓' },
+                            { key: 'markets', label: '🌍 Markets & Instruments', placeholder: 'Forex (EURUSD, GBPUSD), Indices (NAS100), Gold...', icon: '📈' },
+                            { key: 'timeframes', label: '⏱️ Timeframes', placeholder: '15min entries, 1H/4H for bias, Daily for direction...', icon: '🕐' },
+                            { key: 'style', label: '🎯 Trading Style', placeholder: 'Scalping / Day trading / Swing / Break of structure / Supply & demand...', icon: '🏹' },
+                            { key: 'entryRules', label: '🟢 Entry Rules — What makes you take a trade?', placeholder: 'Break of structure + retest, order block tap, fair value gap fill...', icon: '✅' },
+                            { key: 'exitRules', label: '🔴 Exit Rules — How do you close trades?', placeholder: 'Fixed R:R (1:2), trail stop, close at next structure, time-based...', icon: '🚪' },
+                            { key: 'riskPerTrade', label: '💰 Risk Per Trade', placeholder: '1% of account, fixed $50, depends on setup grade...', icon: '⚖️' },
+                            { key: 'sessionsTime', label: '🕐 When Do You Trade?', placeholder: 'London open (8-11am), NY session, Asian...', icon: '🌏' },
+                            { key: 'newsApproach', label: '📰 How Do You Handle News?', placeholder: 'Avoid trading during news, trade the reaction, close positions before...', icon: '📢' },
+                            { key: 'maxTrades', label: '🔢 Max Trades Per Day', placeholder: '3 trades max, stop after 2 losses in a row...', icon: '🛑' },
+                            { key: 'strengths', label: '💪 What Are You Good At?', placeholder: 'Patient entries, good at reading structure, disciplined on SL...', icon: '🌟' },
+                            { key: 'weaknesses', label: '⚠️ What Are You Working On?', placeholder: 'Revenge trading, overtrading, moving stop loss, FOMO entries...', icon: '🔧' },
+                          ].map(field => (
+                            <div key={field.key} style={{ display: 'flex', flexDirection: 'column' as const }}>
+                              <label style={{ color: theme.text, fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>{field.label}</label>
+                              <input type="text" placeholder={field.placeholder} value={(strategyBuilder as any)[field.key] || ''} onChange={(e) => setStrategyBuilder(prev => ({...prev, [field.key]: e.target.value}))} style={{ ...inputStyle, fontSize: '12px', padding: '8px 10px' }} />
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ marginTop: '10px' }}>
+                          <label style={{ color: theme.text, fontSize: '11px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>🎯 Trading Goals — What are you trying to achieve?</label>
+                          <input type="text" placeholder="Pass prop firm challenge, consistent $200/day, build to full-time trading income..." value={strategyBuilder.goals || ''} onChange={(e) => setStrategyBuilder(prev => ({...prev, goals: e.target.value}))} style={{ ...inputStyle, width: '100%', fontSize: '12px', padding: '8px 10px' }} />
+                        </div>
+                        <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+                          <button onClick={() => { setMyStrategy(strategyFromBuilder()); setShowStrategyEditor(false) }} style={{ flex: 1, padding: '10px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>✓ Save Strategy</button>
+                          <button onClick={() => { setMyStrategy(strategyFromBuilder()); setShowStrategyEditor(false); setTimeout(() => sendCoachMessage('I just filled out my strategy builder. Can you review it, tell me what looks good, identify any gaps, and suggest what I should think about next? Be specific to my experience level.'), 200) }} style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg, #fbbf24, #d97706)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>🧠 Save & Ask Coach to Review</button>
+                        </div>
+                      </div>
                     ) : myStrategy ? (
-                      <div style={{ padding: '12px', background: darkMode ? '#0f172a' : '#f8fafc', borderRadius: '8px', fontSize: '12px', color: theme.text, whiteSpace: 'pre-line' as const, maxHeight: '80px', overflow: 'hidden', position: 'relative' as const }}>{myStrategy}<div style={{ position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: '30px', background: darkMode ? 'linear-gradient(transparent, #0f172a)' : 'linear-gradient(transparent, #f8fafc)' }} /></div>
+                      <div style={{ padding: '12px', background: darkMode ? '#0f172a' : '#f8fafc', borderRadius: '8px', fontSize: '12px', color: theme.text, whiteSpace: 'pre-line' as const, maxHeight: '100px', overflow: 'hidden', position: 'relative' as const, cursor: 'pointer' }} onClick={() => setShowStrategyEditor(true)}>{myStrategy}<div style={{ position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: '30px', background: darkMode ? 'linear-gradient(transparent, #0f172a)' : 'linear-gradient(transparent, #f8fafc)' }} /></div>
                     ) : (
-                      <div style={{ padding: '16px', background: darkMode ? '#0f172a' : '#fefce8', borderRadius: '8px', textAlign: 'center' as const, border: '1px dashed '+theme.warning }}><span style={{ color: theme.warning, fontSize: '12px' }}>Define your strategy so the coach can give personalised feedback</span></div>
+                      <div onClick={() => setShowStrategyEditor(true)} style={{ padding: '20px', background: darkMode ? '#0f172a' : '#fefce8', borderRadius: '12px', textAlign: 'center' as const, border: '2px dashed '+theme.warning, cursor: 'pointer' }}>
+                        <div style={{ fontSize: '24px', marginBottom: '6px' }}>🧩</div>
+                        <div style={{ color: theme.warning, fontSize: '14px', fontWeight: 700 }}>Build Your Trading Strategy</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>Answer guided questions so the coach knows your style, rules, and goals</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '2px' }}>New to trading? No worries — skip what you don{"'"}t know and the coach will help fill the gaps</div>
+                      </div>
                     )}
                   </div>
                   {/* QUICK ACTIONS */}
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '12px' }}>
-                    {[{label:'Am I ready to trade?',icon:'🧘'},{label:'Review my session',icon:'📊'},{label:'Analyse my patterns',icon:'🔍'},{label:'Help me plan tomorrow',icon:'📋'},{label:'I\'m feeling tilted',icon:'😤'},{label:'Celebrate my wins!',icon:'🎉'}].map(q => (
+                    {[{label:'Help me build my strategy',icon:'🧩'},{label:'Am I ready to trade?',icon:'🧘'},{label:'Review my session',icon:'📊'},{label:'Analyse my patterns',icon:'🔍'},{label:'Help me plan tomorrow',icon:'📋'},{label:'I\'m feeling tilted',icon:'😤'},{label:'Celebrate my wins!',icon:'🎉'}].map(q => (
                       <button key={q.label} onClick={() => sendCoachMessage(q.label)} style={{ padding: '6px 12px', background: darkMode ? '#334155' : '#f1f5f9', border: '1px solid '+theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '11px', color: theme.text, display: 'flex', alignItems: 'center', gap: '4px' }}><span>{q.icon}</span>{q.label}</button>
                     ))}
                   </div>
