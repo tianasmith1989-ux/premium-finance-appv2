@@ -322,6 +322,56 @@ export default function Dashboard() {
   const [tradePlans, setTradePlans] = useState<any[]>([])
   const [newTradePlan, setNewTradePlan] = useState({ instrument: '', direction: 'long', entry: '', stopLoss: '', takeProfit: '', notes: '', date: new Date().toISOString().split('T')[0] })
   const [dailyCheckIn, setDailyCheckIn] = useState<any[]>([])
+  const [coachOpen, setCoachOpen] = useState(false)
+  const [coachMessages, setCoachMessages] = useState<{role:string,content:string}[]>([])
+  const [coachInput, setCoachInput] = useState('')
+  const [coachLoading, setCoachLoading] = useState(false)
+  const [myStrategy, setMyStrategy] = useState('')
+  const [showStrategyEditor, setShowStrategyEditor] = useState(false)
+  const coachChatRef = useRef<HTMLDivElement>(null)
+
+  const buildCoachContext = () => {
+    const today = new Date().toISOString().split('T')[0]
+    const todayTr = trades.filter((t:any) => t.date === today)
+    const todayPL2 = todayTr.reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0)
+    const totalPL2 = trades.reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0)
+    const wr = trades.length > 0 ? (trades.filter((t:any) => parseFloat(t.profitLoss||'0') > 0).length / trades.length * 100) : 0
+    const recentTrades = trades.slice(0, 10).map((t:any) => t.date+' '+t.instrument+' '+t.direction+' '+(parseFloat(t.profitLoss||'0')>=0?'+':'')+t.profitLoss+' emotion:'+t.emotion+(t.rulesBroken?' RULES_BROKEN:'+t.rulesBroken:'')).join('\n')
+    const emotionBreakdown = ['disciplined','confident','fomo','revenge','anxious','fearful'].map(em => { const et = trades.filter((t:any)=>t.emotion===em); const ep = et.reduce((s:number,t:any)=>s+parseFloat(t.profitLoss||'0'),0); return et.length > 0 ? em+': '+et.length+' trades, P/L: $'+ep.toFixed(0) : null }).filter(Boolean).join('; ')
+    const checkIn = todayCheckIn ? 'Mood:'+todayCheckIn.mood+'/5 Energy:'+todayCheckIn.energy+'/5 Focus:'+todayCheckIn.focus+'/5' : 'No check-in today'
+    const propInfo = propAccounts.map((a:any) => a.firm+' '+a.phase+' Balance:$'+a.currentBalance+' MaxDD:$'+a.maxDrawdown+(a.dailyDrawdown?' DailyDD:$'+a.dailyDrawdown:'')+(a.newsTrading==='no'?' NO_NEWS':'')+(a.weekendHolding==='no'?' NO_WEEKEND':'')).join('; ')
+    return 'TRADER CONTEXT:\n'+'Strategy: '+(myStrategy||'Not defined yet')+'\n'+'Today: '+todayTr.length+' trades, P/L: $'+todayPL2.toFixed(0)+'\n'+'All-time: '+trades.length+' trades, P/L: $'+totalPL2.toFixed(0)+', Win Rate: '+wr.toFixed(1)+'%\n'+'Mental State: '+checkIn+'\n'+'Emotion Breakdown: '+emotionBreakdown+'\n'+'Accounts: '+(propInfo||'None')+'\n'+'Recent Trades:\n'+recentTrades+'\n'+'Risk Rules: Max daily loss $'+riskLimits.maxDailyLoss+', Max trades/day '+riskLimits.maxDailyTrades+', Risk/trade '+riskLimits.maxRiskPerTrade+'%'
+  }
+
+  const sendCoachMessage = async (text?: string) => {
+    const msg = text || coachInput
+    if (!msg.trim()) return
+    const userMsg = { role: 'user', content: msg }
+    setCoachMessages(prev => [...prev, userMsg])
+    setCoachInput('')
+    setCoachLoading(true)
+    try {
+      const context = buildCoachContext()
+      const systemPrompt = 'You are an expert trading coach inside the Aureus trading app. You have full access to the trader\'s data, strategy, mental state, and trade history. Your role is to:\n1. Help them plan sessions and review trades\n2. Coach them through psychology issues (tilt, revenge trading, FOMO)\n3. Give honest, direct feedback on their trading\n4. Help refine their strategy\n5. Celebrate wins and help process losses healthily\n\nBe concise but warm. Use their actual data in responses. If they\'re showing signs of tilt or revenge trading, call it out firmly but kindly. Never give specific financial advice - help them follow THEIR rules better.\n\nHere is their current data:\n'+context
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: [...coachMessages, userMsg].map(m => ({role: m.role as 'user'|'assistant', content: m.content}))
+        })
+      })
+      const data = await response.json()
+      const reply = data.content?.map((c:any) => c.text||'').join('') || 'Sorry, I couldn\'t process that. Try again.'
+      setCoachMessages(prev => [...prev, { role: 'assistant', content: reply }])
+    } catch (e) {
+      setCoachMessages(prev => [...prev, { role: 'assistant', content: 'Connection error. Please try again.' }])
+    }
+    setCoachLoading(false)
+    setTimeout(() => coachChatRef.current?.scrollTo(0, coachChatRef.current.scrollHeight), 100)
+  }
   const [todayCheckIn, setTodayCheckIn] = useState({ mood: 3, energy: 3, focus: 3, notes: '', date: new Date().toISOString().split('T')[0] })
   const [tradeImages, setTradeImages] = useState<{[tradeId:number]:string}>({})
   const handleTradeImageUpload = (tradeId: number, event: React.ChangeEvent<HTMLInputElement>) => {
@@ -999,7 +1049,8 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
-      {showConfetti && (<div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' as const, zIndex: 9999 }}>{Array.from({ length: 50 }).map((_, i) => (<div key={i} style={{ position: 'absolute' as const, left: Math.random()*100+'%', top: '-10px', width: Math.random()*10+5+'px', height: Math.random()*10+5+'px', background: ['#f59e0b','#10b981','#8b5cf6','#ef4444','#3b82f6','#f472b6'][Math.floor(Math.random()*6)], borderRadius: Math.random()>0.5?'50%':'2px', animation: `confettiFall ${Math.random()*2+1.5}s ease-in forwards`, animationDelay: Math.random()*0.5+'s' }} />))}<style>{`@keyframes confettiFall { 0%{transform:translateY(-10px) rotate(0deg);opacity:1} 100%{transform:translateY(100vh) rotate(720deg);opacity:0} }`}</style></div>)}
+      {showConfetti && (<div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' as const, zIndex: 9999 }}>{Array.from({ length: 50 }).map((_, i) => (<div key={i} style={{ position: 'absolute' as const, left: Math.random()*100+'%', top: '-10px', width: Math.random()*10+5+'px', height: Math.random()*10+5+'px', background: ['#f59e0b','#10b981','#8b5cf6','#ef4444','#3b82f6','#f472b6'][Math.floor(Math.random()*6)], borderRadius: Math.random()>0.5?'50%':'2px', animation: `confettiFall ${Math.random()*2+1.5}s ease-in forwards`, animationDelay: Math.random()*0.5+'s' }} />))}<style>{`@keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
+@keyframes confettiFall { 0%{transform:translateY(-10px) rotate(0deg);opacity:1} 100%{transform:translateY(100vh) rotate(720deg);opacity:0} }`}</style></div>)}
       {tourActive && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: darkMode ? 'linear-gradient(135deg, #1e293b, #1e1b4b)' : 'white', borderRadius: '24px', padding: '32px', maxWidth: '560px', width: '100%', boxShadow: '0 25px 80px rgba(0,0,0,0.4)', border: '2px solid ' + theme.accent + '40', position: 'relative' as const }}>
@@ -1890,14 +1941,66 @@ export default function Dashboard() {
               )
             })()}
 
+            {/* === AI TRADING COACH === */}
+            <div style={{ ...cardStyle, border: '2px solid ' + (coachOpen ? theme.accent+'60' : theme.border), background: coachOpen ? (darkMode ? 'linear-gradient(135deg, #1e293b, #172554)' : 'linear-gradient(135deg, #eff6ff, #f5f3ff)') : theme.cardBg }}>
+              <div onClick={() => setCoachOpen(!coachOpen)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>🧠</div>
+                  <div><h3 style={{ margin: 0, color: theme.text, fontSize: '18px', fontWeight: 700 }}>AI Trading Coach</h3><span style={{ color: theme.textMuted, fontSize: '11px' }}>Strategy • Psychology • Trade Review • Planning</span></div>
+                </div>
+                <div style={{ fontSize: '20px', color: theme.textMuted, transition: 'transform 0.3s', transform: coachOpen ? 'rotate(180deg)' : 'rotate(0)' }}>▼</div>
+              </div>
+              {coachOpen && (
+                <div style={{ marginTop: '16px' }}>
+                  {/* MY STRATEGY */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ color: theme.text, fontSize: '13px', fontWeight: 700 }}>📜 My Trading Strategy</span>
+                      <button onClick={() => setShowStrategyEditor(!showStrategyEditor)} style={{ padding: '4px 12px', background: showStrategyEditor ? theme.accent : 'transparent', color: showStrategyEditor ? 'white' : theme.accent, border: '1px solid '+theme.accent, borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>{showStrategyEditor ? 'Save' : myStrategy ? 'Edit' : '+ Define Strategy'}</button>
+                    </div>
+                    {showStrategyEditor ? (
+                      <textarea value={myStrategy} onChange={(e) => setMyStrategy(e.target.value)} placeholder={"Describe your trading strategy here. Include:\n\n• What markets/instruments you trade\n• Your preferred timeframes\n• Entry criteria (what triggers a trade)\n• Exit criteria (TP and SL rules)\n• Position sizing rules\n• Times you trade (kill zones)\n• Rules you must follow\n• What you're working on improving"} style={{ ...inputStyle, width: '100%', minHeight: '150px', fontSize: '12px', lineHeight: 1.6, resize: 'vertical' as const }} />
+                    ) : myStrategy ? (
+                      <div style={{ padding: '12px', background: darkMode ? '#0f172a' : '#f8fafc', borderRadius: '8px', fontSize: '12px', color: theme.text, whiteSpace: 'pre-line' as const, maxHeight: '80px', overflow: 'hidden', position: 'relative' as const }}>{myStrategy}<div style={{ position: 'absolute' as const, bottom: 0, left: 0, right: 0, height: '30px', background: darkMode ? 'linear-gradient(transparent, #0f172a)' : 'linear-gradient(transparent, #f8fafc)' }} /></div>
+                    ) : (
+                      <div style={{ padding: '16px', background: darkMode ? '#0f172a' : '#fefce8', borderRadius: '8px', textAlign: 'center' as const, border: '1px dashed '+theme.warning }}><span style={{ color: theme.warning, fontSize: '12px' }}>Define your strategy so the coach can give personalised feedback</span></div>
+                    )}
+                  </div>
+                  {/* QUICK ACTIONS */}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '12px' }}>
+                    {[{label:'Am I ready to trade?',icon:'🧘'},{label:'Review my session',icon:'📊'},{label:'Analyse my patterns',icon:'🔍'},{label:'Help me plan tomorrow',icon:'📋'},{label:'I\'m feeling tilted',icon:'😤'},{label:'Celebrate my wins!',icon:'🎉'}].map(q => (
+                      <button key={q.label} onClick={() => sendCoachMessage(q.label)} style={{ padding: '6px 12px', background: darkMode ? '#334155' : '#f1f5f9', border: '1px solid '+theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '11px', color: theme.text, display: 'flex', alignItems: 'center', gap: '4px' }}><span>{q.icon}</span>{q.label}</button>
+                    ))}
+                  </div>
+                  {/* CHAT */}
+                  <div ref={coachChatRef} style={{ maxHeight: '400px', overflowY: 'auto' as const, marginBottom: '12px', padding: '12px', background: darkMode ? '#0f172a' : '#fafafa', borderRadius: '12px', border: '1px solid '+theme.border }}>
+                    {coachMessages.length === 0 && (<div style={{ textAlign: 'center' as const, padding: '30px', color: theme.textMuted }}><div style={{ fontSize: '32px', marginBottom: '8px' }}>🧠</div><div style={{ fontSize: '14px', fontWeight: 600 }}>Your AI Trading Coach</div><div style={{ fontSize: '12px', marginTop: '4px' }}>Ask me anything about your trades, strategy, or psychology. I have full context of your data.</div></div>)}
+                    {coachMessages.map((m, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: '8px' }}>
+                        <div style={{ maxWidth: '80%', padding: '10px 14px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? 'linear-gradient(135deg, #fbbf24, #d97706)' : (darkMode ? '#1e293b' : 'white'), color: m.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.6, whiteSpace: 'pre-line' as const, border: m.role === 'assistant' ? '1px solid '+theme.border : 'none' }}>{m.content}</div>
+                      </div>
+                    ))}
+                    {coachLoading && (<div style={{ display: 'flex', gap: '6px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.accent, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.accent, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.accent, animation: 'pulse 1s infinite 0.4s' }} /></div>)}
+                  </div>
+                  {/* INPUT */}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input type="text" value={coachInput} onChange={(e) => setCoachInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendCoachMessage()} placeholder="Ask your trading coach..." style={{ ...inputStyle, flex: 1, fontSize: '13px', padding: '10px 14px' }} />
+                    <button onClick={() => sendCoachMessage()} disabled={coachLoading || !coachInput.trim()} style={{ padding: '10px 20px', background: coachLoading ? theme.textMuted : 'linear-gradient(135deg, #fbbf24, #d97706)', color: 'white', border: 'none', borderRadius: '10px', cursor: coachLoading ? 'default' : 'pointer', fontSize: '13px', fontWeight: 700 }}>Send</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* === COLLAPSIBLE SECTIONS === */}
             {[
+              { id: 'session', icon: '📋', title: 'Session Planner', color: '#14b8a6' },
+              { id: 'psychology', icon: '🧠', title: 'Trading Psychology', color: theme.purple },
+              { id: 'risk', icon: '🛡️', title: 'Risk Management', color: theme.danger },
               { id: 'journal', icon: '📓', title: 'Trade Journal', color: theme.warning },
               { id: 'analytics', icon: '📊', title: 'Analytics & Performance', color: theme.accent },
-              { id: 'psychology', icon: '🧠', title: 'Psychology & Discipline', color: theme.purple },
               { id: 'props', icon: '🏢', title: 'Prop Firm Dashboard', color: theme.success },
-              { id: 'risk', icon: '🛡️', title: 'Risk Management', color: theme.danger },
-              { id: 'session', icon: '📋', title: 'Session Planner', color: '#14b8a6' },
+              { id: 'planner', icon: '🎯', title: 'Trade Planner', color: '#f59e0b' },
+              { id: 'checkin', icon: '🧘', title: 'Daily Check-In', color: '#f472b6' },
             ].map(sec => (
               <div key={sec.id} style={cardStyle}>
                 <div onClick={() => toggleTradingSection(sec.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
@@ -2075,20 +2178,57 @@ export default function Dashboard() {
 
                 {/* PSYCHOLOGY */}
                 {tradingSections[sec.id] && sec.id === 'psychology' && (
-                  <div style={{ marginTop: '20px' }}>
-                    <div style={{ marginBottom: '24px' }}>
-                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '16px' }}>✅ Pre-Trade Checklist</h4>
-                      <p style={{ color: theme.textMuted, fontSize: '12px', margin: '0 0 12px 0' }}>Complete before every trade. Resets when you log a trade.</p>
-                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                        {checklist.map(item => (<div key={item.id} onClick={() => setChecklist(prev => prev.map(c => c.id === item.id ? { ...c, checked: !c.checked } : c))} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: item.checked ? (darkMode ? '#1e3a32' : '#f0fdf4') : (darkMode ? '#1e293b' : '#fafafa'), borderRadius: '10px', cursor: 'pointer', border: '1px solid ' + (item.checked ? theme.success + '40' : theme.border) }}><div style={{ width: '24px', height: '24px', borderRadius: '6px', background: item.checked ? theme.success : 'transparent', border: item.checked ? 'none' : '2px solid ' + theme.border, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '14px', flexShrink: 0 }}>{item.checked ? '✓' : ''}</div><span style={{ color: item.checked ? theme.success : theme.text, fontSize: '14px', textDecoration: item.checked ? 'line-through' : 'none' }}>{item.text}</span></div>))}
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}><input type="text" placeholder="Add custom check..." value={customChecklistItem} onChange={(e) => setCustomChecklistItem(e.target.value)} style={{ ...inputStyle, flex: 1, fontSize: '12px' }} /><button onClick={() => { if (customChecklistItem) { setChecklist(prev => [...prev, { id: Date.now(), text: customChecklistItem, checked: false }]); setCustomChecklistItem('') } }} style={{ ...btnPurple, fontSize: '12px', padding: '8px 14px' }}>+ Add</button></div>
+                  <div style={{ padding: '16px' }}>
+                    {/* EMOTIONAL STATE TRACKER */}
+                    <div style={{ marginBottom: '20px' }}>
+                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>🧘 Pre-Session Mental Check</h4>
+                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '12px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '12px' }}>
+                          {[{label:'Mood',icon:'😊',key:'mood'},{label:'Energy',icon:'⚡',key:'energy'},{label:'Focus',icon:'🎯',key:'focus'}].map(m => (
+                            <div key={m.key}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '6px', fontWeight: 600 }}>{m.icon} {m.label}</div><div style={{ display: 'flex', gap: '4px' }}>{[1,2,3,4,5].map(n => (<button key={n} onClick={() => setTodayCheckIn({...todayCheckIn, [m.key]: n})} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: (todayCheckIn as any)[m.key]>=n?(['#ef4444','#f97316','#fbbf24','#84cc16','#10b981'][n-1]):(darkMode?'#334155':'#e2e8f0'), cursor: 'pointer', color: (todayCheckIn as any)[m.key]>=n?'white':theme.textMuted, fontWeight: 700, fontSize: '13px' }}>{n}</button>))}</div></div>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                          <input type="text" placeholder="How are you feeling? Any life stress, sleep quality, or concerns?" value={todayCheckIn.notes} onChange={(e) => setTodayCheckIn({...todayCheckIn, notes: e.target.value})} style={{ ...inputStyle, flex: 1, fontSize: '12px' }} />
+                          <button onClick={() => { setDailyCheckIn(prev => [...prev, {...todayCheckIn, id: Date.now()}]); setTodayCheckIn({mood:3,energy:3,focus:3,notes:'',date:new Date().toISOString().split('T')[0]}); awardXP(10) }} style={{ padding: '8px 16px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>Log State</button>
+                        </div>
+                        {(() => { const total = todayCheckIn.mood + todayCheckIn.energy + todayCheckIn.focus; const avg = total / 3; return total < 9 ? (<div style={{ padding: '10px 14px', background: theme.danger+'15', borderRadius: '8px', border: '1px solid '+theme.danger+'30' }}><div style={{ color: theme.danger, fontWeight: 700, fontSize: '13px' }}>⚠️ LOW READINESS — Score: {total}/15</div><div style={{ color: theme.danger, fontSize: '12px', marginTop: '4px' }}>Consider: Reduce position size by 50%, set strict max 2 trades, or sit out entirely. Protecting capital IS a winning trade.</div></div>) : total < 12 ? (<div style={{ padding: '10px 14px', background: theme.warning+'15', borderRadius: '8px', border: '1px solid '+theme.warning+'30' }}><div style={{ color: theme.warning, fontWeight: 700, fontSize: '13px' }}>⚠️ MODERATE — Score: {total}/15</div><div style={{ color: theme.warning, fontSize: '12px', marginTop: '4px' }}>Trade with caution. Reduce size if needed. Follow your plan strictly.</div></div>) : (<div style={{ padding: '10px 14px', background: theme.success+'15', borderRadius: '8px', border: '1px solid '+theme.success+'30' }}><div style={{ color: theme.success, fontWeight: 700, fontSize: '13px' }}>✅ READY — Score: {total}/15</div><div style={{ color: theme.success, fontSize: '12px', marginTop: '4px' }}>Good mental state. Execute your plan with confidence.</div></div>) })()}
                       </div>
-                      <div style={{ marginTop: '12px', padding: '12px 16px', background: checklist.every(c=>c.checked) ? theme.success+'15' : theme.warning+'15', borderRadius: '10px', textAlign: 'center' as const }}><span style={{ color: checklist.every(c=>c.checked) ? theme.success : theme.warning, fontWeight: 700 }}>{checklist.filter(c=>c.checked).length}/{checklist.length} complete {checklist.every(c=>c.checked) ? '— ✅ Clear to trade!' : '— Complete checklist before trading'}</span></div>
                     </div>
-                    <div>
-                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '16px' }}>⚠️ Rule Violations Log</h4>
-                      {(() => { const violations = trades.filter(t => t.rulesBroken); return violations.length === 0 ? <div style={{ padding: '20px', background: theme.success+'10', borderRadius: '12px', textAlign: 'center' as const }}><span style={{ color: theme.success, fontWeight: 700 }}>🎯 Clean record — no rule violations logged!</span></div> : <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>{violations.map(t => (<div key={t.id} style={{ padding: '10px 14px', background: theme.danger+'10', borderRadius: '8px', marginBottom: '6px', borderLeft: '3px solid '+theme.danger }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{t.instrument} — {t.date}</span><span style={{ color: theme.danger, fontWeight: 700, fontSize: '13px' }}>${parseFloat(t.profitLoss||'0').toFixed(2)}</span></div><div style={{ color: theme.danger, fontSize: '12px', marginTop: '4px' }}>⚠️ {t.rulesBroken}</div></div>))}</div> })()}
+                    {/* PRE-TRADE RULES COMMITMENT */}
+                    <div style={{ marginBottom: '20px' }}>
+                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📋 Pre-Trade Checklist</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                        {['I have identified the trend direction','I have marked key support/resistance levels','My entry has a clear trigger (not just hoping)','Stop loss is placed at a logical level','Risk is within my rules (max % per trade)','I am NOT revenge trading or chasing','I can afford to lose this trade','I have checked for upcoming news events'].map((rule, i) => (
+                          <label key={i} style={{ display: 'flex', gap: '8px', padding: '10px 12px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '8px', cursor: 'pointer', alignItems: 'center', fontSize: '12px', color: theme.text, border: '1px solid ' + theme.border }}>
+                            <input type="checkbox" style={{ width: '16px', height: '16px', accentColor: theme.success }} />{rule}
+                          </label>
+                        ))}
+                      </div>
                     </div>
+                    {/* REVENGE TRADE DETECTOR */}
+                    <div style={{ marginBottom: '20px' }}>
+                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>🔥 Revenge Trade Detector</h4>
+                      {(() => { const today = new Date().toISOString().split('T')[0]; const todayTrades = trades.filter((t:any) => t.date === today); const losses = todayTrades.filter((t:any) => parseFloat(t.profitLoss||'0') < 0); const lastThree = todayTrades.slice(-3).map((t:any) => parseFloat(t.profitLoss||'0')); const consecutiveLosses = lastThree.filter(p => p < 0).length; const todayPL = todayTrades.reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0); return (<div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                        <div style={{ padding: '12px', background: todayTrades.length >= parseInt(riskLimits.maxDailyTrades||'5') ? theme.danger+'20' : darkMode?'#1e293b':'#fafafa', borderRadius: '10px', textAlign: 'center' as const, border: '1px solid '+(todayTrades.length >= parseInt(riskLimits.maxDailyTrades||'5') ? theme.danger : theme.border) }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>Trades Today</div><div style={{ color: todayTrades.length >= parseInt(riskLimits.maxDailyTrades||'5') ? theme.danger : theme.text, fontSize: '20px', fontWeight: 800 }}>{todayTrades.length}</div></div>
+                        <div style={{ padding: '12px', background: consecutiveLosses >= 3 ? theme.danger+'20' : darkMode?'#1e293b':'#fafafa', borderRadius: '10px', textAlign: 'center' as const, border: '1px solid '+(consecutiveLosses >= 3 ? theme.danger : theme.border) }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>Recent Losses</div><div style={{ color: consecutiveLosses >= 2 ? theme.danger : theme.text, fontSize: '20px', fontWeight: 800 }}>{consecutiveLosses}/3</div>{consecutiveLosses >= 2 && <div style={{ color: theme.danger, fontSize: '9px', fontWeight: 700 }}>STOP TRADING</div>}</div>
+                        <div style={{ padding: '12px', background: todayPL < -parseFloat(riskLimits.maxDailyLoss||'999999') ? theme.danger+'20' : darkMode?'#1e293b':'#fafafa', borderRadius: '10px', textAlign: 'center' as const, border: '1px solid '+theme.border }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>Today P/L</div><div style={{ color: todayPL >= 0 ? theme.success : theme.danger, fontSize: '20px', fontWeight: 800 }}>{todayPL >= 0 ? '+' : ''}${todayPL.toFixed(0)}</div></div>
+                        <div style={{ padding: '12px', background: darkMode?'#1e293b':'#fafafa', borderRadius: '10px', textAlign: 'center' as const, border: '1px solid '+theme.border }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>Win Rate Today</div><div style={{ color: theme.text, fontSize: '20px', fontWeight: 800 }}>{todayTrades.length > 0 ? ((todayTrades.filter((t:any) => parseFloat(t.profitLoss||'0') > 0).length / todayTrades.length) * 100).toFixed(0) : 0}%</div></div>
+                      </div>) })()}
+                    </div>
+                    {/* PSYCHOLOGY PATTERNS FROM DATA */}
+                    <div style={{ marginBottom: '20px' }}>
+                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📊 Your Psychology Patterns</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                        {(() => { const emotions = ['disciplined','confident','neutral','anxious','fomo','revenge','greedy','fearful']; const emotionIcons: {[k:string]:string} = {disciplined:'🎯',confident:'💪',neutral:'😐',anxious:'😰',fomo:'🤯',revenge:'😤',greedy:'🤑',fearful:'😨'}; return emotions.map(em => { const emTrades = trades.filter((t:any) => t.emotion === em); const emPL = emTrades.reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0); const emWR = emTrades.length > 0 ? (emTrades.filter((t:any) => parseFloat(t.profitLoss||'0') > 0).length / emTrades.length * 100) : 0; return emTrades.length > 0 ? (<div key={em} style={{ padding: '10px', background: darkMode?'#1e293b':'#fafafa', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div><span style={{ fontSize: '14px' }}>{emotionIcons[em]||''}</span><span style={{ color: theme.text, fontWeight: 600, fontSize: '12px', marginLeft: '6px', textTransform: 'capitalize' as const }}>{em}</span><span style={{ color: theme.textMuted, fontSize: '10px', marginLeft: '6px' }}>{emTrades.length}t</span></div><div style={{ textAlign: 'right' as const }}><div style={{ color: emPL >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '13px' }}>{emPL >= 0 ? '+' : ''}${emPL.toFixed(0)}</div><div style={{ color: emWR >= 50 ? theme.success : theme.danger, fontSize: '10px' }}>{emWR.toFixed(0)}% WR</div></div></div>) : null }) })()}
+                      </div>
+                      {trades.filter((t:any) => t.emotion === 'revenge' || t.emotion === 'fomo').length > 0 && (<div style={{ marginTop: '8px', padding: '10px', background: theme.danger+'10', borderRadius: '8px', border: '1px solid '+theme.danger+'20' }}><div style={{ color: theme.danger, fontSize: '12px', fontWeight: 700 }}>💡 Insight: Your FOMO/Revenge trades have cost you ${Math.abs(trades.filter((t:any) => t.emotion === 'revenge' || t.emotion === 'fomo').reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0)).toFixed(0)}. Eliminating these would improve your results significantly.</div></div>)}
+                    </div>
+                    {/* MENTAL STATE HISTORY with P/L correlation */}
+                    {dailyCheckIn.length > 0 && (<div>
+                      <h4 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '14px' }}>📈 Mental State vs P/L</h4>
+                      {dailyCheckIn.slice().reverse().slice(0,7).map((ci:any) => { const dp = trades.filter((t:any) => t.date === ci.date).reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0); const dc = trades.filter((t:any) => t.date === ci.date).length; const avg = ((ci.mood+ci.energy+ci.focus)/3).toFixed(1); return (<div key={ci.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: darkMode?'#1e293b':'#fafafa', borderRadius: '6px', marginBottom: '4px', fontSize: '12px' }}><div><span style={{ color: theme.textMuted }}>{ci.date}</span><span style={{ marginLeft: '8px' }}>😊{ci.mood} ⚡{ci.energy} 🎯{ci.focus}</span><span style={{ color: parseFloat(avg) >= 3.5 ? theme.success : parseFloat(avg) >= 2.5 ? theme.warning : theme.danger, fontWeight: 700, marginLeft: '6px' }}>Avg: {avg}</span></div><div>{dc > 0 ? <span style={{ color: dp >= 0 ? theme.success : theme.danger, fontWeight: 700 }}>{dp >= 0 ? '+' : ''}${dp.toFixed(0)} ({dc}t)</span> : <span style={{ color: theme.textMuted }}>No trades</span>}</div></div>) })}
+                    </div>)}
                   </div>
                 )}
 
