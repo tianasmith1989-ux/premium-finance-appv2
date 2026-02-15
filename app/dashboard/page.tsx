@@ -970,17 +970,29 @@ export default function Dashboard() {
     const yrs = parseInt(tradingCalculator.years || '0'); const mos = parseInt(tradingCalculator.months || '0'); const dys = parseInt(tradingCalculator.days || '0')
     const riskPct = parseFloat(tradingCalculator.riskPerTrade || '0'); const winRt = parseFloat(tradingCalculator.winRate || '0') / 100; const rr = parseFloat(tradingCalculator.riskReward || '0')
     const includeDays = tradingCalculator.includeDays
-    const totalCalendarDays = (yrs * 365) + (mos * 30) + dys
-    const tradingDaysPerWeek = includeDays.length; const tradingDaysRatio = tradingDaysPerWeek / 7
-    const totalTradingDays = Math.round(totalCalendarDays * tradingDaysRatio)
-    const tradingDaysPerYear = Math.round(365 * tradingDaysRatio)
+    const dayMap2: {[k:number]:string} = {0:'S2',1:'M',2:'T',3:'W',4:'T2',5:'F',6:'S'}
+    const startDate2 = new Date()
+    const endDate = new Date(startDate2)
+    endDate.setFullYear(endDate.getFullYear() + yrs)
+    endDate.setMonth(endDate.getMonth() + mos)
+    endDate.setDate(endDate.getDate() + dys)
+    const totalCalendarDays = Math.round((endDate.getTime() - startDate2.getTime()) / (1000*60*60*24))
+    let totalTradingDays = 0
+    const tempDate = new Date(startDate2)
+    for (let i = 0; i < totalCalendarDays; i++) {
+      const dk = dayMap2[tempDate.getDay()]
+      if (includeDays.includes(dk)) totalTradingDays++
+      tempDate.setDate(tempDate.getDate() + 1)
+    }
+    const tradingDaysPerWeek = includeDays.length
+    const tradingDaysPerYear = Math.round((totalTradingDays / Math.max(totalCalendarDays, 1)) * 365)
     let ratePerTradingDay: number
     if (returnPeriod === 'daily') ratePerTradingDay = returnRate
     else if (returnPeriod === 'weekly') ratePerTradingDay = returnRate / tradingDaysPerWeek
-    else if (returnPeriod === 'monthly') ratePerTradingDay = returnRate / Math.round(30 * tradingDaysRatio)
+    else if (returnPeriod === 'monthly') ratePerTradingDay = returnRate / Math.round(tradingDaysPerYear / 12)
     else ratePerTradingDay = returnRate / tradingDaysPerYear
     const effectiveRate = ratePerTradingDay * reinvestRate
-    const tradingDaysPerMonth = Math.round(30 * tradingDaysRatio)
+    const tradingDaysPerMonth = Math.round(tradingDaysPerYear / 12)
     const contributionPerTradingDay = tradingDaysPerMonth > 0 ? monthlyAdd / tradingDaysPerMonth : 0
     let balance = startCap; const yearlyProgress: any[] = []; let currentYear = 0; let daysInCurrentYear = 0
     const dailyBreakdown: any[] = []
@@ -2481,7 +2493,7 @@ export default function Dashboard() {
                   <div style={{ textAlign: 'center' as const, marginBottom: '4px', fontSize: '12px', color: theme.textMuted }}>Projection for {tradingCalculator.years || 0}y {tradingCalculator.months || 0}m {tradingCalculator.days || 0}d</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
                     <div><div style={{ color: theme.textMuted, fontSize: '12px' }}>Investment Value</div><div style={{ color: theme.success, fontSize: '36px', fontWeight: 900 }}>${tradingResults.futureValue >= 1e6 ? (tradingResults.futureValue/1e6).toFixed(2)+'M' : tradingResults.futureValue.toFixed(2)}</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '8px' }}>Total Interest / Earnings</div><div style={{ color: theme.accent, fontSize: '24px', fontWeight: 800 }}>${tradingResults.profit.toFixed(2)}</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '8px' }}>Percentage Profit</div><div style={{ color: theme.warning, fontSize: '24px', fontWeight: 800 }}>{((tradingResults.profit / Math.max(parseFloat(tradingCalculator.startingCapital || '1'), 1)) * 100).toFixed(0)}%</div></div>
-                    <div><div style={{ color: theme.textMuted, fontSize: '12px' }}>Total Days / Business Days</div><div style={{ color: theme.text, fontSize: '24px', fontWeight: 800 }}>{tradingResults.totalTradingDays} / {Math.round(tradingResults.totalTradingDays * 5/7)}</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '8px' }}>Daily Interest Rate</div><div style={{ color: theme.purple, fontSize: '24px', fontWeight: 800 }}>{tradingCalculator.returnPeriod === 'daily' ? tradingCalculator.returnRate : (parseFloat(tradingCalculator.returnRate||'0') / (tradingCalculator.returnPeriod === 'weekly' ? 5 : tradingCalculator.returnPeriod === 'monthly' ? 21 : 252)).toFixed(4)}%</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '8px' }}>Initial Balance</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 800 }}>${parseFloat(tradingCalculator.startingCapital || '0').toFixed(2)}</div></div>
+                    <div><div style={{ color: theme.textMuted, fontSize: '12px' }}>Total Days / Business Days</div><div style={{ color: theme.text, fontSize: '24px', fontWeight: 800 }}>{tradingResults.totalCalendarDays} / {tradingResults.totalTradingDays}</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '8px' }}>Daily Interest Rate</div><div style={{ color: theme.purple, fontSize: '24px', fontWeight: 800 }}>{tradingCalculator.returnPeriod === 'daily' ? tradingCalculator.returnRate : (parseFloat(tradingCalculator.returnRate||'0') / (tradingCalculator.returnPeriod === 'weekly' ? 5 : tradingCalculator.returnPeriod === 'monthly' ? 21 : 252)).toFixed(4)}%</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '8px' }}>Initial Balance</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 800 }}>${parseFloat(tradingCalculator.startingCapital || '0').toFixed(2)}</div></div>
                   </div>
                 </div>
                 <div style={{ marginTop: '16px' }}>
