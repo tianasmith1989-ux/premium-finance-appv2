@@ -270,6 +270,7 @@ export default function Dashboard() {
   })
   const [tradingResults, setTradingResults] = useState<any>(null)
   const [calculatingTrading, setCalculatingTrading] = useState(false)
+  const [breakdownView, setBreakdownView] = useState<'daily'|'weekly'|'monthly'|'yearly'>('daily')
 
   // Gamification state
   const [xpPoints, setXpPoints] = useState(0)
@@ -982,17 +983,37 @@ export default function Dashboard() {
     const tradingDaysPerMonth = Math.round(30 * tradingDaysRatio)
     const contributionPerTradingDay = tradingDaysPerMonth > 0 ? monthlyAdd / tradingDaysPerMonth : 0
     let balance = startCap; const yearlyProgress: any[] = []; let currentYear = 0; let daysInCurrentYear = 0
-    for (let day = 1; day <= totalTradingDays; day++) {
-      balance = balance * (1 + effectiveRate) + contributionPerTradingDay; daysInCurrentYear++
-      if (daysInCurrentYear >= tradingDaysPerYear || day === totalTradingDays) {
-        currentYear++; const totalMonths = currentYear * 12
-        const contributed = startCap + (monthlyAdd * Math.min(totalMonths, yrs * 12 + mos))
-        yearlyProgress.push({ year: currentYear, value: balance, contributed, profit: balance - contributed }); daysInCurrentYear = 0
+    const dailyBreakdown: any[] = []
+    const startDate = new Date()
+    let calendarDay = 0; let tradingDay = 0
+    const dayMap: {[k:number]:string} = {0:'S2',1:'M',2:'T',3:'W',4:'T2',5:'F',6:'S'}
+    while (tradingDay < totalTradingDays) {
+      const currentDate = new Date(startDate)
+      currentDate.setDate(startDate.getDate() + calendarDay)
+      const dayKey = dayMap[currentDate.getDay()]
+      const isTradingDay = includeDays.includes(dayKey)
+      if (isTradingDay) {
+        tradingDay++
+        const dayEarning = balance * effectiveRate + contributionPerTradingDay
+        const prevBalance = balance
+        balance = balance + dayEarning
+        const totalEarnings = balance - startCap
+        dailyBreakdown.push({ date: currentDate, day: tradingDay, earning: dayEarning, totalEarnings, balance, excluded: false })
+        daysInCurrentYear++
+        if (daysInCurrentYear >= tradingDaysPerYear || tradingDay === totalTradingDays) {
+          currentYear++; const totalMonths2 = currentYear * 12
+          const contributed = startCap + (monthlyAdd * Math.min(totalMonths2, yrs * 12 + mos))
+          yearlyProgress.push({ year: currentYear, value: balance, contributed, profit: balance - contributed }); daysInCurrentYear = 0
+        }
+      } else {
+        dailyBreakdown.push({ date: currentDate, day: 0, earning: 0, totalEarnings: balance - startCap, balance, excluded: true })
       }
+      calendarDay++
+      if (calendarDay > totalCalendarDays + 30) break
     }
     const totalMonths = yrs * 12 + mos; const totalContributed = startCap + (monthlyAdd * totalMonths)
     const expectancy = (winRt * rr * riskPct) - ((1 - winRt) * riskPct)
-    setTradingResults({ futureValue: balance, totalContributed, profit: balance - totalContributed, yearlyProgress, totalCalendarDays, totalTradingDays, tradingDaysPerYear, tradeStats: { expectedWinRate: winRt * 100, avgWin: rr * riskPct, avgLoss: riskPct, expectancy, tradesPerYear: 100 } })
+    setTradingResults({ futureValue: balance, totalContributed, profit: balance - totalContributed, yearlyProgress, totalCalendarDays, totalTradingDays, tradingDaysPerYear, dailyBreakdown, tradeStats: { expectedWinRate: winRt * 100, avgWin: rr * riskPct, avgLoss: riskPct, expectancy, tradesPerYear: 100 } })
     setCalculatingTrading(false)
   }
 
@@ -2485,6 +2506,97 @@ export default function Dashboard() {
                     })()}
                   </div>
                 </div>
+                {/* DETAILED BREAKDOWN TABLE */}
+                {tradingResults.dailyBreakdown && tradingResults.dailyBreakdown.length > 0 && (
+                  <div style={{ marginTop: '16px' }}>
+                    <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📋 Earnings Breakdown</h4>
+                    <div style={{ display: 'flex', gap: '4px', marginBottom: '12px', background: darkMode ? '#0f172a' : '#f1f5f9', borderRadius: '8px', padding: '3px' }}>
+                      {[{id:'daily' as const,label:'daily'},{id:'weekly' as const,label:'weekly'},{id:'monthly' as const,label:'monthly'},{id:'yearly' as const,label:'yearly'}].map(t => (
+                        <button key={t.id} onClick={() => setBreakdownView(t.id)} style={{ flex: 1, padding: '6px', borderRadius: '6px', border: 'none', background: breakdownView === t.id ? theme.warning : 'transparent', color: breakdownView === t.id ? 'white' : theme.textMuted, cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>{t.label}</button>
+                      ))}
+                    </div>
+                    <div style={{ maxHeight: '400px', overflowY: 'auto' as const, borderRadius: '8px', border: '1px solid '+theme.border }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                        <thead><tr style={{ background: darkMode ? '#0f172a' : '#1e293b', position: 'sticky' as const, top: 0 }}>
+                          <th style={{ padding: '10px 12px', color: '#f97316', fontWeight: 700, textAlign: 'left' as const }}>Date / Day</th>
+                          <th style={{ padding: '10px 12px', color: theme.textMuted, fontWeight: 700, textAlign: 'left' as const }}>Earnings</th>
+                          <th style={{ padding: '10px 12px', color: '#22c55e', fontWeight: 700, textAlign: 'left' as const }}>Total Earnings</th>
+                          <th style={{ padding: '10px 12px', color: '#eab308', fontWeight: 700, textAlign: 'left' as const }}>Balance</th>
+                        </tr></thead>
+                        <tbody>
+                          {(() => {
+                            const bd = tradingResults.dailyBreakdown
+                            if (breakdownView === 'daily') {
+                              return bd.map((row: any, i: number) => row.excluded ? (
+                                <tr key={i} style={{ background: darkMode ? '#1e293b' : '#f1f5f9' }}><td colSpan={4} style={{ padding: '4px 12px', color: theme.textMuted, fontSize: '11px', fontStyle: 'italic' as const }}>Day excluded</td></tr>
+                              ) : (
+                                <tr key={i} style={{ background: i % 2 === 0 ? (darkMode ? '#0f172a' : '#fafafa') : (darkMode ? '#1e293b' : 'white'), borderBottom: '1px solid '+theme.border }}>
+                                  <td style={{ padding: '8px 12px', color: theme.text }}>{row.date.toLocaleDateString('en-AU', {day:'2-digit',month:'short',year:'2-digit'}).replace(/ /g,' ')}</td>
+                                  <td style={{ padding: '8px 12px', color: theme.text, fontWeight: 600 }}>${row.earning.toFixed(2)}</td>
+                                  <td style={{ padding: '8px 12px', color: '#22c55e', fontWeight: 600 }}>${row.totalEarnings.toFixed(2)}</td>
+                                  <td style={{ padding: '8px 12px', color: '#eab308', fontWeight: 700 }}>${row.balance.toFixed(2)}</td>
+                                </tr>
+                              ))
+                            } else if (breakdownView === 'weekly') {
+                              const weeks: any[] = []; let weekEarnings = 0; let weekStart: any = null
+                              bd.filter((r:any) => !r.excluded).forEach((row:any, i:number) => {
+                                if (!weekStart) weekStart = row
+                                weekEarnings += row.earning
+                                if ((i+1) % tradingResults.dailyBreakdown.filter((r:any)=>!r.excluded).length === 0 || row.date.getDay() === 5 || i === bd.filter((r:any)=>!r.excluded).length-1) {
+                                  weeks.push({ start: weekStart.date, earning: weekEarnings, totalEarnings: row.totalEarnings, balance: row.balance })
+                                  weekEarnings = 0; weekStart = null
+                                }
+                              })
+                              // Simpler: group by week number
+                              const weekGroups: any[] = []; let wk: any = null; let wkCount = 0
+                              bd.filter((r:any)=>!r.excluded).forEach((row:any, i:number) => {
+                                if (i % Math.max(1, tradingResults.dailyBreakdown.filter((r:any)=>!r.excluded).length > 5 ? tradingCalculator.includeDays.length : 5) === 0) {
+                                  if (wk) weekGroups.push(wk)
+                                  wk = { start: row.date, earning: 0, totalEarnings: 0, balance: 0 }; wkCount++
+                                }
+                                if (wk) { wk.earning += row.earning; wk.totalEarnings = row.totalEarnings; wk.balance = row.balance }
+                              })
+                              if (wk) weekGroups.push(wk)
+                              return weekGroups.map((w:any, i:number) => (
+                                <tr key={i} style={{ background: i % 2 === 0 ? (darkMode ? '#0f172a' : '#fafafa') : (darkMode ? '#1e293b' : 'white'), borderBottom: '1px solid '+theme.border }}>
+                                  <td style={{ padding: '8px 12px', color: theme.text }}>Week {i+1}</td>
+                                  <td style={{ padding: '8px 12px', color: theme.text, fontWeight: 600 }}>${w.earning.toFixed(2)}</td>
+                                  <td style={{ padding: '8px 12px', color: '#22c55e', fontWeight: 600 }}>${w.totalEarnings.toFixed(2)}</td>
+                                  <td style={{ padding: '8px 12px', color: '#eab308', fontWeight: 700 }}>${w.balance.toFixed(2)}</td>
+                                </tr>
+                              ))
+                            } else if (breakdownView === 'monthly') {
+                              const months: any[] = []; let mo: any = null; let lastMonth = -1
+                              bd.filter((r:any)=>!r.excluded).forEach((row:any) => {
+                                const m = row.date.getMonth()
+                                if (m !== lastMonth) { if (mo) months.push(mo); mo = { label: row.date.toLocaleDateString('en-AU',{month:'short',year:'numeric'}), earning: 0, totalEarnings: 0, balance: 0 }; lastMonth = m }
+                                if (mo) { mo.earning += row.earning; mo.totalEarnings = row.totalEarnings; mo.balance = row.balance }
+                              })
+                              if (mo) months.push(mo)
+                              return months.map((m:any, i:number) => (
+                                <tr key={i} style={{ background: i % 2 === 0 ? (darkMode ? '#0f172a' : '#fafafa') : (darkMode ? '#1e293b' : 'white'), borderBottom: '1px solid '+theme.border }}>
+                                  <td style={{ padding: '8px 12px', color: theme.text, fontWeight: 600 }}>{m.label}</td>
+                                  <td style={{ padding: '8px 12px', color: theme.text, fontWeight: 600 }}>${m.earning.toFixed(2)}</td>
+                                  <td style={{ padding: '8px 12px', color: '#22c55e', fontWeight: 600 }}>${m.totalEarnings.toFixed(2)}</td>
+                                  <td style={{ padding: '8px 12px', color: '#eab308', fontWeight: 700 }}>${m.balance.toFixed(2)}</td>
+                                </tr>
+                              ))
+                            } else {
+                              return tradingResults.yearlyProgress.map((y:any, i:number) => (
+                                <tr key={i} style={{ background: i % 2 === 0 ? (darkMode ? '#0f172a' : '#fafafa') : (darkMode ? '#1e293b' : 'white'), borderBottom: '1px solid '+theme.border }}>
+                                  <td style={{ padding: '8px 12px', color: theme.text, fontWeight: 600 }}>Year {y.year}</td>
+                                  <td style={{ padding: '8px 12px', color: theme.text, fontWeight: 600 }}>${y.profit.toFixed(2)}</td>
+                                  <td style={{ padding: '8px 12px', color: '#22c55e', fontWeight: 600 }}>${y.profit.toFixed(2)}</td>
+                                  <td style={{ padding: '8px 12px', color: '#eab308', fontWeight: 700 }}>${y.value.toFixed(2)}</td>
+                                </tr>
+                              ))
+                            }
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
                 <div style={{ marginTop: '12px', padding: '12px 16px', background: darkMode ? '#334155' : '#fff7ed', borderRadius: '10px', border: '1px solid ' + theme.warning + '30', fontSize: '11px', color: theme.textMuted, lineHeight: 1.5 }}>⚠️ This calculator is for illustrative purposes only and does not constitute financial advice.</div>
               </>)}
             </div>
