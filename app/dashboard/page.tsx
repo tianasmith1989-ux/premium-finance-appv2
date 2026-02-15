@@ -345,6 +345,8 @@ export default function Dashboard() {
   const [personalAccounts, setPersonalAccounts] = useState<any[]>([])
   const [newPersonalAccount, setNewPersonalAccount] = useState({ broker: '', accountSize: '', currentBalance: '', type: 'forex' })
   const [editingPropId, setEditingPropId] = useState<number|null>(null)
+  const [showNewAccountForm, setShowNewAccountForm] = useState<'prop'|'personal'|null>(null)
+  const [inlineNewAccount, setInlineNewAccount] = useState({ name: '', size: '', type: 'prop' as 'prop'|'personal' })
   const [newPropAccount, setNewPropAccount] = useState({ firm: 'FTMO', type: 'forex', phase: 'phase1', accountSize: '100000', currentBalance: '100000', maxDrawdown: '10000', profitTarget: '10000', startDate: new Date().toISOString().split('T')[0], status: 'active', cost: '0', monthlyCost: '0' })
   const [propPayouts, setPropPayouts] = useState<any[]>([])
   const [newPayout, setNewPayout] = useState({ accountId: '', amount: '', date: new Date().toISOString().split('T')[0] })
@@ -1928,6 +1930,53 @@ export default function Dashboard() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><span style={{ color: theme.textMuted, fontSize: '10px' }}>Conf:</span>{[1,2,3,4,5].map(n => (<button key={n} onClick={() => setNewTradeExtra({...newTradeExtra, confidence: String(n)})} style={{ width: '22px', height: '22px', borderRadius: '50%', border: 'none', background: parseInt(newTradeExtra.confidence||'3') >= n ? '#fbbf24' : (darkMode ? '#334155' : '#e2e8f0'), cursor: 'pointer', fontSize: '9px', color: parseInt(newTradeExtra.confidence||'3') >= n ? 'white' : theme.textMuted }}>★</button>))}</div>
                         <button onClick={addEnhancedTrade} style={{ ...btnWarning, fontSize: '12px' }}>📝 Log Trade</button>
                       </div>
+                      {/* ACCOUNT SELECTOR ROW */}
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' as const }}>
+                        <span style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>📂 Account:</span>
+                        <select value={newTrade.linkedAccount} onChange={(e) => { if (e.target.value === 'new-prop' || e.target.value === 'new-personal') { setShowNewAccountForm(e.target.value === 'new-prop' ? 'prop' : 'personal'); setInlineNewAccount({ name: '', size: '', type: e.target.value === 'new-prop' ? 'prop' : 'personal' }) } else { setNewTrade({...newTrade, linkedAccount: e.target.value}); setShowNewAccountForm(null) } }} style={{ ...inputStyle, fontSize: '12px', padding: '6px 10px', minWidth: '160px', background: newTrade.linkedAccount ? (darkMode ? '#1e3a2e' : '#ecfdf5') : undefined, borderColor: newTrade.linkedAccount ? theme.success+'60' : theme.inputBorder }}>
+                          <option value="">No Account (unlinked)</option>
+                          {propAccounts.length > 0 && <option disabled>── Prop Firms ──</option>}
+                          {propAccounts.map((a: any) => <option key={a.id} value={String(a.id)}>🏢 {a.firm} - {a.phase} (${parseFloat(a.currentBalance||'0').toLocaleString()})</option>)}
+                          {personalAccounts.length > 0 && <option disabled>── Personal ──</option>}
+                          {personalAccounts.map((a: any) => <option key={'p-'+a.id} value={'personal-'+a.id}>🏦 {a.broker} (${parseFloat(a.currentBalance||'0').toLocaleString()})</option>)}
+                          <option disabled>────────────</option>
+                          <option value="new-prop">➕ New Prop Account...</option>
+                          <option value="new-personal">➕ New Personal Account...</option>
+                        </select>
+                        {newTrade.linkedAccount && <span style={{ color: theme.success, fontSize: '11px', fontWeight: 600 }}>✓ Trade will update this account</span>}
+                      </div>
+                      {/* INLINE NEW ACCOUNT CREATION */}
+                      {showNewAccountForm && (
+                        <div style={{ marginTop: '8px', padding: '12px', background: darkMode ? '#1e293b' : '#f0fdf4', borderRadius: '10px', border: '2px solid ' + theme.success + '40' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ color: theme.success, fontSize: '13px', fontWeight: 700 }}>{showNewAccountForm === 'prop' ? '🏢 New Prop Account' : '🏦 New Personal Account'}</span>
+                            <button onClick={() => setShowNewAccountForm(null)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '16px' }}>✕</button>
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'end', flexWrap: 'wrap' as const }}>
+                            <div><label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '2px' }}>{showNewAccountForm === 'prop' ? 'Firm Name' : 'Broker Name'}</label><input type="text" placeholder={showNewAccountForm === 'prop' ? 'FTMO, MFF...' : 'IC Markets...'} value={inlineNewAccount.name} onChange={(e) => setInlineNewAccount({...inlineNewAccount, name: e.target.value})} style={{ ...inputStyle, width: '120px', fontSize: '12px' }} autoFocus /></div>
+                            <div><label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '2px' }}>Account Size</label><input type="number" placeholder="100000" value={inlineNewAccount.size} onChange={(e) => setInlineNewAccount({...inlineNewAccount, size: e.target.value})} style={{ ...inputStyle, width: '100px', fontSize: '12px' }} /></div>
+                            {showNewAccountForm === 'prop' && (
+                              <div><label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '2px' }}>Phase</label><select id="inlinePhase" style={{ ...inputStyle, fontSize: '12px' }}><option value="phase1">Phase 1</option><option value="phase2">Phase 2</option><option value="funded">Funded</option></select></div>
+                            )}
+                            <button onClick={() => {
+                              if (!inlineNewAccount.name || !inlineNewAccount.size) return
+                              if (showNewAccountForm === 'prop') {
+                                const phase = (document.getElementById('inlinePhase') as HTMLSelectElement)?.value || 'phase1'
+                                const newAcc = { firm: inlineNewAccount.name, type: 'forex', phase, accountSize: inlineNewAccount.size, currentBalance: inlineNewAccount.size, maxDrawdown: String(parseFloat(inlineNewAccount.size)*0.1), profitTarget: String(parseFloat(inlineNewAccount.size)*0.1), startDate: new Date().toISOString().split('T')[0], status: 'active', cost: '0', monthlyCost: '0', id: Date.now() }
+                                setPropAccounts(prev => [...prev, newAcc])
+                                setNewTrade({...newTrade, linkedAccount: String(newAcc.id)})
+                              } else {
+                                const newAcc = { broker: inlineNewAccount.name, accountSize: inlineNewAccount.size, currentBalance: inlineNewAccount.size, type: 'forex', id: Date.now() }
+                                setPersonalAccounts(prev => [...prev, newAcc])
+                                setNewTrade({...newTrade, linkedAccount: 'personal-' + newAcc.id})
+                              }
+                              setShowNewAccountForm(null)
+                              setInlineNewAccount({ name: '', size: '', type: 'prop' })
+                              awardXP(15)
+                            }} style={{ padding: '8px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>✓ Create & Link</button>
+                          </div>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center' }}>
                         <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
                           
@@ -1962,7 +2011,7 @@ export default function Dashboard() {
                               <div style={{ textAlign: 'right' as const }}><div style={{ color: isWin ? theme.success : theme.danger, fontWeight: 800, fontSize: '16px' }}>{isWin ? '+' : ''}${pl.toFixed(2)}</div></div>
                               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '2px' }}>
                                 <label style={{ padding: '4px 6px', background: tradeImages[t.id] ? theme.success+'20' : (darkMode ? '#334155' : '#f1f5f9'), border: '1px solid '+(tradeImages[t.id] ? theme.success+'40' : theme.border), borderRadius: '4px', cursor: 'pointer', fontSize: '10px', color: tradeImages[t.id] ? theme.success : theme.textMuted, textAlign: 'center' as const }}>{tradeImages[t.id] ? '✅📸' : '📸'}<input type="file" accept="image/*" onChange={(e) => handleTradeImageUpload(t.id, e)} style={{ display: 'none' }} /></label>
-                                <select value={t.linkedAccount || ''} onChange={(e) => setTrades(prev => prev.map(tr => tr.id === t.id ? {...tr, linkedAccount: e.target.value} : tr))} style={{ padding: '2px 4px', background: t.linkedAccount ? theme.success+'15' : 'transparent', border: '1px solid '+(t.linkedAccount ? theme.success+'40' : theme.border), borderRadius: '4px', fontSize: '9px', color: t.linkedAccount ? theme.success : theme.textMuted, cursor: 'pointer', maxWidth: '70px' }} title="Link to account"><option value="">📂</option>{propAccounts.map((a: any) => <option key={a.id} value={String(a.id)}>{a.firm}</option>)}{personalAccounts.map((a: any) => <option key={'p-'+a.id} value={'personal-'+a.id}>{a.broker}</option>)}</select>
+                                <select value={t.linkedAccount || ''} onChange={(e) => { const val = e.target.value; setTrades(prev => prev.map(tr => tr.id === t.id ? {...tr, linkedAccount: val} : tr)); if (val) { const pl = parseFloat(t.profitLoss||'0'); const isP = val.startsWith('personal-'); if (isP) { setPersonalAccounts(prev => prev.map(a => a.id===parseInt(val.replace('personal-',''))?{...a,currentBalance:String(parseFloat(a.currentBalance||'0')+pl)}:a)) } else { setPropAccounts(prev => prev.map(a => a.id===parseInt(val)?{...a,currentBalance:String(parseFloat(a.currentBalance||'0')+pl)}:a)) }}}} style={{ padding: '3px 4px', background: t.linkedAccount ? theme.success+'15' : 'transparent', border: '1px solid '+(t.linkedAccount ? theme.success+'40' : theme.border), borderRadius: '4px', fontSize: '9px', color: t.linkedAccount ? theme.success : theme.textMuted, cursor: 'pointer', maxWidth: '80px' }} title="Link to account"><option value="">📂 Link</option>{propAccounts.map((a: any) => <option key={a.id} value={String(a.id)}>🏢 {a.firm}</option>)}{personalAccounts.map((a: any) => <option key={'p-'+a.id} value={'personal-'+a.id}>🏦 {a.broker}</option>)}</select>
                                 <button onClick={() => deleteTrade(t.id)} style={{ padding: '4px 6px', background: theme.danger+'15', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>🗑️</button>
                               </div>
                             </div>
