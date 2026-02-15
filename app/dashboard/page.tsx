@@ -323,6 +323,7 @@ export default function Dashboard() {
   const [newTradePlan, setNewTradePlan] = useState({ instrument: '', direction: 'long', entry: '', stopLoss: '', takeProfit: '', notes: '', date: new Date().toISOString().split('T')[0] })
   const [dailyCheckIn, setDailyCheckIn] = useState<any[]>([])
   const [coachOpen, setCoachOpen] = useState(false)
+  const [prepTab, setPrepTab] = useState<'session'|'mindset'|'risk'|'trades'>('session')
   const [coachMessages, setCoachMessages] = useState<{role:string,content:string}[]>([])
   const [coachInput, setCoachInput] = useState('')
   const [coachLoading, setCoachLoading] = useState(false)
@@ -2019,12 +2020,8 @@ export default function Dashboard() {
 
             {/* === COLLAPSIBLE SECTIONS === */}
             {[
-              { id: 'session', icon: '📋', title: 'Session Planner', color: '#14b8a6' },
-              { id: 'psychology', icon: '🧠', title: 'Trading Psychology', color: theme.purple },
-              { id: 'risk', icon: '🛡️', title: 'Risk Management', color: theme.danger },
+              { id: 'presession', icon: '🧭', title: 'Pre-Session Setup', color: '#14b8a6' },
               { id: 'journal', icon: '📓', title: 'Trade Journal', color: theme.warning },
-              { id: 'planner', icon: '🎯', title: 'Trade Planner', color: '#f59e0b' },
-              { id: 'checkin', icon: '🧘', title: 'Daily Check-In', color: '#f472b6' },
             ].map(sec => (
               <div key={sec.id} style={cardStyle}>
                 <div onClick={() => toggleTradingSection(sec.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
@@ -2033,6 +2030,140 @@ export default function Dashboard() {
                 </div>
 
                 {/* JOURNAL */}
+                {tradingSections[sec.id] && sec.id === 'presession' && (
+                  <div style={{ padding: '16px' }}>
+                    {/* SUB-TABS */}
+                    <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', background: darkMode ? '#0f172a' : '#f1f5f9', borderRadius: '10px', padding: '4px' }}>
+                      {[{id:'session' as const,label:'📋 Session Plan',color:'#14b8a6'},{id:'mindset' as const,label:'🧠 Mindset',color:'#8b5cf6'},{id:'risk' as const,label:'🛡️ Risk',color:theme.danger},{id:'trades' as const,label:'🎯 Trade Plans',color:'#f59e0b'}].map(t => (
+                        <button key={t.id} onClick={() => setPrepTab(t.id)} style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: 'none', background: prepTab === t.id ? t.color : 'transparent', color: prepTab === t.id ? 'white' : theme.textMuted, cursor: 'pointer', fontSize: '12px', fontWeight: 600, transition: 'all 0.2s' }}>{t.label}</button>
+                      ))}
+                    </div>
+
+                    {/* SESSION PLAN TAB */}
+                    {prepTab === 'session' && (
+                      <div>
+                        <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '12px', marginBottom: '16px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
+                            <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Market Bias</label><select value={sessionPlan.bias} onChange={(e) => setSessionPlan({ ...sessionPlan, bias: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }}><option value="bullish">🟢 Bullish</option><option value="bearish">🔴 Bearish</option><option value="neutral">⚪ Neutral / Range</option></select></div>
+                            <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Max Trades Today</label><input type="number" value={sessionPlan.maxTrades} onChange={(e) => setSessionPlan({ ...sessionPlan, maxTrades: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
+                            <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Max Loss Today $</label><input type="number" value={sessionPlan.maxLoss} onChange={(e) => setSessionPlan({ ...sessionPlan, maxLoss: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                            <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Pairs / Instruments</label><input type="text" placeholder="EURUSD, GBPUSD, NAS100..." value={sessionPlan.pairs} onChange={(e) => setSessionPlan({ ...sessionPlan, pairs: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
+                            <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Key Levels</label><input type="text" placeholder="1.0850 support, 1.0920 resistance..." value={sessionPlan.keyLevels} onChange={(e) => setSessionPlan({ ...sessionPlan, keyLevels: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                            <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>News / Events</label><input type="text" placeholder="CPI at 8:30, FOMC at 14:00..." value={sessionPlan.newsEvents} onChange={(e) => setSessionPlan({ ...sessionPlan, newsEvents: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
+                            <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Session Goals</label><input type="text" placeholder="Follow the plan, no revenge trades..." value={sessionPlan.goals} onChange={(e) => setSessionPlan({ ...sessionPlan, goals: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
+                          </div>
+                          <div style={{ marginBottom: '12px' }}><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Notes / Trade Ideas</label><textarea placeholder="What setups am I looking for today? What to avoid?" value={sessionPlan.notes} onChange={(e) => setSessionPlan({ ...sessionPlan, notes: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px', minHeight: '50px', resize: 'vertical' as const }} /></div>
+                          <button onClick={saveSessionPlan} style={{ ...btnPrimary, width: '100%', background: '#14b8a6', fontSize: '12px' }}>📋 Save Session Plan</button>
+                        </div>
+                        {sessionPlans.length > 0 && <div>{sessionPlans.slice().reverse().slice(0,3).map(sp => (<div key={sp.id} style={{ padding: '10px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '8px', marginBottom: '6px', fontSize: '12px' }}><span style={{ color: theme.text, fontWeight: 600 }}>{sp.date}</span> <span style={{ color: sp.bias==='bullish'?theme.success:sp.bias==='bearish'?theme.danger:theme.textMuted }}>{sp.bias==='bullish'?'🟢':'🔴'} {sp.bias}</span>{sp.pairs && <span style={{ color: theme.textMuted, marginLeft: '8px' }}>{sp.pairs}</span>}</div>))}</div>}
+                      </div>
+                    )}
+
+                    {/* MINDSET TAB */}
+                    {prepTab === 'mindset' && (
+                      <div>
+                        {/* Mental State Check */}
+                        <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '12px', marginBottom: '16px' }}>
+                          <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>🧘 Mental State Check</h4>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '12px' }}>
+                            {[{label:'Mood',icon:'😊',key:'mood'},{label:'Energy',icon:'⚡',key:'energy'},{label:'Focus',icon:'🎯',key:'focus'}].map(m => (
+                              <div key={m.key}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '6px', fontWeight: 600 }}>{m.icon} {m.label}</div><div style={{ display: 'flex', gap: '4px' }}>{[1,2,3,4,5].map(n => (<button key={n} onClick={() => setTodayCheckIn({...todayCheckIn, [m.key]: n})} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: (todayCheckIn as any)[m.key]>=n?(['#ef4444','#f97316','#fbbf24','#84cc16','#10b981'][n-1]):(darkMode?'#334155':'#e2e8f0'), cursor: 'pointer', color: (todayCheckIn as any)[m.key]>=n?'white':theme.textMuted, fontWeight: 700, fontSize: '13px' }}>{n}</button>))}</div></div>
+                            ))}
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                            <input type="text" placeholder="How are you feeling? Sleep, stress, concerns?" value={todayCheckIn.notes} onChange={(e) => setTodayCheckIn({...todayCheckIn, notes: e.target.value})} style={{ ...inputStyle, flex: 1, fontSize: '12px' }} />
+                            <button onClick={() => { setDailyCheckIn(prev => [...prev, {...todayCheckIn, id: Date.now()}]); setTodayCheckIn({mood:3,energy:3,focus:3,notes:'',date:new Date().toISOString().split('T')[0]}); awardXP(10) }} style={{ padding: '8px 16px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>Log</button>
+                          </div>
+                          {(() => { const total = todayCheckIn.mood + todayCheckIn.energy + todayCheckIn.focus; return total < 9 ? (<div style={{ padding: '10px', background: theme.danger+'15', borderRadius: '8px', border: '1px solid '+theme.danger+'30' }}><span style={{ color: theme.danger, fontWeight: 700, fontSize: '12px' }}>⚠️ LOW ({total}/15) — Reduce size 50% or sit out. Protecting capital IS a winning trade.</span></div>) : total < 12 ? (<div style={{ padding: '10px', background: theme.warning+'15', borderRadius: '8px' }}><span style={{ color: theme.warning, fontWeight: 700, fontSize: '12px' }}>⚠️ MODERATE ({total}/15) — Trade with caution. Follow plan strictly.</span></div>) : (<div style={{ padding: '10px', background: theme.success+'15', borderRadius: '8px' }}><span style={{ color: theme.success, fontWeight: 700, fontSize: '12px' }}>✅ READY ({total}/15) — Execute your plan with confidence.</span></div>) })()}
+                        </div>
+                        {/* Pre-Trade Checklist */}
+                        <div style={{ marginBottom: '16px' }}>
+                          <h4 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '14px' }}>📋 Pre-Trade Checklist</h4>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                            {['Identified trend direction','Marked key levels','Clear entry trigger (not hoping)','Stop loss at logical level','Risk within my rules','NOT revenge trading or chasing','Can afford to lose this trade','Checked for news events'].map((rule, i) => (
+                              <label key={i} style={{ display: 'flex', gap: '8px', padding: '8px 10px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '6px', cursor: 'pointer', alignItems: 'center', fontSize: '11px', color: theme.text }}><input type="checkbox" style={{ accentColor: theme.success }} />{rule}</label>
+                            ))}
+                          </div>
+                        </div>
+                        {/* Revenge Trade Detector */}
+                        <div style={{ marginBottom: '16px' }}>
+                          <h4 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '14px' }}>🔥 Today{"'"}s Status</h4>
+                          {(() => { const today = new Date().toISOString().split('T')[0]; const todayTrades = trades.filter((t:any) => t.date === today); const todayPL3 = todayTrades.reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0); const consecutiveLosses = todayTrades.slice(-3).filter((t:any) => parseFloat(t.profitLoss||'0') < 0).length; return (<div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                            <div style={{ padding: '10px', background: darkMode?'#1e293b':'#fafafa', borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '9px' }}>Trades</div><div style={{ color: theme.text, fontSize: '18px', fontWeight: 800 }}>{todayTrades.length}</div></div>
+                            <div style={{ padding: '10px', background: consecutiveLosses >= 2 ? theme.danger+'20' : darkMode?'#1e293b':'#fafafa', borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '9px' }}>Consec. Losses</div><div style={{ color: consecutiveLosses >= 2 ? theme.danger : theme.text, fontSize: '18px', fontWeight: 800 }}>{consecutiveLosses}</div>{consecutiveLosses >= 2 && <div style={{ color: theme.danger, fontSize: '9px', fontWeight: 700 }}>STOP</div>}</div>
+                            <div style={{ padding: '10px', background: darkMode?'#1e293b':'#fafafa', borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '9px' }}>P/L</div><div style={{ color: todayPL3 >= 0 ? theme.success : theme.danger, fontSize: '18px', fontWeight: 800 }}>{todayPL3 >= 0?'+':''}${todayPL3.toFixed(0)}</div></div>
+                            <div style={{ padding: '10px', background: darkMode?'#1e293b':'#fafafa', borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '9px' }}>Win Rate</div><div style={{ color: theme.text, fontSize: '18px', fontWeight: 800 }}>{todayTrades.length > 0 ? ((todayTrades.filter((t:any) => parseFloat(t.profitLoss||'0') > 0).length / todayTrades.length) * 100).toFixed(0) : 0}%</div></div>
+                          </div>) })()}
+                        </div>
+                        {/* Emotion patterns */}
+                        {trades.length > 0 && (<div>
+                          <h4 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '14px' }}>📊 Emotion Patterns</h4>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                            {(() => { const emotionIcons2: {[k:string]:string} = {disciplined:'🎯',confident:'💪',neutral:'😐',anxious:'😰',fomo:'🤯',revenge:'😤',greedy:'🤑',fearful:'😨'}; return ['disciplined','confident','fomo','revenge','anxious','fearful'].map(em => { const et = trades.filter((t:any) => t.emotion === em); const ep = et.reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0); return et.length > 0 ? (<div key={em} style={{ padding: '8px', background: darkMode?'#1e293b':'#fafafa', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: '12px' }}>{emotionIcons2[em]} <span style={{ textTransform: 'capitalize' as const }}>{em}</span> <span style={{ color: theme.textMuted }}>({et.length})</span></span><span style={{ color: ep >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '12px' }}>{ep >= 0?'+':''}${ep.toFixed(0)}</span></div>) : null }) })()}
+                          </div>
+                        </div>)}
+                        {/* Check-in history */}
+                        {dailyCheckIn.length > 0 && (<div style={{ marginTop: '12px' }}><h4 style={{ margin: '0 0 6px 0', color: theme.text, fontSize: '13px' }}>Recent Check-ins</h4>{dailyCheckIn.slice().reverse().slice(0,5).map((ci:any) => { const dp=trades.filter((t:any)=>t.date===ci.date).reduce((s:number,t:any)=>s+parseFloat(t.profitLoss||'0'),0); const dc=trades.filter((t:any)=>t.date===ci.date).length; return(<div key={ci.id} style={{display:'flex',justifyContent:'space-between',padding:'6px 10px',background:darkMode?'#1e293b':'#fafafa',borderRadius:'6px',marginBottom:'3px',fontSize:'11px'}}><span style={{color:theme.textMuted}}>{ci.date} — 😊{ci.mood} ⚡{ci.energy} 🎯{ci.focus}</span>{dc>0?<span style={{color:dp>=0?theme.success:theme.danger,fontWeight:700}}>{dp>=0?'+':''}${dp.toFixed(0)}</span>:<span style={{color:theme.textMuted}}>—</span>}</div>)})}</div>)}
+                      </div>
+                    )}
+
+                    {/* RISK TAB */}
+                    {prepTab === 'risk' && (
+                      <div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                          {[{l:'Max Daily Loss',k:'maxDailyLoss',c:theme.danger},{l:'Max Weekly Loss',k:'maxWeeklyLoss',c:theme.danger},{l:'Max Daily Trades',k:'maxDailyTrades',c:theme.warning},{l:'Risk Per Trade %',k:'maxRiskPerTrade',c:theme.accent},{l:'Max Positions',k:'maxOpenPositions',c:theme.purple},{l:'Max Monthly Loss',k:'maxMonthlyLoss',c:'#dc2626'}].map((f,i) => (<div key={i} style={{ padding: '12px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '10px', border: '1px solid ' + theme.border }}><label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '4px', textTransform: 'uppercase' as const }}>{f.l}</label><input type="number" value={(riskLimits as any)[f.k] || ''} onChange={(e) => setRiskLimits(prev => ({ ...prev, [f.k]: e.target.value }))} style={{ ...inputStyle, width: '100%', fontSize: '16px', fontWeight: 700, textAlign: 'center' as const, background: 'transparent', border: '2px solid '+f.c+'40', color: f.c }} /></div>))}
+                        </div>
+                        {(() => {
+                          const allAccounts = [...propAccounts.map(a => ({name: a.firm+' ('+a.phase+')', balance: parseFloat(a.currentBalance||'0')})), ...personalAccounts.map(a => ({name: a.broker+' (Personal)', balance: parseFloat(a.currentBalance||'0')}))]
+                          const accountBal = allAccounts.length > 0 ? allAccounts[0].balance : parseFloat(forexProp.currentBalance || forexProp.accountSize || '100000')
+                          const riskPct = parseFloat(riskLimits.maxRiskPerTrade || '2') / 100
+                          const riskAmount = accountBal * riskPct
+                          const rrRatios = [1, 1.5, 2, 3, 5]
+                          return (<div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                              <div style={{ padding: '16px', background: theme.accent+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Balance</div><div style={{ color: theme.text, fontSize: '22px', fontWeight: 900 }}>${accountBal.toLocaleString()}</div></div>
+                              <div style={{ padding: '16px', background: theme.danger+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Risk/Trade ({riskLimits.maxRiskPerTrade}%)</div><div style={{ color: theme.danger, fontSize: '22px', fontWeight: 900 }}>${riskAmount.toFixed(0)}</div></div>
+                              <div style={{ padding: '16px', background: theme.success+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Max Daily Exposure</div><div style={{ color: theme.success, fontSize: '22px', fontWeight: 900 }}>${(riskAmount * parseInt(riskLimits.maxDailyTrades || '5')).toFixed(0)}</div></div>
+                            </div>
+                            <h4 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '14px' }}>📐 R:R & Win Rate Cheatsheet</h4>
+                            <div style={{ overflowX: 'auto' as const, marginBottom: '16px' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                                <thead><tr style={{ background: darkMode ? '#0f172a' : '#1e293b' }}><th style={{ padding: '8px', color: '#fbbf24', fontWeight: 800, textAlign: 'left' as const }}>R:R</th>{[20,30,40,50,60,70].map(wr => (<th key={wr} style={{ padding: '8px', color: '#fbbf24', fontWeight: 800, textAlign: 'center' as const }}>{wr}%</th>))}</tr></thead>
+                                <tbody>{[{rr:'1:1',r:1},{rr:'1:2',r:2},{rr:'1:3',r:3},{rr:'1:4',r:4},{rr:'1:5',r:5}].map(row => (<tr key={row.rr}><td style={{ padding: '6px 8px', color: theme.text, fontWeight: 800, fontSize: '13px', borderBottom: '1px solid '+theme.border }}>{row.rr}</td>{[20,30,40,50,60,70].map(wr => { const ev = (wr/100*row.r)-((100-wr)/100*1); const res = ev>0.05?'PROFIT':ev>-0.05?'EVEN':'LOSS'; const bg = res==='PROFIT'?'#16a34a':res==='EVEN'?(darkMode?'#334155':'#d1d5db'):'#b91c1c'; return (<td key={wr} style={{ padding: '6px', textAlign: 'center' as const, background: bg, color: 'white', fontWeight: 700, fontSize: '10px' }}>{res}<br/><span style={{ fontSize: '8px', opacity: 0.8 }}>{ev>=0?'+':''}{(riskAmount*ev*10).toFixed(0)}/10t</span></td>)})}</tr>))}</tbody>
+                              </table>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+                              {rrRatios.map(rr => (<div key={rr} style={{ padding: '10px', background: darkMode?'#1e293b':'#fafafa', borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '9px' }}>Risk ${riskAmount.toFixed(0)}</div><div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700 }}>1:{rr}</div><div style={{ color: theme.success, fontSize: '16px', fontWeight: 800 }}>+${(riskAmount * rr).toFixed(0)}</div></div>))}
+                            </div>
+                          </div>)
+                        })()}
+                      </div>
+                    )}
+
+                    {/* TRADE PLANS TAB */}
+                    {prepTab === 'trades' && (
+                      <div>
+                        <p style={{ color: theme.textMuted, fontSize: '12px', margin: '0 0 12px 0' }}>Plan specific trades before your session. Compare planned vs actual.</p>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '12px', alignItems: 'end' }}>
+                          <div><label style={{ color: theme.textMuted, fontSize: '9px', display: 'block' }}>Pair</label><input type="text" placeholder="EURUSD" value={newTradePlan.instrument} onChange={(e) => setNewTradePlan({...newTradePlan, instrument: e.target.value})} style={{ ...inputStyle, width: '80px', fontSize: '12px' }} /></div>
+                          <div><label style={{ color: theme.textMuted, fontSize: '9px', display: 'block' }}>Dir</label><select value={newTradePlan.direction} onChange={(e) => setNewTradePlan({...newTradePlan, direction: e.target.value})} style={{ ...inputStyle, fontSize: '12px' }}><option value="long">Long</option><option value="short">Short</option></select></div>
+                          <div><label style={{ color: theme.textMuted, fontSize: '9px', display: 'block' }}>Entry</label><input type="text" placeholder="1.0850" value={newTradePlan.entry} onChange={(e) => setNewTradePlan({...newTradePlan, entry: e.target.value})} style={{ ...inputStyle, width: '70px', fontSize: '12px' }} /></div>
+                          <div><label style={{ color: theme.textMuted, fontSize: '9px', display: 'block' }}>SL</label><input type="text" placeholder="1.0820" value={newTradePlan.stopLoss} onChange={(e) => setNewTradePlan({...newTradePlan, stopLoss: e.target.value})} style={{ ...inputStyle, width: '70px', fontSize: '12px' }} /></div>
+                          <div><label style={{ color: theme.textMuted, fontSize: '9px', display: 'block' }}>TP</label><input type="text" placeholder="1.0920" value={newTradePlan.takeProfit} onChange={(e) => setNewTradePlan({...newTradePlan, takeProfit: e.target.value})} style={{ ...inputStyle, width: '70px', fontSize: '12px' }} /></div>
+                          <div><label style={{ color: theme.textMuted, fontSize: '9px', display: 'block' }}>Notes</label><input type="text" placeholder="Setup reason" value={newTradePlan.notes} onChange={(e) => setNewTradePlan({...newTradePlan, notes: e.target.value})} style={{ ...inputStyle, width: '100px', fontSize: '12px' }} /></div>
+                          <button onClick={() => { if (!newTradePlan.instrument) return; setTradePlans(prev => [...prev, {...newTradePlan, id: Date.now()}]); setNewTradePlan({instrument:'',direction:'long',entry:'',stopLoss:'',takeProfit:'',notes:'',date:new Date().toISOString().split('T')[0]}); awardXP(10) }} style={{ padding: '8px 12px', background: theme.warning, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>📝 Plan</button>
+                        </div>
+                        {tradePlans.length > 0 && (<div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>{tradePlans.map(plan => { const actual = trades.find((t: any) => t.instrument && plan.instrument && t.instrument.toLowerCase()===plan.instrument.toLowerCase() && t.date===plan.date); return (<div key={plan.id} style={{ padding: '10px 14px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '8px', border: '1px solid '+(actual?theme.success:theme.warning)+'30', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div><span style={{ color: theme.text, fontWeight: 700, fontSize: '13px' }}>{plan.instrument}</span><span style={{ color: plan.direction==='long'?theme.success:theme.danger, fontSize: '11px', marginLeft: '6px' }}>{plan.direction.toUpperCase()}</span><span style={{ color: theme.textMuted, fontSize: '10px', marginLeft: '8px' }}>E:{plan.entry} SL:{plan.stopLoss} TP:{plan.takeProfit}</span></div><div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>{actual ? <span style={{ padding: '2px 8px', background: parseFloat(actual.profitLoss||'0')>=0?theme.success+'20':theme.danger+'20', color: parseFloat(actual.profitLoss||'0')>=0?theme.success:theme.danger, borderRadius: '6px', fontSize: '11px', fontWeight: 700 }}>Result: {parseFloat(actual.profitLoss||'0')>=0?'+':''}${parseFloat(actual.profitLoss||'0').toFixed(0)}</span> : <span style={{ padding: '2px 8px', background: theme.warning+'20', color: theme.warning, borderRadius: '6px', fontSize: '11px' }}>Pending</span>}<button onClick={() => setTradePlans(prev => prev.filter(p => p.id!==plan.id))} style={{ background:'none', border:'none', color:theme.danger, cursor:'pointer', fontSize:'14px' }}>x</button></div></div>) })}</div>)}
+                        {tradePlans.length === 0 && <div style={{ textAlign: 'center' as const, padding: '20px', color: theme.textMuted, fontSize: '12px' }}>No trades planned yet. Plan before you trade!</div>}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {tradingSections[sec.id] && sec.id === 'journal' && (
                   <div style={{ marginTop: '20px' }}>
                     <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '16px' }}>
@@ -2201,60 +2332,7 @@ export default function Dashboard() {
                 )}
 
                 {/* PSYCHOLOGY */}
-                {tradingSections[sec.id] && sec.id === 'psychology' && (
-                  <div style={{ padding: '16px' }}>
-                    {/* EMOTIONAL STATE TRACKER */}
-                    <div style={{ marginBottom: '20px' }}>
-                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>🧘 Pre-Session Mental Check</h4>
-                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '12px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '12px' }}>
-                          {[{label:'Mood',icon:'😊',key:'mood'},{label:'Energy',icon:'⚡',key:'energy'},{label:'Focus',icon:'🎯',key:'focus'}].map(m => (
-                            <div key={m.key}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '6px', fontWeight: 600 }}>{m.icon} {m.label}</div><div style={{ display: 'flex', gap: '4px' }}>{[1,2,3,4,5].map(n => (<button key={n} onClick={() => setTodayCheckIn({...todayCheckIn, [m.key]: n})} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: (todayCheckIn as any)[m.key]>=n?(['#ef4444','#f97316','#fbbf24','#84cc16','#10b981'][n-1]):(darkMode?'#334155':'#e2e8f0'), cursor: 'pointer', color: (todayCheckIn as any)[m.key]>=n?'white':theme.textMuted, fontWeight: 700, fontSize: '13px' }}>{n}</button>))}</div></div>
-                          ))}
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                          <input type="text" placeholder="How are you feeling? Any life stress, sleep quality, or concerns?" value={todayCheckIn.notes} onChange={(e) => setTodayCheckIn({...todayCheckIn, notes: e.target.value})} style={{ ...inputStyle, flex: 1, fontSize: '12px' }} />
-                          <button onClick={() => { setDailyCheckIn(prev => [...prev, {...todayCheckIn, id: Date.now()}]); setTodayCheckIn({mood:3,energy:3,focus:3,notes:'',date:new Date().toISOString().split('T')[0]}); awardXP(10) }} style={{ padding: '8px 16px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>Log State</button>
-                        </div>
-                        {(() => { const total = todayCheckIn.mood + todayCheckIn.energy + todayCheckIn.focus; const avg = total / 3; return total < 9 ? (<div style={{ padding: '10px 14px', background: theme.danger+'15', borderRadius: '8px', border: '1px solid '+theme.danger+'30' }}><div style={{ color: theme.danger, fontWeight: 700, fontSize: '13px' }}>⚠️ LOW READINESS — Score: {total}/15</div><div style={{ color: theme.danger, fontSize: '12px', marginTop: '4px' }}>Consider: Reduce position size by 50%, set strict max 2 trades, or sit out entirely. Protecting capital IS a winning trade.</div></div>) : total < 12 ? (<div style={{ padding: '10px 14px', background: theme.warning+'15', borderRadius: '8px', border: '1px solid '+theme.warning+'30' }}><div style={{ color: theme.warning, fontWeight: 700, fontSize: '13px' }}>⚠️ MODERATE — Score: {total}/15</div><div style={{ color: theme.warning, fontSize: '12px', marginTop: '4px' }}>Trade with caution. Reduce size if needed. Follow your plan strictly.</div></div>) : (<div style={{ padding: '10px 14px', background: theme.success+'15', borderRadius: '8px', border: '1px solid '+theme.success+'30' }}><div style={{ color: theme.success, fontWeight: 700, fontSize: '13px' }}>✅ READY — Score: {total}/15</div><div style={{ color: theme.success, fontSize: '12px', marginTop: '4px' }}>Good mental state. Execute your plan with confidence.</div></div>) })()}
-                      </div>
-                    </div>
-                    {/* PRE-TRADE RULES COMMITMENT */}
-                    <div style={{ marginBottom: '20px' }}>
-                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📋 Pre-Trade Checklist</h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                        {['I have identified the trend direction','I have marked key support/resistance levels','My entry has a clear trigger (not just hoping)','Stop loss is placed at a logical level','Risk is within my rules (max % per trade)','I am NOT revenge trading or chasing','I can afford to lose this trade','I have checked for upcoming news events'].map((rule, i) => (
-                          <label key={i} style={{ display: 'flex', gap: '8px', padding: '10px 12px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '8px', cursor: 'pointer', alignItems: 'center', fontSize: '12px', color: theme.text, border: '1px solid ' + theme.border }}>
-                            <input type="checkbox" style={{ width: '16px', height: '16px', accentColor: theme.success }} />{rule}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                    {/* REVENGE TRADE DETECTOR */}
-                    <div style={{ marginBottom: '20px' }}>
-                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>🔥 Revenge Trade Detector</h4>
-                      {(() => { const today = new Date().toISOString().split('T')[0]; const todayTrades = trades.filter((t:any) => t.date === today); const losses = todayTrades.filter((t:any) => parseFloat(t.profitLoss||'0') < 0); const lastThree = todayTrades.slice(-3).map((t:any) => parseFloat(t.profitLoss||'0')); const consecutiveLosses = lastThree.filter(p => p < 0).length; const todayPL = todayTrades.reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0); return (<div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                        <div style={{ padding: '12px', background: todayTrades.length >= parseInt(riskLimits.maxDailyTrades||'5') ? theme.danger+'20' : darkMode?'#1e293b':'#fafafa', borderRadius: '10px', textAlign: 'center' as const, border: '1px solid '+(todayTrades.length >= parseInt(riskLimits.maxDailyTrades||'5') ? theme.danger : theme.border) }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>Trades Today</div><div style={{ color: todayTrades.length >= parseInt(riskLimits.maxDailyTrades||'5') ? theme.danger : theme.text, fontSize: '20px', fontWeight: 800 }}>{todayTrades.length}</div></div>
-                        <div style={{ padding: '12px', background: consecutiveLosses >= 3 ? theme.danger+'20' : darkMode?'#1e293b':'#fafafa', borderRadius: '10px', textAlign: 'center' as const, border: '1px solid '+(consecutiveLosses >= 3 ? theme.danger : theme.border) }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>Recent Losses</div><div style={{ color: consecutiveLosses >= 2 ? theme.danger : theme.text, fontSize: '20px', fontWeight: 800 }}>{consecutiveLosses}/3</div>{consecutiveLosses >= 2 && <div style={{ color: theme.danger, fontSize: '9px', fontWeight: 700 }}>STOP TRADING</div>}</div>
-                        <div style={{ padding: '12px', background: todayPL < -parseFloat(riskLimits.maxDailyLoss||'999999') ? theme.danger+'20' : darkMode?'#1e293b':'#fafafa', borderRadius: '10px', textAlign: 'center' as const, border: '1px solid '+theme.border }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>Today P/L</div><div style={{ color: todayPL >= 0 ? theme.success : theme.danger, fontSize: '20px', fontWeight: 800 }}>{todayPL >= 0 ? '+' : ''}${todayPL.toFixed(0)}</div></div>
-                        <div style={{ padding: '12px', background: darkMode?'#1e293b':'#fafafa', borderRadius: '10px', textAlign: 'center' as const, border: '1px solid '+theme.border }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>Win Rate Today</div><div style={{ color: theme.text, fontSize: '20px', fontWeight: 800 }}>{todayTrades.length > 0 ? ((todayTrades.filter((t:any) => parseFloat(t.profitLoss||'0') > 0).length / todayTrades.length) * 100).toFixed(0) : 0}%</div></div>
-                      </div>) })()}
-                    </div>
-                    {/* PSYCHOLOGY PATTERNS FROM DATA */}
-                    <div style={{ marginBottom: '20px' }}>
-                      <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📊 Your Psychology Patterns</h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                        {(() => { const emotions = ['disciplined','confident','neutral','anxious','fomo','revenge','greedy','fearful']; const emotionIcons: {[k:string]:string} = {disciplined:'🎯',confident:'💪',neutral:'😐',anxious:'😰',fomo:'🤯',revenge:'😤',greedy:'🤑',fearful:'😨'}; return emotions.map(em => { const emTrades = trades.filter((t:any) => t.emotion === em); const emPL = emTrades.reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0); const emWR = emTrades.length > 0 ? (emTrades.filter((t:any) => parseFloat(t.profitLoss||'0') > 0).length / emTrades.length * 100) : 0; return emTrades.length > 0 ? (<div key={em} style={{ padding: '10px', background: darkMode?'#1e293b':'#fafafa', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div><span style={{ fontSize: '14px' }}>{emotionIcons[em]||''}</span><span style={{ color: theme.text, fontWeight: 600, fontSize: '12px', marginLeft: '6px', textTransform: 'capitalize' as const }}>{em}</span><span style={{ color: theme.textMuted, fontSize: '10px', marginLeft: '6px' }}>{emTrades.length}t</span></div><div style={{ textAlign: 'right' as const }}><div style={{ color: emPL >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '13px' }}>{emPL >= 0 ? '+' : ''}${emPL.toFixed(0)}</div><div style={{ color: emWR >= 50 ? theme.success : theme.danger, fontSize: '10px' }}>{emWR.toFixed(0)}% WR</div></div></div>) : null }) })()}
-                      </div>
-                      {trades.filter((t:any) => t.emotion === 'revenge' || t.emotion === 'fomo').length > 0 && (<div style={{ marginTop: '8px', padding: '10px', background: theme.danger+'10', borderRadius: '8px', border: '1px solid '+theme.danger+'20' }}><div style={{ color: theme.danger, fontSize: '12px', fontWeight: 700 }}>💡 Insight: Your FOMO/Revenge trades have cost you ${Math.abs(trades.filter((t:any) => t.emotion === 'revenge' || t.emotion === 'fomo').reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0)).toFixed(0)}. Eliminating these would improve your results significantly.</div></div>)}
-                    </div>
-                    {/* MENTAL STATE HISTORY with P/L correlation */}
-                    {dailyCheckIn.length > 0 && (<div>
-                      <h4 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '14px' }}>📈 Mental State vs P/L</h4>
-                      {dailyCheckIn.slice().reverse().slice(0,7).map((ci:any) => { const dp = trades.filter((t:any) => t.date === ci.date).reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0); const dc = trades.filter((t:any) => t.date === ci.date).length; const avg = ((ci.mood+ci.energy+ci.focus)/3).toFixed(1); return (<div key={ci.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: darkMode?'#1e293b':'#fafafa', borderRadius: '6px', marginBottom: '4px', fontSize: '12px' }}><div><span style={{ color: theme.textMuted }}>{ci.date}</span><span style={{ marginLeft: '8px' }}>😊{ci.mood} ⚡{ci.energy} 🎯{ci.focus}</span><span style={{ color: parseFloat(avg) >= 3.5 ? theme.success : parseFloat(avg) >= 2.5 ? theme.warning : theme.danger, fontWeight: 700, marginLeft: '6px' }}>Avg: {avg}</span></div><div>{dc > 0 ? <span style={{ color: dp >= 0 ? theme.success : theme.danger, fontWeight: 700 }}>{dp >= 0 ? '+' : ''}${dp.toFixed(0)} ({dc}t)</span> : <span style={{ color: theme.textMuted }}>No trades</span>}</div></div>) })}
-                    </div>)}
-                  </div>
-                )}
+                
 
                 {/* PROP FIRM DASHBOARD */}
                 {tradingSections[sec.id] && sec.id === 'props' && (
@@ -2353,118 +2431,12 @@ export default function Dashboard() {
                 )}
 
                 {/* RISK MANAGEMENT */}
-                {tradingSections[sec.id] && sec.id === 'risk' && (
-                  <div style={{ marginTop: '20px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
-                      {[{l:'Max Daily Loss',k:'maxDailyLoss',prefix:'$',c:theme.danger},{l:'Max Weekly Loss',k:'maxWeeklyLoss',prefix:'$',c:theme.danger},{l:'Max Daily Trades',k:'maxDailyTrades',prefix:'',c:theme.warning},{l:'Risk Per Trade %',k:'maxRiskPerTrade',prefix:'',c:theme.accent},{l:'Max Open Positions',k:'maxOpenPositions',prefix:'',c:theme.purple},{l:'Max Monthly Loss',k:'maxMonthlyLoss',prefix:'$',c:'#dc2626'}].map((f,i) => (<div key={i} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '6px', textTransform: 'uppercase' as const }}>{f.l}</label><input type="number" value={(riskLimits as any)[f.k] || ''} onChange={(e) => setRiskLimits(prev => ({ ...prev, [f.k]: e.target.value }))} style={{ ...inputStyle, width: '100%', fontSize: '16px', fontWeight: 700, textAlign: 'center' as const, background: 'transparent', border: '2px solid '+f.c+'40', color: f.c }} /></div>))}
-                    </div>
-                    <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>📊 Position Size Calculator</h4>
-                    {(() => {
-                      const allAccounts = [...propAccounts.map(a => ({name: a.firm+' ('+a.phase+')', balance: parseFloat(a.currentBalance||'0')})), ...personalAccounts.map(a => ({name: a.broker+' (Personal)', balance: parseFloat(a.currentBalance||'0')}))]
-                      const accountBal = allAccounts.length > 0 ? allAccounts[0].balance : parseFloat(forexProp.currentBalance || forexProp.accountSize || '100000')
-                      const riskPct = parseFloat(riskLimits.maxRiskPerTrade || '2') / 100
-                      const riskAmount = accountBal * riskPct
-                      const rrRatios = [1, 1.5, 2, 3, 5]
-                      return (<div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
-                          <div style={{ padding: '20px', background: 'linear-gradient(135deg, '+theme.accent+'15, '+theme.purple+'15)', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid '+theme.accent+'30' }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>Account Balance</div><div style={{ color: theme.text, fontSize: '28px', fontWeight: 900 }}>${accountBal.toLocaleString()}</div>{allAccounts.length > 0 && <div style={{ color: theme.textMuted, fontSize: '10px' }}>{allAccounts[0].name}</div>}</div>
-                          <div style={{ padding: '20px', background: 'linear-gradient(135deg, '+theme.danger+'15, '+theme.warning+'15)', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid '+theme.danger+'30' }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>Risk per Trade ({riskLimits.maxRiskPerTrade}%)</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 900 }}>${riskAmount.toFixed(0)}</div></div>
-                          <div style={{ padding: '20px', background: 'linear-gradient(135deg, '+theme.success+'15, #fbbf2415)', borderRadius: '16px', textAlign: 'center' as const, border: '1px solid '+theme.success+'30' }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>Max Daily Exposure</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 900 }}>${(riskAmount * parseInt(riskLimits.maxDailyTrades || '5')).toFixed(0)}</div></div>
-                        </div>
-                        <h4 style={{ margin: '16px 0 12px 0', color: theme.text, fontSize: '14px' }}>📐 Risk:Reward & Win Rate Cheatsheet</h4>
-                        <div style={{ overflowX: 'auto' as const, marginBottom: '16px' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                            <thead>
-                              <tr style={{ background: darkMode ? '#0f172a' : '#1e293b' }}>
-                                <th style={{ padding: '10px', color: '#fbbf24', fontWeight: 800, textAlign: 'left' as const, borderBottom: '2px solid #fbbf24' }}>R:R</th>
-                                {[20,30,40,50,60,70].map(wr => (<th key={wr} style={{ padding: '10px', color: '#fbbf24', fontWeight: 800, textAlign: 'center' as const, borderBottom: '2px solid #fbbf24' }}>{wr}%</th>))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {[{rr:'1:1',r:1},{rr:'1:2',r:2},{rr:'1:3',r:3},{rr:'1:4',r:4},{rr:'1:5',r:5}].map(row => (
-                                <tr key={row.rr}>
-                                  <td style={{ padding: '8px 10px', color: theme.text, fontWeight: 800, fontSize: '14px', borderBottom: '1px solid '+theme.border }}>{row.rr}</td>
-                                  {[20,30,40,50,60,70].map(wr => {
-                                    const winPct = wr/100; const losePct = 1-winPct
-                                    const expectancyVal = (winPct * row.r) - (losePct * 1)
-                                    const result = expectancyVal > 0.05 ? 'PROFIT' : expectancyVal > -0.05 ? 'BREAK EVEN' : 'LOSS'
-                                    const bg = result === 'PROFIT' ? '#16a34a' : result === 'BREAK EVEN' ? (darkMode ? '#334155' : '#d1d5db') : '#b91c1c'
-                                    const dollarResult = riskAmount * expectancyVal * 10
-                                    return (<td key={wr} style={{ padding: '8px', textAlign: 'center' as const, background: bg, color: 'white', fontWeight: 700, fontSize: '11px', borderBottom: '1px solid rgba(0,0,0,0.2)' }}>{result}<br/><span style={{ fontSize: '9px', opacity: 0.8 }}>{expectancyVal >= 0 ? '+' : ''}{dollarResult.toFixed(0)}/10t</span></td>)
-                                  })}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                          <div style={{ marginTop: '8px', fontSize: '10px', color: theme.textMuted, textAlign: 'center' as const }}>Based on ${riskAmount.toFixed(0)} risk per trade. Values show expected P/L over 10 trades.</div>
-                        </div>
-                        <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>💰 Your R:R Payouts</h4>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', marginBottom: '16px' }}>
-                          {rrRatios.map(rr => (<div key={rr} style={{ padding: '12px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '10px', textAlign: 'center' as const, border: '1px solid ' + theme.border }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>Risk ${riskAmount.toFixed(0)}</div><div style={{ color: theme.accent, fontSize: '12px', fontWeight: 700, margin: '4px 0' }}>1:{rr}</div><div style={{ color: theme.success, fontSize: '18px', fontWeight: 800 }}>+${(riskAmount * rr).toFixed(0)}</div></div>))}
-                        </div>
-                        <h4 style={{ margin: '16px 0 12px 0', color: theme.text, fontSize: '14px' }}>📋 Today{"'"}s Risk Status</h4>
-                        {(() => { const today = new Date().toISOString().split('T')[0]; const todayTrades = trades.filter((t:any) => t.date === today); const todayPL = todayTrades.reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0); const maxDaily = parseFloat(riskLimits.maxDailyLoss||'0'); const maxTrades = parseInt(riskLimits.maxDailyTrades||'5'); return (<div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}><div style={{ padding: '12px', borderRadius: '10px', textAlign: 'center' as const, background: todayPL < 0 && Math.abs(todayPL) >= maxDaily ? theme.danger+'20' : theme.success+'15', border: '1px solid ' + (todayPL < 0 && Math.abs(todayPL) >= maxDaily ? theme.danger : theme.success) + '30' }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>Today{"'"}s P/L</div><div style={{ color: todayPL >= 0 ? theme.success : theme.danger, fontSize: '20px', fontWeight: 800 }}>{todayPL >= 0 ? '+' : ''}${todayPL.toFixed(0)}</div>{maxDaily > 0 && todayPL < 0 && <div style={{ color: theme.danger, fontSize: '10px' }}>{((Math.abs(todayPL)/maxDaily)*100).toFixed(0)}% of daily limit</div>}</div><div style={{ padding: '12px', borderRadius: '10px', textAlign: 'center' as const, background: todayTrades.length >= maxTrades ? theme.warning+'20' : darkMode?'#1e293b':'#fafafa', border: '1px solid ' + theme.border }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>Trades Today</div><div style={{ color: todayTrades.length >= maxTrades ? theme.warning : theme.text, fontSize: '20px', fontWeight: 800 }}>{todayTrades.length}/{maxTrades}</div></div><div style={{ padding: '12px', borderRadius: '10px', textAlign: 'center' as const, background: darkMode?'#1e293b':'#fafafa', border: '1px solid ' + theme.border }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>Remaining Risk</div><div style={{ color: theme.success, fontSize: '20px', fontWeight: 800 }}>${(maxDaily > 0 ? Math.max(0, maxDaily - Math.abs(Math.min(0, todayPL))) : riskAmount * (maxTrades - todayTrades.length)).toFixed(0)}</div></div></div>) })()}
-                      </div>)
-                    })()}
-                  </div>
-                )}
+                
 
                 {/* SESSION PLANNER */}
-                {tradingSections[sec.id] && sec.id === 'session' && (
-                  <div style={{ marginTop: '20px' }}>
-                    <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '16px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
-                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Market Bias</label><select value={sessionPlan.bias} onChange={(e) => setSessionPlan({ ...sessionPlan, bias: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }}><option value="bullish">🟢 Bullish</option><option value="bearish">🔴 Bearish</option><option value="neutral">⚪ Neutral / Range</option></select></div>
-                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Max Trades Today</label><input type="number" value={sessionPlan.maxTrades} onChange={(e) => setSessionPlan({ ...sessionPlan, maxTrades: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
-                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Max Loss Today $</label><input type="number" value={sessionPlan.maxLoss} onChange={(e) => setSessionPlan({ ...sessionPlan, maxLoss: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Pairs / Instruments</label><input type="text" placeholder="EURUSD, GBPUSD, NAS100..." value={sessionPlan.pairs} onChange={(e) => setSessionPlan({ ...sessionPlan, pairs: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
-                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Key Levels</label><input type="text" placeholder="1.0850 support, 1.0920 resistance..." value={sessionPlan.keyLevels} onChange={(e) => setSessionPlan({ ...sessionPlan, keyLevels: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>News / Events</label><input type="text" placeholder="CPI at 8:30, FOMC at 14:00..." value={sessionPlan.newsEvents} onChange={(e) => setSessionPlan({ ...sessionPlan, newsEvents: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
-                        <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Session Goals</label><input type="text" placeholder="Follow the plan, no revenge trades..." value={sessionPlan.goals} onChange={(e) => setSessionPlan({ ...sessionPlan, goals: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px' }} /></div>
-                      </div>
-                      <div style={{ marginBottom: '12px' }}><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Notes / Trade Ideas</label><textarea placeholder="What setups am I looking for today? What to avoid?" value={sessionPlan.notes} onChange={(e) => setSessionPlan({ ...sessionPlan, notes: e.target.value })} style={{ ...inputStyle, width: '100%', fontSize: '12px', minHeight: '60px', resize: 'vertical' as const }} /></div>
-                      <button onClick={saveSessionPlan} style={{ ...btnPrimary, width: '100%', background: '#14b8a6', fontSize: '12px' }}>📋 Save Session Plan</button>
-                    </div>
-                    {sessionPlans.length > 0 && <div><h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '14px' }}>Previous Plans</h4>{sessionPlans.slice().reverse().slice(0,5).map(sp => (<div key={sp.id} style={{ padding: '12px 16px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '10px', marginBottom: '8px', border: '1px solid ' + theme.border }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}><span style={{ color: theme.text, fontWeight: 600 }}>{sp.date}</span><span style={{ padding: '2px 8px', background: sp.bias === 'bullish' ? theme.success+'20' : sp.bias === 'bearish' ? theme.danger+'20' : theme.textMuted+'20', color: sp.bias === 'bullish' ? theme.success : sp.bias === 'bearish' ? theme.danger : theme.textMuted, borderRadius: '4px', fontSize: '11px' }}>{sp.bias === 'bullish' ? '🟢' : sp.bias === 'bearish' ? '🔴' : '⚪'} {sp.bias}</span></div>{sp.pairs && <div style={{ fontSize: '12px', color: theme.textMuted }}>📊 {sp.pairs}</div>}{sp.keyLevels && <div style={{ fontSize: '12px', color: theme.textMuted }}>📏 {sp.keyLevels}</div>}{sp.goals && <div style={{ fontSize: '12px', color: theme.purple }}>🎯 {sp.goals}</div>}</div>))}</div>}
-                  </div>
-                )}
-                {tradingSections[sec.id] && sec.id === 'planner' && (
-                  <div style={{ padding: '16px' }}>
-                    <p style={{ color: theme.textMuted, fontSize: '12px', margin: '0 0 12px 0' }}>Plan trades before sessions. Compare planned vs actual.</p>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '12px', alignItems: 'end' }}>
-                      <div><label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '2px' }}>Pair</label><input type="text" placeholder="EURUSD" value={newTradePlan.instrument} onChange={(e) => setNewTradePlan({...newTradePlan, instrument: e.target.value})} style={{ ...inputStyle, width: '90px', fontSize: '12px' }} /></div>
-                      <div><label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '2px' }}>Dir</label><select value={newTradePlan.direction} onChange={(e) => setNewTradePlan({...newTradePlan, direction: e.target.value})} style={{ ...inputStyle, fontSize: '12px', padding: '8px' }}><option value="long">Long</option><option value="short">Short</option></select></div>
-                      <div><label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '2px' }}>Entry</label><input type="text" placeholder="1.0850" value={newTradePlan.entry} onChange={(e) => setNewTradePlan({...newTradePlan, entry: e.target.value})} style={{ ...inputStyle, width: '75px', fontSize: '12px' }} /></div>
-                      <div><label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '2px' }}>SL</label><input type="text" placeholder="1.0820" value={newTradePlan.stopLoss} onChange={(e) => setNewTradePlan({...newTradePlan, stopLoss: e.target.value})} style={{ ...inputStyle, width: '75px', fontSize: '12px' }} /></div>
-                      <div><label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '2px' }}>TP</label><input type="text" placeholder="1.0920" value={newTradePlan.takeProfit} onChange={(e) => setNewTradePlan({...newTradePlan, takeProfit: e.target.value})} style={{ ...inputStyle, width: '75px', fontSize: '12px' }} /></div>
-                      <div><label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '2px' }}>Notes</label><input type="text" placeholder="Reason" value={newTradePlan.notes} onChange={(e) => setNewTradePlan({...newTradePlan, notes: e.target.value})} style={{ ...inputStyle, width: '110px', fontSize: '12px' }} /></div>
-                      <button onClick={() => { if (!newTradePlan.instrument) return; setTradePlans(prev => [...prev, {...newTradePlan, id: Date.now()}]); setNewTradePlan({instrument:'',direction:'long',entry:'',stopLoss:'',takeProfit:'',notes:'',date:new Date().toISOString().split('T')[0]}); awardXP(10) }} style={{ padding: '8px 14px', background: theme.warning, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>📝 Plan</button>
-                    </div>
-                    {tradePlans.length > 0 && (<div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>{tradePlans.map(plan => { const actual = trades.find((t: any) => t.instrument && plan.instrument && t.instrument.toLowerCase()===plan.instrument.toLowerCase() && t.date===plan.date); return (<div key={plan.id} style={{ padding: '10px 14px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '10px', border: '1px solid '+(actual?theme.success:theme.warning)+'30', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div><span style={{ color: theme.text, fontWeight: 700 }}>{plan.instrument}</span><span style={{ color: plan.direction==='long'?theme.success:theme.danger, fontSize: '11px', marginLeft: '6px' }}>{plan.direction.toUpperCase()}</span><span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '8px' }}>E:{plan.entry} SL:{plan.stopLoss} TP:{plan.takeProfit}</span></div><div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>{actual ? <span style={{ padding: '2px 8px', background: parseFloat(actual.profitLoss||'0')>=0?theme.success+'20':theme.danger+'20', color: parseFloat(actual.profitLoss||'0')>=0?theme.success:theme.danger, borderRadius: '6px', fontSize: '11px', fontWeight: 700 }}>Result: {parseFloat(actual.profitLoss||'0')>=0?'+':''}${parseFloat(actual.profitLoss||'0').toFixed(0)}</span> : <span style={{ padding: '2px 8px', background: theme.warning+'20', color: theme.warning, borderRadius: '6px', fontSize: '11px' }}>Pending</span>}<button onClick={() => setTradePlans(prev => prev.filter(p => p.id!==plan.id))} style={{ background:'none', border:'none', color:theme.danger, cursor:'pointer', fontSize:'14px' }}>✕</button></div></div>) })}</div>)}
-                  </div>
-                )}
-                {tradingSections[sec.id] && sec.id === 'checkin' && (
-                  <div style={{ padding: '16px' }}>
-                    <p style={{ color: theme.textMuted, fontSize: '12px', margin: '0 0 12px 0' }}>Rate your mental state before trading. Track how mood affects P/L.</p>
-                    <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '12px', marginBottom: '12px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '12px' }}>
-                        {[{label:'Mood',icon:'😊',key:'mood'},{label:'Energy',icon:'⚡',key:'energy'},{label:'Focus',icon:'🎯',key:'focus'}].map(m => (
-                          <div key={m.key}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '6px', fontWeight: 600 }}>{m.icon} {m.label}</div><div style={{ display: 'flex', gap: '4px' }}>{[1,2,3,4,5].map(n => (<button key={n} onClick={() => setTodayCheckIn({...todayCheckIn, [m.key]: n})} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: (todayCheckIn as any)[m.key]>=n?(['#ef4444','#f97316','#fbbf24','#84cc16','#10b981'][n-1]):(darkMode?'#334155':'#e2e8f0'), cursor: 'pointer', color: (todayCheckIn as any)[m.key]>=n?'white':theme.textMuted, fontWeight: 700, fontSize: '13px' }}>{n}</button>))}</div></div>
-                        ))}
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <input type="text" placeholder="How are you feeling?" value={todayCheckIn.notes} onChange={(e) => setTodayCheckIn({...todayCheckIn, notes: e.target.value})} style={{ ...inputStyle, flex: 1, fontSize: '12px' }} />
-                        <button onClick={() => { setDailyCheckIn(prev => [...prev, {...todayCheckIn, id: Date.now()}]); setTodayCheckIn({mood:3,energy:3,focus:3,notes:'',date:new Date().toISOString().split('T')[0]}); awardXP(10) }} style={{ padding: '8px 16px', background: '#f472b6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>🧘 Log</button>
-                      </div>
-                      {todayCheckIn.mood+todayCheckIn.energy+todayCheckIn.focus < 9 && <div style={{ marginTop: '8px', padding: '8px 12px', background: theme.danger+'15', borderRadius: '8px', fontSize: '12px', color: theme.danger, fontWeight: 600 }}>⚠️ Low scores — consider reducing size or sitting out</div>}
-                    </div>
-                    {dailyCheckIn.length > 0 && (<div><h4 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '14px' }}>History</h4>{dailyCheckIn.slice().reverse().slice(0,10).map((ci:any)=>{const dp=trades.filter((t:any)=>t.date===ci.date).reduce((s:number,t:any)=>s+parseFloat(t.profitLoss||'0'),0);const dc=trades.filter((t:any)=>t.date===ci.date).length;return(<div key={ci.id} style={{display:'flex',justifyContent:'space-between',padding:'6px 10px',background:darkMode?'#1e293b':'#fafafa',borderRadius:'6px',marginBottom:'4px',fontSize:'12px'}}><div><span style={{color:theme.textMuted}}>{ci.date}</span><span style={{marginLeft:'8px'}}>😊{ci.mood} ⚡{ci.energy} 🎯{ci.focus}</span></div><div>{dc>0?<span style={{color:dp>=0?theme.success:theme.danger,fontWeight:700}}>{dp>=0?'+':''}${dp.toFixed(0)} ({dc}t)</span>:<span style={{color:theme.textMuted}}>No trades</span>}</div></div>)})}</div>)}
-                  </div>
-                )}
+                
+                
+                
               </div>
             ))}
 
