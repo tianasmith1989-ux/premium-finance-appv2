@@ -327,6 +327,8 @@ export default function Dashboard() {
   const [prepTab, setPrepTab] = useState<'session'|'mindset'|'risk'|'trades'>('session')
   const [coachMessages, setCoachMessages] = useState<{role:string,content:string}[]>([])
   const [coachInput, setCoachInput] = useState('')
+  const [coachImage, setCoachImage] = useState<string|null>(null)
+  const coachImageRef = useRef<HTMLInputElement>(null)
   const [coachLoading, setCoachLoading] = useState(false)
   const [myStrategy, setMyStrategy] = useState('')
   const [showStrategyEditor, setShowStrategyEditor] = useState(false)
@@ -364,12 +366,15 @@ export default function Dashboard() {
     return 'TRADER CONTEXT:\n'+'Strategy: '+(myStrategy||'Not defined yet')+'\n'+'Today: '+todayTr.length+' trades, P/L: $'+todayPL2.toFixed(0)+'\n'+'All-time: '+trades.length+' trades, P/L: $'+totalPL2.toFixed(0)+', Win Rate: '+wr.toFixed(1)+'%\n'+'Mental State: '+checkIn+'\n'+'Emotion Breakdown: '+emotionBreakdown+'\n'+'Accounts: '+(propInfo||'None')+'\n'+'Recent Trades:\n'+recentTrades+'\n'+'Risk Rules: Max daily loss $'+riskLimits.maxDailyLoss+', Max trades/day '+riskLimits.maxDailyTrades+', Risk/trade '+riskLimits.maxRiskPerTrade+'%'
   }
 
-  const sendCoachMessage = async (text?: string) => {
+  const sendCoachMessage = async (text?: string, imageData?: string) => {
     const msg = text || coachInput
-    if (!msg.trim()) return
-    const userMsg = { role: 'user', content: msg }
+    const img = imageData || coachImage
+    if (!msg.trim() && !img) return
+    const displayMsg = msg + (img ? ' [📸 Screenshot attached]' : '')
+    const userMsg = { role: 'user', content: displayMsg }
     setCoachMessages(prev => [...prev, userMsg])
     setCoachInput('')
+    setCoachImage(null)
     setCoachLoading(true)
     try {
       const context = buildCoachContext()
@@ -379,7 +384,8 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           system: systemPrompt,
-          messages: [...coachMessages, userMsg].map(m => ({role: m.role as 'user'|'assistant', content: m.content}))
+          messages: [...coachMessages, userMsg].map(m => ({role: m.role as 'user'|'assistant', content: m.content})),
+          image: img || undefined
         })
       })
       const data = await response.json()
@@ -2028,7 +2034,7 @@ export default function Dashboard() {
                   </div>
                   {/* QUICK ACTIONS */}
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '12px' }}>
-                    {[{label:'Help me build my strategy',icon:'🧩'},{label:'Am I ready to trade?',icon:'🧘'},{label:'Review my session',icon:'📊'},{label:'Analyse my patterns',icon:'🔍'},{label:'Help me plan tomorrow',icon:'📋'},{label:'I\'m feeling tilted',icon:'😤'},{label:'Celebrate my wins!',icon:'🎉'}].map(q => (
+                    {[{label:'Help me build my strategy',icon:'🧩'},{label:'Analyse my chart setup',icon:'📸'},{label:'Am I ready to trade?',icon:'🧘'},{label:'Review my session',icon:'📊'},{label:'Analyse my patterns',icon:'🔍'},{label:'Help me plan tomorrow',icon:'📋'},{label:'I\'m feeling tilted',icon:'😤'},{label:'Celebrate my wins!',icon:'🎉'}].map(q => (
                       <button key={q.label} onClick={() => sendCoachMessage(q.label)} style={{ padding: '6px 12px', background: darkMode ? '#334155' : '#f1f5f9', border: '1px solid '+theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '11px', color: theme.text, display: 'flex', alignItems: 'center', gap: '4px' }}><span>{q.icon}</span>{q.label}</button>
                     ))}
                   </div>
@@ -2044,8 +2050,13 @@ export default function Dashboard() {
                   </div>
                   {/* INPUT */}
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <input type="text" value={coachInput} onChange={(e) => setCoachInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendCoachMessage()} placeholder="Ask your trading coach..." style={{ ...inputStyle, flex: 1, fontSize: '13px', padding: '10px 14px' }} />
-                    <button onClick={() => sendCoachMessage()} disabled={coachLoading || !coachInput.trim()} style={{ padding: '10px 20px', background: coachLoading ? theme.textMuted : 'linear-gradient(135deg, #fbbf24, #d97706)', color: 'white', border: 'none', borderRadius: '10px', cursor: coachLoading ? 'default' : 'pointer', fontSize: '13px', fontWeight: 700 }}>Send</button>
+                    <div style={{ flex: 1, position: 'relative' as const }}>
+                      {coachImage && (<div style={{ position: 'absolute' as const, top: '-50px', left: 0, display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', background: theme.success+'20', borderRadius: '6px', border: '1px solid '+theme.success+'40' }}><img src={coachImage} alt="" style={{ width: '40px', height: '40px', objectFit: 'cover' as const, borderRadius: '4px' }} /><span style={{ color: theme.success, fontSize: '11px' }}>Chart attached</span><button onClick={() => setCoachImage(null)} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '14px' }}>x</button></div>)}
+                      <input type="text" value={coachInput} onChange={(e) => setCoachInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendCoachMessage()} placeholder={coachImage ? "Describe your setup or ask about this chart..." : "Ask your trading coach..."} style={{ ...inputStyle, width: '100%', fontSize: '13px', padding: '10px 14px' }} />
+                    </div>
+                    <input type="file" ref={coachImageRef} accept="image/*" style={{ display: 'none' }} onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = (ev) => setCoachImage(ev.target?.result as string); reader.readAsDataURL(file); e.target.value = '' }} />
+                    <button onClick={() => coachImageRef.current?.click()} style={{ padding: '10px', background: coachImage ? theme.success : (darkMode ? '#334155' : '#f1f5f9'), color: coachImage ? 'white' : theme.textMuted, border: '1px solid '+(coachImage ? theme.success : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '16px' }} title="Upload chart screenshot">📸</button>
+                    <button onClick={() => sendCoachMessage()} disabled={coachLoading || (!coachInput.trim() && !coachImage)} style={{ padding: '10px 20px', background: coachLoading ? theme.textMuted : 'linear-gradient(135deg, #fbbf24, #d97706)', color: 'white', border: 'none', borderRadius: '10px', cursor: coachLoading ? 'default' : 'pointer', fontSize: '13px', fontWeight: 700 }}>Send</button>
                   </div>
                 </div>
               )}
@@ -2150,15 +2161,30 @@ export default function Dashboard() {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
                           {[{l:'Max Daily Loss',k:'maxDailyLoss',c:theme.danger},{l:'Max Weekly Loss',k:'maxWeeklyLoss',c:theme.danger},{l:'Max Daily Trades',k:'maxDailyTrades',c:theme.warning},{l:'Risk Per Trade %',k:'maxRiskPerTrade',c:theme.accent},{l:'Max Positions',k:'maxOpenPositions',c:theme.purple},{l:'Max Monthly Loss',k:'maxMonthlyLoss',c:'#dc2626'}].map((f,i) => (<div key={i} style={{ padding: '12px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '10px', border: '1px solid ' + theme.border }}><label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '4px', textTransform: 'uppercase' as const }}>{f.l}</label><input type="number" value={(riskLimits as any)[f.k] || ''} onChange={(e) => setRiskLimits(prev => ({ ...prev, [f.k]: e.target.value }))} style={{ ...inputStyle, width: '100%', fontSize: '16px', fontWeight: 700, textAlign: 'center' as const, background: 'transparent', border: '2px solid '+f.c+'40', color: f.c }} /></div>))}
                         </div>
+                        <div style={{ marginBottom: '12px', padding: '12px', background: darkMode?'#1e293b':'#fafafa', borderRadius: '10px' }}>
+                          <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '6px' }}>🏦 Select Account for Calculations</label>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <select value={riskLimits.selectedAccount || ''} onChange={(e) => setRiskLimits(prev => ({...prev, selectedAccount: e.target.value}))} style={{ ...inputStyle, flex: 1, fontSize: '13px' }}>
+                              <option value="">Custom Balance</option>
+                              {propAccounts.map((a:any) => <option key={a.id} value={'prop-'+a.id}>🏢 {a.firm} ({a.phase}) — ${parseFloat(a.currentBalance||'0').toLocaleString()}</option>)}
+                              {personalAccounts.map((a:any) => <option key={a.id} value={'personal-'+a.id}>🏦 {a.broker} — ${parseFloat(a.currentBalance||'0').toLocaleString()}</option>)}
+                            </select>
+                            {(!riskLimits.selectedAccount) && <input type="number" placeholder="Account balance" value={riskLimits.customBalance || ''} onChange={(e) => setRiskLimits(prev => ({...prev, customBalance: e.target.value}))} style={{ ...inputStyle, width: '140px', fontSize: '13px' }} />}
+                          </div>
+                        </div>
                         {(() => {
-                          const allAccounts = [...propAccounts.map(a => ({name: a.firm+' ('+a.phase+')', balance: parseFloat(a.currentBalance||'0')})), ...personalAccounts.map(a => ({name: a.broker+' (Personal)', balance: parseFloat(a.currentBalance||'0')}))]
-                          const accountBal = allAccounts.length > 0 ? allAccounts[0].balance : parseFloat(forexProp.currentBalance || forexProp.accountSize || '100000')
+                          const selectedAcc = riskLimits.selectedAccount || ''
+                          let accountBal = parseFloat(riskLimits.customBalance || '100000')
+                          let accountName = 'Custom'
+                          if (selectedAcc.startsWith('prop-')) { const a = propAccounts.find((a:any) => 'prop-'+a.id === selectedAcc); if (a) { accountBal = parseFloat(a.currentBalance||'0'); accountName = a.firm+' ('+a.phase+')' } }
+                          else if (selectedAcc.startsWith('personal-')) { const a = personalAccounts.find((a:any) => 'personal-'+a.id === selectedAcc); if (a) { accountBal = parseFloat(a.currentBalance||'0'); accountName = a.broker } }
+                          else { const allAccounts = [...propAccounts.map(a => ({name: a.firm+' ('+a.phase+')', balance: parseFloat(a.currentBalance||'0')})), ...personalAccounts.map(a => ({name: a.broker+' (Personal)', balance: parseFloat(a.currentBalance||'0')}))]; if (allAccounts.length > 0 && !riskLimits.customBalance) { accountBal = allAccounts[0].balance; accountName = allAccounts[0].name } }
                           const riskPct = parseFloat(riskLimits.maxRiskPerTrade || '2') / 100
                           const riskAmount = accountBal * riskPct
                           const rrRatios = [1, 1.5, 2, 3, 5]
                           return (<div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
-                              <div style={{ padding: '16px', background: theme.accent+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Balance</div><div style={{ color: theme.text, fontSize: '22px', fontWeight: 900 }}>${accountBal.toLocaleString()}</div></div>
+                              <div style={{ padding: '16px', background: theme.accent+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Balance</div><div style={{ color: theme.text, fontSize: '22px', fontWeight: 900 }}>${accountBal.toLocaleString()}</div><div style={{ color: theme.textMuted, fontSize: '9px' }}>{accountName}</div></div>
                               <div style={{ padding: '16px', background: theme.danger+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Risk/Trade ({riskLimits.maxRiskPerTrade}%)</div><div style={{ color: theme.danger, fontSize: '22px', fontWeight: 900 }}>${riskAmount.toFixed(0)}</div></div>
                               <div style={{ padding: '16px', background: theme.success+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Max Daily Exposure</div><div style={{ color: theme.success, fontSize: '22px', fontWeight: 900 }}>${(riskAmount * parseInt(riskLimits.maxDailyTrades || '5')).toFixed(0)}</div></div>
                             </div>
