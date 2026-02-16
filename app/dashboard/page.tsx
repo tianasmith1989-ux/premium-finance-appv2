@@ -300,7 +300,8 @@ export default function Dashboard() {
     { title: 'Step 5: The Calendar', body: 'Your financial command centre! Every income, expense, debt payment, and savings contribution shows here.\n\nClick any day to expand it. Hit "PAY" to:\n✅ Mark income as received\n✅ Mark bills as paid\n✅ Reduce debt balances\n✅ Add to savings goals\n\nColour coding: 💚 Income, 💙 Expenses, ❤️ Debts, 💜 Goals', tab: 'dashboard', icon: '📅' },
     { title: 'Overview: Escape the Rat Race', body: 'The Overview tab shows your big picture:\n\n🐀 Rat Race Tracker — How close passive income is to covering expenses\n📊 Cash Flow Quadrant — Kiyosaki\'s E/S/B/I framework\n🗺️ Passive Income Quest Board — 10 paths to passive income with difficulty ratings\n🧮 Goal Calculator — See how compound interest grows your money', tab: 'overview', icon: '💎' },
     { title: 'Path: Baby Steps to Freedom', body: 'Your step-by-step roadmap to financial independence:\n\n1️⃣ $1K Emergency Fund\n2️⃣ Pay Off All Debt\n3️⃣ 3-6 Month Emergency Fund\n4️⃣ Invest 15%\n5️⃣ Save for Property\n6️⃣ Pay Off Mortgage\n7️⃣ Build Wealth\n8️⃣ Reach Your FIRE Number\n\nEach step has action buttons to create goals and add them to your calendar. Plus a complete Australian Home Buying Guide!', tab: 'path', icon: '🎯' },
-    { title: 'Trading Mode', body: 'Switch to Trading Mode for powerful tools:\n\n📝 Trade Journal — Log trades with AI text or screenshot upload\n📊 Analytics — Equity curve, win rate, P/L by session and emotion\n🧠 Psychology — Pre-trade checklist and rule violation tracking\n💼 Prop Firm Dashboard — Track multiple funded accounts\n🧮 Compound Calculator — Project earnings with day selection\n📅 Trading Calendar — See daily P/L at a glance', tab: 'trading', icon: '📈' },
+    { title: 'Trade Prep', body: 'The Trade Prep tab is your pre-session command centre:\n\n🧠 AI Trading Coach — Chat with an AI that knows your strategy and data. Upload chart screenshots for setup analysis!\n🧭 Pre-Session Setup — Plan sessions, check mindset, manage risk, plan specific trades\n📓 Trade Journal — Log trades with emotion tracking and account linking\n📊 Compound Calculator — Project growth day by day\n\nStart by defining your strategy in the AI Coach!', tab: 'trading', icon: '📋' },
+    { title: 'Trading Analytics', body: 'Review your performance in the Analytics tab:\n\n📊 Analytics — Win rate, equity curve, P/L by instrument, day heatmap, monthly results, trading calendar\n🏢 Prop Firms — Full dashboard with all your accounts, rules, and progress bars\n🏦 Personal Accounts — Track broker accounts alongside prop firms\n\nTrades logged in Trade Prep automatically update account balances and show here.', tab: 'tradingAnalytics', icon: '📊' },
     { title: 'XP & Achievements', body: 'Everything you do earns XP! Add income (+15), track debt (+20), create goals (+25), mark payments (+10).\n\nLevel up from 🐣 Hatchling to 🏆 Money Master!\n\nUnlock achievements like 🎯 First Goal, 💳 Debt Tracked, and 🎉 Debt Destroyed. Confetti included! 🎊', tab: null, icon: '🎮' },
     { title: 'You\'re Ready! 🚀', body: 'That\'s everything! Here\'s the best workflow:\n\n1. Add income and expenses\n2. Set up debts as boss battles\n3. Create savings goals\n4. Check your calendar every payday\n5. Review the Overview weekly\n6. Follow the Baby Steps on the Path tab\n\nYour financial freedom journey starts now. Let\'s go! ⚜', tab: null, icon: '🏆' },
   ]
@@ -818,13 +819,43 @@ export default function Dashboard() {
     alert(`${goal.name} is now on your calendar!\n\n$${paymentAmount.toFixed(2)} per ${frequency}\nStarting ${startDate}\n\nMark payments as done on the calendar!`)
   }
 
-  const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCsvUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; if (!file) return
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const text = e.target?.result as string
       const lines = text.split('\n').filter(line => line.trim())
       if (lines.length < 2) { alert('CSV file appears empty'); return }
+
+      // Try AI parsing first
+      try {
+        const csvPreview = lines.slice(0, 30).join('\n')
+        const response = await fetch('/api/coach', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system: 'You parse bank CSV files. Return ONLY a JSON array, no other text. Each object: {"date":"YYYY-MM-DD","description":"clean name","amount":number (negative=expense, positive=income),"category":"one of: Housing,Utilities,Food,Transport,Entertainment,Shopping,Health,Subscriptions,Savings,Income,Other"}. Clean up descriptions (remove reference numbers, extra spaces). Categorize Australian merchants: Woolworths/Coles=Food, Telstra/Optus=Utilities, Afterpay/Zip=Shopping, Netflix/Spotify=Subscriptions, Uber=Transport, etc.',
+            messages: [{ role: 'user', content: 'Parse this CSV:\n'+csvPreview }]
+          })
+        })
+        const data = await response.json()
+        const reply = data.reply || ''
+        const jsonMatch = reply.match(/\[.*\]/s)
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0])
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const transactions = parsed.map((t: any, idx: number) => ({
+              id: Date.now() + idx, date: t.date || new Date().toISOString().split('T')[0],
+              description: t.description || 'Transaction', amount: Math.abs(t.amount || 0),
+              category: t.category || 'Other', isExpense: (t.amount || 0) < 0, selected: (t.amount || 0) < 0
+            }))
+            setCsvTransactions(transactions); setShowCsvImport(true)
+            if (fileInputRef.current) fileInputRef.current.value = ''
+            return
+          }
+        }
+      } catch(err) { console.log('AI parse failed, falling back to manual') }
+
+      // Fallback: manual parsing
       const header = lines[0].toLowerCase()
       const hasHeader = header.includes('date') || header.includes('description') || header.includes('amount')
       const dataLines = hasHeader ? lines.slice(1) : lines
@@ -840,7 +871,7 @@ export default function Dashboard() {
           for (let i = parts.length - 1; i >= 0; i--) { const cleaned = parts[i].replace(/[$,]/g, '').trim(); const num = parseFloat(cleaned); if (!isNaN(num) && num !== 0) { amount = num; break } }
           let longestText = ''
           for (const part of parts) { const cleaned = part.replace(/["']/g, '').trim(); if (cleaned.length > longestText.length && !datePatterns.some(p => p.test(cleaned)) && isNaN(parseFloat(cleaned.replace(/[$,]/g, '')))) longestText = cleaned }
-          description = longestText || `Transaction ${idx + 1}`
+          description = longestText || 'Transaction '+(idx + 1)
           if (date || amount !== 0) { transactions.push({ id: Date.now() + idx, date: date || new Date().toISOString().split('T')[0], description, amount: Math.abs(amount), category: autoCategorize(description), isExpense: amount < 0, selected: amount < 0 }) }
         }
       })
@@ -1046,13 +1077,19 @@ export default function Dashboard() {
 
   const askBudgetCoach = async () => {
     if (!chatInput.trim()) return
-    setChatMessages(prev => [...prev, { role: 'user', content: chatInput }]); setChatInput(''); setIsAskingCoach(true)
+    const userMsg = chatInput
+    setChatMessages(prev => [...prev, { role: 'user', content: userMsg }]); setChatInput(''); setIsAskingCoach(true)
     try {
-      const context = 'Income: $' + monthlyIncome.toFixed(2) + ', Expenses: $' + monthlyExpenses.toFixed(2) + ', Debt: $' + totalDebtBalance.toFixed(2)
-      const response = await fetch('/api/budget-coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: chatInput, financialContext: context }) })
+      const incomeList = incomeStreams.map(i => i.name+': $'+i.amount+'/'+i.frequency+' ('+i.type+')').join(', ')
+      const expenseList = expenses.slice(0,15).map(e => e.name+': $'+e.amount+'/'+e.frequency+' ['+e.category+']').join(', ')
+      const debtList = debts.map(d => d.name+': $'+d.balance+' @ '+d.rate+'% (min $'+d.minPayment+')').join(', ')
+      const goalList = savingsGoals.map(g => g.name+': $'+g.savedAmount+'/$'+g.targetAmount).join(', ')
+      const context = 'FINANCIAL SNAPSHOT:\nMonthly Income: $'+monthlyIncome.toFixed(0)+' | Monthly Expenses: $'+monthlyExpenses.toFixed(0)+' | Surplus: $'+monthlySurplus.toFixed(0)+'\nTotal Debt: $'+totalDebtBalance.toFixed(0)+' | Passive Income: $'+passiveIncome.toFixed(0)+'\n\nIncome: '+incomeList+'\nExpenses: '+expenseList+'\nDebts: '+debtList+'\nGoals: '+goalList
+      const systemPrompt = 'You are a friendly Australian financial coach inside the Aureus budgeting app. You have full access to the user\'s financial data. Give practical, specific advice based on their actual numbers. Be concise and encouraging. Reference their specific debts, goals, and income by name. Use Australian financial context (super, HECS, Medicare, ATO). Never give licensed financial advice — help them understand their options.\n\n'+context
+      const response = await fetch('/api/coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ system: systemPrompt, messages: chatMessages.concat([{role:'user',content:userMsg}]).map(m => ({role: m.role, content: m.content})) }) })
       const data = await response.json()
-      setChatMessages(prev => [...prev, { role: 'assistant', content: data.advice || 'Sorry, I could not respond.' }])
-    } catch(err) { setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]) }
+      setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply || data.advice || 'Sorry, I could not respond.' }])
+    } catch(err) { setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong. Make sure your API key is set.' }]) }
     finally { setIsAskingCoach(false) }
   }
 
@@ -2705,14 +2742,42 @@ export default function Dashboard() {
                             {(() => { let running = 0; const points = trades.slice().reverse().map((t:any) => { running += parseFloat(t.profitLoss||'0'); return running }); const max2 = Math.max(...points.map(Math.abs), 1); return points.map((p,i) => (<div key={i} style={{ flex: 1, height: Math.abs(p/max2*100)+'%', minHeight: '2px', background: p >= 0 ? theme.success : theme.danger, borderRadius: '2px 2px 0 0', alignSelf: 'flex-end', opacity: 0.7 + (i/points.length)*0.3 }} title={'$'+p.toFixed(0)} />)) })()}
                           </div>
                         </div>
+                        {/* P/L BY INSTRUMENT */}
+                        <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '16px' }}>
+                          <h4 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '14px' }}>📊 P/L by Instrument</h4>
+                          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '4px' }}>
+                            {(() => { const byInstrument: {[k:string]:{pl:number,count:number}} = {}; trades.forEach((t:any) => { const inst = t.instrument || 'Unknown'; if (!byInstrument[inst]) byInstrument[inst] = {pl:0,count:0}; byInstrument[inst].pl += parseFloat(t.profitLoss||'0'); byInstrument[inst].count++ }); return Object.entries(byInstrument).sort((a,b) => (b[1] as any).pl - (a[1] as any).pl).map(([inst, data]: any) => (<div key={inst} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', borderRadius: '6px', background: darkMode ? '#0f172a' : '#fafafa' }}><span style={{ color: theme.text, fontWeight: 600, fontSize: '12px' }}>{inst} <span style={{ color: theme.textMuted, fontWeight: 400 }}>({data.count})</span></span><span style={{ color: data.pl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '12px' }}>{data.pl >= 0 ? '+' : ''}${data.pl.toFixed(0)}</span></div>)) })()}
+                          </div>
+                        </div>
+                        {/* DAY OF WEEK HEATMAP */}
+                        <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '16px' }}>
+                          <h4 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '14px' }}>📅 Day of Week Performance</h4>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+                            {['Mon','Tue','Wed','Thu','Fri'].map((day, di) => { const dayTrades = trades.filter((t:any) => new Date(t.date).getDay() === di+1); const dayPL = dayTrades.reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0); return (<div key={day} style={{ padding: '10px', borderRadius: '8px', textAlign: 'center' as const, background: dayPL > 0 ? theme.success+'20' : dayPL < 0 ? theme.danger+'20' : (darkMode?'#0f172a':'#fafafa') }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>{day}</div><div style={{ color: dayPL >= 0 ? theme.success : theme.danger, fontSize: '16px', fontWeight: 800 }}>{dayPL >= 0?'+':''}${dayPL.toFixed(0)}</div><div style={{ color: theme.textMuted, fontSize: '9px' }}>{dayTrades.length}t</div></div>) })}
+                          </div>
+                        </div>
+                        {/* MONTHLY P/L */}
+                        <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', marginBottom: '16px' }}>
+                          <h4 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '14px' }}>📈 Monthly P/L</h4>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
+                            {(() => { const byMonth: {[k:string]:number} = {}; trades.forEach((t:any) => { const m = t.date?.substring(0,7); if (m) { if (!byMonth[m]) byMonth[m] = 0; byMonth[m] += parseFloat(t.profitLoss||'0') } }); return Object.entries(byMonth).sort().map(([m, pl]) => (<div key={m} style={{ padding: '10px 14px', borderRadius: '8px', background: (pl as number) >= 0 ? theme.success+'15' : theme.danger+'15', border: '1px solid '+((pl as number) >= 0 ? theme.success : theme.danger)+'30' }}><div style={{ color: theme.textMuted, fontSize: '10px' }}>{m}</div><div style={{ color: (pl as number) >= 0 ? theme.success : theme.danger, fontSize: '16px', fontWeight: 800 }}>{(pl as number) >= 0 ? '+' : ''}${(pl as number).toFixed(0)}</div></div>)) })()}
+                          </div>
+                        </div>
+                        {/* TRADE CALENDAR */}
+                        <div style={{ padding: '16px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px' }}>
+                          <h4 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '14px' }}>📅 Trading Calendar</h4>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px' }}>
+                            {['M','T','W','T','F','S','S'].map(d => <div key={d+Math.random()} style={{ textAlign: 'center' as const, color: theme.textMuted, fontSize: '10px', padding: '4px' }}>{d}</div>)}
+                            {(() => { const today = new Date(); const firstDay = new Date(today.getFullYear(), today.getMonth(), 1); const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0); const startPad = (firstDay.getDay() + 6) % 7; const cells = []; for (let i = 0; i < startPad; i++) cells.push(<div key={'pad-'+i} />); for (let d = 1; d <= lastDay.getDate(); d++) { const dateStr = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'); const dayTrades = trades.filter((t:any) => t.date === dateStr); const pl = dayTrades.reduce((s:number,t:any) => s + parseFloat(t.profitLoss||'0'), 0); cells.push(<div key={d} style={{ padding: '4px', borderRadius: '4px', textAlign: 'center' as const, background: dayTrades.length > 0 ? (pl >= 0 ? theme.success+'20' : theme.danger+'20') : 'transparent', fontSize: '10px' }}><div style={{ color: theme.textMuted }}>{d}</div>{dayTrades.length > 0 && <div style={{ color: pl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '9px' }}>{pl >= 0?'+':''}${pl.toFixed(0)}</div>}</div>) } return cells })()}
+                          </div>
+                        </div>
                       </div>)
                     })()}
                   </div>
                 )}
 
                 {tradingSections[sec.id] && sec.id === 'props' && (
-                  <div style={{ marginTop: '16px', color: theme.textMuted, textAlign: 'center' as const, padding: '20px' }}>
-                    <div style={{ fontSize: '13px' }}>Prop Firm Dashboard data shared from Trade Prep tab</div>
+                  <div style={{ marginTop: '16px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '16px' }}>
                       <div style={{ padding: '16px', background: theme.success+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Active Accounts</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 900 }}>{propAccounts.filter((a:any) => a.status === 'active').length + personalAccounts.length}</div></div>
                       <div style={{ padding: '16px', background: theme.warning+'15', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '10px', textTransform: 'uppercase' as const }}>Total Balance</div><div style={{ color: theme.warning, fontSize: '28px', fontWeight: 900 }}>${(propAccounts.reduce((s: number, a: any) => s + parseFloat(a.currentBalance||'0'), 0) + personalAccounts.reduce((s:number, a:any) => s + parseFloat(a.currentBalance||'0'), 0)).toLocaleString()}</div></div>
@@ -2743,7 +2808,8 @@ export default function Dashboard() {
               { id:'calendar',icon:'📅',title:'Calendar',color:'#3b82f6',items:[{q:'What does PAY do?',a:'Marks an item as paid. For debts: reduces balance. For goals: increases saved amount. For power-ups: applies to linked debt/goal. Click ✓ to undo.'},{q:'Color coding?',a:'💰 Green = Income\n💸 Blue = Expenses\n💳 Red = Debt payments\n🎯 Purple = Goal savings\n⚡ Light purple = Power-ups'}]},
               { id:'overview',icon:'💎',title:'Overview Tab',color:'#a78bfa',items:[{q:'What is the Rat Race Escape Tracker?',a:'Shows what % of your expenses are covered by passive income. 100% = escaped! Milestones at 25%, 50%, 75%, 100%.'},{q:'Cash Flow Quadrant?',a:'Kiyosaki\'s E/S/B/I framework:\n👔 Employee → 🔧 Self-Employed → 🏢 Business Owner → 📈 Investor\nGoal: Move income from left (you work) to right (money works).'},{q:'What is the 4% rule?',a:'Withdraw 4% of investments per year without running out. $1M = $40K/year = $3,333/month passive income.'}]},
               { id:'xp',icon:'🎮',title:'XP & Gamification',color:'#f472b6',items:[{q:'How do I earn XP?',a:'+10 Marking paid | +10 Add expense | +15 Add income | +20 Add debt | +25 Add goal | +30 Debt power-up | +50 Achievement'},{q:'What are the levels?',a:'🐣 Lv1 (0) → 🌱 Lv2 (100) → 📈 Lv3 (250) → 💪 Lv4 (500) → 🎯 Lv5 (800) → 🌟 Lv6 (1200) → ⚡ Lv7 (1800) → 🔥 Lv8 (2500) → 💎 Lv9 (3500) → 🏆 Lv10 (5000)'},{q:'Achievements?',a:'🎯 First Goal | 🏅 5 Goals | 💳 Debt Tracked | ✅ Goal Complete | 🎉 Debt Destroyed | 💸 5 Payments | ⚡ 20 Payments | 💰 3+ Income Streams'}]},
-              { id:'tips',icon:'💡',title:'Tips & Best Practices',color:'#fbbf24',items:[{q:'Best workflow?',a:'1. Set up income & expenses\n2. Add debts with power-ups\n3. Create goals, add to calendar\n4. Every payday: open calendar, mark items paid\n5. Check Overview weekly\n6. Review spending monthly\n7. Check the Quest Board for passive income ideas'},{q:'Is data saved?',a:'Currently data resets on page refresh. Persistent storage is a planned feature. Screenshot your progress regularly!'}]}
+              { id:'trading2',icon:'📈',title:'Trading Mode',color:'#f59e0b',items:[{q:'How does Trade Prep work?',a:'Trade Prep has 4 sub-tabs in Pre-Session Setup:\n📋 Session Plan — Set market bias, pairs, levels, goals\n🧠 Mindset — Rate mood/energy/focus, pre-trade checklist\n🛡️ Risk — Set limits, position size calculator, R:R cheatsheet\n🎯 Trade Plans — Plan specific entries with SL/TP'},{q:'What is the AI Trading Coach?',a:'The coach sits at the top of Trade Prep. It knows your strategy, trades, and psychology patterns. You can:\n• Upload chart screenshots for setup analysis\n• Get pre-session readiness checks\n• Review your trades and patterns\n• Work through tilt and psychology issues\n\nDefine your strategy using the guided builder first!'},{q:'How do Prop Firm accounts work?',a:'Add prop firm accounts with full rule tracking: daily/max drawdown, profit target, profit split, news trading rules, lot limits, payout frequency. Trades logged in the journal auto-update linked account balances.'},{q:'What analytics are available?',a:'The Analytics tab shows: Win rate, profit factor, expectancy, equity curve, P/L by instrument, day-of-week heatmap, monthly P/L, trading calendar, and prop firm summaries.'}]},
+              { id:'tips',icon:'💡',title:'Tips & Best Practices',color:'#fbbf24',items:[{q:'Best budget workflow?',a:'1. Set up income & expenses\n2. Add debts with power-ups\n3. Create goals, add to calendar\n4. Every payday: open calendar, mark items paid\n5. Check Overview weekly\n6. Review spending monthly\n7. Check the Quest Board for passive income ideas'},{q:'Best trading workflow?',a:'1. Open Trade Prep\n2. Fill Session Plan (bias, pairs, levels)\n3. Do Mental State check\n4. Review Pre-Trade Checklist\n5. Plan specific trades\n6. Log trades in Journal\n7. Review in Analytics\n8. Chat with AI Coach for feedback'},{q:'Is data saved?',a:'Currently data resets on page refresh. Persistent storage is coming soon. The app will have user accounts with full data sync.'}]}
             ].map(section => (
               <div key={section.id} style={cardStyle}>
                 <div onClick={() => setExpandedGuideSection(expandedGuideSection === section.id ? null : section.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
