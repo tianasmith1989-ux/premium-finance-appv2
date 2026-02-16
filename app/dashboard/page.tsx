@@ -1085,7 +1085,7 @@ export default function Dashboard() {
       const incomeList = incomeStreams.map(i => i.name+': $'+i.amount+'/'+i.frequency+' ('+i.type+')').join(', ')
       const expenseList = expenses.slice(0,15).map(e => e.name+': $'+e.amount+'/'+e.frequency+' ['+e.category+']').join(', ')
       const debtList = debts.map(d => d.name+': $'+d.balance+' @ '+d.rate+'% (min $'+d.minPayment+')').join(', ')
-      const goalList = savingsGoals.map(g => g.name+': $'+g.savedAmount+'/$'+g.targetAmount).join(', ')
+      const goalList = goals.map((g:any) => g.name+': $'+(g.savedAmount||'0')+'/$'+(g.targetAmount||'0')).join(', ')
       const context = 'FINANCIAL SNAPSHOT:\nMonthly Income: $'+monthlyIncome.toFixed(0)+' | Monthly Expenses: $'+monthlyExpenses.toFixed(0)+' | Surplus: $'+monthlySurplus.toFixed(0)+'\nTotal Debt: $'+totalDebtBalance.toFixed(0)+' | Passive Income: $'+passiveIncome.toFixed(0)+'\n\nIncome: '+incomeList+'\nExpenses: '+expenseList+'\nDebts: '+debtList+'\nGoals: '+goalList
       const systemPrompt = 'You are a friendly Australian financial coach inside the Aureus budgeting app. You have full access to the user\'s financial data. Give practical, specific advice based on their actual numbers. Be concise and encouraging. Reference their specific debts, goals, and income by name. Use Australian financial context (super, HECS, Medicare, ATO). Never give licensed financial advice — help them understand their options.\n\n'+context
       const response = await fetch('/api/coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ system: systemPrompt, messages: chatMessages.concat([{role:'user',content:userMsg}]).map(m => ({role: m.role, content: m.content})) }) })
