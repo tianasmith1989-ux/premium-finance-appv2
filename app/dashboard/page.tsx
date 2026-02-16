@@ -1,10 +1,13 @@
 'use client'
 
 import { useUser } from '@clerk/nextjs'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useUserData, UserData } from './useUserData'
 
 export default function Dashboard() {
   const { user } = useUser()
+  const { userData, isLoading: isDataLoading, isSaving, lastSaved, saveUserData } = useUserData(user?.id)
+  const [dataLoaded, setDataLoaded] = useState(false)
   
   const [appMode, setAppMode] = useState<'budget' | 'trading' | null>(null)
   const [showModeSelector, setShowModeSelector] = useState(true)
@@ -552,6 +555,66 @@ export default function Dashboard() {
       setTimeout(() => setNewAchievement(null), 3500)
     }
   }
+  // === LOAD USER DATA FROM DATABASE ===
+  useEffect(() => {
+    if (userData && !dataLoaded) {
+      if (userData.appMode) { setAppMode(userData.appMode); setShowModeSelector(false) }
+      if (userData.darkMode !== undefined) setDarkMode(userData.darkMode)
+      if (userData.incomeStreams) setIncomeStreams(userData.incomeStreams)
+      if (userData.expenses) setExpenses(userData.expenses)
+      if (userData.debts) setDebts(userData.debts)
+      if (userData.goals) setGoals(userData.goals)
+      if (userData.assets) setAssets(userData.assets)
+      if (userData.liabilities) setLiabilities(userData.liabilities)
+      if (userData.paidOccurrences) setPaidOccurrences(new Set(userData.paidOccurrences))
+      if (userData.debtExtraPayment) setDebtExtraPayment(userData.debtExtraPayment)
+      if (userData.customPresets) setCustomPresets(userData.customPresets)
+      if (userData.payslipData) setPayslipData(userData.payslipData)
+      if (userData.trades) setTrades(userData.trades)
+      if (userData.tradeImages) setTradeImages(userData.tradeImages)
+      if (userData.propAccounts) setPropAccounts(userData.propAccounts)
+      if (userData.personalAccounts) setPersonalAccounts(userData.personalAccounts)
+      if (userData.propPayouts) setPropPayouts(userData.propPayouts)
+      if (userData.tradePlans) setTradePlans(userData.tradePlans)
+      if (userData.sessionPlans) setSessionPlans(userData.sessionPlans)
+      if (userData.dailyCheckIn) setDailyCheckIn(userData.dailyCheckIn)
+      if (userData.riskLimits) setRiskLimits(userData.riskLimits)
+      if (userData.myStrategy) setMyStrategy(userData.myStrategy)
+      if (userData.strategyBuilder) setStrategyBuilder(userData.strategyBuilder)
+      if (userData.monthlyPLGoal) setMonthlyPLGoal(userData.monthlyPLGoal)
+      if (userData.dismissedSavings) setDismissedSavings(userData.dismissedSavings)
+      if (userData.xpPoints) setXpPoints(userData.xpPoints)
+      if (userData.achievements) setAchievements(userData.achievements)
+      if (userData.tradingSections) setTradingSections(userData.tradingSections)
+      if (userData.tradingPayoutsAsIncome !== undefined) setTradingPayoutsAsIncome(userData.tradingPayoutsAsIncome)
+      if (userData.coachMessages) setCoachMessages(userData.coachMessages)
+      setDataLoaded(true)
+    }
+  }, [userData, dataLoaded])
+
+  // === AUTO-SAVE — triggers on any data change ===
+  const saveTimer = useRef<NodeJS.Timeout|null>(null)
+  const triggerSave = useCallback(() => {
+    if (!user?.id || !dataLoaded) return
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      const dataToSave: UserData = {
+        appMode, darkMode, incomeStreams, expenses, debts, goals, assets, liabilities,
+        paidOccurrences: Array.from(paidOccurrences),
+        debtExtraPayment, customPresets, payslipData,
+        trades, tradeImages, propAccounts, personalAccounts, propPayouts,
+        tradePlans, sessionPlans, dailyCheckIn, riskLimits, myStrategy,
+        strategyBuilder, monthlyPLGoal, coachMessages,
+        dismissedSavings, xpPoints, achievements, tradingSections, tradingPayoutsAsIncome,
+      }
+      saveUserData(dataToSave)
+    }, 1000)
+  }, [user?.id, dataLoaded, appMode, darkMode, incomeStreams, expenses, debts, goals, assets, liabilities, paidOccurrences, debtExtraPayment, customPresets, payslipData, trades, tradeImages, propAccounts, personalAccounts, propPayouts, tradePlans, sessionPlans, dailyCheckIn, riskLimits, myStrategy, strategyBuilder, monthlyPLGoal, coachMessages, dismissedSavings, xpPoints, achievements, tradingSections, tradingPayoutsAsIncome, saveUserData])
+
+  useEffect(() => {
+    if (dataLoaded) triggerSave()
+  }, [dataLoaded, triggerSave])
+
   useEffect(() => {
     if (goals.length >= 1) unlockAchievement('first_goal', '🎯 First Goal Set!')
     if (goals.length >= 5) unlockAchievement('five_goals', '🏅 Goal Machine!')
@@ -1147,6 +1210,20 @@ export default function Dashboard() {
       <button onClick={(e) => { e.stopPropagation(); togglePaid(item.id, item.sourceType, item.sourceId, parseFloat(item.amount || '0'), item.targetDebtId, item.targetGoalId) }} style={{ padding: compact ? '4px 8px' : '6px 12px', background: item.isPaid ? '#6b7280' : (item.sourceType === 'extraDebt' || item.sourceType === 'extraGoal' || item.sourceType === 'goal') ? '#8b5cf6' : '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: compact ? '10px' : '12px', fontWeight: 700, flexShrink: 0 }}>{item.isPaid ? '✓' : 'PAY'}</button>
     </div>
   )
+  // Show loading while data loads
+  if (isDataLoading && user?.id) {
+    return (
+      <div style={{ minHeight: '100vh', background: darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)' : 'linear-gradient(135deg, #f0f9ff 0%, #faf5ff 100%)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚜</div>
+        <div style={{ color: '#fbbf24', fontSize: '24px', fontWeight: 800, marginBottom: '8px' }}>Aureus</div>
+        <div style={{ color: '#94a3b8', fontSize: '14px' }}>Loading your data...</div>
+        <div style={{ marginTop: '20px', width: '200px', height: '4px', background: '#334155', borderRadius: '2px', overflow: 'hidden' }}>
+          <div style={{ width: '60%', height: '100%', background: 'linear-gradient(90deg, #fbbf24, #d97706)', borderRadius: '2px', animation: 'pulse 1.5s ease-in-out infinite' }} />
+        </div>
+      </div>
+    )
+  }
+
   if (showModeSelector) {
     return (
       <div style={{ minHeight: '100vh', background: darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)' : 'linear-gradient(135deg, #f0f9ff 0%, #faf5ff 100%)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -1223,7 +1300,11 @@ export default function Dashboard() {
       <header style={{ padding: '16px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, position: 'sticky' as const, top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <button onClick={() => setShowModeSelector(true)} style={{ padding: '10px 16px', background: appMode === 'budget' ? theme.success : theme.warning, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }}>{appMode === 'budget' ? '💰' : '📈'} {appMode === 'budget' ? 'Budget' : 'Trading'} ▼</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isSaving && <span style={{ color: theme.textMuted, fontSize: '11px' }}>💾 Saving...</span>}
+                {!isSaving && lastSaved && <span style={{ color: theme.success, fontSize: '11px' }}>✓ Saved</span>}
+                <button onClick={() => setShowModeSelector(true)} style={{ padding: '10px 16px', background: appMode === 'budget' ? theme.success : theme.warning, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }}>{appMode === 'budget' ? '💰' : '📈'} {appMode === 'budget' ? 'Budget' : 'Trading'} ▼</button>
+              </div>
             <h1 style={{ margin: 0, color: theme.text, fontSize: '24px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}><div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706, #fbbf24)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', boxShadow: '0 2px 8px rgba(251,191,36,0.4), inset 0 1px 2px rgba(255,255,255,0.3)', border: '2px solid #f59e0b' }}>⚜</div><span style={{ background: 'linear-gradient(135deg, #fbbf24, #f59e0b, #d97706)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '1px' }}>AUREUS</span></h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 14px', background: darkMode ? '#334155' : '#f1f5f9', borderRadius: '10px', border: '2px solid ' + currentLevel.color }}>
