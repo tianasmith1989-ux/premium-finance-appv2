@@ -10,6 +10,8 @@ export default function Dashboard() {
   const [showModeSelector, setShowModeSelector] = useState(true)
   const [activeTab, setActiveTab] = useState<'dashboard' | 'overview' | 'path' | 'trading' | 'tradingAnalytics' | 'guide'>('dashboard')
   const [darkMode, setDarkMode] = useState(true)
+  const [showSavingsFinder, setShowSavingsFinder] = useState(true)
+  const [dismissedSavings, setDismissedSavings] = useState<string[]>([])
   const [calendarMonth, setCalendarMonth] = useState(new Date())
   const [tradingCalendarMonth, setTradingCalendarMonth] = useState(new Date())
   
@@ -839,7 +841,7 @@ export default function Dashboard() {
         })
         const data = await response.json()
         const reply = data.reply || ''
-        const jsonMatch = reply.match(/\[.*\]/s)
+        const jsonMatch = reply.match(/\[[\s\S]*\]/)
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0])
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -1091,6 +1093,49 @@ export default function Dashboard() {
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply || data.advice || 'Sorry, I could not respond.' }])
     } catch(err) { setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong. Make sure your API key is set.' }]) }
     finally { setIsAskingCoach(false) }
+  }
+
+
+  const getSavingsSuggestions = () => {
+    const suggestions: {id:string,title:string,saving:number,desc:string,icon:string,action?:string}[] = []
+    // Check subscriptions
+    const subs = expenses.filter(e => e.category === 'Subscriptions')
+    subs.forEach(s => {
+      const monthly = parseFloat(s.amount||'0') * (s.frequency==='weekly'?4.33:s.frequency==='fortnightly'?2.17:s.frequency==='quarterly'?0.33:s.frequency==='yearly'?0.083:1)
+      if (monthly > 15) suggestions.push({id:'sub-'+s.id,title:'Review '+s.name,saving:monthly*0.5,desc:'Do you still use '+s.name+'? Cancel or downgrade to save ~$'+((monthly*0.5).toFixed(0))+'/mo',icon:'📱'})
+    })
+    // Check entertainment
+    const entertainment = expenses.filter(e => e.category === 'Entertainment')
+    const entTotal = entertainment.reduce((s,e) => { const m = parseFloat(e.amount||'0') * (e.frequency==='weekly'?4.33:e.frequency==='fortnightly'?2.17:e.frequency==='quarterly'?0.33:e.frequency==='yearly'?0.083:1); return s + m }, 0)
+    if (entTotal > 100) suggestions.push({id:'ent-cut',title:'Entertainment budget',saving:entTotal*0.2,desc:'Your entertainment costs $'+(entTotal.toFixed(0))+'/mo. A 20% cut saves $'+((entTotal*0.2).toFixed(0))+'/mo',icon:'🎬'})
+    // Check food
+    const food = expenses.filter(e => e.category === 'Food')
+    const foodTotal = food.reduce((s,e) => { const m = parseFloat(e.amount||'0') * (e.frequency==='weekly'?4.33:e.frequency==='fortnightly'?2.17:e.frequency==='quarterly'?0.33:e.frequency==='yearly'?0.083:1); return s + m }, 0)
+    if (foodTotal > 400) suggestions.push({id:'food-save',title:'Food & groceries',saving:foodTotal*0.15,desc:'Meal prepping 2 days/week could save ~$'+((foodTotal*0.15).toFixed(0))+'/mo on your $'+(foodTotal.toFixed(0))+' food budget',icon:'🍔'})
+    // Check shopping
+    const shopping = expenses.filter(e => e.category === 'Shopping')
+    const shopTotal = shopping.reduce((s,e) => { const m = parseFloat(e.amount||'0') * (e.frequency==='weekly'?4.33:e.frequency==='fortnightly'?2.17:e.frequency==='quarterly'?0.33:e.frequency==='yearly'?0.083:1); return s + m }, 0)
+    if (shopTotal > 100) suggestions.push({id:'shop-30',title:'30-day rule on shopping',saving:shopTotal*0.3,desc:'Wait 30 days before non-essential purchases. Could save $'+((shopTotal*0.3).toFixed(0))+'/mo',icon:'🛍️'})
+    // Check for high-interest debt
+    debts.forEach(d => {
+      const rate = parseFloat(d.rate||'0')
+      if (rate > 15) suggestions.push({id:'debt-'+d.id,title:'Refinance '+d.name,saving:parseFloat(d.balance||'0')*((rate-10)/100)/12,desc:d.name+' at '+rate+'% is expensive. Refinancing to ~10% could save $'+((parseFloat(d.balance||'0')*((rate-10)/100)/12).toFixed(0))+'/mo in interest',icon:'💳'})
+    })
+    // Check transport
+    const transport = expenses.filter(e => e.category === 'Transport')
+    const transTotal = transport.reduce((s,e) => { const m = parseFloat(e.amount||'0') * (e.frequency==='weekly'?4.33:e.frequency==='fortnightly'?2.17:e.frequency==='quarterly'?0.33:e.frequency==='yearly'?0.083:1); return s + m }, 0)
+    if (transTotal > 200) suggestions.push({id:'trans-save',title:'Transport costs',saving:transTotal*0.15,desc:'Carpooling or public transport 1-2 days/week could save ~$'+((transTotal*0.15).toFixed(0))+'/mo',icon:'🚗'})
+    // Check utilities
+    const utils = expenses.filter(e => e.category === 'Utilities')
+    const utilTotal = utils.reduce((s,e) => { const m = parseFloat(e.amount||'0') * (e.frequency==='weekly'?4.33:e.frequency==='fortnightly'?2.17:e.frequency==='quarterly'?0.33:e.frequency==='yearly'?0.083:1); return s + m }, 0)
+    if (utilTotal > 200) suggestions.push({id:'util-compare',title:'Compare utility providers',saving:25,desc:'Switching energy/internet providers could save $25+/mo. Check compare.energy.gov.au',icon:'⚡'})
+    // Generic if nothing found
+    if (suggestions.length === 0 && expenses.length > 0) {
+      suggestions.push({id:'gen-coffee',title:'Coffee savings',saving:20,desc:'Making coffee at home 3 days/week instead of buying saves ~$20/mo',icon:'☕'})
+      suggestions.push({id:'gen-lunch',title:'Pack lunch twice/week',saving:40,desc:'Bringing lunch 2 days saves ~$10/week = $40/mo',icon:'🥗'})
+    }
+    // Always show the target
+    return suggestions.filter(s => !dismissedSavings.includes(s.id))
   }
 
   const renderCalendarItem = (item: any, compact: boolean = false) => (
@@ -2537,6 +2582,40 @@ export default function Dashboard() {
             ))}
 
             {/* DAILY COMPOUND INTEREST CALCULATOR */}
+            <div style={cardStyle}>
+              {(() => {
+                const suggestions = getSavingsSuggestions()
+                const totalPotential = suggestions.reduce((s, sg) => s + sg.saving, 0)
+                const weeklyTarget = 12.50
+                const weeklySaving = totalPotential / 4.33
+                if (expenses.length === 0) return null
+                return (<div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>💰</div>
+                      <div><h3 style={{ margin: 0, color: theme.text, fontSize: '16px' }}>Make Aureus Pay For Itself</h3><span style={{ color: theme.textMuted, fontSize: '11px' }}>Save $12.50/week to cover your subscription</span></div>
+                    </div>
+                    <div style={{ textAlign: 'right' as const }}><div style={{ color: weeklySaving >= weeklyTarget ? theme.success : theme.warning, fontSize: '22px', fontWeight: 900 }}>${weeklySaving.toFixed(0)}/wk</div><div style={{ fontSize: '10px', color: weeklySaving >= weeklyTarget ? theme.success : theme.textMuted }}>{weeklySaving >= weeklyTarget ? '✅ Target met!' : '$'+((weeklyTarget-weeklySaving).toFixed(0))+' more to find'}</div></div>
+                  </div>
+                  <div style={{ width: '100%', height: '8px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}><div style={{ width: Math.min(100, (weeklySaving/weeklyTarget)*100)+'%', height: '100%', background: weeklySaving >= weeklyTarget ? theme.success : 'linear-gradient(90deg, #fbbf24, #d97706)', borderRadius: '4px', transition: 'width 0.5s' }} /></div>
+                  {suggestions.length > 0 && (<div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
+                    {suggestions.slice(0, 4).map(s => (
+                      <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: darkMode ? '#1e293b' : '#fafafa', borderRadius: '8px', border: '1px solid '+theme.border }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                          <span style={{ fontSize: '18px' }}>{s.icon}</span>
+                          <div><div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{s.title}</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{s.desc}</div></div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ color: theme.success, fontWeight: 800, fontSize: '15px', whiteSpace: 'nowrap' as const }}>-${s.saving.toFixed(0)}/mo</span>
+                          <button onClick={() => setDismissedSavings(prev => [...prev, s.id])} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '14px', padding: '2px' }} title="Dismiss">x</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>)}
+                  {totalPotential > 0 && <div style={{ marginTop: '8px', padding: '8px 12px', background: theme.success+'10', borderRadius: '8px', textAlign: 'center' as const }}><span style={{ color: theme.success, fontSize: '13px', fontWeight: 700 }}>💡 Total potential savings: ${totalPotential.toFixed(0)}/mo (${(totalPotential/4.33).toFixed(0)}/week)</span></div>}
+                </div>)
+              })()}
+            </div>
             <div style={cardStyle}>
               <h3 style={{ margin: '0 0 8px 0', color: theme.success, fontSize: '18px' }}>📈 Daily Compound Interest Calculator</h3>
               <p style={{ margin: '0 0 16px 0', color: theme.textMuted, fontSize: '12px' }}>Calculate compound growth with daily, weekly, or monthly compounding</p>
