@@ -184,7 +184,13 @@ export async function POST(request: NextRequest) {
         return 'No financial data provided yet.'
       }
       
-      const { income = [], expenses = [], debts = [], goals = [], assets = [], liabilities = [] } = data
+      const income = data.income || []
+      const expenses = data.expenses || []
+      const debts = data.debts || []
+      const goals = data.goals || []
+      const assets = data.assets || []
+      const liabilities = data.liabilities || []
+      
       let context = '=== CURRENT FINANCIAL SNAPSHOT ===\n'
 
       // Income
@@ -294,8 +300,12 @@ export async function POST(request: NextRequest) {
 
       const passiveCoverage = totalExpenses > 0 ? (passiveIncome / totalExpenses * 100) : 0
       const fireNumber = (totalExpenses * 12) * 25
-      const emergencyFundMonths = data.savings ? 
-        (typeof data.savings === 'string' ? parseFloat(data.savings) : data.savings) / totalExpenses : 0
+      
+      let emergencyFundMonths = 0
+      if (data.savings) {
+        const savings = typeof data.savings === 'string' ? parseFloat(data.savings) : data.savings
+        emergencyFundMonths = totalExpenses > 0 ? savings / totalExpenses : 0
+      }
 
       context += `\n=== KEY METRICS ===\n`
       context += `Monthly Surplus: $${surplus.toFixed(0)}\n`
@@ -319,10 +329,12 @@ export async function POST(request: NextRequest) {
 
       if (mem.name) context += `\nName: ${mem.name}\n`
 
-      if (mem.lifeEvents?.length > 0) {
+      // Fix: Properly handle potentially undefined lifeEvents
+      const lifeEvents = mem.lifeEvents || []
+      if (lifeEvents.length > 0) {
         context += '\n📅 IMPORTANT DATES:\n'
         // Sort by date, show upcoming first
-        const sorted = [...mem.lifeEvents].sort((a, b) => 
+        const sorted = [...lifeEvents].sort((a, b) => 
           new Date(a.date).getTime() - new Date(b.date).getTime()
         )
         sorted.forEach((event: LifeEvent) => {
@@ -334,9 +346,11 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      if (mem.patterns?.length > 0) {
+      // Fix: Properly handle potentially undefined patterns
+      const patterns = mem.patterns || []
+      if (patterns.length > 0) {
         context += '\n📊 PATTERNS I\'VE NOTICED:\n'
-        mem.patterns.slice(-5).forEach((p: string) => context += `  - ${p}\n`)
+        patterns.slice(-5).forEach((p: string) => context += `  - ${p}\n`)
       }
 
       if (mem.preferences) {
@@ -352,9 +366,11 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      if (mem.notes?.length > 0) {
+      // Fix: Properly handle potentially undefined notes
+      const notes = mem.notes || []
+      if (notes.length > 0) {
         context += '\n📝 RECENT NOTES:\n'
-        mem.notes.slice(-3).forEach((n: string) => context += `  - ${n}\n`)
+        notes.slice(-3).forEach((n: string) => context += `  - ${n}\n`)
       }
 
       context += '\n⚠️ IMPORTANT: If the user shares NEW personal information (dates, events, preferences, patterns), ALWAYS include it in memoryUpdates.\n'
