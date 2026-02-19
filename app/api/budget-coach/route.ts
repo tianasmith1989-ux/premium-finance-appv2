@@ -1,55 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function POST(request: NextRequest) {
-  try {
-    const { 
-      mode,           // 'onboarding' | 'proactive' | 'question' | 'legacy'
-      question,       // user's question (for question mode)
-      onboardingStep, // current step in onboarding
-      userResponse,   // user's response during onboarding
-      financialData,  // all financial data (income, expenses, debts, goals, assets, liabilities)
-      memory,         // persistent memory (life events, preferences, patterns)
-      financialContext // legacy support for old API calls
-    } = await request.json()
+// Types for better type safety
+interface MemoryUpdate {
+  lifeEvents?: LifeEvent[]
+  patterns?: string[]
+  notes?: string[]
+  preferences?: Preferences
+  extractedData?: any
+  lastUpdated?: string
+}
 
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
-    }
+interface LifeEvent {
+  name: string
+  date: string
+  budget?: number
+  addedDate: string
+}
 
-    // Legacy support - if old format, use simple response
-    if (financialContext && question && !mode) {
-      const legacyPrompt = `${financialContext}
+interface Preferences {
+  communicationStyle?: string
+  checkInFrequency?: string
+  motivators?: string[]
+}
 
-You are Aureus, a professional yet friendly financial advisor. Based on the user's actual financial data above, provide specific, actionable advice. Use their real numbers in your response. Be encouraging but honest. Keep responses concise and practical.
+interface AureusResponse {
+  message: string
+  memoryUpdates?: MemoryUpdate
+  alerts?: string[]
+  insight?: string
+  suggestion?: string
+  greeting?: string
+  currentStep?: string
+  mood?: 'positive' | 'neutral' | 'warning'
+  nextStep?: string
+  isComplete?: boolean
+  extractedData?: any
+}
 
-User's question: ${question}`
+interface UserMemory {
+  name?: string
+  lifeEvents?: LifeEvent[]
+  patterns?: string[]
+  preferences?: Preferences
+  notes?: string[]
+  lastUpdated?: string
+  [key: string]: any
+}
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1500,
-          messages: [{ role: 'user', content: legacyPrompt }]
-        })
-      })
-
-      const data = await response.json()
-      const advice = data.content?.[0]?.text || 'I apologize, but I could not generate advice.'
-      return NextResponse.json({ advice })
-    }
-
-    let systemPrompt = ''
-    let userPrompt = ''
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-
-    // ✅ Single declaration of financial frameworks
-    const FINANCIAL_FRAMEWORKS = `
+const FINANCIAL_FRAMEWORKS = `
 === FINANCIAL FRAMEWORKS YOU USE ===
 
 **BABY STEPS (Dave Ramsey inspired):**
@@ -78,51 +76,86 @@ User's question: ${question}`
 - Debt-to-Income Ratio
 - Passive Income Coverage = Passive Income / Monthly Expenses × 100
 - Emergency Fund Months = Savings / Monthly Expenses
+
+**MEMORY MANAGEMENT RULES:**
+- When users share personal information (birthdays, anniversaries, goals, preferences), ALWAYS include it in memoryUpdates
+- When users mention spending patterns or habits, note them in patterns
+- When users share important context about their life, add to notes
+- Always preserve exact numbers and dates users mention
+- If unsure about exact details, ask for clarification before storing
 `
+
+export async function POST(request: NextRequest) {
+  try {
+    const { 
+      mode = 'question',           // 'onboarding' | 'proactive' | 'question'
+      question,                    // user's question (for question mode)
+      onboardingStep,              // current step in onboarding
+      userResponse,                // user's response during onboarding
+      financialData,               // all financial data
+      memory = {},                 // persistent memory
+      lastExchange,                // previous exchange for context
+      userId                       // user identifier for memory updates
+    } = await request.json()
+
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
+    }
+
+    const today = new Date().toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'long' 
+    })
 
     // Build financial context from user data
     const buildFinancialContext = () => {
       if (!financialData) return 'No financial data provided yet.'
-      const { income, expenses, debts, goals, assets, liabilities } = financialData
+      
+      const { income = [], expenses = [], debts = [], goals = [], assets = [], liabilities = [] } = financialData
       let context = '=== CURRENT FINANCIAL SNAPSHOT ===\n'
 
+      // Helper to normalize to monthly
+      const toMonthly = (amount: number, frequency: string): number => {
+        if (frequency === 'weekly') return amount * 4.33
+        if (frequency === 'fortnightly') return amount * 2.17
+        if (frequency === 'yearly') return amount / 12
+        return amount // monthly default
+      }
+
       // Income
-      if (income?.length > 0) {
+      if (income.length > 0) {
         let totalIncome = 0
         let passiveIncome = 0
         income.forEach((i: any) => {
           const amt = parseFloat(i.amount || '0')
-          let monthly = amt
-          if (i.frequency === 'weekly') monthly = amt * 4.33
-          if (i.frequency === 'fortnightly') monthly = amt * 2.17
-          if (i.frequency === 'yearly') monthly = amt / 12
+          const monthly = toMonthly(amt, i.frequency)
           totalIncome += monthly
           if (i.type === 'passive') passiveIncome += monthly
         })
         context += `\nINCOME: $${totalIncome.toFixed(0)}/month (Passive: $${passiveIncome.toFixed(0)})\n`
-        income.forEach((i: any) => {
+        income.slice(0, 5).forEach((i: any) => {
           context += `  - ${i.name}: $${i.amount}/${i.frequency} (${i.type})\n`
         })
+        if (income.length > 5) context += `  ... and ${income.length - 5} more income sources\n`
       }
 
       // Expenses
-      if (expenses?.length > 0) {
+      if (expenses.length > 0) {
         const totalExpenses = expenses.reduce((sum: number, e: any) => {
-          const amt = parseFloat(e.amount || '0')
-          if (e.frequency === 'weekly') return sum + amt * 4.33
-          if (e.frequency === 'fortnightly') return sum + amt * 2.17
-          if (e.frequency === 'yearly') return sum + amt / 12
-          return sum + amt
+          return sum + toMonthly(parseFloat(e.amount || '0'), e.frequency)
         }, 0)
         context += `\nEXPENSES: $${totalExpenses.toFixed(0)}/month\n`
-        expenses.slice(0, 10).forEach((e: any) => {
+        expenses.slice(0, 8).forEach((e: any) => {
           context += `  - ${e.name}: $${e.amount}/${e.frequency}${e.category ? ` [${e.category}]` : ''}\n`
         })
-        if (expenses.length > 10) context += `  ... and ${expenses.length - 10} more\n`
+        if (expenses.length > 8) context += `  ... and ${expenses.length - 8} more expenses\n`
       }
 
       // Debts
-      if (debts?.length > 0) {
+      if (debts.length > 0) {
         const totalDebt = debts.reduce((sum: number, d: any) => sum + parseFloat(d.balance || '0'), 0)
         const monthlyDebtPayments = debts.reduce((sum: number, d: any) => sum + parseFloat(d.minPayment || '0'), 0)
         context += `\nDEBTS: $${totalDebt.toFixed(0)} total, $${monthlyDebtPayments.toFixed(0)}/month in payments\n`
@@ -132,117 +165,150 @@ User's question: ${question}`
       }
 
       // Goals
-      if (goals?.length > 0) {
+      if (goals.length > 0) {
         context += `\nGOALS:\n`
         goals.forEach((g: any) => {
-          const progress = (parseFloat(g.saved || '0') / parseFloat(g.target || '1') * 100).toFixed(0)
-          const remaining = parseFloat(g.target || '0') - parseFloat(g.saved || '0')
-          context += `  - ${g.name}: $${g.saved}/$${g.target} (${progress}%) - $${remaining.toFixed(0)} to go\n`
+          const saved = parseFloat(g.saved || '0')
+          const target = parseFloat(g.target || '1')
+          const progress = target > 0 ? (saved / target * 100).toFixed(0) : '0'
+          const remaining = target - saved
+          context += `  - ${g.name}: $${saved}/$${target} (${progress}%) - $${remaining.toFixed(0)} to go\n`
           if (g.deadline) context += `    Deadline: ${g.deadline}\n`
         })
       }
 
       // Assets & Liabilities
-      if (assets?.length > 0) {
+      if (assets.length > 0) {
         const totalAssets = assets.reduce((sum: number, a: any) => sum + parseFloat(a.value || '0'), 0)
         context += `\nASSETS: $${totalAssets.toFixed(0)} total\n`
-        assets.forEach((a: any) => {
+        assets.slice(0, 5).forEach((a: any) => {
           context += `  - ${a.name}: $${a.value} (${a.type})\n`
         })
       }
 
-      if (liabilities?.length > 0) {
+      if (liabilities.length > 0) {
         const totalLiabilities = liabilities.reduce((sum: number, l: any) => sum + parseFloat(l.value || '0'), 0)
         context += `\nLIABILITIES: $${totalLiabilities.toFixed(0)} total\n`
       }
 
       // Key metrics
-      const totalIncome = income?.reduce((sum: number, i: any) => {
-        const amt = parseFloat(i.amount || '0')
-        if (i.frequency === 'weekly') return sum + amt * 4.33
-        if (i.frequency === 'fortnightly') return sum + amt * 2.17
-        return sum + amt
-      }, 0) || 0
+      const totalIncome = income.reduce((sum: number, i: any) => {
+        return sum + toMonthly(parseFloat(i.amount || '0'), i.frequency)
+      }, 0)
 
-      const totalExpenses = expenses?.reduce((sum: number, e: any) => {
-        const amt = parseFloat(e.amount || '0')
-        if (e.frequency === 'weekly') return sum + amt * 4.33
-        if (e.frequency === 'fortnightly') return sum + amt * 2.17
-        return sum + amt
-      }, 0) || 0
+      const totalExpenses = expenses.reduce((sum: number, e: any) => {
+        return sum + toMonthly(parseFloat(e.amount || '0'), e.frequency)
+      }, 0)
 
-      const totalDebtPayments = debts?.reduce((sum: number, d: any) => sum + parseFloat(d.minPayment || '0'), 0) || 0
+      const totalDebtPayments = debts.reduce((sum: number, d: any) => sum + parseFloat(d.minPayment || '0'), 0)
       const surplus = totalIncome - totalExpenses - totalDebtPayments
       const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100) : 0
 
-      const passiveIncome = income?.filter((i: any) => i.type === 'passive').reduce((sum: number, i: any) => {
-        const amt = parseFloat(i.amount || '0')
-        if (i.frequency === 'weekly') return sum + amt * 4.33
-        if (i.frequency === 'fortnightly') return sum + amt * 2.17
-        return sum + amt
-      }, 0) || 0
+      const passiveIncome = income
+        .filter((i: any) => i.type === 'passive')
+        .reduce((sum: number, i: any) => {
+          return sum + toMonthly(parseFloat(i.amount || '0'), i.frequency)
+        }, 0)
 
       const passiveCoverage = totalExpenses > 0 ? (passiveIncome / totalExpenses * 100) : 0
       const fireNumber = (totalExpenses * 12) * 25
+      const emergencyFundMonths = financialData.savings ? 
+        (parseFloat(financialData.savings) / totalExpenses) : 0
 
       context += `\n=== KEY METRICS ===\n`
       context += `Monthly Surplus: $${surplus.toFixed(0)}\n`
       context += `Savings Rate: ${savingsRate.toFixed(1)}%\n`
       context += `Passive Income Coverage: ${passiveCoverage.toFixed(1)}%\n`
+      context += `Emergency Fund: ${emergencyFundMonths.toFixed(1)} months\n`
       context += `FIRE Number: $${fireNumber.toFixed(0)}\n`
 
       return context
     }
 
     const buildMemoryContext = () => {
-      if (!memory) return ''
+      if (!memory || Object.keys(memory).length === 0) {
+        return '\n=== WHAT I REMEMBER ABOUT YOU ===\nNo memories stored yet. Ask questions to learn about them!\n'
+      }
+      
+      const mem = memory as UserMemory
       let context = '\n=== WHAT I REMEMBER ABOUT YOU ===\n'
+      context += `Last updated: ${mem.lastUpdated || 'Unknown'}\n`
 
-      if (memory.name) context += `Name: ${memory.name}\n`
-      if (memory.lifeEvents?.length > 0) {
-        context += '\nIMPORTANT DATES:\n'
-        memory.lifeEvents.forEach((event: any) => {
-          context += `  - ${event.name}: ${event.date}${event.budget ? ` (budget: $${event.budget})` : ''}\n`
+      if (mem.name) context += `\nName: ${mem.name}\n`
+
+      if (mem.lifeEvents?.length > 0) {
+        context += '\n📅 IMPORTANT DATES:\n'
+        // Sort by date, show upcoming first
+        const sorted = [...mem.lifeEvents].sort((a, b) => 
+          new Date(a.date).getTime() - new Date(b.date).getTime()
+        )
+        sorted.forEach((event: LifeEvent) => {
+          const eventDate = new Date(event.date)
+          const today = new Date()
+          const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+          const upcoming = daysUntil > 0 && daysUntil < 30 ? ' 🔜' : ''
+          context += `  - ${event.name}: ${event.date}${event.budget ? ` ($${event.budget})` : ''}${upcoming}\n`
         })
       }
-      if (memory.patterns?.length > 0) {
-        context += '\nPATTERNS I\'VE NOTICED:\n'
-        memory.patterns.forEach((p: string) => context += `  - ${p}\n`)
-      }
-      if (memory.preferences) {
-        context += '\nYOUR PREFERENCES:\n'
-        if (memory.preferences.communicationStyle) context += `  - Communication: ${memory.preferences.communicationStyle}\n`
-        if (memory.preferences.checkInFrequency) context += `  - Check-ins: ${memory.preferences.checkInFrequency}\n`
-        if (memory.preferences.motivators) context += `  - Motivated by: ${memory.preferences.motivators.join(', ')}\n`
-      }
-      if (memory.notes?.length > 0) {
-        context += '\nNOTES:\n'
-        memory.notes.slice(-5).forEach((n: string) => context += `  - ${n}\n`)
+
+      if (mem.patterns?.length > 0) {
+        context += '\n📊 PATTERNS I\'VE NOTICED:\n'
+        mem.patterns.slice(-5).forEach((p: string) => context += `  - ${p}\n`)
       }
 
+      if (mem.preferences) {
+        context += '\n⚙️ YOUR PREFERENCES:\n'
+        if (mem.preferences.communicationStyle) {
+          context += `  - Communication: ${mem.preferences.communicationStyle}\n`
+        }
+        if (mem.preferences.checkInFrequency) {
+          context += `  - Check-ins: ${mem.preferences.checkInFrequency}\n`
+        }
+        if (mem.preferences.motivators?.length) {
+          context += `  - Motivated by: ${mem.preferences.motivators.join(', ')}\n`
+        }
+      }
+
+      if (mem.notes?.length > 0) {
+        context += '\n📝 RECENT NOTES:\n'
+        mem.notes.slice(-3).forEach((n: string) => context += `  - ${n}\n`)
+      }
+
+      context += '\n⚠️ IMPORTANT: If the user shares NEW personal information (dates, events, preferences, patterns), ALWAYS include it in memoryUpdates.\n'
+      
       return context
     }
 
-    // Build prompts per mode
-    if (mode === 'onboarding') {
-      systemPrompt = `You are Aureus, a warm, friendly, and genuinely helpful financial companion. You're having a conversation to get to know a new user and set up their financial profile.
+    // Build conversation context from last exchange
+    const buildConversationContext = () => {
+      if (!lastExchange) return ''
+      return `
+=== PREVIOUS EXCHANGE ===
+User said: "${lastExchange.userMessage}"
+You responded with: ${JSON.stringify(lastExchange.aiResponse)}
+`
+    }
+
+    // Create system prompt based on mode
+    let systemPrompt = `You are Aureus, a warm, friendly, and genuinely helpful financial companion. Today is ${today}.
 
 ${FINANCIAL_FRAMEWORKS}
 
-Your personality:
-- Warm and encouraging, like a supportive friend who's great with money
-- You use casual language, occasional emojis, but stay professional
-- You celebrate small wins and don't judge financial struggles
-- You're genuinely curious about their life, not just their money
-- You keep responses SHORT - 2-3 sentences max, then ask ONE question
-- You know about Baby Steps, FIRE, and help users find their path
+${buildFinancialContext()}
+${buildMemoryContext()}
+${buildConversationContext()}
 
-Current onboarding step: ${onboardingStep}
+`
+
+    // Add mode-specific instructions
+    if (mode === 'onboarding') {
+      systemPrompt += `
+You're currently onboarding a new user at step: ${onboardingStep}
 
 The onboarding flow:
 1. greeting - Get their name, make them feel welcome
 2. income - Ask about how they make money (job, side hustles, passive income?)
-3. expenses - Ask about their main bills and spending
+3. expenses - Ask about their main bills and spending  
 4. debts - Gently ask if they have any debts to tackle
 5. goals - What are they saving for? Dreams?
 6. life_events - Birthdays, anniversaries, holidays they budget for
@@ -250,29 +316,32 @@ The onboarding flow:
 8. preferences - How do they want you to communicate? Direct or gentle?
 9. complete - Summarize and get them excited to start
 
-Always respond with JSON in this format:
+Your personality during onboarding:
+- Warm and encouraging, like a supportive friend
+- Use casual language, occasional emojis
+- Celebrate small wins, don't judge
+- Keep responses SHORT - 2-3 sentences max, then ask ONE question
+
+Respond with JSON in this format:
 {
   "message": "Your conversational response",
   "nextStep": "the next onboarding step (or same step if need more info)",
   "extractedData": { any data to save from their response },
-  "isComplete": false
+  "isComplete": false,
+  "memoryUpdates": { 
+    "name": "if you learned their name",
+    "preferences": { any preferences they mentioned },
+    "notes": ["any important context to remember"]
+  }
 }`
-
-      userPrompt = `User's response: "${userResponse || 'Just started'}"\n\nCurrent data collected so far: ${JSON.stringify(memory || {})}`
-
-    } else if (mode === 'proactive') {
-      systemPrompt = `You are Aureus, a proactive financial companion. Today is ${today}.
-
-${FINANCIAL_FRAMEWORKS}
-
-${buildFinancialContext()}
-${buildMemoryContext()}
-
-Your job is to analyze the user's financial situation and give them the most important, timely insight RIGHT NOW.
+    } 
+    else if (mode === 'proactive') {
+      systemPrompt += `
+You're being proactive - analyze their situation and give the most important insight RIGHT NOW.
 
 Consider:
-1. Where are they on the Baby Steps? What's their next milestone?
-2. How close are they to escaping the rat race (passive income vs expenses)?
+1. Where are they on the Baby Steps? Next milestone?
+2. How close to escaping the rat race (passive income vs expenses)?
 3. Any upcoming life events in the next 30 days?
 4. Any warning signs (overspending, upcoming bills, low surplus)?
 5. Any wins to celebrate?
@@ -280,46 +349,47 @@ Consider:
 Rules:
 - Lead with what matters TODAY
 - Reference their actual numbers
-- Mention their progress on their chosen path (Baby Steps, FIRE, etc.)
-- If there's an upcoming life event, mention it
 - Keep it to 2-3 sentences MAX
 - Be warm but direct
-- End with a helpful suggestion or offer to help
 
 Respond with JSON:
 {
   "greeting": "A short personalized greeting",
-  "insight": "Your main proactive insight",
+  "insight": "Your main proactive insight", 
   "suggestion": "An optional actionable suggestion",
   "alerts": ["any urgent items as short strings"],
   "currentStep": "Their current Baby Step or FIRE progress",
-  "mood": "positive" | "neutral" | "warning"
+  "mood": "positive" | "neutral" | "warning",
+  "memoryUpdates": { any new patterns or observations }
 }`
-
-      userPrompt = `Generate a proactive insight for this user right now.`
-
-    } else {
-      // Question mode (default)
-      systemPrompt = `You are Aureus, a knowledgeable and supportive financial companion. Today is ${today}.
-
-${FINANCIAL_FRAMEWORKS}
-
-${buildFinancialContext()}
-${buildMemoryContext()}
+    } 
+    else {
+      // Question mode
+      systemPrompt += `
+You're answering a question from the user. Use their actual numbers, reference Baby Steps or FIRE when relevant.
 
 Rules:
-- Use their actual numbers in your response
-- Reference the Baby Steps or FIRE path when relevant
+- Use their actual numbers in responses
 - Be specific and actionable
 - Keep responses concise (3-5 sentences)
-- If they ask to add/change something, confirm what you understood
-- Be encouraging but honest about challenges
-- If they seem stuck, suggest their next Baby Step or action`
+- Confirm any changes they want to make
+- Be encouraging but honest
 
-      userPrompt = question || 'Hello!'
+Question: ${question || 'Hello!'}
+
+Respond with JSON:
+{
+  "message": "Your helpful response",
+  "memoryUpdates": { 
+    "patterns": ["any new spending patterns noticed"],
+    "notes": ["any important context from this conversation"],
+    "preferences": { any communication preferences they mention }
+  },
+  "alerts": ["any important alerts based on this question"]
+}`
     }
 
-    // Send to Anthropic API
+    // Call Anthropic API
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -328,31 +398,106 @@ Rules:
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-sonnet-20241022',
         max_tokens: 1500,
-        messages: [{ role: 'user', content: userPrompt }],
+        temperature: 0.7,
+        messages: [{ 
+          role: 'user', 
+          content: mode === 'onboarding' 
+            ? `User response: "${userResponse || 'Just started onboarding'}"\n\nCurrent data: ${JSON.stringify(memory || {})}`
+            : mode === 'proactive'
+            ? 'Generate a proactive insight for me right now.'
+            : question || 'Hello!'
+        }],
         system: systemPrompt
       })
     })
 
     const data = await response.json()
+    
     if (!response.ok) {
       console.error('Anthropic API error:', data)
-      return NextResponse.json({ error: data.error?.message || 'Request failed' }, { status: response.status })
+      return NextResponse.json(
+        { error: data.error?.message || 'Request failed' }, 
+        { status: response.status }
+      )
     }
 
     const responseText = data.content?.[0]?.text || ''
-
+    
+    // Parse response with fallback
+    let parsedResponse: AureusResponse
     try {
-      const parsed = JSON.parse(responseText)
-      return NextResponse.json({ ...parsed, raw: responseText })
-    } catch {
-      return NextResponse.json({ message: responseText, raw: responseText })
+      parsedResponse = JSON.parse(responseText)
+    } catch (e) {
+      // If JSON parsing fails, wrap the text in a standard format
+      parsedResponse = {
+        message: responseText,
+        memoryUpdates: {}
+      }
     }
+
+    // If there are memory updates, save them to the database
+    if (parsedResponse.memoryUpdates && Object.keys(parsedResponse.memoryUpdates).length > 0 && userId) {
+      try {
+        await saveMemoryUpdates(userId, parsedResponse.memoryUpdates)
+      } catch (error) {
+        console.error('Failed to save memory updates:', error)
+        // Continue even if memory save fails - don't break the user experience
+      }
+    }
+
+    return NextResponse.json({
+      ...parsedResponse,
+      timestamp: new Date().toISOString(),
+      _raw: process.env.NODE_ENV === 'development' ? responseText : undefined // Only in dev
+    })
 
   } catch (error) {
     console.error('Budget coach error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json(
+      { 
+        error: 'Internal server error',
+        message: 'I apologize, but I encountered an error. Please try again.',
+        memoryUpdates: {}
+      }, 
+      { status: 500 }
+    )
   }
 }
 
+// Helper function to save memory updates to your database
+async function saveMemoryUpdates(userId: string, updates: MemoryUpdate): Promise<void> {
+  // This is where you'd implement your database logic
+  // Example with Prisma:
+  /*
+  await prisma.userMemory.upsert({
+    where: { userId },
+    update: {
+      lifeEvents: { push: updates.lifeEvents },
+      patterns: { push: updates.patterns },
+      notes: { push: updates.notes },
+      preferences: updates.preferences ? { ...updates.preferences } : undefined,
+      lastUpdated: new Date().toISOString()
+    },
+    create: {
+      userId,
+      lifeEvents: updates.lifeEvents || [],
+      patterns: updates.patterns || [],
+      notes: updates.notes || [],
+      preferences: updates.preferences || {},
+      lastUpdated: new Date().toISOString()
+    }
+  })
+  */
+  
+  // For now, just log
+  console.log(`Saving memory updates for user ${userId}:`, updates)
+  
+  // You could also call your own API endpoint
+  await fetch(`${process.env.APP_URL}/api/update-memory`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, updates })
+  })
+}
