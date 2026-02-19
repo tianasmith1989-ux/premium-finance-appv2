@@ -13,7 +13,6 @@ export async function POST(request: NextRequest) {
     } = await request.json()
 
     const apiKey = process.env.ANTHROPIC_API_KEY
-    
     if (!apiKey) {
       return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
     }
@@ -47,8 +46,9 @@ User's question: ${question}`
 
     let systemPrompt = ''
     let userPrompt = ''
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
-    // Financial frameworks the AI knows about
+    // ✅ Single declaration of financial frameworks
     const FINANCIAL_FRAMEWORKS = `
 === FINANCIAL FRAMEWORKS YOU USE ===
 
@@ -80,14 +80,12 @@ User's question: ${question}`
 - Emergency Fund Months = Savings / Monthly Expenses
 `
 
-    // Build context from financial data
+    // Build financial context from user data
     const buildFinancialContext = () => {
       if (!financialData) return 'No financial data provided yet.'
-      
       const { income, expenses, debts, goals, assets, liabilities } = financialData
-      
       let context = '=== CURRENT FINANCIAL SNAPSHOT ===\n'
-      
+
       // Income
       if (income?.length > 0) {
         let totalIncome = 0
@@ -106,7 +104,7 @@ User's question: ${question}`
           context += `  - ${i.name}: $${i.amount}/${i.frequency} (${i.type})\n`
         })
       }
-      
+
       // Expenses
       if (expenses?.length > 0) {
         const totalExpenses = expenses.reduce((sum: number, e: any) => {
@@ -122,7 +120,7 @@ User's question: ${question}`
         })
         if (expenses.length > 10) context += `  ... and ${expenses.length - 10} more\n`
       }
-      
+
       // Debts
       if (debts?.length > 0) {
         const totalDebt = debts.reduce((sum: number, d: any) => sum + parseFloat(d.balance || '0'), 0)
@@ -132,7 +130,7 @@ User's question: ${question}`
           context += `  - ${d.name}: $${d.balance} @ ${d.interestRate}% (min: $${d.minPayment}/mo)\n`
         })
       }
-      
+
       // Goals
       if (goals?.length > 0) {
         context += `\nGOALS:\n`
@@ -143,8 +141,8 @@ User's question: ${question}`
           if (g.deadline) context += `    Deadline: ${g.deadline}\n`
         })
       }
-      
-      // Assets & Liabilities (if provided)
+
+      // Assets & Liabilities
       if (assets?.length > 0) {
         const totalAssets = assets.reduce((sum: number, a: any) => sum + parseFloat(a.value || '0'), 0)
         context += `\nASSETS: $${totalAssets.toFixed(0)} total\n`
@@ -152,119 +150,80 @@ User's question: ${question}`
           context += `  - ${a.name}: $${a.value} (${a.type})\n`
         })
       }
-      
+
       if (liabilities?.length > 0) {
         const totalLiabilities = liabilities.reduce((sum: number, l: any) => sum + parseFloat(l.value || '0'), 0)
         context += `\nLIABILITIES: $${totalLiabilities.toFixed(0)} total\n`
       }
-      
-      // Calculate key metrics
+
+      // Key metrics
       const totalIncome = income?.reduce((sum: number, i: any) => {
         const amt = parseFloat(i.amount || '0')
         if (i.frequency === 'weekly') return sum + amt * 4.33
         if (i.frequency === 'fortnightly') return sum + amt * 2.17
         return sum + amt
       }, 0) || 0
-      
+
       const totalExpenses = expenses?.reduce((sum: number, e: any) => {
         const amt = parseFloat(e.amount || '0')
         if (e.frequency === 'weekly') return sum + amt * 4.33
         if (e.frequency === 'fortnightly') return sum + amt * 2.17
         return sum + amt
       }, 0) || 0
-      
+
       const totalDebtPayments = debts?.reduce((sum: number, d: any) => sum + parseFloat(d.minPayment || '0'), 0) || 0
       const surplus = totalIncome - totalExpenses - totalDebtPayments
       const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100) : 0
-      
+
       const passiveIncome = income?.filter((i: any) => i.type === 'passive').reduce((sum: number, i: any) => {
         const amt = parseFloat(i.amount || '0')
         if (i.frequency === 'weekly') return sum + amt * 4.33
         if (i.frequency === 'fortnightly') return sum + amt * 2.17
         return sum + amt
       }, 0) || 0
-      
+
       const passiveCoverage = totalExpenses > 0 ? (passiveIncome / totalExpenses * 100) : 0
       const fireNumber = (totalExpenses * 12) * 25
-      
+
       context += `\n=== KEY METRICS ===\n`
       context += `Monthly Surplus: $${surplus.toFixed(0)}\n`
       context += `Savings Rate: ${savingsRate.toFixed(1)}%\n`
       context += `Passive Income Coverage: ${passiveCoverage.toFixed(1)}%\n`
       context += `FIRE Number: $${fireNumber.toFixed(0)}\n`
-      
+
       return context
     }
 
-    // Build memory context
     const buildMemoryContext = () => {
       if (!memory) return ''
-      
       let context = '\n=== WHAT I REMEMBER ABOUT YOU ===\n'
-      
+
       if (memory.name) context += `Name: ${memory.name}\n`
-      
       if (memory.lifeEvents?.length > 0) {
         context += '\nIMPORTANT DATES:\n'
         memory.lifeEvents.forEach((event: any) => {
           context += `  - ${event.name}: ${event.date}${event.budget ? ` (budget: $${event.budget})` : ''}\n`
         })
       }
-      
       if (memory.patterns?.length > 0) {
         context += '\nPATTERNS I\'VE NOTICED:\n'
         memory.patterns.forEach((p: string) => context += `  - ${p}\n`)
       }
-      
       if (memory.preferences) {
         context += '\nYOUR PREFERENCES:\n'
         if (memory.preferences.communicationStyle) context += `  - Communication: ${memory.preferences.communicationStyle}\n`
         if (memory.preferences.checkInFrequency) context += `  - Check-ins: ${memory.preferences.checkInFrequency}\n`
         if (memory.preferences.motivators) context += `  - Motivated by: ${memory.preferences.motivators.join(', ')}\n`
       }
-      
       if (memory.notes?.length > 0) {
         context += '\nNOTES:\n'
         memory.notes.slice(-5).forEach((n: string) => context += `  - ${n}\n`)
       }
-      
+
       return context
     }
 
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-
-    // Financial frameworks the AI knows about
-    const FINANCIAL_FRAMEWORKS = `
-=== FINANCIAL FRAMEWORKS YOU USE ===
-
-**BABY STEPS (Dave Ramsey inspired):**
-1. $1,000 Emergency Fund - starter emergency fund
-2. Pay off all debt (except mortgage) - debt snowball method
-3. 3-6 months expenses in savings - full emergency fund
-4. Invest 15% of income for retirement
-5. Save for children's education
-6. Pay off home early
-7. Build wealth and give generously
-
-**RAT RACE ESCAPE / FIRE PATH:**
-- Calculate monthly expenses (the "nut" to crack)
-- Build passive income streams to cover expenses
-- FIRE Number = Annual Expenses × 25
-- Track passive income coverage percentage
-- Goal: Passive Income >= Monthly Expenses = FREEDOM
-
-**DEBT PAYOFF METHODS:**
-- Avalanche: Highest interest first (mathematically optimal)
-- Snowball: Smallest balance first (psychologically motivating)
-
-**KEY METRICS TO TRACK:**
-- Monthly Surplus = Income - Expenses - Debt Payments
-- Savings Rate = (Income - Expenses) / Income × 100
-- Debt-to-Income Ratio
-- Passive Income Coverage = Passive Income / Monthly Expenses × 100
-- Emergency Fund Months = Savings / Monthly Expenses
-`
-
+    // Build prompts per mode
     if (mode === 'onboarding') {
       systemPrompt = `You are Aureus, a warm, friendly, and genuinely helpful financial companion. You're having a conversation to get to know a new user and set up their financial profile.
 
@@ -290,10 +249,6 @@ The onboarding flow:
 7. financial_path - Are they following Baby Steps? Pursuing FIRE? Just want stability?
 8. preferences - How do they want you to communicate? Direct or gentle?
 9. complete - Summarize and get them excited to start
-
-Based on their response, either:
-- Acknowledge what they said and ask a follow-up, OR
-- Move to the next step if you have enough info
 
 Always respond with JSON in this format:
 {
@@ -364,6 +319,7 @@ Rules:
       userPrompt = question || 'Hello!'
     }
 
+    // Send to Anthropic API
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -374,38 +330,29 @@ Rules:
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1500,
-        messages: [{
-          role: 'user',
-          content: userPrompt
-        }],
+        messages: [{ role: 'user', content: userPrompt }],
         system: systemPrompt
       })
     })
 
     const data = await response.json()
-
     if (!response.ok) {
       console.error('Anthropic API error:', data)
-      return NextResponse.json({ 
-        error: data.error?.message || 'Request failed' 
-      }, { status: response.status })
+      return NextResponse.json({ error: data.error?.message || 'Request failed' }, { status: response.status })
     }
 
     const responseText = data.content?.[0]?.text || ''
 
-    // Try to parse as JSON for structured responses
     try {
       const parsed = JSON.parse(responseText)
       return NextResponse.json({ ...parsed, raw: responseText })
     } catch {
-      // Return as plain text if not JSON
       return NextResponse.json({ message: responseText, raw: responseText })
     }
 
   } catch (error) {
     console.error('Budget coach error:', error)
-    return NextResponse.json({ 
-      error: 'Internal server error' 
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
