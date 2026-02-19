@@ -484,7 +484,7 @@ export default function Dashboard() {
     setIsLoading(false)
   }
 
-  // FIXED: Now sends ALL data to the API
+  // FIXED: Complete rewrite of onboarding handler
   const handleOnboardingResponse = async (response: string, mode: 'budget' | 'trading') => {
     setIsLoading(true)
     setChatMessages(prev => [...prev, { role: 'user', content: response }])
@@ -500,7 +500,7 @@ export default function Dashboard() {
         mode: 'onboarding', 
         onboardingStep: currentStep, 
         userResponse: response, 
-        memory: memory
+        memory: { ...memory } // Spread to ensure it's a fresh object
       }
       
       // CRITICAL: Add financialData for budget mode
@@ -524,15 +524,16 @@ export default function Dashboard() {
       
       // Add lastExchange for context if there are previous messages
       if (chatMessages.length > 0) {
-        const lastUserMsg = [...chatMessages].reverse().find(m => m.role === 'user')
-        const lastAiMsg = [...chatMessages].reverse().find(m => m.role === 'assistant')
-        if (lastUserMsg && lastAiMsg) {
+        const lastMessages = chatMessages.slice(-2) // Get last 2 messages
+        if (lastMessages.length === 2) {
           requestBody.lastExchange = {
-            userMessage: lastUserMsg.content,
-            aiResponse: { message: lastAiMsg.content }
+            userMessage: lastMessages[0].content,
+            aiResponse: { message: lastMessages[1].content }
           }
         }
       }
+      
+      console.log('Sending onboarding request:', requestBody) // Debug log
       
       const apiResponse = await fetch(endpoint, {
         method: 'POST',
@@ -541,26 +542,26 @@ export default function Dashboard() {
       })
       
       const data = await apiResponse.json()
-      setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.raw || "Let's continue..." }])
+      console.log('API Response:', data) // Debug log
       
-      // Update memory and financial data based on AI response
-      if (data.extractedData) {
+      // FIXED: Update memory with both memoryUpdates and extractedData
+      if (data.memoryUpdates || data.extractedData) {
+        const updates = { ...(data.memoryUpdates || {}), ...(data.extractedData || {}) }
+        
         if (mode === 'budget') {
-          setBudgetMemory((prev: any) => ({ ...prev, ...data.extractedData }))
-          
-          // Also update financial data if the AI extracted any
-          if (data.extractedData.income) setIncomeStreams(data.extractedData.income)
-          if (data.extractedData.expenses) setExpenses(data.extractedData.expenses)
-          if (data.extractedData.debts) setDebts(data.extractedData.debts)
-          if (data.extractedData.goals) setGoals(data.extractedData.goals)
+          setBudgetMemory((prev: any) => {
+            const newMemory = { ...prev, ...updates }
+            console.log('Updated budget memory:', newMemory) // Debug
+            return newMemory
+          })
         } else {
-          setTradingMemory((prev: any) => ({ ...prev, ...data.extractedData }))
+          setTradingMemory((prev: any) => ({ ...prev, ...updates }))
         }
       }
       
-      if (data.memoryUpdates && mode === 'budget') {
-        setBudgetMemory((prev: any) => ({ ...prev, ...data.memoryUpdates }))
-      }
+      // FIXED: Always use the message from the response
+      const aiMessage = data.message || "Let's continue..."
+      setChatMessages(prev => [...prev, { role: 'assistant', content: aiMessage }])
       
       if (data.isComplete) {
         if (mode === 'budget') {
@@ -572,8 +573,11 @@ export default function Dashboard() {
         }
         setTimeout(() => fetchProactiveInsight(mode), 500)
       } else if (data.nextStep) {
-        if (mode === 'budget') setBudgetOnboarding(prev => ({ ...prev, step: data.nextStep }))
-        else setTradingOnboarding(prev => ({ ...prev, step: data.nextStep }))
+        if (mode === 'budget') {
+          setBudgetOnboarding(prev => ({ ...prev, step: data.nextStep }))
+        } else {
+          setTradingOnboarding(prev => ({ ...prev, step: data.nextStep }))
+        }
       }
     } catch (error) {
       console.error('Onboarding error:', error)
@@ -582,7 +586,7 @@ export default function Dashboard() {
     setIsLoading(false)
   }
 
-  // FIXED: Now sends ALL data to the API
+  // FIXED: Regular chat message handler
   const handleChatMessage = async () => {
     if (!chatInput.trim() || isLoading) return
     const message = chatInput.trim()
@@ -623,15 +627,16 @@ export default function Dashboard() {
       
       // Add last exchange for context
       if (chatMessages.length > 0) {
-        const lastUserMsg = [...chatMessages].reverse().find(m => m.role === 'user')
-        const lastAiMsg = [...chatMessages].reverse().find(m => m.role === 'assistant')
-        if (lastUserMsg && lastAiMsg) {
+        const lastMessages = chatMessages.slice(-2)
+        if (lastMessages.length === 2) {
           requestBody.lastExchange = {
-            userMessage: lastUserMsg.content,
-            aiResponse: { message: lastAiMsg.content }
+            userMessage: lastMessages[0].content,
+            aiResponse: { message: lastMessages[1].content }
           }
         }
       }
+      
+      console.log('Sending chat request:', requestBody) // Debug log
       
       const response = await fetch(endpoint, { 
         method: 'POST', 
@@ -640,6 +645,8 @@ export default function Dashboard() {
       })
       
       const data = await response.json()
+      console.log('Chat response:', data) // Debug log
+      
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
       
       // Update memory if the AI returns updates
@@ -851,7 +858,7 @@ export default function Dashboard() {
       </header>
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
-        {/* AI AGENT CARD - FIXED: Now receives all data */}
+        {/* AI AGENT CARD */}
         <div style={{ background: `linear-gradient(135deg, ${appMode === 'budget' ? theme.success : theme.warning}15, ${theme.purple}15)`, border: `2px solid ${appMode === 'budget' ? theme.success : theme.warning}`, borderRadius: '20px', padding: '24px', marginBottom: '24px' }}>
           {proactiveInsight && !budgetOnboarding.isActive && !tradingOnboarding.isActive && (
             <div style={{ marginBottom: chatMessages.length > 0 ? '16px' : '0' }}>
@@ -903,7 +910,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* BUDGET DASHBOARD TAB */}
+        {/* BUDGET DASHBOARD TAB - Keep your existing code here */}
         {appMode === 'budget' && activeTab === 'dashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             {/* This Month Summary */}
@@ -1060,7 +1067,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* OVERVIEW TAB */}
+        {/* OVERVIEW TAB - Keep your existing code */}
         {appMode === 'budget' && activeTab === 'overview' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
@@ -1106,7 +1113,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* PATH TAB */}
+        {/* PATH TAB - Keep your existing code */}
         {appMode === 'budget' && activeTab === 'path' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             <div style={cardStyle}>
@@ -1172,7 +1179,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* TRADING TAB */}
+        {/* TRADING TAB - Keep your existing code */}
         {appMode === 'trading' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
