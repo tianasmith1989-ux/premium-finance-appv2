@@ -1,5 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Financial frameworks the AI knows about
+const FINANCIAL_FRAMEWORKS = `
+=== FINANCIAL FRAMEWORKS YOU USE ===
+
+**BABY STEPS (Dave Ramsey inspired):**
+1. $1,000 Emergency Fund - starter emergency fund
+2. Pay off all debt (except mortgage) - debt snowball method
+3. 3-6 months expenses in savings - full emergency fund
+4. Invest 15% of income for retirement
+5. Save for children's education
+6. Pay off home early
+7. Build wealth and give generously
+
+**RAT RACE ESCAPE / FIRE PATH:**
+- Calculate monthly expenses (the "nut" to crack)
+- Build passive income streams to cover expenses
+- FIRE Number = Annual Expenses × 25
+- Track passive income coverage percentage
+- Goal: Passive Income >= Monthly Expenses = FREEDOM
+
+**DEBT PAYOFF METHODS:**
+- Avalanche: Highest interest first (mathematically optimal)
+- Snowball: Smallest balance first (psychologically motivating)
+
+**KEY METRICS TO TRACK:**
+- Monthly Surplus = Income - Expenses - Debt Payments
+- Savings Rate = (Income - Expenses) / Income × 100
+- Debt-to-Income Ratio
+- Passive Income Coverage = Passive Income / Monthly Expenses × 100
+- Emergency Fund Months = Savings / Monthly Expenses
+`
+
 export async function POST(request: NextRequest) {
   try {
     const { 
@@ -233,38 +265,6 @@ User's question: ${question}`
 
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
-    // Financial frameworks the AI knows about
-    const FINANCIAL_FRAMEWORKS = `
-=== FINANCIAL FRAMEWORKS YOU USE ===
-
-**BABY STEPS (Dave Ramsey inspired):**
-1. $1,000 Emergency Fund - starter emergency fund
-2. Pay off all debt (except mortgage) - debt snowball method
-3. 3-6 months expenses in savings - full emergency fund
-4. Invest 15% of income for retirement
-5. Save for children's education
-6. Pay off home early
-7. Build wealth and give generously
-
-**RAT RACE ESCAPE / FIRE PATH:**
-- Calculate monthly expenses (the "nut" to crack)
-- Build passive income streams to cover expenses
-- FIRE Number = Annual Expenses × 25
-- Track passive income coverage percentage
-- Goal: Passive Income >= Monthly Expenses = FREEDOM
-
-**DEBT PAYOFF METHODS:**
-- Avalanche: Highest interest first (mathematically optimal)
-- Snowball: Smallest balance first (psychologically motivating)
-
-**KEY METRICS TO TRACK:**
-- Monthly Surplus = Income - Expenses - Debt Payments
-- Savings Rate = (Income - Expenses) / Income × 100
-- Debt-to-Income Ratio
-- Passive Income Coverage = Passive Income / Monthly Expenses × 100
-- Emergency Fund Months = Savings / Monthly Expenses
-`
-
     if (mode === 'onboarding') {
       systemPrompt = `You are Aureus, a warm, friendly financial companion helping a new user set up their financial profile through natural conversation.
 
@@ -425,11 +425,3 @@ Keep responses concise (2-4 sentences).`
     }, { status: 500 })
   }
 }
-
-
-
-
-
-
-
-
