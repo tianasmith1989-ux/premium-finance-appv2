@@ -343,6 +343,76 @@ export default function Dashboard() {
     alert(`${goal.name} added to calendar!`)
   }
 
+  // Debt payoff calculator - calculates months to payoff
+  const calculateSingleDebtPayoff = (debt: any) => {
+    const balance = parseFloat(debt.balance || '0')
+    const interestRate = parseFloat(debt.interestRate || '0') / 100 / 12 // Monthly rate
+    const minPayment = convertToMonthly(parseFloat(debt.minPayment || '0'), debt.frequency || 'monthly')
+    
+    // Get any extra payments targeting this debt
+    const extraPayments = expenses.filter(e => e.targetDebtId === debt.id)
+      .reduce((sum, e) => sum + convertToMonthly(parseFloat(e.amount || '0'), e.frequency), 0)
+    
+    const totalPayment = minPayment + extraPayments
+    
+    if (balance <= 0) return { months: 0, totalInterest: 0, payoffDate: 'Paid off!' }
+    if (totalPayment <= 0) return { months: 999, totalInterest: 0, payoffDate: 'No payment set' }
+    
+    // Check if payment covers interest
+    const monthlyInterest = balance * interestRate
+    if (totalPayment <= monthlyInterest) {
+      return { months: 999, totalInterest: 0, payoffDate: 'Payment too low!' }
+    }
+    
+    // Calculate payoff
+    let remaining = balance
+    let months = 0
+    let totalInterest = 0
+    
+    while (remaining > 0 && months < 600) {
+      const interest = remaining * interestRate
+      totalInterest += interest
+      remaining = remaining + interest - totalPayment
+      months++
+    }
+    
+    const payoffDate = new Date()
+    payoffDate.setMonth(payoffDate.getMonth() + months)
+    
+    return {
+      months,
+      totalInterest,
+      payoffDate: months < 600 ? payoffDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Never',
+      extraPayments,
+      totalPayment
+    }
+  }
+
+  // Add extra payment to a specific debt
+  const addExtraPaymentToDebt = (debtId: number) => {
+    const extra = debtExtraPayment[debtId]
+    if (!extra || !extra.amount || parseFloat(extra.amount) <= 0) { 
+      alert('Please enter an extra payment amount')
+      return 
+    }
+    const debt = debts.find(d => d.id === debtId)
+    if (!debt) return
+    
+    setExpenses([...expenses, { 
+      id: Date.now(), 
+      name: `Extra → ${debt.name}`, 
+      amount: extra.amount, 
+      frequency: extra.frequency, 
+      category: 'debt',
+      dueDate: new Date().toISOString().split('T')[0], 
+      targetDebtId: debt.id 
+    }])
+    
+    alert(`Extra payment of $${extra.amount}/${extra.frequency} added to ${debt.name}`)
+    setDebtExtraPayment(prev => ({ ...prev, [debtId]: { amount: '', frequency: 'monthly' } }))
+    setShowExtraInput(null)
+  }
+
   // ==================== CSV IMPORT ====================
   const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -439,52 +509,25 @@ export default function Dashboard() {
     setPaidOccurrences(newPaid)
   }
 
-  // ==================== FIXED AI AGENT FUNCTIONS ====================
+  // ==================== AI AGENT FUNCTIONS ====================
   const fetchProactiveInsight = async (mode: 'budget' | 'trading') => {
     setIsLoading(true)
     try {
       const endpoint = mode === 'budget' ? '/api/budget-coach' : '/api/trading-coach'
+      const body = mode === 'budget'
+        ? { mode: 'proactive', financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }, memory: budgetMemory }
+        : { mode: 'proactive', tradingData: { trades }, memory: tradingMemory }
       
-      const requestBody: any = { 
-        mode: 'proactive',
-        memory: mode === 'budget' ? budgetMemory : tradingMemory
-      }
-      
-      if (mode === 'budget') {
-        requestBody.financialData = {
-          income: incomeStreams,
-          expenses: expenses,
-          debts: debts,
-          goals: goals,
-          assets: assets,
-          liabilities: liabilities
-        }
-      } else {
-        requestBody.tradingData = {
-          trades: trades
-        }
-      }
-      
-      const response = await fetch(endpoint, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(requestBody) 
-      })
-      
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await response.json()
       setProactiveInsight(data)
     } catch (error) {
       console.error('Failed to fetch insight:', error)
-      setProactiveInsight({ 
-        greeting: `Hey${budgetMemory.name ? ' ' + budgetMemory.name : ''}!`, 
-        insight: 'Ready to help you with your finances today.', 
-        mood: 'neutral' 
-      })
+      setProactiveInsight({ greeting: `Hey${budgetMemory.name ? ' ' + budgetMemory.name : ''}!`, insight: 'Ready to help you with your finances today.', mood: 'neutral' })
     }
     setIsLoading(false)
   }
 
-  // FIXED: Complete rewrite of onboarding handler
   const handleOnboardingResponse = async (response: string, mode: 'budget' | 'trading') => {
     setIsLoading(true)
     setChatMessages(prev => [...prev, { role: 'user', content: response }])
@@ -495,73 +538,31 @@ export default function Dashboard() {
       const currentStep = mode === 'budget' ? budgetOnboarding.step : tradingOnboarding.step
       const memory = mode === 'budget' ? budgetMemory : tradingMemory
       
-      // Build the request body with ALL data
-      const requestBody: any = { 
-        mode: 'onboarding', 
-        onboardingStep: currentStep, 
-        userResponse: response, 
-        memory: { ...memory } // Spread to ensure it's a fresh object
-      }
-      
-      // CRITICAL: Add financialData for budget mode
-      if (mode === 'budget') {
-        requestBody.financialData = {
-          income: incomeStreams,
-          expenses: expenses,
-          debts: debts,
-          goals: goals,
-          assets: assets,
-          liabilities: liabilities
-        }
-      }
-      
-      // Add tradingData for trading mode
-      if (mode === 'trading') {
-        requestBody.tradingData = {
-          trades: trades
-        }
-      }
-      
-      // Add lastExchange for context if there are previous messages
-      if (chatMessages.length > 0) {
-        const lastMessages = chatMessages.slice(-2) // Get last 2 messages
-        if (lastMessages.length === 2) {
-          requestBody.lastExchange = {
-            userMessage: lastMessages[0].content,
-            aiResponse: { message: lastMessages[1].content }
-          }
-        }
-      }
-      
-      console.log('Sending onboarding request:', requestBody) // Debug log
-      
       const apiResponse = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({ 
+          mode: 'onboarding', 
+          onboardingStep: currentStep, 
+          userResponse: response, 
+          memory,
+          financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }
+        })
       })
       
       const data = await apiResponse.json()
-      console.log('API Response:', data) // Debug log
+      setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.raw || "Let's continue..." }])
       
-      // FIXED: Update memory with both memoryUpdates and extractedData
-      if (data.memoryUpdates || data.extractedData) {
-        const updates = { ...(data.memoryUpdates || {}), ...(data.extractedData || {}) }
-        
-        if (mode === 'budget') {
-          setBudgetMemory((prev: any) => {
-            const newMemory = { ...prev, ...updates }
-            console.log('Updated budget memory:', newMemory) // Debug
-            return newMemory
-          })
-        } else {
-          setTradingMemory((prev: any) => ({ ...prev, ...updates }))
-        }
+      // Execute any actions returned by the AI
+      if (data.actions && Array.isArray(data.actions)) {
+        executeAIActions(data.actions)
       }
       
-      // FIXED: Always use the message from the response
-      const aiMessage = data.message || "Let's continue..."
-      setChatMessages(prev => [...prev, { role: 'assistant', content: aiMessage }])
+      // Legacy support for extractedData
+      if (data.extractedData) {
+        if (mode === 'budget') setBudgetMemory((prev: any) => ({ ...prev, ...data.extractedData }))
+        else setTradingMemory((prev: any) => ({ ...prev, ...data.extractedData }))
+      }
       
       if (data.isComplete) {
         if (mode === 'budget') {
@@ -573,20 +574,103 @@ export default function Dashboard() {
         }
         setTimeout(() => fetchProactiveInsight(mode), 500)
       } else if (data.nextStep) {
-        if (mode === 'budget') {
-          setBudgetOnboarding(prev => ({ ...prev, step: data.nextStep }))
-        } else {
-          setTradingOnboarding(prev => ({ ...prev, step: data.nextStep }))
-        }
+        if (mode === 'budget') setBudgetOnboarding(prev => ({ ...prev, step: data.nextStep }))
+        else setTradingOnboarding(prev => ({ ...prev, step: data.nextStep }))
       }
     } catch (error) {
-      console.error('Onboarding error:', error)
       setChatMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I had trouble with that. Let's try again!" }])
     }
     setIsLoading(false)
   }
 
-  // FIXED: Regular chat message handler
+  // Execute actions returned by AI
+  const executeAIActions = (actions: any[]) => {
+    actions.forEach(action => {
+      const { type, data } = action
+      
+      switch (type) {
+        case 'addIncome':
+          if (data.name && data.amount) {
+            setIncomeStreams(prev => [...prev, {
+              id: Date.now() + Math.random(),
+              name: data.name,
+              amount: data.amount.toString().replace(/[$,]/g, ''),
+              frequency: data.frequency || 'monthly',
+              type: data.type || 'active',
+              startDate: new Date().toISOString().split('T')[0]
+            }])
+          }
+          break
+          
+        case 'addExpense':
+          if (data.name && data.amount) {
+            setExpenses(prev => [...prev, {
+              id: Date.now() + Math.random(),
+              name: data.name,
+              amount: data.amount.toString().replace(/[$,]/g, ''),
+              frequency: data.frequency || 'monthly',
+              category: data.category || 'other',
+              dueDate: new Date().toISOString().split('T')[0]
+            }])
+          }
+          break
+          
+        case 'addDebt':
+          if (data.name && data.balance) {
+            setDebts(prev => [...prev, {
+              id: Date.now() + Math.random(),
+              name: data.name,
+              balance: data.balance.toString().replace(/[$,]/g, ''),
+              interestRate: data.interestRate || '0',
+              minPayment: data.minPayment || '0',
+              frequency: 'monthly',
+              paymentDate: new Date().toISOString().split('T')[0],
+              originalBalance: data.balance.toString().replace(/[$,]/g, '')
+            }])
+          }
+          break
+          
+        case 'addGoal':
+          if (data.name && data.target) {
+            setGoals(prev => [...prev, {
+              id: Date.now() + Math.random(),
+              name: data.name,
+              target: data.target.toString().replace(/[$,]/g, ''),
+              saved: data.saved || '0',
+              deadline: data.deadline || '',
+              savingsFrequency: 'monthly',
+              startDate: new Date().toISOString().split('T')[0],
+              paymentAmount: ''
+            }])
+          }
+          break
+          
+        case 'addAsset':
+          if (data.name && data.value) {
+            setAssets(prev => [...prev, {
+              id: Date.now() + Math.random(),
+              name: data.name,
+              value: data.value.toString().replace(/[$,]/g, ''),
+              type: data.type || 'savings'
+            }])
+          }
+          break
+          
+        case 'setMemory':
+          if (data.name) {
+            setBudgetMemory((prev: any) => ({ ...prev, name: data.name }))
+          }
+          if (data.lifeEvents) {
+            setBudgetMemory((prev: any) => ({ ...prev, lifeEvents: data.lifeEvents }))
+          }
+          if (data.currentStep) {
+            setBudgetMemory((prev: any) => ({ ...prev, currentStep: data.currentStep }))
+          }
+          break
+      }
+    })
+  }
+
   const handleChatMessage = async () => {
     if (!chatInput.trim() || isLoading) return
     const message = chatInput.trim()
@@ -602,59 +686,32 @@ export default function Dashboard() {
     
     try {
       const endpoint = appMode === 'budget' ? '/api/budget-coach' : '/api/trading-coach'
+      const body = appMode === 'budget'
+        ? { mode: 'question', question: message, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }, memory: budgetMemory }
+        : { mode: 'question', question: message, tradingData: { trades }, memory: tradingMemory }
       
-      // Build request with ALL data
-      const requestBody: any = {
-        mode: 'question',
-        question: message,
-        memory: appMode === 'budget' ? budgetMemory : tradingMemory
-      }
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const data = await response.json()
       
-      if (appMode === 'budget') {
-        requestBody.financialData = {
-          income: incomeStreams,
-          expenses: expenses,
-          debts: debts,
-          goals: goals,
-          assets: assets,
-          liabilities: liabilities
+      // Execute any actions
+      if (data.actions && Array.isArray(data.actions)) {
+        executeAIActions(data.actions)
+        // Add confirmation of what was added
+        const addedItems = data.actions.filter((a: any) => a.type.startsWith('add'))
+        if (addedItems.length > 0) {
+          const summary = addedItems.map((a: any) => `${a.type.replace('add', '')}: ${a.data.name}`).join(', ')
+          setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "Done!" }])
+          // Show what was added in a subtle way
+          if (!data.message?.toLowerCase().includes('added')) {
+            setChatMessages(prev => [...prev, { role: 'assistant', content: `✅ Added: ${summary}` }])
+          }
+        } else {
+          setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
         }
       } else {
-        requestBody.tradingData = {
-          trades: trades
-        }
-      }
-      
-      // Add last exchange for context
-      if (chatMessages.length > 0) {
-        const lastMessages = chatMessages.slice(-2)
-        if (lastMessages.length === 2) {
-          requestBody.lastExchange = {
-            userMessage: lastMessages[0].content,
-            aiResponse: { message: lastMessages[1].content }
-          }
-        }
-      }
-      
-      console.log('Sending chat request:', requestBody) // Debug log
-      
-      const response = await fetch(endpoint, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(requestBody) 
-      })
-      
-      const data = await response.json()
-      console.log('Chat response:', data) // Debug log
-      
-      setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
-      
-      // Update memory if the AI returns updates
-      if (data.memoryUpdates && appMode === 'budget') {
-        setBudgetMemory((prev: any) => ({ ...prev, ...data.memoryUpdates }))
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
       }
     } catch (error) {
-      console.error('Chat error:', error)
       setChatMessages(prev => [...prev, { role: 'assistant', content: "Sorry, something went wrong. Please try again." }])
     }
     setIsLoading(false)
@@ -664,16 +721,10 @@ export default function Dashboard() {
     setChatMessages([])
     if (mode === 'budget') {
       setBudgetOnboarding({ isActive: true, step: 'greeting' })
-      setChatMessages([{ 
-        role: 'assistant', 
-        content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" 
-      }])
+      setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" }])
     } else {
       setTradingOnboarding({ isActive: true, step: 'greeting' })
-      setChatMessages([{ 
-        role: 'assistant', 
-        content: "Hey trader! 📈 I'm Aureus, your trading mentor. I'll help you stay disciplined, track your performance, and crush those prop firm challenges.\n\nWhat's your name, and how long have you been trading?" 
-      }])
+      setChatMessages([{ role: 'assistant', content: "Hey trader! 📈 I'm Aureus, your trading mentor. I'll help you stay disciplined, track your performance, and crush those prop firm challenges.\n\nWhat's your name, and how long have you been trading?" }])
     }
   }
 
@@ -801,6 +852,8 @@ export default function Dashboard() {
     )
   }
 
+  // Continued in render return...
+
   // ==================== RENDER: MAIN APP ====================
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
@@ -887,30 +940,12 @@ export default function Dashboard() {
           )}
           
           <div style={{ display: 'flex', gap: '12px' }}>
-            <input 
-              type="text" 
-              value={chatInput} 
-              onChange={e => setChatInput(e.target.value)} 
-              onKeyPress={e => e.key === 'Enter' && handleChatMessage()} 
-              placeholder={budgetOnboarding.isActive || tradingOnboarding.isActive ? "Type your response..." : "Ask Aureus anything..."} 
-              style={{ ...inputStyle, flex: 1 }} 
-              disabled={isLoading} 
-            />
-            <button 
-              onClick={handleChatMessage} 
-              disabled={isLoading || !chatInput.trim()} 
-              style={{ 
-                ...btnPrimary, 
-                background: appMode === 'budget' ? theme.success : theme.warning, 
-                opacity: isLoading || !chatInput.trim() ? 0.5 : 1 
-              }}
-            >
-              {isLoading ? '...' : 'Send'}
-            </button>
+            <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder={budgetOnboarding.isActive || tradingOnboarding.isActive ? "Type your response..." : "Ask Aureus anything..."} style={{ ...inputStyle, flex: 1 }} disabled={isLoading} />
+            <button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ ...btnPrimary, background: appMode === 'budget' ? theme.success : theme.warning, opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button>
           </div>
         </div>
 
-        {/* BUDGET DASHBOARD TAB - Keep your existing code here */}
+        {/* BUDGET DASHBOARD TAB */}
         {appMode === 'budget' && activeTab === 'dashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             {/* This Month Summary */}
@@ -1007,7 +1042,7 @@ export default function Dashboard() {
 
             {/* Debts & Goals */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-              {/* Debts */}
+              {/* Debts with Payoff Calculator */}
               <div style={cardStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{ margin: 0, color: theme.warning, fontSize: '18px' }}>💳 Debts</h3>
@@ -1020,16 +1055,60 @@ export default function Dashboard() {
                   <input placeholder="Min payment" type="number" value={newDebt.minPayment} onChange={e => setNewDebt({...newDebt, minPayment: e.target.value})} style={{...inputStyle, width: '90px'}} />
                   <button onClick={addDebt} style={btnWarning}>+</button>
                 </div>
-                <div style={{ maxHeight: '250px', overflowY: 'auto' as const }}>
-                  {debts.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No debts - debt free! 🎉</p> : debts.map(debt => (
-                    <div key={debt.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#3a2e1e' : '#fefce8', borderRadius: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <div><div style={{ color: theme.text, fontWeight: 600 }}>{debt.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{debt.interestRate}% APR • ${debt.minPayment}/mo</div></div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: theme.warning, fontWeight: 700 }}>${parseFloat(debt.balance).toFixed(0)}</span><button onClick={() => deleteDebt(debt.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>×</button></div>
+                <div style={{ maxHeight: '350px', overflowY: 'auto' as const }}>
+                  {debts.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No debts - debt free! 🎉</p> : debts.map(debt => {
+                    const payoff = calculateSingleDebtPayoff(debt)
+                    const progress = debt.originalBalance ? ((parseFloat(debt.originalBalance) - parseFloat(debt.balance)) / parseFloat(debt.originalBalance)) * 100 : 0
+                    const extraPaymentData = debtExtraPayment[debt.id] || { amount: '', frequency: 'monthly' }
+                    
+                    return (
+                      <div key={debt.id} style={{ padding: '16px', marginBottom: '12px', background: darkMode ? '#3a2e1e' : '#fefce8', borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                          <div>
+                            <div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{debt.name}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px' }}>
+                              {debt.interestRate}% APR • ${debt.minPayment}/{debt.frequency || 'mo'}
+                              {payoff.extraPayments > 0 && <span style={{ color: theme.success }}> + ${payoff.extraPayments.toFixed(0)} extra</span>}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' as const }}>
+                            <div style={{ color: theme.warning, fontWeight: 700, fontSize: '18px' }}>${parseFloat(debt.balance).toFixed(0)}</div>
+                            <button onClick={() => deleteDebt(debt.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', marginTop: '4px' }}>Delete</button>
+                          </div>
+                        </div>
+                        
+                        {/* Progress bar */}
+                        {debt.originalBalance && (
+                          <div style={{ height: '8px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}>
+                            <div style={{ width: `${Math.min(progress, 100)}%`, height: '100%', background: `linear-gradient(90deg, ${theme.success}, #059669)`, borderRadius: '4px' }} />
+                          </div>
+                        )}
+                        
+                        {/* Payoff info */}
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', marginBottom: '12px' }}>
+                          <div><span style={{ color: theme.textMuted }}>Payoff: </span><span style={{ color: theme.text, fontWeight: 600 }}>{payoff.payoffDate}</span></div>
+                          <div><span style={{ color: theme.textMuted }}>Months: </span><span style={{ color: theme.text, fontWeight: 600 }}>{payoff.months < 600 ? payoff.months : '∞'}</span></div>
+                          <div><span style={{ color: theme.textMuted }}>Interest: </span><span style={{ color: theme.danger, fontWeight: 600 }}>${payoff.totalInterest.toFixed(0)}</span></div>
+                        </div>
+                        
+                        {/* Extra payment input */}
+                        {showExtraInput === debt.id ? (
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <input type="number" placeholder="Extra $" value={extraPaymentData.amount} onChange={e => setDebtExtraPayment({...debtExtraPayment, [debt.id]: {...extraPaymentData, amount: e.target.value}})} style={{...inputStyle, width: '80px', padding: '6px 10px'}} />
+                            <select value={extraPaymentData.frequency} onChange={e => setDebtExtraPayment({...debtExtraPayment, [debt.id]: {...extraPaymentData, frequency: e.target.value}})} style={{...inputStyle, padding: '6px 10px'}}>
+                              <option value="weekly">Weekly</option>
+                              <option value="fortnightly">Fortnightly</option>
+                              <option value="monthly">Monthly</option>
+                            </select>
+                            <button onClick={() => addExtraPaymentToDebt(debt.id)} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Add</button>
+                            <button onClick={() => setShowExtraInput(null)} style={{...btnDanger, padding: '6px 12px', fontSize: '12px'}}>×</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setShowExtraInput(debt.id)} style={{ padding: '6px 12px', background: theme.purple + '30', color: theme.purple, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>+ Add Extra Payment</button>
+                        )}
                       </div>
-                      {debt.originalBalance && <div style={{ height: '6px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${((parseFloat(debt.originalBalance) - parseFloat(debt.balance)) / parseFloat(debt.originalBalance)) * 100}%`, height: '100%', background: theme.success, borderRadius: '3px' }} /></div>}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 
@@ -1067,7 +1146,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* OVERVIEW TAB - Keep your existing code */}
+        {/* OVERVIEW TAB */}
         {appMode === 'budget' && activeTab === 'overview' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
@@ -1113,7 +1192,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* PATH TAB - Keep your existing code */}
+        {/* PATH TAB */}
         {appMode === 'budget' && activeTab === 'path' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             <div style={cardStyle}>
@@ -1179,7 +1258,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* TRADING TAB - Keep your existing code */}
+        {/* TRADING TAB */}
         {appMode === 'trading' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
@@ -1291,3 +1370,4 @@ export default function Dashboard() {
     </div>
   )
 }
+
