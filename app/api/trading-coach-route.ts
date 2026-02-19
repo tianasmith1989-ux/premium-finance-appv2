@@ -1,26 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function POST(request: NextRequest) {
-  try {
-    const { 
-      mode,           // 'onboarding' | 'proactive' | 'question'
-      question,
-      onboardingStep,
-      userResponse,
-      tradingData,
-      memory
-    } = await request.json()
-
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    
-    if (!apiKey) {
-      return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
-    }
-
-    let systemPrompt = ''
-    let userPrompt = ''
-
-    const TRADING_FRAMEWORKS = `
+const TRADING_FRAMEWORKS = `
 === TRADING FRAMEWORKS ===
 
 **PROP FIRM CHALLENGES:**
@@ -45,6 +25,26 @@ export async function POST(request: NextRequest) {
 - FOMO: Entering without proper setup
 - Overtrading: Too many trades, usually after wins
 `
+
+export async function POST(request: NextRequest) {
+  try {
+    const { 
+      mode,           // 'onboarding' | 'proactive' | 'question'
+      question,
+      onboardingStep,
+      userResponse,
+      tradingData,
+      memory
+    } = await request.json()
+
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    
+    if (!apiKey) {
+      return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
+    }
+
+    let systemPrompt = ''
+    let userPrompt = ''
 
     const buildTradingContext = () => {
       if (!tradingData?.trades || tradingData.trades.length === 0) {
