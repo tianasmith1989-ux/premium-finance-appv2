@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 // Types for better type safety
-interface MemoryUpdate {
-  lifeEvents?: LifeEvent[]
-  patterns?: string[]
-  notes?: string[]
-  preferences?: Preferences
-  extractedData?: any
-  lastUpdated?: string
-}
-
 interface LifeEvent {
   name: string
   date: string
@@ -21,6 +12,16 @@ interface Preferences {
   communicationStyle?: string
   checkInFrequency?: string
   motivators?: string[]
+}
+
+interface MemoryUpdate {
+  lifeEvents?: LifeEvent[]
+  patterns?: string[]
+  notes?: string[]
+  preferences?: Preferences
+  extractedData?: any
+  name?: string
+  lastUpdated?: string
 }
 
 interface AureusResponse {
@@ -45,6 +46,60 @@ interface UserMemory {
   notes?: string[]
   lastUpdated?: string
   [key: string]: any
+}
+
+interface IncomeItem {
+  name: string
+  amount: string | number
+  frequency: string
+  type: string
+}
+
+interface ExpenseItem {
+  name: string
+  amount: string | number
+  frequency: string
+  category?: string
+}
+
+interface DebtItem {
+  name: string
+  balance: string | number
+  interestRate: string | number
+  minPayment: string | number
+}
+
+interface GoalItem {
+  name: string
+  saved: string | number
+  target: string | number
+  deadline?: string
+}
+
+interface AssetItem {
+  name: string
+  value: string | number
+  type: string
+}
+
+interface LiabilityItem {
+  name: string
+  value: string | number
+}
+
+interface FinancialData {
+  income?: IncomeItem[]
+  expenses?: ExpenseItem[]
+  debts?: DebtItem[]
+  goals?: GoalItem[]
+  assets?: AssetItem[]
+  liabilities?: LiabilityItem[]
+  savings?: string | number
+}
+
+interface LastExchange {
+  userMessage: string
+  aiResponse: any
 }
 
 const FINANCIAL_FRAMEWORKS = `
@@ -87,56 +142,63 @@ const FINANCIAL_FRAMEWORKS = `
 
 export async function POST(request: NextRequest) {
   try {
+    const body = await request.json()
+    
     const { 
       mode = 'question',           // 'onboarding' | 'proactive' | 'question'
       question,                    // user's question (for question mode)
       onboardingStep,              // current step in onboarding
       userResponse,                // user's response during onboarding
-      financialData,               // all financial data
+      financialData = {},          // all financial data
       memory = {},                 // persistent memory
       lastExchange,                // previous exchange for context
       userId                       // user identifier for memory updates
-    } = await request.json()
+    } = body
 
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
       return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
     }
 
+    // Fix: Use correct TypeScript types for date options
     const today = new Date().toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'long' 
+      weekday: 'long' as const, 
+      year: 'numeric' as const, 
+      month: 'long' as const, 
+      day: 'numeric' as const 
     })
+
+    // Helper to normalize to monthly
+    const toMonthly = (amount: number, frequency: string): number => {
+      if (frequency === 'weekly') return amount * 4.33
+      if (frequency === 'fortnightly') return amount * 2.17
+      if (frequency === 'yearly') return amount / 12
+      return amount // monthly default
+    }
 
     // Build financial context from user data
     const buildFinancialContext = () => {
-      if (!financialData) return 'No financial data provided yet.'
+      const data = financialData as FinancialData
       
-      const { income = [], expenses = [], debts = [], goals = [], assets = [], liabilities = [] } = financialData
-      let context = '=== CURRENT FINANCIAL SNAPSHOT ===\n'
-
-      // Helper to normalize to monthly
-      const toMonthly = (amount: number, frequency: string): number => {
-        if (frequency === 'weekly') return amount * 4.33
-        if (frequency === 'fortnightly') return amount * 2.17
-        if (frequency === 'yearly') return amount / 12
-        return amount // monthly default
+      if (!data || Object.keys(data).length === 0) {
+        return 'No financial data provided yet.'
       }
+      
+      const { income = [], expenses = [], debts = [], goals = [], assets = [], liabilities = [] } = data
+      let context = '=== CURRENT FINANCIAL SNAPSHOT ===\n'
 
       // Income
       if (income.length > 0) {
         let totalIncome = 0
         let passiveIncome = 0
-        income.forEach((i: any) => {
-          const amt = parseFloat(i.amount || '0')
+        income.forEach((i: IncomeItem) => {
+          const amt = typeof i.amount === 'string' ? parseFloat(i.amount) : i.amount
           const monthly = toMonthly(amt, i.frequency)
           totalIncome += monthly
           if (i.type === 'passive') passiveIncome += monthly
         })
         context += `\nINCOME: $${totalIncome.toFixed(0)}/month (Passive: $${passiveIncome.toFixed(0)})\n`
-        income.slice(0, 5).forEach((i: any) => {
+        income.slice(0, 5).forEach((i: IncomeItem) => {
           context += `  - ${i.name}: $${i.amount}/${i.frequency} (${i.type})\n`
         })
         if (income.length > 5) context += `  ... and ${income.length - 5} more income sources\n`
@@ -144,11 +206,12 @@ export async function POST(request: NextRequest) {
 
       // Expenses
       if (expenses.length > 0) {
-        const totalExpenses = expenses.reduce((sum: number, e: any) => {
-          return sum + toMonthly(parseFloat(e.amount || '0'), e.frequency)
+        const totalExpenses = expenses.reduce((sum: number, e: ExpenseItem) => {
+          const amt = typeof e.amount === 'string' ? parseFloat(e.amount) : e.amount
+          return sum + toMonthly(amt, e.frequency)
         }, 0)
         context += `\nEXPENSES: $${totalExpenses.toFixed(0)}/month\n`
-        expenses.slice(0, 8).forEach((e: any) => {
+        expenses.slice(0, 8).forEach((e: ExpenseItem) => {
           context += `  - ${e.name}: $${e.amount}/${e.frequency}${e.category ? ` [${e.category}]` : ''}\n`
         })
         if (expenses.length > 8) context += `  ... and ${expenses.length - 8} more expenses\n`
@@ -156,10 +219,16 @@ export async function POST(request: NextRequest) {
 
       // Debts
       if (debts.length > 0) {
-        const totalDebt = debts.reduce((sum: number, d: any) => sum + parseFloat(d.balance || '0'), 0)
-        const monthlyDebtPayments = debts.reduce((sum: number, d: any) => sum + parseFloat(d.minPayment || '0'), 0)
+        const totalDebt = debts.reduce((sum: number, d: DebtItem) => {
+          const balance = typeof d.balance === 'string' ? parseFloat(d.balance) : d.balance
+          return sum + balance
+        }, 0)
+        const monthlyDebtPayments = debts.reduce((sum: number, d: DebtItem) => {
+          const minPayment = typeof d.minPayment === 'string' ? parseFloat(d.minPayment) : d.minPayment
+          return sum + minPayment
+        }, 0)
         context += `\nDEBTS: $${totalDebt.toFixed(0)} total, $${monthlyDebtPayments.toFixed(0)}/month in payments\n`
-        debts.forEach((d: any) => {
+        debts.forEach((d: DebtItem) => {
           context += `  - ${d.name}: $${d.balance} @ ${d.interestRate}% (min: $${d.minPayment}/mo)\n`
         })
       }
@@ -167,53 +236,66 @@ export async function POST(request: NextRequest) {
       // Goals
       if (goals.length > 0) {
         context += `\nGOALS:\n`
-        goals.forEach((g: any) => {
-          const saved = parseFloat(g.saved || '0')
-          const target = parseFloat(g.target || '1')
+        goals.forEach((g: GoalItem) => {
+          const saved = typeof g.saved === 'string' ? parseFloat(g.saved) : g.saved
+          const target = typeof g.target === 'string' ? parseFloat(g.target) : g.target
           const progress = target > 0 ? (saved / target * 100).toFixed(0) : '0'
           const remaining = target - saved
-          context += `  - ${g.name}: $${saved}/$${target} (${progress}%) - $${remaining.toFixed(0)} to go\n`
+          context += `  - ${g.name}: $${saved.toFixed(0)}/$${target.toFixed(0)} (${progress}%) - $${remaining.toFixed(0)} to go\n`
           if (g.deadline) context += `    Deadline: ${g.deadline}\n`
         })
       }
 
       // Assets & Liabilities
       if (assets.length > 0) {
-        const totalAssets = assets.reduce((sum: number, a: any) => sum + parseFloat(a.value || '0'), 0)
+        const totalAssets = assets.reduce((sum: number, a: AssetItem) => {
+          const value = typeof a.value === 'string' ? parseFloat(a.value) : a.value
+          return sum + value
+        }, 0)
         context += `\nASSETS: $${totalAssets.toFixed(0)} total\n`
-        assets.slice(0, 5).forEach((a: any) => {
+        assets.slice(0, 5).forEach((a: AssetItem) => {
           context += `  - ${a.name}: $${a.value} (${a.type})\n`
         })
       }
 
       if (liabilities.length > 0) {
-        const totalLiabilities = liabilities.reduce((sum: number, l: any) => sum + parseFloat(l.value || '0'), 0)
+        const totalLiabilities = liabilities.reduce((sum: number, l: LiabilityItem) => {
+          const value = typeof l.value === 'string' ? parseFloat(l.value) : l.value
+          return sum + value
+        }, 0)
         context += `\nLIABILITIES: $${totalLiabilities.toFixed(0)} total\n`
       }
 
       // Key metrics
-      const totalIncome = income.reduce((sum: number, i: any) => {
-        return sum + toMonthly(parseFloat(i.amount || '0'), i.frequency)
+      const totalIncome = income.reduce((sum: number, i: IncomeItem) => {
+        const amt = typeof i.amount === 'string' ? parseFloat(i.amount) : i.amount
+        return sum + toMonthly(amt, i.frequency)
       }, 0)
 
-      const totalExpenses = expenses.reduce((sum: number, e: any) => {
-        return sum + toMonthly(parseFloat(e.amount || '0'), e.frequency)
+      const totalExpenses = expenses.reduce((sum: number, e: ExpenseItem) => {
+        const amt = typeof e.amount === 'string' ? parseFloat(e.amount) : e.amount
+        return sum + toMonthly(amt, e.frequency)
       }, 0)
 
-      const totalDebtPayments = debts.reduce((sum: number, d: any) => sum + parseFloat(d.minPayment || '0'), 0)
+      const totalDebtPayments = debts.reduce((sum: number, d: DebtItem) => {
+        const minPayment = typeof d.minPayment === 'string' ? parseFloat(d.minPayment) : d.minPayment
+        return sum + minPayment
+      }, 0)
+      
       const surplus = totalIncome - totalExpenses - totalDebtPayments
       const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100) : 0
 
       const passiveIncome = income
-        .filter((i: any) => i.type === 'passive')
-        .reduce((sum: number, i: any) => {
-          return sum + toMonthly(parseFloat(i.amount || '0'), i.frequency)
+        .filter((i: IncomeItem) => i.type === 'passive')
+        .reduce((sum: number, i: IncomeItem) => {
+          const amt = typeof i.amount === 'string' ? parseFloat(i.amount) : i.amount
+          return sum + toMonthly(amt, i.frequency)
         }, 0)
 
       const passiveCoverage = totalExpenses > 0 ? (passiveIncome / totalExpenses * 100) : 0
       const fireNumber = (totalExpenses * 12) * 25
-      const emergencyFundMonths = financialData.savings ? 
-        (parseFloat(financialData.savings) / totalExpenses) : 0
+      const emergencyFundMonths = data.savings ? 
+        (typeof data.savings === 'string' ? parseFloat(data.savings) : data.savings) / totalExpenses : 0
 
       context += `\n=== KEY METRICS ===\n`
       context += `Monthly Surplus: $${surplus.toFixed(0)}\n`
@@ -226,11 +308,12 @@ export async function POST(request: NextRequest) {
     }
 
     const buildMemoryContext = () => {
-      if (!memory || Object.keys(memory).length === 0) {
+      const mem = memory as UserMemory
+      
+      if (!mem || Object.keys(mem).length === 0) {
         return '\n=== WHAT I REMEMBER ABOUT YOU ===\nNo memories stored yet. Ask questions to learn about them!\n'
       }
       
-      const mem = memory as UserMemory
       let context = '\n=== WHAT I REMEMBER ABOUT YOU ===\n'
       context += `Last updated: ${mem.lastUpdated || 'Unknown'}\n`
 
@@ -244,8 +327,8 @@ export async function POST(request: NextRequest) {
         )
         sorted.forEach((event: LifeEvent) => {
           const eventDate = new Date(event.date)
-          const today = new Date()
-          const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+          const todayDate = new Date()
+          const daysUntil = Math.ceil((eventDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24))
           const upcoming = daysUntil > 0 && daysUntil < 30 ? ' 🔜' : ''
           context += `  - ${event.name}: ${event.date}${event.budget ? ` ($${event.budget})` : ''}${upcoming}\n`
         })
@@ -282,10 +365,11 @@ export async function POST(request: NextRequest) {
     // Build conversation context from last exchange
     const buildConversationContext = () => {
       if (!lastExchange) return ''
+      const exchange = lastExchange as LastExchange
       return `
 === PREVIOUS EXCHANGE ===
-User said: "${lastExchange.userMessage}"
-You responded with: ${JSON.stringify(lastExchange.aiResponse)}
+User said: "${exchange.userMessage}"
+You responded with: ${JSON.stringify(exchange.aiResponse)}
 `
     }
 
@@ -440,7 +524,8 @@ Respond with JSON:
     // If there are memory updates, save them to the database
     if (parsedResponse.memoryUpdates && Object.keys(parsedResponse.memoryUpdates).length > 0 && userId) {
       try {
-        await saveMemoryUpdates(userId, parsedResponse.memoryUpdates)
+        // Don't await this - fire and forget to not block response
+        saveMemoryUpdates(userId, parsedResponse.memoryUpdates).catch(console.error)
       } catch (error) {
         console.error('Failed to save memory updates:', error)
         // Continue even if memory save fails - don't break the user experience
@@ -495,9 +580,14 @@ async function saveMemoryUpdates(userId: string, updates: MemoryUpdate): Promise
   console.log(`Saving memory updates for user ${userId}:`, updates)
   
   // You could also call your own API endpoint
-  await fetch(`${process.env.APP_URL}/api/update-memory`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, updates })
-  })
+  const appUrl = process.env.APP_URL || 'http://localhost:3000'
+  try {
+    await fetch(`${appUrl}/api/update-memory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, updates })
+    })
+  } catch (error) {
+    console.error('Error calling memory update endpoint:', error)
+  }
 }
