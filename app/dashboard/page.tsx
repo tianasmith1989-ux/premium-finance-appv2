@@ -439,25 +439,52 @@ export default function Dashboard() {
     setPaidOccurrences(newPaid)
   }
 
-  // ==================== AI AGENT FUNCTIONS ====================
+  // ==================== FIXED AI AGENT FUNCTIONS ====================
   const fetchProactiveInsight = async (mode: 'budget' | 'trading') => {
     setIsLoading(true)
     try {
       const endpoint = mode === 'budget' ? '/api/budget-coach' : '/api/trading-coach'
-      const body = mode === 'budget'
-        ? { mode: 'proactive', financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }, memory: budgetMemory }
-        : { mode: 'proactive', tradingData: { trades }, memory: tradingMemory }
       
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const requestBody: any = { 
+        mode: 'proactive',
+        memory: mode === 'budget' ? budgetMemory : tradingMemory
+      }
+      
+      if (mode === 'budget') {
+        requestBody.financialData = {
+          income: incomeStreams,
+          expenses: expenses,
+          debts: debts,
+          goals: goals,
+          assets: assets,
+          liabilities: liabilities
+        }
+      } else {
+        requestBody.tradingData = {
+          trades: trades
+        }
+      }
+      
+      const response = await fetch(endpoint, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(requestBody) 
+      })
+      
       const data = await response.json()
       setProactiveInsight(data)
     } catch (error) {
       console.error('Failed to fetch insight:', error)
-      setProactiveInsight({ greeting: `Hey${budgetMemory.name ? ' ' + budgetMemory.name : ''}!`, insight: 'Ready to help you with your finances today.', mood: 'neutral' })
+      setProactiveInsight({ 
+        greeting: `Hey${budgetMemory.name ? ' ' + budgetMemory.name : ''}!`, 
+        insight: 'Ready to help you with your finances today.', 
+        mood: 'neutral' 
+      })
     }
     setIsLoading(false)
   }
 
+  // FIXED: Now sends ALL data to the API
   const handleOnboardingResponse = async (response: string, mode: 'budget' | 'trading') => {
     setIsLoading(true)
     setChatMessages(prev => [...prev, { role: 'user', content: response }])
@@ -468,18 +495,71 @@ export default function Dashboard() {
       const currentStep = mode === 'budget' ? budgetOnboarding.step : tradingOnboarding.step
       const memory = mode === 'budget' ? budgetMemory : tradingMemory
       
+      // Build the request body with ALL data
+      const requestBody: any = { 
+        mode: 'onboarding', 
+        onboardingStep: currentStep, 
+        userResponse: response, 
+        memory: memory
+      }
+      
+      // CRITICAL: Add financialData for budget mode
+      if (mode === 'budget') {
+        requestBody.financialData = {
+          income: incomeStreams,
+          expenses: expenses,
+          debts: debts,
+          goals: goals,
+          assets: assets,
+          liabilities: liabilities
+        }
+      }
+      
+      // Add tradingData for trading mode
+      if (mode === 'trading') {
+        requestBody.tradingData = {
+          trades: trades
+        }
+      }
+      
+      // Add lastExchange for context if there are previous messages
+      if (chatMessages.length > 0) {
+        const lastUserMsg = [...chatMessages].reverse().find(m => m.role === 'user')
+        const lastAiMsg = [...chatMessages].reverse().find(m => m.role === 'assistant')
+        if (lastUserMsg && lastAiMsg) {
+          requestBody.lastExchange = {
+            userMessage: lastUserMsg.content,
+            aiResponse: { message: lastAiMsg.content }
+          }
+        }
+      }
+      
       const apiResponse = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'onboarding', onboardingStep: currentStep, userResponse: response, memory })
+        body: JSON.stringify(requestBody)
       })
       
       const data = await apiResponse.json()
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.raw || "Let's continue..." }])
       
+      // Update memory and financial data based on AI response
       if (data.extractedData) {
-        if (mode === 'budget') setBudgetMemory((prev: any) => ({ ...prev, ...data.extractedData }))
-        else setTradingMemory((prev: any) => ({ ...prev, ...data.extractedData }))
+        if (mode === 'budget') {
+          setBudgetMemory((prev: any) => ({ ...prev, ...data.extractedData }))
+          
+          // Also update financial data if the AI extracted any
+          if (data.extractedData.income) setIncomeStreams(data.extractedData.income)
+          if (data.extractedData.expenses) setExpenses(data.extractedData.expenses)
+          if (data.extractedData.debts) setDebts(data.extractedData.debts)
+          if (data.extractedData.goals) setGoals(data.extractedData.goals)
+        } else {
+          setTradingMemory((prev: any) => ({ ...prev, ...data.extractedData }))
+        }
+      }
+      
+      if (data.memoryUpdates && mode === 'budget') {
+        setBudgetMemory((prev: any) => ({ ...prev, ...data.memoryUpdates }))
       }
       
       if (data.isComplete) {
@@ -496,11 +576,13 @@ export default function Dashboard() {
         else setTradingOnboarding(prev => ({ ...prev, step: data.nextStep }))
       }
     } catch (error) {
+      console.error('Onboarding error:', error)
       setChatMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I had trouble with that. Let's try again!" }])
     }
     setIsLoading(false)
   }
 
+  // FIXED: Now sends ALL data to the API
   const handleChatMessage = async () => {
     if (!chatInput.trim() || isLoading) return
     const message = chatInput.trim()
@@ -516,14 +598,56 @@ export default function Dashboard() {
     
     try {
       const endpoint = appMode === 'budget' ? '/api/budget-coach' : '/api/trading-coach'
-      const body = appMode === 'budget'
-        ? { mode: 'question', question: message, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }, memory: budgetMemory }
-        : { mode: 'question', question: message, tradingData: { trades }, memory: tradingMemory }
       
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      // Build request with ALL data
+      const requestBody: any = {
+        mode: 'question',
+        question: message,
+        memory: appMode === 'budget' ? budgetMemory : tradingMemory
+      }
+      
+      if (appMode === 'budget') {
+        requestBody.financialData = {
+          income: incomeStreams,
+          expenses: expenses,
+          debts: debts,
+          goals: goals,
+          assets: assets,
+          liabilities: liabilities
+        }
+      } else {
+        requestBody.tradingData = {
+          trades: trades
+        }
+      }
+      
+      // Add last exchange for context
+      if (chatMessages.length > 0) {
+        const lastUserMsg = [...chatMessages].reverse().find(m => m.role === 'user')
+        const lastAiMsg = [...chatMessages].reverse().find(m => m.role === 'assistant')
+        if (lastUserMsg && lastAiMsg) {
+          requestBody.lastExchange = {
+            userMessage: lastUserMsg.content,
+            aiResponse: { message: lastAiMsg.content }
+          }
+        }
+      }
+      
+      const response = await fetch(endpoint, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(requestBody) 
+      })
+      
       const data = await response.json()
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
+      
+      // Update memory if the AI returns updates
+      if (data.memoryUpdates && appMode === 'budget') {
+        setBudgetMemory((prev: any) => ({ ...prev, ...data.memoryUpdates }))
+      }
     } catch (error) {
+      console.error('Chat error:', error)
       setChatMessages(prev => [...prev, { role: 'assistant', content: "Sorry, something went wrong. Please try again." }])
     }
     setIsLoading(false)
@@ -533,10 +657,16 @@ export default function Dashboard() {
     setChatMessages([])
     if (mode === 'budget') {
       setBudgetOnboarding({ isActive: true, step: 'greeting' })
-      setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" }])
+      setChatMessages([{ 
+        role: 'assistant', 
+        content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" 
+      }])
     } else {
       setTradingOnboarding({ isActive: true, step: 'greeting' })
-      setChatMessages([{ role: 'assistant', content: "Hey trader! 📈 I'm Aureus, your trading mentor. I'll help you stay disciplined, track your performance, and crush those prop firm challenges.\n\nWhat's your name, and how long have you been trading?" }])
+      setChatMessages([{ 
+        role: 'assistant', 
+        content: "Hey trader! 📈 I'm Aureus, your trading mentor. I'll help you stay disciplined, track your performance, and crush those prop firm challenges.\n\nWhat's your name, and how long have you been trading?" 
+      }])
     }
   }
 
@@ -664,8 +794,6 @@ export default function Dashboard() {
     )
   }
 
-  // Continued in render return...
-
   // ==================== RENDER: MAIN APP ====================
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
@@ -723,7 +851,7 @@ export default function Dashboard() {
       </header>
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
-        {/* AI AGENT CARD */}
+        {/* AI AGENT CARD - FIXED: Now receives all data */}
         <div style={{ background: `linear-gradient(135deg, ${appMode === 'budget' ? theme.success : theme.warning}15, ${theme.purple}15)`, border: `2px solid ${appMode === 'budget' ? theme.success : theme.warning}`, borderRadius: '20px', padding: '24px', marginBottom: '24px' }}>
           {proactiveInsight && !budgetOnboarding.isActive && !tradingOnboarding.isActive && (
             <div style={{ marginBottom: chatMessages.length > 0 ? '16px' : '0' }}>
@@ -752,8 +880,26 @@ export default function Dashboard() {
           )}
           
           <div style={{ display: 'flex', gap: '12px' }}>
-            <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder={budgetOnboarding.isActive || tradingOnboarding.isActive ? "Type your response..." : "Ask Aureus anything..."} style={{ ...inputStyle, flex: 1 }} disabled={isLoading} />
-            <button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ ...btnPrimary, background: appMode === 'budget' ? theme.success : theme.warning, opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button>
+            <input 
+              type="text" 
+              value={chatInput} 
+              onChange={e => setChatInput(e.target.value)} 
+              onKeyPress={e => e.key === 'Enter' && handleChatMessage()} 
+              placeholder={budgetOnboarding.isActive || tradingOnboarding.isActive ? "Type your response..." : "Ask Aureus anything..."} 
+              style={{ ...inputStyle, flex: 1 }} 
+              disabled={isLoading} 
+            />
+            <button 
+              onClick={handleChatMessage} 
+              disabled={isLoading || !chatInput.trim()} 
+              style={{ 
+                ...btnPrimary, 
+                background: appMode === 'budget' ? theme.success : theme.warning, 
+                opacity: isLoading || !chatInput.trim() ? 0.5 : 1 
+              }}
+            >
+              {isLoading ? '...' : 'Send'}
+            </button>
           </div>
         </div>
 
