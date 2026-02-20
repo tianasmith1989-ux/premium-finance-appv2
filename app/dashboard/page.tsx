@@ -2383,14 +2383,175 @@ export default function Dashboard() {
         {/* PATH TAB */}
         {appMode === 'budget' && activeTab === 'path' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-            {/* Current Status */}
+            
+            {/* RAT RACE ESCAPE TRACKER */}
+            <div style={{ padding: '32px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
+              <div style={{ textAlign: 'center' as const, marginBottom: '24px' }}>
+                <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px', marginBottom: '8px' }}>RAT RACE ESCAPE TRACKER</div>
+                <div style={{ fontSize: '64px', fontWeight: 'bold', color: monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) >= 1 ? theme.success : '#f59e0b') : theme.textMuted }}>
+                  {monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) * 100).toFixed(1) : '0.0'}%
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '20px' }}>{((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? '🎉' : '🐀'}</span>
+                  <span style={{ color: ((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? theme.success : '#ef4444', fontSize: '16px' }}>
+                    {((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? 'FINANCIALLY FREE!' : 'Still in the Rat Race'}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Progress Bar with Milestones */}
+              <div style={{ position: 'relative' as const, marginBottom: '32px' }}>
+                <div style={{ height: '8px', background: '#334155', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ 
+                    width: Math.min(((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100, 100) + '%', 
+                    height: '100%', 
+                    background: 'linear-gradient(90deg, #8b5cf6, #10b981)',
+                    borderRadius: '4px',
+                    transition: 'width 0.5s ease'
+                  }} />
+                </div>
+                {/* Milestones */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', position: 'relative' as const }}>
+                  {[
+                    { pct: 0, icon: '🌱', label: 'Start' },
+                    { pct: 25, icon: '🌿', label: 'Seed Planted' },
+                    { pct: 50, icon: '🌳', label: 'Growing' },
+                    { pct: 75, icon: '⚡', label: 'Almost There' },
+                    { pct: 100, icon: '💎', label: 'FREE!' }
+                  ].map((m, i) => {
+                    const reached = ((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100 >= m.pct
+                    return (
+                      <div key={i} style={{ textAlign: 'center' as const, flex: 1 }}>
+                        <div style={{ fontSize: '20px', opacity: reached ? 1 : 0.4 }}>{m.icon}</div>
+                        <div style={{ fontSize: '10px', color: reached ? theme.text : '#64748b', marginTop: '4px' }}>{m.label}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              
+              {/* Stats Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '20px' }}>
+                <div style={{ padding: '20px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                  <div style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Passive Income</div>
+                  <div style={{ color: theme.success, fontSize: '28px', fontWeight: 'bold' }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</div>
+                  <div style={{ color: '#64748b', fontSize: '12px' }}>/month</div>
+                </div>
+                <div style={{ padding: '20px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                  <div style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Total Outgoing</div>
+                  <div style={{ color: theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${monthlyExpenses.toFixed(0)}</div>
+                  <div style={{ color: '#64748b', fontSize: '12px' }}>/month</div>
+                </div>
+                <div style={{ padding: '20px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                  <div style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Money Works 24/7</div>
+                  <div style={{ color: theme.purple, fontSize: '28px', fontWeight: 'bold' }}>${((passiveIncome + totalPassiveQuestIncome) / 720).toFixed(2)}</div>
+                  <div style={{ color: '#64748b', fontSize: '12px' }}>/hour while you sleep</div>
+                </div>
+                <div style={{ padding: '20px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                  <div style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Gap to Freedom</div>
+                  <div style={{ color: (passiveIncome + totalPassiveQuestIncome) >= monthlyExpenses ? theme.success : theme.warning, fontSize: '28px', fontWeight: 'bold' }}>
+                    ${Math.max(0, monthlyExpenses - passiveIncome - totalPassiveQuestIncome).toFixed(0)}
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '12px' }}>{(passiveIncome + totalPassiveQuestIncome) >= monthlyExpenses ? 'COVERED! 🎉' : 'still needed'}</div>
+                </div>
+              </div>
+              
+              {/* Next Milestone */}
+              {(() => {
+                const coverage = ((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100
+                const nextMilestone = coverage < 25 ? { pct: 25, icon: '🌱', name: 'Seed Planted' } 
+                  : coverage < 50 ? { pct: 50, icon: '🌳', name: 'Growing' }
+                  : coverage < 75 ? { pct: 75, icon: '⚡', name: 'Almost There' }
+                  : coverage < 100 ? { pct: 100, icon: '💎', name: 'Financial Freedom' }
+                  : null
+                if (!nextMilestone) return null
+                const needed = (nextMilestone.pct / 100) * monthlyExpenses - (passiveIncome + totalPassiveQuestIncome)
+                return (
+                  <div style={{ padding: '16px', background: 'linear-gradient(90deg, #8b5cf620, #10b98120)', borderRadius: '12px', textAlign: 'center' as const }}>
+                    <span style={{ color: '#64748b' }}>Next: </span>
+                    <span style={{ fontSize: '16px' }}>{nextMilestone.icon}</span>
+                    <span style={{ color: theme.purple, fontWeight: 600 }}> {nextMilestone.name}</span>
+                    <span style={{ color: '#64748b' }}> — need ${needed.toFixed(0)} more passive income</span>
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* CASH FLOW QUADRANT */}
             <div style={cardStyle}>
-              <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>📍 Where You Are Now</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-                <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>💎 Net Worth</div><div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${netWorth.toFixed(0)}</div></div>
-                <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>📈 Surplus</div><div style={{ color: monthlySurplus >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${monthlySurplus.toFixed(0)}</div></div>
-                <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>💳 Total Debt</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${totalDebtBalance.toFixed(0)}</div></div>
-                <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>🌴 Passive Income</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 'bold' }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}/mo</div></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>💡 Cash Flow Quadrant</h2>
+                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Move income from left → right to build freedom</p>
+                </div>
+                <div style={{ display: 'flex', gap: '16px' }}>
+                  <div style={{ textAlign: 'right' as const }}>
+                    <div style={{ fontSize: '11px', color: theme.danger }}>📊 You work</div>
+                    <div style={{ color: theme.danger, fontWeight: 700 }}>${activeIncome.toFixed(0)}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' as const }}>
+                    <div style={{ fontSize: '11px', color: theme.success }}>📈 Money works</div>
+                    <div style={{ color: theme.success, fontWeight: 700 }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</div>
+                  </div>
+                </div>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                {/* Employee */}
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '28px' }}>👔</div>
+                    <div style={{ textAlign: 'right' as const }}>
+                      <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>${incomeStreams.filter(i => i.type === 'active').reduce((sum, i) => sum + convertToMonthly(parseFloat(i.amount || '0'), i.frequency), 0).toFixed(0)}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>{monthlyIncome > 0 ? ((incomeStreams.filter(i => i.type === 'active').reduce((sum, i) => sum + convertToMonthly(parseFloat(i.amount || '0'), i.frequency), 0) / monthlyIncome) * 100).toFixed(0) : 0}%</div>
+                    </div>
+                  </div>
+                  <div style={{ color: theme.textMuted, fontSize: '24px', fontWeight: 300, marginBottom: '4px' }}>E</div>
+                  <div style={{ color: theme.text, fontWeight: 600 }}>Employee</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>You work for money</div>
+                </div>
+                
+                {/* Business Owner */}
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #8b5cf6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '28px' }}>🏢</div>
+                    <div style={{ textAlign: 'right' as const }}>
+                      <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>$0</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>0%</div>
+                    </div>
+                  </div>
+                  <div style={{ color: theme.textMuted, fontSize: '24px', fontWeight: 300, marginBottom: '4px' }}>B</div>
+                  <div style={{ color: theme.text, fontWeight: 600 }}>Business Owner</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Systems work for you</div>
+                </div>
+                
+                {/* Self-Employed */}
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #f59e0b' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '28px' }}>🔧</div>
+                    <div style={{ textAlign: 'right' as const }}>
+                      <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>$0</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>0%</div>
+                    </div>
+                  </div>
+                  <div style={{ color: theme.textMuted, fontSize: '24px', fontWeight: 300, marginBottom: '4px' }}>S</div>
+                  <div style={{ color: theme.text, fontWeight: 600 }}>Self-Employed</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>You own a job</div>
+                </div>
+                
+                {/* Investor */}
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #10b981' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '28px' }}>📈</div>
+                    <div style={{ textAlign: 'right' as const }}>
+                      <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>{monthlyIncome > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyIncome) * 100).toFixed(0) : 0}%</div>
+                    </div>
+                  </div>
+                  <div style={{ color: theme.textMuted, fontSize: '24px', fontWeight: 300, marginBottom: '4px' }}>I</div>
+                  <div style={{ color: theme.text, fontWeight: 600 }}>Investor</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Money works for you</div>
+                </div>
               </div>
             </div>
 
@@ -2520,163 +2681,161 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Passive Income Quest Board - Enhanced */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🎯 Passive Income Quests</h2>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <div style={{ padding: '8px 16px', background: theme.success + '20', borderRadius: '8px' }}>
-                    <span style={{ color: theme.success, fontWeight: 700 }}>${totalPassiveQuestIncome.toFixed(0)}/mo earned</span>
+            {/* Passive Income Quest Board - Professional Design */}
+            <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', border: '1px solid ' + theme.border }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '24px' }}>💰</span>
+                    <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>Passive Income Quest Board</h2>
                   </div>
-                  <div style={{ padding: '8px 16px', background: theme.purple + '20', borderRadius: '8px' }}>
-                    <span style={{ color: theme.purple, fontWeight: 700 }}>{passiveQuests.filter(q => q.status === 'completed').length}/{passiveQuests.length} complete</span>
-                  </div>
+                  <p style={{ margin: 0, color: theme.textMuted, fontSize: '13px' }}>10 paths to $5K/month — unlock by adding income streams</p>
+                </div>
+                <div style={{ padding: '8px 16px', background: theme.warning + '20', borderRadius: '8px', border: '1px solid ' + theme.warning }}>
+                  <span style={{ color: theme.warning, fontWeight: 700, fontSize: '18px' }}>{passiveQuests.filter(q => q.status !== 'locked').length}/{passiveQuests.length}</span>
+                  <div style={{ color: theme.warning, fontSize: '11px' }}>UNLOCKED</div>
                 </div>
               </div>
               
-              {/* Quest Detail Modal */}
-              {activeQuestId && (() => {
-                const quest = passiveQuests.find(q => q.id === activeQuestId)
-                if (!quest) return null
-                return (
-                  <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setActiveQuestId(null)}>
-                    <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '600px', width: '100%', maxHeight: '85vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-                        <div>
-                          <div style={{ fontSize: '40px', marginBottom: '8px' }}>{quest.icon}</div>
-                          <h3 style={{ margin: 0, color: theme.text, fontSize: '24px' }}>{quest.name}</h3>
-                          <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                            <span style={{ padding: '4px 10px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '12px' }}>{quest.potentialIncome}</span>
-                            <span style={{ padding: '4px 10px', background: theme.accent + '20', color: theme.accent, borderRadius: '4px', fontSize: '12px' }}>{quest.difficulty}</span>
-                            <span style={{ padding: '4px 10px', background: theme.purple + '20', color: theme.purple, borderRadius: '4px', fontSize: '12px' }}>{quest.timeToSetup}</span>
+              {/* All Quests in Professional 2-column Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                {passiveQuests.map(quest => {
+                  const isLocked = quest.status === 'locked'
+                  const isExpanded = activeQuestId === quest.id
+                  const difficultyStars = quest.difficulty === 'Easy' ? 1 : quest.difficulty === 'Medium' ? 2 : quest.difficulty === 'Hard' ? 3 : 4
+                  
+                  return (
+                    <div key={quest.id} style={{ 
+                      padding: '20px', 
+                      background: darkMode ? '#1e293b' : '#f8fafc', 
+                      borderRadius: '12px', 
+                      border: '1px solid ' + theme.border,
+                      opacity: isLocked ? 0.7 : 1
+                    }}>
+                      {/* Header Row */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                          <div style={{ width: '44px', height: '44px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+                            {isLocked ? '🔒' : quest.icon}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, color: theme.text, fontSize: '15px' }}>{quest.name}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '13px' }}>{quest.description}</div>
                           </div>
                         </div>
-                        <button onClick={() => setActiveQuestId(null)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
-                      </div>
-                      
-                      <div style={{ background: darkMode ? '#1e293b' : '#f0fdf4', borderRadius: '12px', padding: '16px', marginBottom: '20px', borderLeft: '4px solid ' + theme.success }}>
-                        <p style={{ margin: 0, color: theme.text, fontSize: '14px', lineHeight: 1.6 }}>💡 <strong>Aureus says:</strong> {quest.aureusAdvice}</p>
-                      </div>
-                      
-                      <h4 style={{ color: theme.text, margin: '0 0 12px 0' }}>📋 Quest Steps</h4>
-                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', marginBottom: '20px' }}>
-                        {quest.steps.map((step: any, idx: number) => (
-                          <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px', background: idx < (quest.currentStep || 0) ? theme.success + '10' : idx === (quest.currentStep || 0) ? theme.warning + '10' : 'transparent', borderRadius: '8px', border: idx === (quest.currentStep || 0) ? '2px solid ' + theme.warning : '1px solid ' + theme.border }}>
-                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: idx < (quest.currentStep || 0) ? theme.success : idx === (quest.currentStep || 0) ? theme.warning : theme.border, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold', flexShrink: 0 }}>
-                              {idx < (quest.currentStep || 0) ? '✓' : idx + 1}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 600, color: theme.text, marginBottom: '4px' }}>{step.title}</div>
-                              <div style={{ color: theme.textMuted, fontSize: '13px' }}>{step.description}</div>
-                              {idx === (quest.currentStep || 0) && quest.status === 'in_progress' && (
-                                <button onClick={() => {
-                                  const newStep = (quest.currentStep || 0) + 1
-                                  const newProgress = (newStep / quest.steps.length) * 100
-                                  setPassiveQuests(passiveQuests.map(q => q.id === quest.id ? { ...q, currentStep: newStep, progress: newProgress, status: newProgress >= 100 ? 'completed' : 'in_progress' } : q))
-                                }} style={{ marginTop: '8px', padding: '6px 12px', background: theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
-                                  ✓ {step.action}
-                                </button>
-                              )}
-                            </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '4px' }}>
+                          {isLocked ? (
+                            <span style={{ padding: '4px 10px', background: '#f59e0b30', color: '#f59e0b', borderRadius: '4px', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              🔒 LOCKED
+                            </span>
+                          ) : quest.status === 'completed' ? (
+                            <span style={{ padding: '4px 10px', background: theme.success + '30', color: theme.success, borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                              ✓ COMPLETE
+                            </span>
+                          ) : quest.status === 'in_progress' ? (
+                            <span style={{ padding: '4px 10px', background: theme.accent + '30', color: theme.accent, borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                              IN PROGRESS
+                            </span>
+                          ) : null}
+                          {/* Star Rating */}
+                          <div style={{ color: '#f59e0b', fontSize: '12px' }}>
+                            {'★'.repeat(difficultyStars)}{'☆'.repeat(4 - difficultyStars)}
                           </div>
-                        ))}
+                        </div>
                       </div>
                       
-                      {quest.status === 'completed' && (
-                        <div style={{ background: theme.success + '20', borderRadius: '12px', padding: '16px', textAlign: 'center' as const }}>
-                          <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎉</div>
-                          <div style={{ color: theme.success, fontWeight: 700, fontSize: '18px' }}>Quest Complete!</div>
-                          {quest.monthlyIncome > 0 && <div style={{ color: theme.text, marginTop: '8px' }}>Earning ${quest.monthlyIncome}/mo in passive income</div>}
-                        </div>
-                      )}
+                      {/* Tags Row */}
+                      <div style={{ display: 'flex', gap: '8px', margin: '12px 0', marginLeft: '56px' }}>
+                        <span style={{ padding: '3px 8px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          💰 {quest.potentialIncome}
+                        </span>
+                        <span style={{ padding: '3px 8px', background: darkMode ? '#334155' : '#e2e8f0', color: theme.textMuted, borderRadius: '4px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          ⏱ {quest.timeToSetup}
+                        </span>
+                      </div>
                       
-                      {quest.status === 'not_started' && (
-                        <button onClick={() => {
-                          setPassiveQuests(passiveQuests.map(q => q.id === quest.id ? { ...q, status: 'in_progress', currentStep: 0, progress: 0 } : q))
-                        }} style={{ width: '100%', padding: '14px', background: theme.accent, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}>
-                          🚀 Start This Quest
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })()}
-              
-              {/* Beginner Quests */}
-              <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ color: theme.success, fontSize: '16px', margin: '0 0 12px 0' }}>🌱 Beginner Quests - Start Here!</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-                  {passiveQuests.filter(q => q.category === 'beginner').map(quest => (
-                    <div key={quest.id} onClick={() => setActiveQuestId(quest.id)} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: quest.status === 'completed' ? '2px solid ' + theme.success : quest.status === 'in_progress' ? '2px solid ' + theme.accent : '1px solid ' + theme.border, cursor: 'pointer', transition: 'transform 0.2s' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '24px' }}>{quest.icon}</span>
-                          <span style={{ fontWeight: 600, color: theme.text }}>{quest.name}</span>
-                        </div>
-                        {quest.status === 'completed' && <span style={{ color: theme.success, fontSize: '20px' }}>✓</span>}
-                      </div>
-                      <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>{quest.description}</div>
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                        <span style={{ padding: '2px 8px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '11px' }}>{quest.potentialIncome}</span>
-                        <span style={{ padding: '2px 8px', background: theme.border, color: theme.textMuted, borderRadius: '4px', fontSize: '11px' }}>{quest.timeToSetup}</span>
-                      </div>
+                      {/* Progress bar for in-progress quests */}
                       {quest.status === 'in_progress' && (
-                        <div>
+                        <div style={{ marginLeft: '56px', marginBottom: '12px' }}>
                           <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
                             <div style={{ width: quest.progress + '%', height: '100%', background: theme.accent }} />
                           </div>
-                          <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '4px' }}>Step {quest.currentStep + 1} of {quest.steps.length}</div>
+                          <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '4px' }}>Step {(quest.currentStep || 0) + 1} of {quest.steps?.length || 4}</div>
                         </div>
                       )}
-                      {quest.status === 'completed' && quest.monthlyIncome > 0 && (
-                        <div style={{ color: theme.success, fontSize: '14px', fontWeight: 600 }}>+${quest.monthlyIncome}/mo 🎉</div>
-                      )}
-                      {quest.status === 'not_started' && (
-                        <div style={{ color: theme.accent, fontSize: '13px', fontWeight: 500 }}>Click to start →</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Intermediate Quests */}
-              <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ color: theme.warning, fontSize: '16px', margin: '0 0 12px 0' }}>📈 Intermediate Quests</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-                  {passiveQuests.filter(q => q.category === 'intermediate').map(quest => (
-                    <div key={quest.id} onClick={() => quest.status !== 'locked' && setActiveQuestId(quest.id)} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: quest.status === 'locked' ? '1px dashed ' + theme.border : quest.status === 'completed' ? '2px solid ' + theme.success : '1px solid ' + theme.border, opacity: quest.status === 'locked' ? 0.6 : 1, cursor: quest.status === 'locked' ? 'not-allowed' : 'pointer' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '24px' }}>{quest.status === 'locked' ? '🔒' : quest.icon}</span>
-                        <span style={{ fontWeight: 600, color: theme.text }}>{quest.name}</span>
-                      </div>
-                      <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>{quest.description}</div>
-                      {quest.status === 'locked' ? (
-                        <div style={{ fontSize: '12px', color: theme.warning, background: theme.warning + '20', padding: '6px 10px', borderRadius: '6px' }}>🔐 Unlock: {quest.unlockRequirement}</div>
-                      ) : (
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <span style={{ padding: '2px 8px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '11px' }}>{quest.potentialIncome}</span>
+                      
+                      {/* Expand Guide Button */}
+                      <button 
+                        onClick={() => isLocked ? null : setActiveQuestId(isExpanded ? null : quest.id)}
+                        disabled={isLocked}
+                        style={{ 
+                          background: 'none', 
+                          border: 'none', 
+                          color: isLocked ? theme.textMuted : theme.accent, 
+                          fontSize: '13px', 
+                          cursor: isLocked ? 'not-allowed' : 'pointer',
+                          padding: 0,
+                          marginLeft: '56px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        {isLocked ? (
+                          <span style={{ color: theme.warning, fontSize: '12px' }}>🔐 {quest.unlockRequirement}</span>
+                        ) : (
+                          <>▼ {isExpanded ? 'Hide' : 'Expand'} guide</>
+                        )}
+                      </button>
+                      
+                      {/* Expanded Content */}
+                      {isExpanded && !isLocked && (
+                        <div style={{ marginTop: '16px', marginLeft: '56px', padding: '16px', background: darkMode ? '#0f172a' : '#f1f5f9', borderRadius: '8px' }}>
+                          <div style={{ background: theme.success + '15', padding: '12px', borderRadius: '8px', marginBottom: '16px', borderLeft: '3px solid ' + theme.success }}>
+                            <p style={{ margin: 0, color: theme.text, fontSize: '13px', lineHeight: 1.6 }}>💡 {quest.aureusAdvice}</p>
+                          </div>
+                          
+                          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                            {quest.steps?.map((step: any, idx: number) => (
+                              <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                <div style={{ 
+                                  width: '24px', height: '24px', borderRadius: '50%', 
+                                  background: idx < (quest.currentStep || 0) ? theme.success : idx === (quest.currentStep || 0) ? theme.warning : theme.border, 
+                                  color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                                  fontSize: '12px', fontWeight: 'bold', flexShrink: 0 
+                                }}>
+                                  {idx < (quest.currentStep || 0) ? '✓' : idx + 1}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontWeight: 500, color: theme.text, fontSize: '13px' }}>{step.title}</div>
+                                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>{step.description}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {quest.status === 'not_started' && (
+                            <button onClick={() => {
+                              setPassiveQuests(passiveQuests.map(q => q.id === quest.id ? { ...q, status: 'in_progress', currentStep: 0, progress: 0 } : q))
+                            }} style={{ marginTop: '16px', padding: '10px 20px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, width: '100%' }}>
+                              🚀 Start This Quest
+                            </button>
+                          )}
+                          
+                          {quest.status === 'in_progress' && (
+                            <button onClick={() => {
+                              const newStep = (quest.currentStep || 0) + 1
+                              const newProgress = (newStep / (quest.steps?.length || 4)) * 100
+                              setPassiveQuests(passiveQuests.map(q => q.id === quest.id ? { ...q, currentStep: newStep, progress: newProgress, status: newProgress >= 100 ? 'completed' : 'in_progress' } : q))
+                            }} style={{ marginTop: '16px', padding: '10px 20px', background: theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, width: '100%' }}>
+                              ✓ Complete Current Step
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Advanced Quests */}
-              <div>
-                <h3 style={{ color: theme.purple, fontSize: '16px', margin: '0 0 12px 0' }}>💎 Advanced Quests</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-                  {passiveQuests.filter(q => q.category === 'advanced').map(quest => (
-                    <div key={quest.id} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px dashed ' + theme.border, opacity: 0.6 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '24px' }}>🔒</span>
-                        <span style={{ fontWeight: 600, color: theme.text }}>{quest.name}</span>
-                      </div>
-                      <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>{quest.description}</div>
-                      <div style={{ fontSize: '12px', color: theme.purple, background: theme.purple + '20', padding: '6px 10px', borderRadius: '6px' }}>🔐 Unlock: {quest.unlockRequirement}</div>
-                    </div>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
             </div>
 
