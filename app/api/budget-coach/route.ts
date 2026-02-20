@@ -126,14 +126,31 @@ ${onboardingStep === 'expenses' ? `
 Collect: name, amount, date (day of month), frequency
 Can add MULTIPLE expenses at once if user gives several!
 
-When ready:
-{"type": "addExpense", "data": {"name": "Credit Card", "amount": "120", "frequency": "monthly", "category": "other", "dueDate": "${currentYear}-${currentMonth}-27"}}
+IMPORTANT - WHAT GOES WHERE:
+- EXPENSES: Rent, groceries, phone, utilities, subscriptions, child support, transport
+- NOT EXPENSES: Credit card payments, loan payments → These go in DEBTS section
+
+If user says "credit card $120/month" → Tell them: "I'll track that in the debts section - we'll get to that next! Any other regular bills?"
+
+When ready (regular expenses only):
+{"type": "addExpense", "data": {"name": "Rent", "amount": "200", "frequency": "weekly", "category": "housing", "dueDate": "${currentYear}-${currentMonth}-27"}}
 {"type": "addExpense", "data": {"name": "Child Support", "amount": "60", "frequency": "fortnightly", "category": "other", "dueDate": "${currentYear}-${currentMonth}-27"}}
+
+Categories: housing, utilities, food, transport, subscriptions, health, entertainment, other
 ` : ''}
 
 ${onboardingStep === 'debts' ? `
-Collect: name, total balance owed, APR %, minimum payment, payment date
-{"type": "addDebt", "data": {"name": "Credit Card", "balance": "2000", "interestRate": "20", "minPayment": "120", "paymentDate": "${currentYear}-${currentMonth}-27"}}
+Collect: name, total BALANCE owed, APR %, minimum payment, payment date
+
+IMPORTANT: The minimum payment is tracked HERE - don't also add it as an expense!
+When user says "I pay $120/month on my credit card" and the balance is $3000:
+- Add as DEBT with minPayment: "120"
+- This payment will show in the budget automatically
+
+If they mentioned a credit card payment during expenses step, use that amount as minPayment.
+
+When ready:
+{"type": "addDebt", "data": {"name": "Credit Card", "balance": "3000", "interestRate": "20", "minPayment": "120", "paymentDate": "${currentYear}-${currentMonth}-27"}}
 ` : ''}
 
 ${onboardingStep === 'goals' ? `
