@@ -500,18 +500,46 @@ export default function Dashboard() {
   const getCalendarItemsForDay = (day: number) => {
     const { month, year } = getDaysInMonth()
     const items: any[] = []
-    const checkDate = new Date(year, month, day)
+    
+    // Parse date string "YYYY-MM-DD" without timezone issues
+    const parseDateParts = (dateStr: string) => {
+      if (!dateStr) return null
+      const parts = dateStr.split('-')
+      if (parts.length !== 3) return null
+      return { year: parseInt(parts[0]), month: parseInt(parts[1]) - 1, day: parseInt(parts[2]) }
+    }
     
     const shouldShowItem = (startDate: string, frequency: string) => {
       if (!startDate) return frequency === 'monthly' && day === 1
-      const start = new Date(startDate)
-      if (start > checkDate) return false
-      if (frequency === 'once') return start.getDate() === day && start.getMonth() === month && start.getFullYear() === year
-      if (frequency === 'monthly') return start.getDate() === day
-      if (frequency === 'weekly') return Math.floor((checkDate.getTime() - start.getTime()) / 86400000) % 7 === 0
-      if (frequency === 'fortnightly') return Math.floor((checkDate.getTime() - start.getTime()) / 86400000) % 14 === 0
-      if (frequency === 'quarterly') return start.getDate() === day && (month - start.getMonth() + 12) % 3 === 0
-      if (frequency === 'yearly') return start.getDate() === day && start.getMonth() === month
+      
+      const start = parseDateParts(startDate)
+      if (!start) return false
+      
+      // Check if start date is in the future relative to this calendar day
+      const startTime = new Date(start.year, start.month, start.day).getTime()
+      const checkTime = new Date(year, month, day).getTime()
+      if (startTime > checkTime) return false
+      
+      if (frequency === 'once') {
+        return start.day === day && start.month === month && start.year === year
+      }
+      if (frequency === 'monthly') {
+        return start.day === day
+      }
+      if (frequency === 'weekly') {
+        const daysDiff = Math.floor((checkTime - startTime) / 86400000)
+        return daysDiff >= 0 && daysDiff % 7 === 0
+      }
+      if (frequency === 'fortnightly') {
+        const daysDiff = Math.floor((checkTime - startTime) / 86400000)
+        return daysDiff >= 0 && daysDiff % 14 === 0
+      }
+      if (frequency === 'quarterly') {
+        return start.day === day && (month - start.month + 12) % 3 === 0
+      }
+      if (frequency === 'yearly') {
+        return start.day === day && start.month === month
+      }
       return false
     }
 
