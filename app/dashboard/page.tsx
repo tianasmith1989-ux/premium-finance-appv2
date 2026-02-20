@@ -81,6 +81,36 @@ export default function Dashboard() {
   // Edit State - for inline editing
   const [editingItem, setEditingItem] = useState<{type: string, id: number, data: any} | null>(null)
   
+  // Alerts & Reminders
+  const [alertsEnabled, setAlertsEnabled] = useState(true)
+  const [alertDaysBefore, setAlertDaysBefore] = useState(2)
+  
+  // Motivational Quotes from Money Masters
+  const moneyQuotes = [
+    { quote: "The goal isn't more money. The goal is living life on your terms.", author: "Chris Brogan" },
+    { quote: "It's not about having a lot of money. It's about having a lot of options.", author: "Chris Rock" },
+    { quote: "Do not save what is left after spending; spend what is left after saving.", author: "Warren Buffett" },
+    { quote: "The habit of saving is itself an education.", author: "T.T. Munger" },
+    { quote: "A budget is telling your money where to go instead of wondering where it went.", author: "Dave Ramsey" },
+    { quote: "Financial peace isn't the acquisition of stuff. It's learning to live on less than you make.", author: "Dave Ramsey" },
+    { quote: "The stock market is a device for transferring money from the impatient to the patient.", author: "Warren Buffett" },
+    { quote: "Beware of little expenses; a small leak will sink a great ship.", author: "Benjamin Franklin" },
+    { quote: "Rich people stay rich by living like they're broke. Broke people stay broke by living like they're rich.", author: "Unknown" },
+    { quote: "The quickest way to double your money is to fold it in half and put it in your back pocket.", author: "Will Rogers" },
+    { quote: "Money is a terrible master but an excellent servant.", author: "P.T. Barnum" },
+    { quote: "Compound interest is the eighth wonder of the world.", author: "Albert Einstein" },
+    { quote: "The best time to plant a tree was 20 years ago. The second best time is now.", author: "Chinese Proverb" },
+    { quote: "Don't work for money; make money work for you.", author: "Robert Kiyosaki" },
+    { quote: "Every dollar you spend is a vote for the kind of world you want to live in.", author: "Anna Lappé" },
+    { quote: "You must gain control over your money or the lack of it will forever control you.", author: "Dave Ramsey" },
+    { quote: "The more you learn, the more you earn.", author: "Warren Buffett" },
+    { quote: "Wealth is the ability to fully experience life.", author: "Henry David Thoreau" },
+    { quote: "It is not the man who has too little, but the man who craves more, that is poor.", author: "Seneca" },
+    { quote: "An investment in knowledge pays the best interest.", author: "Benjamin Franklin" }
+  ]
+  
+  const [currentQuote] = useState(() => moneyQuotes[Math.floor(Math.random() * moneyQuotes.length)])
+  
   // Presets & CSV
   const [showPresets, setShowPresets] = useState(false)
   const [showCsvImport, setShowCsvImport] = useState(false)
@@ -164,8 +194,6 @@ export default function Dashboard() {
   const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
   const [isLoading, setIsLoading] = useState(false)
   const [proactiveInsight, setProactiveInsight] = useState<any>(null)
-  
-  const chatEndRef = useRef<HTMLDivElement>(null)
 
   // ==================== THEME ====================
   const theme = {
@@ -235,8 +263,12 @@ export default function Dashboard() {
     localStorage.setItem('aureus_data', JSON.stringify(data))
   }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences])
 
+  // Scroll chat to bottom - use scrollTop instead of scrollIntoView to avoid page jump
+  const chatContainerRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    }
   }, [chatMessages])
 
   // ==================== CALCULATIONS ====================
@@ -929,6 +961,25 @@ export default function Dashboard() {
         if (mode === 'budget') {
           setBudgetOnboarding({ isActive: false, step: 'complete' })
           setBudgetMemory((prev: any) => ({ ...prev, onboardingComplete: true }))
+          
+          // After a brief pause, suggest automation setup
+          setTimeout(() => {
+            const auto = calculateAutomation()
+            if (auto.payAmount > 0) {
+              setChatMessages(prev => [...prev, { 
+                role: 'assistant', 
+                content: `🎉 **Your budget is all set up!**\n\n` +
+                  `Now here's where the magic happens - let's make your money **manage itself**.\n\n` +
+                  `**🤖 Set & Forget Automation**\n` +
+                  `I can show you how to set up automatic transfers so every payday:\n` +
+                  `• 💳 $${auto.bills.total.toFixed(0)} goes to Bills (auto-pays your expenses)\n` +
+                  `• 🎯 $${auto.savings.total.toFixed(0)} goes to Savings (builds your goals)\n` +
+                  `• 💵 $${auto.spending.toFixed(0)} stays for spending\n\n` +
+                  `Would you like me to walk you through setting this up? It takes about 10 minutes and then you'll never have to think about bills again!\n\n` +
+                  `Also, would you like me to send you **payment reminders** before bills are due?`
+              }])
+            }
+          }, 1500)
         } else {
           setTradingOnboarding({ isActive: false, step: 'complete' })
           setTradingMemory((prev: any) => ({ ...prev, onboardingComplete: true }))
@@ -1173,9 +1224,15 @@ export default function Dashboard() {
     
     try {
       const endpoint = appMode === 'budget' ? '/api/budget-coach' : '/api/trading-coach'
+      
+      // Build conversation history for context
+      const recentHistory = [...chatMessages.slice(-10), { role: 'user', content: message }]
+        .map(m => `${m.role === 'user' ? 'User' : 'Aureus'}: ${m.content}`)
+        .join('\n')
+      
       const body = appMode === 'budget'
-        ? { mode: 'question', question: message, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }, memory: budgetMemory }
-        : { mode: 'question', question: message, tradingData: { trades }, memory: tradingMemory }
+        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }, memory: budgetMemory }
+        : { mode: 'question', question: message, conversationHistory: recentHistory, tradingData: { trades }, memory: tradingMemory }
       
       const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await response.json()
@@ -1589,6 +1646,64 @@ export default function Dashboard() {
       </header>
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
+        {/* MOTIVATIONAL QUOTE */}
+        {appMode === 'budget' && !budgetOnboarding.isActive && (
+          <div style={{ background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', padding: '16px 20px', marginBottom: '16px', borderLeft: `4px solid ${theme.purple}` }}>
+            <p style={{ color: theme.text, fontSize: '14px', fontStyle: 'italic', margin: 0 }}>"{currentQuote.quote}"</p>
+            <p style={{ color: theme.textMuted, fontSize: '12px', margin: '8px 0 0 0', textAlign: 'right' as const }}>— {currentQuote.author}</p>
+          </div>
+        )}
+
+        {/* UPCOMING PAYMENT ALERTS */}
+        {appMode === 'budget' && alertsEnabled && !budgetOnboarding.isActive && (() => {
+          const today = new Date()
+          const upcomingDays = alertDaysBefore
+          const upcoming: any[] = []
+          
+          // Check expenses
+          expenses.filter(e => !e.targetDebtId && !e.targetGoalId).forEach(exp => {
+            if (!exp.dueDate) return
+            const [year, month, day] = exp.dueDate.split('-').map(Number)
+            const dueDate = new Date(today.getFullYear(), today.getMonth(), day)
+            const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+            if (daysUntil >= 0 && daysUntil <= upcomingDays) {
+              upcoming.push({ name: exp.name, amount: exp.amount, daysUntil, type: 'expense' })
+            }
+          })
+          
+          // Check debts
+          debts.forEach(debt => {
+            if (!debt.paymentDate) return
+            const [year, month, day] = debt.paymentDate.split('-').map(Number)
+            const dueDate = new Date(today.getFullYear(), today.getMonth(), day)
+            const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+            if (daysUntil >= 0 && daysUntil <= upcomingDays) {
+              upcoming.push({ name: debt.name, amount: debt.minPayment, daysUntil, type: 'debt' })
+            }
+          })
+          
+          if (upcoming.length === 0) return null
+          
+          return (
+            <div style={{ background: theme.warning + '20', border: '1px solid ' + theme.warning, borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h4 style={{ margin: 0, color: theme.warning, fontSize: '14px' }}>🔔 Upcoming Payments</h4>
+                <button onClick={() => setAlertsEnabled(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>Dismiss</button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
+                {upcoming.map((item, i) => (
+                  <span key={i} style={{ padding: '6px 12px', background: theme.cardBg, borderRadius: '6px', fontSize: '13px', color: theme.text }}>
+                    {item.type === 'debt' ? '💳' : '📋'} {item.name}: ${item.amount} 
+                    <span style={{ color: item.daysUntil === 0 ? theme.danger : theme.warning, marginLeft: '8px' }}>
+                      {item.daysUntil === 0 ? 'TODAY!' : item.daysUntil === 1 ? 'Tomorrow' : `in ${item.daysUntil} days`}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
+
         {/* AI AGENT CARD */}
         <div style={{ background: `linear-gradient(135deg, ${appMode === 'budget' ? theme.success : theme.warning}15, ${theme.purple}15)`, border: `2px solid ${appMode === 'budget' ? theme.success : theme.warning}`, borderRadius: '20px', padding: '24px', marginBottom: '24px' }}>
           {proactiveInsight && !budgetOnboarding.isActive && !tradingOnboarding.isActive && (
@@ -1606,14 +1721,13 @@ export default function Dashboard() {
           )}
           
           {chatMessages.length > 0 && (
-            <div style={{ maxHeight: '250px', overflowY: 'auto' as const, marginBottom: '16px', padding: '16px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '12px' }}>
+            <div ref={chatContainerRef} style={{ maxHeight: '250px', overflowY: 'auto' as const, marginBottom: '16px', padding: '16px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '12px' }}>
               {chatMessages.map((msg, idx) => (
                 <div key={idx} style={{ marginBottom: '12px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                   <div style={{ maxWidth: '80%', padding: '12px 16px', borderRadius: '16px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '14px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
                 </div>
               ))}
               {isLoading && <div style={{ display: 'flex', gap: '4px', padding: '12px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}
-              <div ref={chatEndRef} />
             </div>
           )}
           
