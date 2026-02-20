@@ -40,16 +40,227 @@ export default function Dashboard() {
   })
   
   // ==================== PASSIVE QUEST STATE ====================
+  const [activeQuestId, setActiveQuestId] = useState<number | null>(null)
   const [passiveQuests, setPassiveQuests] = useState<any[]>([
-    { id: 1, name: 'High-Interest Savings', category: 'beginner', description: 'Earn $5-20/mo passive interest', status: 'not_started', progress: 0, monthlyIncome: 0, steps: ['Research high-interest accounts', 'Open account (Up, ING, Ubank)', 'Transfer emergency fund', 'Watch interest grow!'] },
-    { id: 2, name: 'Cashback Cards', category: 'beginner', description: 'Earn $10-50/mo from spending', status: 'not_started', progress: 0, monthlyIncome: 0, steps: ['Research cashback cards', 'Apply for card', 'Set as default payment', 'Redeem cashback monthly'] },
-    { id: 3, name: 'Bank Account Bonuses', category: 'beginner', description: 'One-time $50-200 bonuses', status: 'not_started', progress: 0, monthlyIncome: 0, steps: ['Find current bonus offers', 'Meet requirements', 'Collect bonus', 'Repeat with next bank'] },
-    { id: 4, name: 'Dividend ETFs', category: 'intermediate', description: 'Earn quarterly dividends', status: 'locked', progress: 0, monthlyIncome: 0, unlockRequirement: 'Complete emergency fund', steps: ['Open brokerage (Stake, CMC)', 'Research dividend ETFs (VAS, VHY)', 'Start with $500+', 'Reinvest dividends'] },
-    { id: 5, name: 'Micro-Investing', category: 'intermediate', description: 'Round-ups grow wealth', status: 'locked', progress: 0, monthlyIncome: 0, unlockRequirement: 'Complete emergency fund', steps: ['Sign up (Raiz, Spaceship)', 'Connect bank account', 'Enable round-ups', 'Add weekly boost'] },
-    { id: 6, name: 'Side Hustle Income', category: 'intermediate', description: 'Turn skills into $$$', status: 'not_started', progress: 0, monthlyIncome: 0, steps: ['Identify your skills', 'Create Airtasker/Fiverr profile', 'Complete first job', 'Build reviews & repeat'] },
-    { id: 7, name: 'Content Creation', category: 'advanced', description: 'YouTube/Blog passive income', status: 'locked', progress: 0, monthlyIncome: 0, unlockRequirement: '$500/mo passive income', steps: ['Choose your niche', 'Create content consistently', 'Monetize (ads, affiliate)', 'Scale & automate'] },
-    { id: 8, name: 'Rental Income', category: 'advanced', description: 'Property or room rental', status: 'locked', progress: 0, monthlyIncome: 0, unlockRequirement: 'Net worth $50k+', steps: ['Save deposit (5-20%)', 'Get pre-approval', 'Find investment property', 'Rent out for cashflow'] }
+    { 
+      id: 1, 
+      name: 'High-Interest Savings', 
+      category: 'beginner', 
+      icon: '🏦',
+      description: 'Earn $5-20/mo passive interest on your savings',
+      potentialIncome: '$5-20/mo',
+      difficulty: 'Easy',
+      timeToSetup: '15 mins',
+      status: 'not_started', 
+      progress: 0, 
+      currentStep: 0,
+      monthlyIncome: 0, 
+      steps: [
+        { title: 'Research accounts', description: 'Compare rates at Up (5%), ING (5.5%), Ubank (5.1%), BOQ (5%)', action: 'I\'ll research savings accounts' },
+        { title: 'Open account', description: 'Most can be opened online in 10 minutes with just your ID', action: 'I\'ve opened my account' },
+        { title: 'Set up auto-transfer', description: 'Transfer your emergency fund or set up regular deposits', action: 'Money is transferred' },
+        { title: 'Track your interest', description: 'Watch passive income grow! $10k at 5% = $42/mo', action: 'Complete quest' }
+      ],
+      aureusAdvice: 'This is the easiest passive income - your money works while you sleep! With $2,000 at 5%, you\'ll earn about $8/month doing nothing.'
+    },
+    { 
+      id: 2, 
+      name: 'Cashback & Rewards', 
+      category: 'beginner',
+      icon: '💳',
+      description: 'Earn cashback on spending you already do',
+      potentialIncome: '$10-50/mo',
+      difficulty: 'Easy',
+      timeToSetup: '20 mins',
+      status: 'not_started', 
+      progress: 0,
+      currentStep: 0,
+      monthlyIncome: 0, 
+      steps: [
+        { title: 'Research cards', description: 'Compare: ING Orange (cashback), Bankwest Breeze (rewards), HSBC (points)', action: 'I\'ve researched options' },
+        { title: 'Apply for card', description: 'Choose no annual fee cards to start. Approval takes 1-5 days', action: 'Card approved' },
+        { title: 'Set as default', description: 'Use for all regular spending - groceries, bills, fuel', action: 'Using the card' },
+        { title: 'Redeem rewards', description: 'Cash out monthly or let points accumulate for bigger rewards', action: 'Complete quest' }
+      ],
+      aureusAdvice: 'The trick is using it for spending you\'d do anyway - NOT spending more to get rewards. That defeats the purpose!'
+    },
+    { 
+      id: 3, 
+      name: 'Bank Bonus Hunting', 
+      category: 'beginner',
+      icon: '🎁',
+      description: 'Collect sign-up bonuses from banks',
+      potentialIncome: '$200-500/year',
+      difficulty: 'Easy',
+      timeToSetup: '30 mins',
+      status: 'not_started', 
+      progress: 0,
+      currentStep: 0,
+      monthlyIncome: 0, 
+      steps: [
+        { title: 'Find current offers', description: 'Check OzBargain, Whirlpool forums for latest bank bonuses', action: 'Found some offers' },
+        { title: 'Meet requirements', description: 'Usually: deposit $X or make Y transactions in 3 months', action: 'Requirements met' },
+        { title: 'Collect bonus', description: 'Wait for bonus to credit (usually within 30 days of meeting criteria)', action: 'Got the bonus' },
+        { title: 'Rinse & repeat', description: 'Move to next bank after 6-12 months. Keep credit checks spaced out', action: 'Complete quest' }
+      ],
+      aureusAdvice: 'This is "churning" - totally legal! Just read the fine print and don\'t close accounts too quickly or you may have to repay the bonus.'
+    },
+    { 
+      id: 4, 
+      name: 'Dividend ETFs', 
+      category: 'intermediate',
+      icon: '📈',
+      description: 'Earn quarterly dividends from Aussie shares',
+      potentialIncome: '$50-200/quarter',
+      difficulty: 'Medium',
+      timeToSetup: '1 hour',
+      status: 'locked', 
+      progress: 0,
+      currentStep: 0,
+      monthlyIncome: 0, 
+      unlockRequirement: 'Complete $2k emergency fund',
+      steps: [
+        { title: 'Open brokerage', description: 'Stake ($3/trade), CMC (free under $1k), Pearler (for auto-invest)', action: 'Brokerage opened' },
+        { title: 'Research ETFs', description: 'VAS (Aussie shares 4%), VHY (high yield 5%), A200 (low fee)', action: 'Picked my ETF' },
+        { title: 'Make first investment', description: 'Start with $500+. More = more dividends. Consider DRP (reinvest)', action: 'First purchase done' },
+        { title: 'Set up regular buys', description: 'Automate monthly purchases. Time in market beats timing market', action: 'Complete quest' }
+      ],
+      aureusAdvice: 'ETFs are diversified - you own tiny pieces of hundreds of companies. VAS gives you the top 300 Aussie companies in one purchase!'
+    },
+    { 
+      id: 5, 
+      name: 'Micro-Investing', 
+      category: 'intermediate',
+      icon: '🌱',
+      description: 'Round-ups that grow your wealth painlessly',
+      potentialIncome: '$20-100/year growth',
+      difficulty: 'Easy',
+      timeToSetup: '15 mins',
+      status: 'locked', 
+      progress: 0,
+      currentStep: 0,
+      monthlyIncome: 0, 
+      unlockRequirement: 'Complete $2k emergency fund',
+      steps: [
+        { title: 'Choose platform', description: 'Raiz (round-ups + rewards), Spaceship (no fees under $5k)', action: 'Signed up' },
+        { title: 'Connect bank', description: 'Link your spending account for automatic round-ups', action: 'Bank connected' },
+        { title: 'Enable round-ups', description: 'Every purchase rounds up to nearest $1 and invests the difference', action: 'Round-ups active' },
+        { title: 'Add weekly boost', description: 'Even $5-10/week accelerates growth massively', action: 'Complete quest' }
+      ],
+      aureusAdvice: 'Round-ups are sneaky good - you barely notice the money leaving but it compounds over years. Start young!'
+    },
+    { 
+      id: 6, 
+      name: 'Side Hustle', 
+      category: 'intermediate',
+      icon: '💪',
+      description: 'Turn your skills into extra income',
+      potentialIncome: '$100-1000+/mo',
+      difficulty: 'Medium',
+      timeToSetup: '2-4 hours',
+      status: 'not_started', 
+      progress: 0,
+      currentStep: 0,
+      monthlyIncome: 0, 
+      steps: [
+        { title: 'Identify skills', description: 'What can you do? Cleaning, handyman, tutoring, design, writing, driving?', action: 'Found my skill' },
+        { title: 'Create profile', description: 'Airtasker, Fiverr, Uber, DoorDash, Tutoring platforms', action: 'Profile created' },
+        { title: 'Complete first job', description: 'Start cheap to get reviews, then raise prices', action: 'First job done' },
+        { title: 'Scale up', description: 'Get regular clients, increase rates, optimize your time', action: 'Complete quest' }
+      ],
+      aureusAdvice: 'Side hustles aren\'t passive at first, but some can become semi-passive with systems and repeat clients!'
+    },
+    { 
+      id: 7, 
+      name: 'Content Creation', 
+      category: 'advanced',
+      icon: '🎬',
+      description: 'Build audience for passive ad/affiliate income',
+      potentialIncome: '$0-10,000+/mo',
+      difficulty: 'Hard',
+      timeToSetup: '6-24 months',
+      status: 'locked', 
+      progress: 0,
+      currentStep: 0,
+      monthlyIncome: 0, 
+      unlockRequirement: '$500/mo passive income',
+      steps: [
+        { title: 'Choose niche', description: 'Finance, tech reviews, cooking, fitness - pick something you love', action: 'Niche chosen' },
+        { title: 'Create consistently', description: '2-3 pieces per week minimum. YouTube, TikTok, blog, podcast', action: 'Creating content' },
+        { title: 'Monetize', description: 'YouTube Partner (1k subs), affiliate links, sponsorships', action: 'Earning money' },
+        { title: 'Automate & scale', description: 'Hire editors, batch create, let old content earn forever', action: 'Complete quest' }
+      ],
+      aureusAdvice: 'This is the ultimate passive income - videos you made years ago can still earn money. But it takes serious time investment upfront.'
+    },
+    { 
+      id: 8, 
+      name: 'Investment Property', 
+      category: 'advanced',
+      icon: '🏠',
+      description: 'Rental income from property',
+      potentialIncome: '$500-2000+/mo',
+      difficulty: 'Expert',
+      timeToSetup: '6-12 months',
+      status: 'locked', 
+      progress: 0,
+      currentStep: 0,
+      monthlyIncome: 0, 
+      unlockRequirement: '$50k deposit saved',
+      steps: [
+        { title: 'Save deposit', description: 'Need 10-20% deposit + stamp duty + costs (see Baby Step 5)', action: 'Deposit saved' },
+        { title: 'Get pre-approval', description: 'Know your borrowing power before house hunting', action: 'Pre-approved' },
+        { title: 'Find property', description: 'High yield areas, look for positive cashflow or neutral gearing', action: 'Property purchased' },
+        { title: 'Rent it out', description: 'Property manager (8-10% of rent) or self-manage', action: 'Complete quest' }
+      ],
+      aureusAdvice: 'Property is powerful because of leverage - banks let you borrow 80-90%! But research hard - bad properties can cost you.'
+    }
   ])
+  
+  // ==================== AUSTRALIAN HOME OWNERSHIP DATA ====================
+  const australianHomeData = {
+    stampDuty: {
+      NSW: { firstHome: 'Exempt up to $800k (concession to $1M)', investor: '~4-5.5% of purchase price' },
+      VIC: { firstHome: 'Exempt up to $600k (concession to $750k)', investor: '~5.5% of purchase price' },
+      QLD: { firstHome: 'Concession up to $550k, exempt for new builds', investor: '~3.5-5.75%' },
+      WA: { firstHome: 'Exempt up to $430k', investor: '~4-5.15%' },
+      SA: { firstHome: 'Exempt up to $650k (new) or no exemption (existing)', investor: '~4-5.5%' }
+    },
+    firstHomeBuyerGrants: {
+      federal: '$15,000 First Home Owner Grant (new builds only)',
+      NSW: '$10,000 FHOG (new builds up to $600k)',
+      VIC: '$10,000 FHOG (new builds up to $750k)',
+      QLD: '$30,000 FHOG (new builds)',
+      WA: '$10,000 FHOG (new builds up to $750k)',
+      SA: '$15,000 FHOG (new builds)'
+    },
+    schemes: [
+      { name: 'First Home Guarantee', description: 'Buy with 5% deposit, no LMI. 35,000 places/year.' },
+      { name: 'Regional First Home Guarantee', description: 'Same but for regional areas. 10,000 places/year.' },
+      { name: 'Family Home Guarantee', description: 'Single parents can buy with 2% deposit.' },
+      { name: 'Help to Buy', description: 'Coming 2024 - govt co-owns up to 40% of your home.' },
+      { name: 'First Home Super Saver', description: 'Withdraw up to $50k from super for deposit (voluntary contributions only).' }
+    ],
+    lmi: {
+      description: "Lender's Mortgage Insurance - protects the BANK if you default. You pay it.",
+      cost: '1-4% of loan amount if deposit is under 20%',
+      avoid: 'Save 20% deposit, use guarantor, or use First Home Guarantee'
+    },
+    depositExample: {
+      price: 600000,
+      deposit5: 30000,
+      deposit10: 60000,
+      deposit20: 120000,
+      stampDutyFirstHome: 0,
+      stampDutyInvestor: 22000,
+      lmiCost5: 15000,
+      lmiCost10: 8000,
+      lmiCost20: 0
+    }
+  }
+  
+  // Selected quest for detail view
+  const [showQuestDetail, setShowQuestDetail] = useState(false)
+  const [selectedBabyStep, setSelectedBabyStep] = useState<number | null>(null)
   
   // ==================== BUDGET STATE ====================
   const [incomeStreams, setIncomeStreams] = useState<any[]>([])
@@ -354,15 +565,113 @@ export default function Dashboard() {
     yearsToFI: monthlySurplus > 0 ? Math.ceil(((totalOutgoing * 12) * 25) / (monthlySurplus * 12)) : 999
   }
 
-  // Australian Baby Steps calculation (adapted from Dave Ramsey for AU context)
+  // Australian Baby Steps with detailed content
   const australianBabySteps = [
-    { step: 1, title: 'Starter Emergency Fund', desc: 'Save $2,000 for emergencies', target: 2000, icon: '🛡️' },
-    { step: 2, title: 'Kill Bad Debt', desc: 'Pay off credit cards, personal loans, BNPL', icon: '💳' },
-    { step: 3, title: 'Full Emergency Fund', desc: '3-6 months expenses saved', icon: '🏦' },
-    { step: 4, title: 'Invest 15% + Super', desc: 'Salary sacrifice + investments', icon: '📈' },
-    { step: 5, title: 'Home Deposit', desc: 'Save 10-20% for your home', icon: '🏠' },
-    { step: 6, title: 'Pay Off Home Early', desc: 'Extra mortgage payments', icon: '🔑' },
-    { step: 7, title: 'Build Wealth & Give', desc: 'Invest, enjoy, and be generous', icon: '💎' }
+    { 
+      step: 1, 
+      title: 'Starter Emergency Fund', 
+      desc: 'Save $2,000 for emergencies', 
+      target: 2000, 
+      icon: '🛡️',
+      aureusAdvice: "This $2,000 is your financial airbag - it stops you going into debt when life throws curveballs. Car breaks down? Unexpected bill? You've got this covered.",
+      tips: [
+        "Open a separate savings account (don't mix with spending!)",
+        "Set up automatic transfers on payday - even $50/fortnight helps",
+        "Use a high-interest account (Up, ING, Ubank) to earn while you save",
+        "Don't touch it except for TRUE emergencies (Netflix isn't an emergency!)"
+      ],
+      actionButton: "Let's set up my emergency fund goal"
+    },
+    { 
+      step: 2, 
+      title: 'Kill Bad Debt', 
+      desc: 'Pay off credit cards, personal loans, BNPL', 
+      icon: '💳',
+      aureusAdvice: "Credit cards at 20%+ interest will DESTROY your wealth. Every $1,000 in CC debt costs you $200/year in interest. HECS/HELP is fine - it's low interest and income-contingent. Focus on the bad stuff.",
+      tips: [
+        "List all debts: CC, personal loans, Afterpay, Zip, car loans",
+        "DON'T include: HECS/HELP, mortgage (those are 'okay' debts)",
+        "Avalanche method: Pay highest interest first (mathematically best)",
+        "Snowball method: Pay smallest balance first (psychologically motivating)",
+        "Cut up credit cards or freeze them in ice (literally!)"
+      ],
+      actionButton: "Show me my debt payoff plan"
+    },
+    { 
+      step: 3, 
+      title: 'Full Emergency Fund', 
+      desc: '3-6 months expenses saved', 
+      icon: '🏦',
+      aureusAdvice: "Now we're building real security. 3-6 months of expenses means you could lose your job and be FINE. That's freedom. That's sleeping well at night.",
+      tips: [
+        "Calculate your monthly expenses (rent, food, bills, minimum debt payments)",
+        "Multiply by 3 (secure job) or 6 (unstable income/single income household)",
+        "This money should be BORING - high-interest savings, not invested",
+        "Takes most people 12-24 months - that's okay, you're building a fortress"
+      ],
+      actionButton: "Calculate my target emergency fund"
+    },
+    { 
+      step: 4, 
+      title: 'Invest 15% + Super', 
+      desc: 'Salary sacrifice + investments', 
+      icon: '📈',
+      aureusAdvice: "Your employer already puts 11.5% into super - that's forced savings! Now add salary sacrifice for tax benefits, and invest outside super too. Time + compound interest = millionaire.",
+      tips: [
+        "Check your super fund - fees matter! Compare on sortedsuper.com.au",
+        "Consider salary sacrifice: $100/fortnight saves ~$30 in tax",
+        "Outside super: ETFs like VAS, VDHG, or A200 through Stake/CMC/Pearler",
+        "Dollar cost average - same amount every month, don't try to time the market",
+        "15% of gross income is the target (including super)"
+      ],
+      actionButton: "Help me start investing"
+    },
+    { 
+      step: 5, 
+      title: 'Home Deposit', 
+      desc: 'Save 10-20% for your home', 
+      icon: '🏠',
+      aureusAdvice: "Aussie dream! But it's a marathon, not a sprint. Let me break down the REAL costs so you're not surprised.",
+      tips: [
+        "5% deposit possible with First Home Guarantee (no LMI, limited spots)",
+        "10% deposit = pay LMI (~$8-15k) but get in sooner",
+        "20% deposit = no LMI, better rates, but takes longer to save",
+        "Don't forget: Stamp duty, legal fees, inspections (~$20-30k extra)",
+        "First Home Super Saver: Pull up to $50k from super for deposit"
+      ],
+      showHomeCalculator: true,
+      actionButton: "Show me home buying costs"
+    },
+    { 
+      step: 6, 
+      title: 'Pay Off Home Early', 
+      desc: 'Extra mortgage payments', 
+      icon: '🔑',
+      aureusAdvice: "Every extra dollar on your mortgage saves you 3-4x in interest over the loan life. A 30-year loan can become 15 years with consistent extra payments!",
+      tips: [
+        "Even $100/month extra can cut years off your mortgage",
+        "Use an offset account - your savings reduce your interest daily",
+        "Make fortnightly payments instead of monthly (26 half-payments = 13 months)",
+        "When you get a raise, put half toward the mortgage",
+        "Check for redraw fees before making extra payments"
+      ],
+      actionButton: "Calculate my early payoff"
+    },
+    { 
+      step: 7, 
+      title: 'Build Wealth & Give', 
+      desc: 'Invest, enjoy, and be generous', 
+      icon: '💎',
+      aureusAdvice: "You've made it! No bad debt, emergency fund solid, home sorted, investing humming. Now it's about growing wealth AND enjoying life. Give generously - it feels amazing.",
+      tips: [
+        "Max out super contributions ($27,500/year concessional)",
+        "Build passive income streams (dividends, rental income)",
+        "Consider family trust structures for tax efficiency",
+        "Give to causes you care about - money is a tool, not the goal",
+        "Teach your kids about money - break the cycle"
+      ],
+      actionButton: "Plan my wealth building"
+    }
   ]
   
   const getBabyStep = () => {
@@ -2211,42 +2520,119 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Passive Income Quest Board */}
+            {/* Passive Income Quest Board - Enhanced */}
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🎯 Passive Income Quests</h2>
-                <div style={{ padding: '8px 16px', background: theme.success + '20', borderRadius: '8px' }}>
-                  <span style={{ color: theme.success, fontWeight: 700 }}>${totalPassiveQuestIncome.toFixed(0)}/mo earned</span>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ padding: '8px 16px', background: theme.success + '20', borderRadius: '8px' }}>
+                    <span style={{ color: theme.success, fontWeight: 700 }}>${totalPassiveQuestIncome.toFixed(0)}/mo earned</span>
+                  </div>
+                  <div style={{ padding: '8px 16px', background: theme.purple + '20', borderRadius: '8px' }}>
+                    <span style={{ color: theme.purple, fontWeight: 700 }}>{passiveQuests.filter(q => q.status === 'completed').length}/{passiveQuests.length} complete</span>
+                  </div>
                 </div>
               </div>
               
+              {/* Quest Detail Modal */}
+              {activeQuestId && (() => {
+                const quest = passiveQuests.find(q => q.id === activeQuestId)
+                if (!quest) return null
+                return (
+                  <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setActiveQuestId(null)}>
+                    <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '600px', width: '100%', maxHeight: '85vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                        <div>
+                          <div style={{ fontSize: '40px', marginBottom: '8px' }}>{quest.icon}</div>
+                          <h3 style={{ margin: 0, color: theme.text, fontSize: '24px' }}>{quest.name}</h3>
+                          <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                            <span style={{ padding: '4px 10px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '12px' }}>{quest.potentialIncome}</span>
+                            <span style={{ padding: '4px 10px', background: theme.accent + '20', color: theme.accent, borderRadius: '4px', fontSize: '12px' }}>{quest.difficulty}</span>
+                            <span style={{ padding: '4px 10px', background: theme.purple + '20', color: theme.purple, borderRadius: '4px', fontSize: '12px' }}>{quest.timeToSetup}</span>
+                          </div>
+                        </div>
+                        <button onClick={() => setActiveQuestId(null)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
+                      </div>
+                      
+                      <div style={{ background: darkMode ? '#1e293b' : '#f0fdf4', borderRadius: '12px', padding: '16px', marginBottom: '20px', borderLeft: '4px solid ' + theme.success }}>
+                        <p style={{ margin: 0, color: theme.text, fontSize: '14px', lineHeight: 1.6 }}>💡 <strong>Aureus says:</strong> {quest.aureusAdvice}</p>
+                      </div>
+                      
+                      <h4 style={{ color: theme.text, margin: '0 0 12px 0' }}>📋 Quest Steps</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', marginBottom: '20px' }}>
+                        {quest.steps.map((step: any, idx: number) => (
+                          <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px', background: idx < (quest.currentStep || 0) ? theme.success + '10' : idx === (quest.currentStep || 0) ? theme.warning + '10' : 'transparent', borderRadius: '8px', border: idx === (quest.currentStep || 0) ? '2px solid ' + theme.warning : '1px solid ' + theme.border }}>
+                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: idx < (quest.currentStep || 0) ? theme.success : idx === (quest.currentStep || 0) ? theme.warning : theme.border, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold', flexShrink: 0 }}>
+                              {idx < (quest.currentStep || 0) ? '✓' : idx + 1}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, color: theme.text, marginBottom: '4px' }}>{step.title}</div>
+                              <div style={{ color: theme.textMuted, fontSize: '13px' }}>{step.description}</div>
+                              {idx === (quest.currentStep || 0) && quest.status === 'in_progress' && (
+                                <button onClick={() => {
+                                  const newStep = (quest.currentStep || 0) + 1
+                                  const newProgress = (newStep / quest.steps.length) * 100
+                                  setPassiveQuests(passiveQuests.map(q => q.id === quest.id ? { ...q, currentStep: newStep, progress: newProgress, status: newProgress >= 100 ? 'completed' : 'in_progress' } : q))
+                                }} style={{ marginTop: '8px', padding: '6px 12px', background: theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
+                                  ✓ {step.action}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {quest.status === 'completed' && (
+                        <div style={{ background: theme.success + '20', borderRadius: '12px', padding: '16px', textAlign: 'center' as const }}>
+                          <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎉</div>
+                          <div style={{ color: theme.success, fontWeight: 700, fontSize: '18px' }}>Quest Complete!</div>
+                          {quest.monthlyIncome > 0 && <div style={{ color: theme.text, marginTop: '8px' }}>Earning ${quest.monthlyIncome}/mo in passive income</div>}
+                        </div>
+                      )}
+                      
+                      {quest.status === 'not_started' && (
+                        <button onClick={() => {
+                          setPassiveQuests(passiveQuests.map(q => q.id === quest.id ? { ...q, status: 'in_progress', currentStep: 0, progress: 0 } : q))
+                        }} style={{ width: '100%', padding: '14px', background: theme.accent, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}>
+                          🚀 Start This Quest
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+              
               {/* Beginner Quests */}
               <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ color: theme.success, fontSize: '16px', margin: '0 0 12px 0' }}>🌱 Beginner Quests</h3>
+                <h3 style={{ color: theme.success, fontSize: '16px', margin: '0 0 12px 0' }}>🌱 Beginner Quests - Start Here!</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
                   {passiveQuests.filter(q => q.category === 'beginner').map(quest => (
-                    <div key={quest.id} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: quest.status === 'completed' ? '2px solid ' + theme.success : quest.status === 'in_progress' ? '2px solid ' + theme.accent : '1px solid ' + theme.border }}>
+                    <div key={quest.id} onClick={() => setActiveQuestId(quest.id)} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: quest.status === 'completed' ? '2px solid ' + theme.success : quest.status === 'in_progress' ? '2px solid ' + theme.accent : '1px solid ' + theme.border, cursor: 'pointer', transition: 'transform 0.2s' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                        <div style={{ fontWeight: 600, color: theme.text }}>{quest.name}</div>
-                        {quest.status === 'completed' && <span style={{ color: theme.success }}>✓</span>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '24px' }}>{quest.icon}</span>
+                          <span style={{ fontWeight: 600, color: theme.text }}>{quest.name}</span>
+                        </div>
+                        {quest.status === 'completed' && <span style={{ color: theme.success, fontSize: '20px' }}>✓</span>}
                       </div>
-                      <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>{quest.description}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>{quest.description}</div>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                        <span style={{ padding: '2px 8px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '11px' }}>{quest.potentialIncome}</span>
+                        <span style={{ padding: '2px 8px', background: theme.border, color: theme.textMuted, borderRadius: '4px', fontSize: '11px' }}>{quest.timeToSetup}</span>
+                      </div>
                       {quest.status === 'in_progress' && (
-                        <div style={{ marginBottom: '12px' }}>
+                        <div>
                           <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
                             <div style={{ width: quest.progress + '%', height: '100%', background: theme.accent }} />
                           </div>
-                          <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '4px' }}>{quest.progress}% complete</div>
+                          <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '4px' }}>Step {quest.currentStep + 1} of {quest.steps.length}</div>
                         </div>
                       )}
                       {quest.status === 'completed' && quest.monthlyIncome > 0 && (
-                        <div style={{ color: theme.success, fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>+${quest.monthlyIncome}/mo</div>
+                        <div style={{ color: theme.success, fontSize: '14px', fontWeight: 600 }}>+${quest.monthlyIncome}/mo 🎉</div>
                       )}
                       {quest.status === 'not_started' && (
-                        <button onClick={() => startQuest(quest.id)} style={{ padding: '8px 16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', width: '100%' }}>Start Quest →</button>
-                      )}
-                      {quest.status === 'in_progress' && (
-                        <button onClick={() => updateQuestProgress(quest.id, Math.floor(quest.progress / 25))} style={{ padding: '8px 16px', background: theme.purple, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', width: '100%' }}>Continue →</button>
+                        <div style={{ color: theme.accent, fontSize: '13px', fontWeight: 500 }}>Click to start →</div>
                       )}
                     </div>
                   ))}
@@ -2258,16 +2644,18 @@ export default function Dashboard() {
                 <h3 style={{ color: theme.warning, fontSize: '16px', margin: '0 0 12px 0' }}>📈 Intermediate Quests</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
                   {passiveQuests.filter(q => q.category === 'intermediate').map(quest => (
-                    <div key={quest.id} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: quest.status === 'locked' ? '1px dashed ' + theme.border : quest.status === 'completed' ? '2px solid ' + theme.success : '1px solid ' + theme.border, opacity: quest.status === 'locked' ? 0.6 : 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                        <div style={{ fontWeight: 600, color: theme.text }}>{quest.status === 'locked' ? '🔒 ' : ''}{quest.name}</div>
+                    <div key={quest.id} onClick={() => quest.status !== 'locked' && setActiveQuestId(quest.id)} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: quest.status === 'locked' ? '1px dashed ' + theme.border : quest.status === 'completed' ? '2px solid ' + theme.success : '1px solid ' + theme.border, opacity: quest.status === 'locked' ? 0.6 : 1, cursor: quest.status === 'locked' ? 'not-allowed' : 'pointer' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '24px' }}>{quest.status === 'locked' ? '🔒' : quest.icon}</span>
+                        <span style={{ fontWeight: 600, color: theme.text }}>{quest.name}</span>
                       </div>
-                      <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>{quest.description}</div>
-                      {quest.status === 'locked' && (
-                        <div style={{ fontSize: '12px', color: theme.warning }}>Unlock: {quest.unlockRequirement}</div>
-                      )}
-                      {quest.status === 'not_started' && (
-                        <button onClick={() => startQuest(quest.id)} style={{ padding: '8px 16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', width: '100%' }}>Start Quest →</button>
+                      <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>{quest.description}</div>
+                      {quest.status === 'locked' ? (
+                        <div style={{ fontSize: '12px', color: theme.warning, background: theme.warning + '20', padding: '6px 10px', borderRadius: '6px' }}>🔐 Unlock: {quest.unlockRequirement}</div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <span style={{ padding: '2px 8px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '11px' }}>{quest.potentialIncome}</span>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -2280,39 +2668,161 @@ export default function Dashboard() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
                   {passiveQuests.filter(q => q.category === 'advanced').map(quest => (
                     <div key={quest.id} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px dashed ' + theme.border, opacity: 0.6 }}>
-                      <div style={{ fontWeight: 600, color: theme.text, marginBottom: '8px' }}>🔒 {quest.name}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '24px' }}>🔒</span>
+                        <span style={{ fontWeight: 600, color: theme.text }}>{quest.name}</span>
+                      </div>
                       <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>{quest.description}</div>
-                      <div style={{ fontSize: '12px', color: theme.purple }}>Unlock: {quest.unlockRequirement}</div>
+                      <div style={{ fontSize: '12px', color: theme.purple, background: theme.purple + '20', padding: '6px 10px', borderRadius: '6px' }}>🔐 Unlock: {quest.unlockRequirement}</div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Australian Baby Steps */}
+            {/* Australian Baby Steps - Enhanced Interactive */}
             <div style={cardStyle}>
-              <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>👶 Australian Baby Steps</h2>
-              <p style={{ color: theme.textMuted, fontSize: '13px', margin: '-12px 0 20px 0' }}>Adapted for Australia - HECS/HELP debt is okay, Super counts toward investing!</p>
+              <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>👶 Australian Baby Steps</h2>
+              <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 20px 0' }}>Click any step for detailed guidance from Aureus!</p>
+              
+              {/* Baby Step Detail Modal */}
+              {selectedBabyStep !== null && (() => {
+                const step = australianBabySteps.find(s => s.step === selectedBabyStep)
+                if (!step) return null
+                const isCurrent = step.step === currentBabyStep.step
+                const done = step.step < currentBabyStep.step
+                return (
+                  <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setSelectedBabyStep(null)}>
+                    <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '650px', width: '100%', maxHeight: '85vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>{done ? '✓' : step.icon}</div>
+                          <div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Step {step.step} of 7</div>
+                            <h3 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>{step.title}</h3>
+                          </div>
+                        </div>
+                        <button onClick={() => setSelectedBabyStep(null)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
+                      </div>
+                      
+                      {done && (
+                        <div style={{ background: theme.success + '20', borderRadius: '12px', padding: '16px', marginBottom: '20px', textAlign: 'center' as const }}>
+                          <span style={{ fontSize: '24px' }}>🎉</span>
+                          <span style={{ color: theme.success, fontWeight: 700, marginLeft: '8px' }}>You've completed this step!</span>
+                        </div>
+                      )}
+                      
+                      {isCurrent && currentBabyStep.target && currentBabyStep.target > 0 && (
+                        <div style={{ background: theme.warning + '20', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <span style={{ color: theme.warning, fontWeight: 600 }}>Your Progress</span>
+                            <span style={{ color: theme.text, fontWeight: 700 }}>${currentBabyStep.current?.toFixed(0) || 0} / ${currentBabyStep.target?.toFixed(0)}</span>
+                          </div>
+                          <div style={{ height: '10px', background: theme.border, borderRadius: '5px', overflow: 'hidden' }}>
+                            <div style={{ width: Math.min(currentBabyStep.progress || 0, 100) + '%', height: '100%', background: theme.warning }} />
+                          </div>
+                          <div style={{ textAlign: 'right' as const, marginTop: '4px', fontSize: '12px', color: theme.textMuted }}>{(currentBabyStep.progress || 0).toFixed(1)}% complete</div>
+                        </div>
+                      )}
+                      
+                      <div style={{ background: darkMode ? '#1e293b' : '#f0fdf4', borderRadius: '12px', padding: '16px', marginBottom: '20px', borderLeft: '4px solid ' + theme.success }}>
+                        <p style={{ margin: 0, color: theme.text, fontSize: '14px', lineHeight: 1.7 }}>💡 <strong>Aureus says:</strong> {step.aureusAdvice}</p>
+                      </div>
+                      
+                      <h4 style={{ color: theme.text, margin: '0 0 12px 0' }}>✅ Tips for this step:</h4>
+                      <ul style={{ margin: 0, paddingLeft: '20px', color: theme.text, lineHeight: 2 }}>
+                        {step.tips?.map((tip: string, idx: number) => (
+                          <li key={idx} style={{ marginBottom: '4px' }}>{tip}</li>
+                        ))}
+                      </ul>
+                      
+                      {/* Home Ownership Calculator for Step 5 */}
+                      {step.step === 5 && (
+                        <div style={{ marginTop: '24px', padding: '20px', background: darkMode ? '#1e293b' : '#fef3c7', borderRadius: '12px', border: '2px solid ' + theme.warning }}>
+                          <h4 style={{ color: theme.warning, margin: '0 0 16px 0' }}>🏠 Australian Home Buying Calculator</h4>
+                          
+                          <div style={{ marginBottom: '16px' }}>
+                            <div style={{ fontWeight: 600, color: theme.text, marginBottom: '8px' }}>Example: $600,000 Home</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '13px' }}>
+                              <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px' }}>
+                                <div style={{ color: theme.textMuted, marginBottom: '4px' }}>5% Deposit</div>
+                                <div style={{ color: theme.text, fontWeight: 700 }}>$30,000</div>
+                                <div style={{ color: theme.danger, fontSize: '11px' }}>+ ~$15k LMI</div>
+                              </div>
+                              <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px' }}>
+                                <div style={{ color: theme.textMuted, marginBottom: '4px' }}>10% Deposit</div>
+                                <div style={{ color: theme.text, fontWeight: 700 }}>$60,000</div>
+                                <div style={{ color: theme.warning, fontSize: '11px' }}>+ ~$8k LMI</div>
+                              </div>
+                              <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px' }}>
+                                <div style={{ color: theme.textMuted, marginBottom: '4px' }}>20% Deposit</div>
+                                <div style={{ color: theme.text, fontWeight: 700 }}>$120,000</div>
+                                <div style={{ color: theme.success, fontSize: '11px' }}>No LMI! ✓</div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div style={{ marginBottom: '16px' }}>
+                            <div style={{ fontWeight: 600, color: theme.text, marginBottom: '8px' }}>🎁 First Home Buyer Grants</div>
+                            <div style={{ fontSize: '13px', color: theme.text, lineHeight: 1.8 }}>
+                              {Object.entries(australianHomeData.firstHomeBuyerGrants).map(([state, grant]) => (
+                                <div key={state} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <span style={{ fontWeight: 500 }}>{state.toUpperCase()}:</span>
+                                  <span>{grant}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div style={{ fontWeight: 600, color: theme.text, marginBottom: '8px' }}>🏛️ Government Schemes</div>
+                            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                              {australianHomeData.schemes.map((scheme, idx) => (
+                                <div key={idx} style={{ padding: '10px', background: theme.cardBg, borderRadius: '8px', fontSize: '13px' }}>
+                                  <span style={{ fontWeight: 600, color: theme.accent }}>{scheme.name}:</span>
+                                  <span style={{ color: theme.textMuted, marginLeft: '8px' }}>{scheme.description}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <button onClick={() => {
+                        setSelectedBabyStep(null)
+                        // Send message to Aureus about this step
+                        setChatInput(`Tell me more about ${step.title}`)
+                      }} style={{ width: '100%', marginTop: '20px', padding: '14px', background: theme.accent, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}>
+                        💬 Ask Aureus About This Step
+                      </button>
+                    </div>
+                  </div>
+                )
+              })()}
+              
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
                 {australianBabySteps.map((item) => {
                   const isCurrent = item.step === currentBabyStep.step
                   const done = item.step < currentBabyStep.step
                   return (
-                    <div key={item.step} style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '16px', background: done ? (darkMode ? '#1e3a32' : '#f0fdf4') : isCurrent ? (darkMode ? '#2e2a1e' : '#fefce8') : (darkMode ? '#334155' : '#f8fafc'), borderRadius: '12px', border: done ? '2px solid ' + theme.success : isCurrent ? '2px solid ' + theme.warning : '1px solid ' + theme.border }}>
+                    <div key={item.step} onClick={() => setSelectedBabyStep(item.step)} style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '16px', background: done ? (darkMode ? '#1e3a32' : '#f0fdf4') : isCurrent ? (darkMode ? '#2e2a1e' : '#fefce8') : (darkMode ? '#334155' : '#f8fafc'), borderRadius: '12px', border: done ? '2px solid ' + theme.success : isCurrent ? '2px solid ' + theme.warning : '1px solid ' + theme.border, cursor: 'pointer', transition: 'transform 0.2s' }}>
                       <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' }}>{done ? '✓' : item.icon}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{item.title}</div>
                         <div style={{ color: theme.textMuted, fontSize: '13px' }}>{item.desc}</div>
-                        {isCurrent && currentBabyStep.target > 0 && (
+                        {isCurrent && currentBabyStep.target && currentBabyStep.target > 0 && (
                           <div style={{ marginTop: '8px' }}>
                             <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
-                              <div style={{ width: Math.min(currentBabyStep.progress, 100) + '%', height: '100%', background: theme.warning }} />
+                              <div style={{ width: Math.min(currentBabyStep.progress || 0, 100) + '%', height: '100%', background: theme.warning }} />
                             </div>
                             <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '4px' }}>${currentBabyStep.current?.toFixed(0) || 0} / ${currentBabyStep.target?.toFixed(0) || 0}</div>
                           </div>
                         )}
                       </div>
-                      <div style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, background: done ? theme.success : isCurrent ? theme.warning : theme.border, color: done || isCurrent ? 'white' : theme.textMuted }}>{done ? '✓ Complete' : isCurrent ? '→ Current' : 'Pending'}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '4px' }}>
+                        <div style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, background: done ? theme.success : isCurrent ? theme.warning : theme.border, color: done || isCurrent ? 'white' : theme.textMuted }}>{done ? '✓ Complete' : isCurrent ? '→ Current' : 'Pending'}</div>
+                        <div style={{ color: theme.accent, fontSize: '12px' }}>Click for details →</div>
+                      </div>
                     </div>
                   )
                 })}
