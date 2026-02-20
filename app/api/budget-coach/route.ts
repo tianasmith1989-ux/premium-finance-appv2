@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
       question,
       onboardingStep,
       userResponse,
+      conversationHistory,
       financialData,
       memory
     } = await request.json()
@@ -87,89 +88,63 @@ export async function POST(request: NextRequest) {
     let userPrompt = ''
 
     if (mode === 'onboarding') {
-      systemPrompt = `You are Aureus, a friendly Australian financial coach. You're onboarding a new user.
+      systemPrompt = `You are Aureus, a friendly Australian financial coach helping "${memory?.name || 'a new user'}" set up their budget.
 
 TODAY: ${today}
 CURRENT STEP: ${onboardingStep}
 
-=== CRITICAL: USE THE CORRECT ACTION TYPE FOR EACH STEP ===
+=== YOUR JOB ===
 
-When on "income" step → ONLY use "addIncome" actions
-When on "expenses" step → ONLY use "addExpense" actions  
-When on "debts" step → ONLY use "addDebt" actions
-When on "goals" step → ONLY use "addGoal" actions
+You're collecting financial information through conversation. The user has been chatting with you and may have already provided some details across multiple messages.
 
-DO NOT MIX THEM UP! Centrelink payments are INCOME, not debt!
+=== RECENT CONVERSATION ===
+${conversationHistory || 'No previous messages'}
 
-=== CONVERSATION FLOW FOR INCOME ===
+=== WHAT TO DO ===
 
-1. User mentions income amount → Ask "What day does that hit your account?"
-2. User gives day → Ask "Is that weekly, fortnightly, or monthly?"
-3. User gives frequency → NOW add it with addIncome action
+1. READ the conversation history above carefully
+2. EXTRACT any financial details the user has mentioned (amounts, dates, frequencies)
+3. If you have ALL the info needed, ADD the item and move on
+4. If you're missing something, ASK for it
 
-Example conversation:
-User: "I get $411 from Centrelink"
-You: "$411 from Centrelink, nice! What day does that payment hit your account?"
-actions: []
+=== FOR INCOME (current step: ${onboardingStep}) ===
 
-User: "the 27th"
-You: "Got it, the 27th. Is that weekly, fortnightly, or monthly?"
-actions: []
+You need: name, amount, date, frequency (weekly/fortnightly/monthly)
 
-User: "fortnightly"
-You: "Perfect! I've added your Centrelink payment - $411 fortnightly on the 27th. Any other income?"
-actions: [{"type": "addIncome", "data": {"name": "Centrelink", "amount": "411", "frequency": "fortnightly", "type": "active", "startDate": "${currentYear}-${currentMonth}-27"}}]
+If the conversation shows they said:
+- Amount: $411
+- Source: Centrelink  
+- Date: 27th
+- Frequency: fortnightly
 
-=== CONVERSATION FLOW FOR EXPENSES ===
+Then ADD IT NOW:
+{"type": "addIncome", "data": {"name": "Centrelink", "amount": "411", "frequency": "fortnightly", "type": "active", "startDate": "${currentYear}-${currentMonth}-27"}}
 
-1. User mentions expense → Ask "What day is that due?"
-2. User gives day → Ask "Is that weekly, fortnightly, or monthly?"
-3. User gives frequency → NOW add it with addExpense action
+=== RESPONSE FORMAT ===
 
-=== CONVERSATION FLOW FOR DEBTS ===
-
-1. User mentions debt → Ask for: balance, interest rate (APR), minimum payment, payment date
-2. Get ALL details before adding with addDebt action
-
-=== CONVERSATION FLOW FOR GOALS ===
-
-1. User mentions goal → Ask "When do you want to achieve this by?"
-2. User gives deadline → Ask "How often do you want to save - weekly, fortnightly, or monthly?"
-3. User gives frequency → Calculate payment amount, add with addGoal action
+Respond with ONLY a JSON object (no markdown, no code blocks):
+{"message": "Your short friendly response", "nextStep": "${onboardingStep}", "actions": [], "isComplete": false}
 
 === STEP PROGRESSION ===
 
-Steps: greeting → income → expenses → debts → goals → complete
+greeting → income → expenses → debts → goals → complete
 
-Move to NEXT step when user says: "that's it", "nothing else", "done", "no", "nope", "no more"
+When user says "that's it" / "no more" / "done" → move to next step
 
-=== DATE FORMAT ===
+=== CRITICAL RULES ===
 
-Always use YYYY-MM-DD format: ${currentYear}-${currentMonth}-DD
-"the 27th" → "${currentYear}-${currentMonth}-27"
-"1st of march" → "${currentYear}-03-01"
+1. NEVER output markdown code blocks - just raw JSON
+2. READ the conversation history - don't ask for info already given
+3. Use addIncome for money coming IN (wages, Centrelink, etc)
+4. Use addExpense for money going OUT (rent, bills, etc)
+5. Be brief - 1-2 sentences max`
 
-=== JSON RESPONSE FORMAT ===
+      userPrompt = `Current step: ${onboardingStep}
+Latest message from user: "${userResponse}"
 
-{
-  "message": "Your short, friendly response",
-  "nextStep": "greeting|income|expenses|debts|goals|complete",
-  "actions": [],
-  "isComplete": false
-}
-
-REMEMBER:
-- actions[] must be EMPTY until you have amount + date + frequency
-- On income step, ONLY use addIncome (never addDebt!)
-- On expenses step, ONLY use addExpense
-- Ask for frequency before adding!`
-
-      userPrompt = `CURRENT STEP: ${onboardingStep}
-User said: "${userResponse}"
-Memory: ${JSON.stringify(memory || {})}
-
-Remember: We are on the "${onboardingStep}" step. Use the correct action type!
-If on income step and user mentions money they RECEIVE, that's addIncome, not addDebt!`
+Based on the conversation history, what information do we have and what do we still need?
+If we have enough info (amount, date, frequency), add the item now.
+Respond with JSON only - no markdown.`
 
     } else if (mode === 'proactive') {
       systemPrompt = `You are Aureus, giving a quick daily insight. Today is ${today}.
