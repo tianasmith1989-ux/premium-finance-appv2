@@ -240,23 +240,30 @@ ${buildFinancialContext()}
 
 User's name: ${memory?.name || 'there'}
 
-Give ONE specific insight based on their data:
-- Upcoming bills this week?
-- Progress on goals?
-- Savings rate looking good or bad?
-- Baby step progress?
+=== CRITICAL: USE THE CORRECT NET FIGURE ===
+The "FORTNIGHTLY BUDGET SUMMARY" above shows the CORRECT "NET AVAILABLE" amount.
+This NET already accounts for: Income - Expenses - Debt Payments - Goal Savings
 
-Keep it to 2 sentences max. Be encouraging but real.
+DO NOT calculate "income minus expenses" yourself - that ignores debt payments and goal savings!
+ALWAYS use the NET AVAILABLE figure from the summary above.
+
+=== YOUR TASK ===
+Give a brief, encouraging insight. Mention:
+- Upcoming bills/income
+- Their NET available (from the summary above!)
+- Progress toward goals or debt freedom
+
+Keep it to 2-3 sentences. Be encouraging but accurate.
 
 Response format:
 {
   "greeting": "Hey ${memory?.name || 'there'}!",
-  "insight": "Your specific insight with their numbers",
+  "insight": "Your specific insight using the NET AVAILABLE figure",
   "suggestion": "One actionable tip (optional)",
   "mood": "positive|neutral|warning"
 }`
 
-      userPrompt = 'Generate proactive insight.'
+      userPrompt = 'Generate proactive insight. Remember to use the NET AVAILABLE figure from the budget summary, not income minus expenses!'
 
     } else {
       // Question/Chat mode - handles questions AND edits
@@ -268,10 +275,19 @@ ${buildFinancialContext()}
 
 User's name: ${memory?.name || 'friend'}
 
+=== CRITICAL: BUDGET MATH ===
+The "FORTNIGHTLY BUDGET SUMMARY" above shows pre-calculated totals.
+ALWAYS use the "NET AVAILABLE" figure when discussing how much money is left.
+
+NET AVAILABLE = Income - Expenses - Debt Payments - Goal Savings
+
+DO NOT say "income minus expenses = available" - that's WRONG because it ignores debt payments and goal savings!
+
 === WHAT YOU CAN DO ===
 
 **ANSWER QUESTIONS:**
 - Use their actual numbers from the data above
+- Use the NET AVAILABLE for "how much is left" questions
 - Be specific and helpful
 
 **ADD NEW ITEMS:**
