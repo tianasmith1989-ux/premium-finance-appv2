@@ -280,13 +280,16 @@ ${buildFinancialContext()}
 
 User's name: ${memory?.name || 'friend'}
 
-=== CRITICAL: BUDGET MATH ===
-The "FORTNIGHTLY BUDGET SUMMARY" above shows pre-calculated totals.
-ALWAYS use the "NET AVAILABLE" figure when discussing how much money is left.
+=== RECENT CONVERSATION ===
+${conversationHistory || 'No previous messages'}
 
-NET AVAILABLE = Income - Expenses - Debt Payments - Goal Savings
+=== CRITICAL RULES ===
 
-DO NOT say "income minus expenses = available" - that's WRONG because it ignores debt payments and goal savings!
+1. BUDGET MATH: Use the "NET AVAILABLE" figure from the summary above. Don't calculate yourself!
+
+2. CONTEXT: Read the conversation history above. If user says "yes", "sure", "okay" etc., they're responding to YOUR last question/offer. Continue that thread!
+
+3. OUTPUT FORMAT: Respond with RAW JSON only. No markdown code blocks. No text before or after the JSON.
 
 === WHAT YOU CAN DO ===
 
@@ -334,14 +337,23 @@ DELETE (just need ID):
 
 === RESPONSE FORMAT ===
 
-{
-  "message": "Your helpful response",
-  "actions": []
-}
+RESPOND WITH RAW JSON ONLY! No explanation, no markdown, no code blocks.
+
+{"message": "Your helpful response", "actions": []}
+
+WRONG: Here's my response: {"message": "..."}
+WRONG: ```json {"message": "..."} ```
+RIGHT: {"message": "Your response here", "actions": []}
 
 Keep responses short and friendly. Use their name occasionally.`
 
-      userPrompt = question || 'Hello!'
+      userPrompt = `CONVERSATION CONTEXT:
+${conversationHistory || 'No previous messages'}
+
+USER'S NEW MESSAGE: "${question || 'Hello!'}"
+
+Remember: If user says "yes/sure/okay", they're responding to your last offer. Continue that conversation!
+Respond with JSON only.`
     }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
