@@ -206,9 +206,10 @@ export default function Dashboard() {
   }, [chatMessages])
 
   // ==================== CALCULATIONS ====================
+  // Simple intuitive conversions that match how people think about money
   const convertToMonthly = (amount: number, frequency: string) => {
-    if (frequency === 'weekly') return amount * 4.33
-    if (frequency === 'fortnightly') return amount * 2.17
+    if (frequency === 'weekly') return amount * 4       // 4 weeks per month
+    if (frequency === 'fortnightly') return amount * 2  // 2 fortnights per month
     if (frequency === 'quarterly') return amount / 3
     if (frequency === 'yearly') return amount / 12
     return amount
@@ -680,7 +681,12 @@ export default function Dashboard() {
         }
       }
       
-      setChatMessages(prev => [...prev, { role: 'assistant', content: (data.message || data.raw || "Let's continue...") + addedSummary }])
+      setChatMessages(prev => [...prev, { role: 'assistant', content: (data.message || data.raw || "I'm processing that - what would you like to do next?") + addedSummary }])
+      
+      // Debug: log if we got an unexpected response
+      if (!data.message && !data.raw) {
+        console.log('Unexpected API response:', data)
+      }
       
       // Legacy support for extractedData
       if (data.extractedData) {
@@ -1827,3 +1833,4 @@ export default function Dashboard() {
     </div>
   )
 }
+
