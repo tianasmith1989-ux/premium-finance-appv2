@@ -53,33 +53,67 @@ export async function POST(request: NextRequest) {
       
       let context = '=== CURRENT FINANCIAL DATA ===\n'
       
+      // Calculate totals for the AI
+      let totalIncomeFortnightly = 0
+      let totalExpensesFortnightly = 0
+      let totalDebtPaymentsFortnightly = 0
+      let totalGoalSavingsFortnightly = 0
+      
+      const convertToFortnightly = (amount: number, frequency: string) => {
+        if (frequency === 'weekly') return amount * 2
+        if (frequency === 'fortnightly') return amount
+        if (frequency === 'monthly') return amount / 2.17
+        if (frequency === 'quarterly') return amount / 6.5
+        if (frequency === 'yearly') return amount / 26
+        return amount
+      }
+      
       if (financialData.income?.length > 0) {
         context += '\nINCOME:\n'
         financialData.income.forEach((inc: any) => {
-          context += `  - ID:${inc.id} "${inc.name}" $${inc.amount}/${inc.frequency} (${inc.type}) on ${inc.startDate}\n`
+          const amount = parseFloat(inc.amount || '0')
+          totalIncomeFortnightly += convertToFortnightly(amount, inc.frequency)
+          context += `  - "${inc.name}" $${inc.amount}/${inc.frequency} on ${inc.startDate}\n`
         })
       }
       
       if (financialData.expenses?.length > 0) {
         context += '\nEXPENSES:\n'
         financialData.expenses.forEach((exp: any) => {
-          context += `  - ID:${exp.id} "${exp.name}" $${exp.amount}/${exp.frequency} [${exp.category}] due ${exp.dueDate}\n`
+          const amount = parseFloat(exp.amount || '0')
+          totalExpensesFortnightly += convertToFortnightly(amount, exp.frequency)
+          context += `  - "${exp.name}" $${exp.amount}/${exp.frequency} due ${exp.dueDate}\n`
         })
       }
       
       if (financialData.debts?.length > 0) {
-        context += '\nDEBTS:\n'
+        context += '\nDEBTS (payments come out of budget!):\n'
         financialData.debts.forEach((debt: any) => {
-          context += `  - ID:${debt.id} "${debt.name}" $${debt.balance} @ ${debt.interestRate}% (min $${debt.minPayment}) due ${debt.paymentDate}\n`
+          const payment = parseFloat(debt.minPayment || '0')
+          totalDebtPaymentsFortnightly += convertToFortnightly(payment, debt.frequency || 'monthly')
+          context += `  - "${debt.name}" owes $${debt.balance} @ ${debt.interestRate}% → PAYMENT: $${debt.minPayment}/${debt.frequency || 'monthly'}\n`
         })
       }
       
       if (financialData.goals?.length > 0) {
-        context += '\nGOALS:\n'
+        context += '\nGOALS (savings come out of budget!):\n'
         financialData.goals.forEach((goal: any) => {
-          context += `  - ID:${goal.id} "${goal.name}" $${goal.saved}/$${goal.target} by ${goal.deadline} ($${goal.paymentAmount}/${goal.savingsFrequency})\n`
+          const payment = parseFloat(goal.paymentAmount || '0')
+          totalGoalSavingsFortnightly += convertToFortnightly(payment, goal.savingsFrequency || 'monthly')
+          context += `  - "${goal.name}" $${goal.saved}/$${goal.target} → SAVING: $${goal.paymentAmount}/${goal.savingsFrequency}\n`
         })
       }
+      
+      // Add calculated summary
+      const netFortnightly = totalIncomeFortnightly - totalExpensesFortnightly - totalDebtPaymentsFortnightly - totalGoalSavingsFortnightly
+      
+      context += '\n=== FORTNIGHTLY BUDGET SUMMARY ===\n'
+      context += `Income: $${totalIncomeFortnightly.toFixed(0)}/fortnight\n`
+      context += `Expenses: $${totalExpensesFortnightly.toFixed(0)}/fortnight\n`
+      context += `Debt Payments: $${totalDebtPaymentsFortnightly.toFixed(0)}/fortnight\n`
+      context += `Goal Savings: $${totalGoalSavingsFortnightly.toFixed(0)}/fortnight\n`
+      context += `NET AVAILABLE: $${netFortnightly.toFixed(0)}/fortnight\n`
+      context += '\n⚠️ IMPORTANT: When giving budget summaries, ALWAYS include debt payments AND goal savings as outgoings!\n'
       
       return context
     }
