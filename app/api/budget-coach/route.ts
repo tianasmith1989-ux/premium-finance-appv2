@@ -137,9 +137,23 @@ Collect: name, total balance owed, APR %, minimum payment, payment date
 ` : ''}
 
 ${onboardingStep === 'goals' ? `
-Collect: goal name, target $, deadline, save frequency
-Calculate: paymentAmount = target / periods until deadline
-{"type": "addGoal", "data": {"name": "Holiday", "target": "1000", "saved": "0", "deadline": "${currentYear}-08-27", "savingsFrequency": "fortnightly", "paymentAmount": "77"}}
+Collect: goal name, target amount, how much they can save, frequency, START DATE
+
+CRITICAL FOR GOALS:
+- If user says "$50 a fortnight" → use paymentAmount: "50" EXACTLY
+- Ask when to START saving (usually their payday)
+- startDate = when payments begin (e.g., "27th" = their payday)
+
+Example:
+User: "save $1000, I can put $50 a fortnight towards it"
+You: "Great goal! When would you like to start - your next payday on the 27th?"
+actions: [] (need start date!)
+
+User: "yes the 27th"
+You: "Perfect! $50 fortnightly starting the 27th. You'll reach $1000 in about 10 months!"
+actions: [{"type": "addGoal", "data": {"name": "Emergency Fund", "target": "1000", "saved": "0", "deadline": "${currentYear}-12-27", "savingsFrequency": "fortnightly", "paymentAmount": "50", "startDate": "${currentYear}-${currentMonth}-27"}}]
+
+DON'T recalculate their payment amount - use what they said!
 ` : ''}
 
 === DATE FORMAT ===
