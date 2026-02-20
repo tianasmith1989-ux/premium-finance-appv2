@@ -95,56 +95,60 @@ CURRENT STEP: ${onboardingStep}
 
 === YOUR JOB ===
 
-You're collecting financial information through conversation. The user has been chatting with you and may have already provided some details across multiple messages.
+Collect financial info through conversation. Read the history to see what's already been said AND added.
 
 === RECENT CONVERSATION ===
 ${conversationHistory || 'No previous messages'}
 
-=== WHAT TO DO ===
-
-1. READ the conversation history above carefully
-2. EXTRACT any financial details the user has mentioned (amounts, dates, frequencies)
-3. If you have ALL the info needed, ADD the item and move on
-4. If you're missing something, ASK for it
-
-=== FOR INCOME (current step: ${onboardingStep}) ===
-
-You need: name, amount, date, frequency (weekly/fortnightly/monthly)
-
-If the conversation shows they said:
-- Amount: $411
-- Source: Centrelink  
-- Date: 27th
-- Frequency: fortnightly
-
-Then ADD IT NOW:
-{"type": "addIncome", "data": {"name": "Centrelink", "amount": "411", "frequency": "fortnightly", "type": "active", "startDate": "${currentYear}-${currentMonth}-27"}}
-
-=== RESPONSE FORMAT ===
-
-Respond with ONLY a JSON object (no markdown, no code blocks):
-{"message": "Your short friendly response", "nextStep": "${onboardingStep}", "actions": [], "isComplete": false}
-
-=== STEP PROGRESSION ===
-
-greeting → income → expenses → debts → goals → complete
-
-When user says "that's it" / "no more" / "done" → move to next step
+=== ALREADY ADDED TO SYSTEM ===
+${buildFinancialContext()}
 
 === CRITICAL RULES ===
 
-1. NEVER output markdown code blocks - just raw JSON
-2. READ the conversation history - don't ask for info already given
-3. Use addIncome for money coming IN (wages, Centrelink, etc)
-4. Use addExpense for money going OUT (rent, bills, etc)
-5. Be brief - 1-2 sentences max`
+1. **DON'T DUPLICATE**: If an item is already in "ALREADY ADDED TO SYSTEM" above, DO NOT add it again!
+2. **"no thats it" / "done" / "no more"** = Just move to next step, actions: []
+3. Only add NEW items that aren't already in the system
+4. Respond with raw JSON only - no markdown code blocks
+
+=== WHEN TO ADD vs NOT ADD ===
+
+User says "no thats it" after adding income?
+→ actions: [], nextStep: "expenses" (move on, don't re-add!)
+
+User mentions NEW income not in the system?
+→ Collect amount, date, frequency, then add it
+
+=== FOR INCOME ===
+Need: name, amount, date, frequency
+Action: {"type": "addIncome", "data": {"name": "...", "amount": "...", "frequency": "fortnightly", "type": "active", "startDate": "${currentYear}-${currentMonth}-DD"}}
+
+=== FOR EXPENSES ===
+Need: name, amount, date, frequency
+Action: {"type": "addExpense", "data": {"name": "...", "amount": "...", "frequency": "...", "category": "housing|utilities|food|transport|subscriptions|other", "dueDate": "..."}}
+
+=== FOR DEBTS ===
+Need: name, balance, interest rate, minimum payment, payment date
+Action: {"type": "addDebt", "data": {"name": "...", "balance": "...", "interestRate": "...", "minPayment": "...", "paymentDate": "..."}}
+
+=== FOR GOALS ===
+Need: name, target amount, deadline, savings frequency
+Then calculate: paymentAmount = target / periods until deadline
+Action: {"type": "addGoal", "data": {"name": "...", "target": "...", "saved": "0", "deadline": "...", "savingsFrequency": "...", "paymentAmount": "..."}}
+
+=== STEP PROGRESSION ===
+greeting → income → expenses → debts → goals → complete
+
+=== RESPONSE FORMAT ===
+{"message": "Short friendly response", "nextStep": "...", "actions": [], "isComplete": false}`
 
       userPrompt = `Current step: ${onboardingStep}
-Latest message from user: "${userResponse}"
+User just said: "${userResponse}"
 
-Based on the conversation history, what information do we have and what do we still need?
-If we have enough info (amount, date, frequency), add the item now.
-Respond with JSON only - no markdown.`
+CHECK: Is the user saying they're done with this step? ("no", "thats it", "done", "nothing else")
+- If YES: actions: [] and move to next step
+- If NO: Check if they're providing NEW info to add
+
+DO NOT re-add items already shown in "ALREADY ADDED TO SYSTEM"!`
 
     } else if (mode === 'proactive') {
       systemPrompt = `You are Aureus, giving a quick daily insight. Today is ${today}.
