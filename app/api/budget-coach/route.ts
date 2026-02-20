@@ -145,67 +145,71 @@ RIGHT: "Added!" with actions: [{...}, {...}, {...}]
 === STEP: ${onboardingStep} ===
 
 ${onboardingStep === 'greeting' ? `
-Get their name.
+Get their name. Keep it friendly and brief.
 Action: {"type": "setMemory", "data": {"name": "TheirName"}}
 ` : ''}
 
 ${onboardingStep === 'income' ? `
-Collect: source, amount, date (day of month), frequency
-DON'T add until you have ALL 4 pieces of info!
+ASK FOR INCOME with this helpful format hint in your message:
+"What income do you have coming in? 
+*(e.g., 'Centrelink $411 fortnightly on the 27th' or 'Wages $800 weekly on Fridays')*"
 
-When ready:
+If user provides ALL info (source, amount, frequency, day) in one message → Add it immediately!
+If missing info → Ask only for what's missing
+
+When you have everything:
 {"type": "addIncome", "data": {"name": "Centrelink", "amount": "411", "frequency": "fortnightly", "type": "active", "startDate": "${currentYear}-${currentMonth}-27"}}
+
+After adding, ask: "Got it! Any other income sources? Or say 'done' to move on to expenses."
 ` : ''}
 
 ${onboardingStep === 'expenses' ? `
-Collect: name, amount, date (day of month), frequency
-Can add MULTIPLE expenses at once if user gives several!
+ASK FOR EXPENSES with this helpful format hint in your message:
+"What regular bills do you have?
+*(e.g., 'Rent $200 weekly on Fridays' or 'Phone $50 monthly on the 15th')*
+You can list several at once!"
 
-IMPORTANT - WHAT GOES WHERE:
+If user provides ALL info → Add immediately! Can add MULTIPLE at once!
+
+WHAT GOES WHERE:
 - EXPENSES: Rent, groceries, phone, utilities, subscriptions, child support, transport
-- NOT EXPENSES: Credit card payments, loan payments → These go in DEBTS section
+- NOT EXPENSES: Credit card/loan payments → These go in DEBTS section
 
-If user says "credit card $120/month" → Tell them: "I'll track that in the debts section - we'll get to that next! Any other regular bills?"
-
-When ready (regular expenses only):
+When ready:
 {"type": "addExpense", "data": {"name": "Rent", "amount": "200", "frequency": "weekly", "category": "housing", "dueDate": "${currentYear}-${currentMonth}-27"}}
-{"type": "addExpense", "data": {"name": "Child Support", "amount": "60", "frequency": "fortnightly", "category": "other", "dueDate": "${currentYear}-${currentMonth}-27"}}
 
 Categories: housing, utilities, food, transport, subscriptions, health, entertainment, other
+After adding: "Added! Any other bills? Or say 'done' to move to debts."
 ` : ''}
 
 ${onboardingStep === 'debts' ? `
-Collect: name, total BALANCE owed, APR %, minimum payment, payment date
+ASK FOR DEBTS with this helpful format hint in your message:
+"Do you have any debts like credit cards, loans, or buy-now-pay-later?
+*(e.g., 'Credit card $3000 balance, 20% interest, paying $120/month on the 27th')*"
 
-IMPORTANT: The minimum payment is tracked HERE - don't also add it as an expense!
-When user says "I pay $120/month on my credit card" and the balance is $3000:
-- Add as DEBT with minPayment: "120"
-- This payment will show in the budget automatically
+Need: name, total BALANCE, interest rate %, minimum payment amount, payment date/day
 
-If they mentioned a credit card payment during expenses step, use that amount as minPayment.
+IMPORTANT: Debt payments are tracked here - don't add as expense too!
 
 When ready:
 {"type": "addDebt", "data": {"name": "Credit Card", "balance": "3000", "interestRate": "20", "minPayment": "120", "paymentDate": "${currentYear}-${currentMonth}-27"}}
+
+After adding: "Added! Any other debts? Or say 'done' to move to goals."
 ` : ''}
 
 ${onboardingStep === 'goals' ? `
-Collect: goal name, target amount, how much they can save, frequency, START DATE
+ASK FOR GOALS with this helpful format hint in your message:
+"What would you like to save for?
+*(e.g., 'Emergency fund $1000, save $50 fortnightly starting on the 27th')*"
 
-CRITICAL FOR GOALS:
-- If user says "$50 a fortnight" → use paymentAmount: "50" EXACTLY
-- Ask when to START saving (usually their payday)
-- startDate = when payments begin (e.g., "27th" = their payday)
+Need: goal name, target amount, how much to save per period, frequency, start date
 
-Example:
-User: "save $1000, I can put $50 a fortnight towards it"
-You: "Great goal! When would you like to start - your next payday on the 27th?"
-actions: [] (need start date!)
+CRITICAL: Use their EXACT payment amount - don't recalculate!
 
-User: "yes the 27th"
-You: "Perfect! $50 fortnightly starting the 27th. You'll reach $1000 in about 10 months!"
-actions: [{"type": "addGoal", "data": {"name": "Emergency Fund", "target": "1000", "saved": "0", "deadline": "${currentYear}-12-27", "savingsFrequency": "fortnightly", "paymentAmount": "50", "startDate": "${currentYear}-${currentMonth}-27"}}]
+When ready:
+{"type": "addGoal", "data": {"name": "Emergency Fund", "target": "1000", "saved": "0", "deadline": "${currentYear}-12-27", "savingsFrequency": "fortnightly", "paymentAmount": "50", "startDate": "${currentYear}-${currentMonth}-27"}}
 
-DON'T recalculate their payment amount - use what they said!
+After adding: "Added! Any other savings goals? Or say 'done' to see your budget summary."
 ` : ''}
 
 === DATE FORMAT ===
@@ -375,11 +379,31 @@ Keep responses short and friendly. Use their name occasionally.`
       }
       cleanedText = cleanedText.trim()
       
+      // Handle empty response
+      if (!cleanedText) {
+        return NextResponse.json({ 
+          message: "I'm ready to help! What would you like to do?", 
+          actions: [], 
+          nextStep: mode === 'onboarding' ? onboardingStep : undefined 
+        })
+      }
+      
       const parsed = JSON.parse(cleanedText)
+      
+      // Ensure message exists
+      if (!parsed.message) {
+        parsed.message = "Got it! What's next?"
+      }
+      
       return NextResponse.json({ ...parsed, raw: responseText })
-    } catch {
-      // If not valid JSON, return as message
-      return NextResponse.json({ message: responseText, actions: [], raw: responseText })
+    } catch (parseError) {
+      // If not valid JSON, return the text as message
+      console.log('JSON parse error:', parseError, 'Response was:', responseText.substring(0, 200))
+      return NextResponse.json({ 
+        message: responseText || "I'm processing that. What would you like to do next?", 
+        actions: [], 
+        raw: responseText 
+      })
     }
 
   } catch (error) {
