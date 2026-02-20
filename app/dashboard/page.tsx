@@ -39,6 +39,9 @@ export default function Dashboard() {
   const [paidOccurrences, setPaidOccurrences] = useState<Set<string>>(new Set())
   const [expandedDay, setExpandedDay] = useState<{day: number, items: any[]} | null>(null)
   
+  // Edit State - for inline editing
+  const [editingItem, setEditingItem] = useState<{type: string, id: number, data: any} | null>(null)
+  
   // Presets & CSV
   const [showPresets, setShowPresets] = useState(false)
   const [showCsvImport, setShowCsvImport] = useState(false)
@@ -446,6 +449,47 @@ export default function Dashboard() {
     setCsvTransactions([])
   }
 
+  // ==================== EDIT FUNCTIONS ====================
+  const startEdit = (type: string, item: any) => {
+    setEditingItem({ type, id: item.id, data: { ...item } })
+  }
+
+  const cancelEdit = () => {
+    setEditingItem(null)
+  }
+
+  const saveEdit = () => {
+    if (!editingItem) return
+    const { type, id, data } = editingItem
+
+    switch (type) {
+      case 'income':
+        setIncomeStreams(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
+        break
+      case 'expense':
+        setExpenses(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
+        break
+      case 'debt':
+        setDebts(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
+        break
+      case 'goal':
+        setGoals(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
+        break
+      case 'asset':
+        setAssets(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
+        break
+      case 'liability':
+        setLiabilities(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
+        break
+    }
+    setEditingItem(null)
+  }
+
+  const updateEditField = (field: string, value: string) => {
+    if (!editingItem) return
+    setEditingItem({ ...editingItem, data: { ...editingItem.data, [field]: value } })
+  }
+
   // ==================== CALENDAR FUNCTIONS ====================
   const getDaysInMonth = () => {
     const year = calendarMonth.getFullYear()
@@ -551,12 +595,30 @@ export default function Dashboard() {
       })
       
       const data = await apiResponse.json()
-      setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.raw || "Let's continue..." }])
       
-      // Execute any actions returned by the AI
-      if (data.actions && Array.isArray(data.actions)) {
+      // Execute any actions returned by the AI FIRST
+      let addedSummary = ''
+      if (data.actions && Array.isArray(data.actions) && data.actions.length > 0) {
         executeAIActions(data.actions)
+        
+        // Build summary of what was added
+        const incomeAdded = data.actions.filter((a: any) => a.type === 'addIncome')
+        const expenseAdded = data.actions.filter((a: any) => a.type === 'addExpense')
+        const debtAdded = data.actions.filter((a: any) => a.type === 'addDebt')
+        const goalAdded = data.actions.filter((a: any) => a.type === 'addGoal')
+        
+        const parts = []
+        if (incomeAdded.length > 0) parts.push(`${incomeAdded.length} income`)
+        if (expenseAdded.length > 0) parts.push(`${expenseAdded.length} expense${expenseAdded.length > 1 ? 's' : ''}`)
+        if (debtAdded.length > 0) parts.push(`${debtAdded.length} debt${debtAdded.length > 1 ? 's' : ''}`)
+        if (goalAdded.length > 0) parts.push(`${goalAdded.length} goal${goalAdded.length > 1 ? 's' : ''}`)
+        
+        if (parts.length > 0) {
+          addedSummary = `\n\n✅ Added: ${parts.join(', ')}`
+        }
       }
+      
+      setChatMessages(prev => [...prev, { role: 'assistant', content: (data.message || data.raw || "Let's continue...") + addedSummary }])
       
       // Legacy support for extractedData
       if (data.extractedData) {
@@ -585,10 +647,19 @@ export default function Dashboard() {
 
   // Execute actions returned by AI
   const executeAIActions = (actions: any[]) => {
+    // Helper to validate and use date from AI, or default to today
+    const getValidDate = (dateStr?: string): string => {
+      if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return dateStr
+      }
+      return new Date().toISOString().split('T')[0]
+    }
+    
     actions.forEach(action => {
       const { type, data } = action
       
       switch (type) {
+        // ===== ADD ACTIONS =====
         case 'addIncome':
           if (data.name && data.amount) {
             setIncomeStreams(prev => [...prev, {
@@ -597,7 +668,7 @@ export default function Dashboard() {
               amount: data.amount.toString().replace(/[$,]/g, ''),
               frequency: data.frequency || 'monthly',
               type: data.type || 'active',
-              startDate: new Date().toISOString().split('T')[0]
+              startDate: getValidDate(data.startDate)
             }])
           }
           break
@@ -610,7 +681,7 @@ export default function Dashboard() {
               amount: data.amount.toString().replace(/[$,]/g, ''),
               frequency: data.frequency || 'monthly',
               category: data.category || 'other',
-              dueDate: new Date().toISOString().split('T')[0]
+              dueDate: getValidDate(data.dueDate)
             }])
           }
           break
@@ -624,7 +695,7 @@ export default function Dashboard() {
               interestRate: data.interestRate || '0',
               minPayment: data.minPayment || '0',
               frequency: 'monthly',
-              paymentDate: new Date().toISOString().split('T')[0],
+              paymentDate: getValidDate(data.paymentDate),
               originalBalance: data.balance.toString().replace(/[$,]/g, '')
             }])
           }
@@ -638,9 +709,9 @@ export default function Dashboard() {
               target: data.target.toString().replace(/[$,]/g, ''),
               saved: data.saved || '0',
               deadline: data.deadline || '',
-              savingsFrequency: 'monthly',
-              startDate: new Date().toISOString().split('T')[0],
-              paymentAmount: ''
+              savingsFrequency: data.savingsFrequency || 'monthly',
+              startDate: getValidDate(data.startDate),
+              paymentAmount: data.paymentAmount || ''
             }])
           }
           break
@@ -655,17 +726,134 @@ export default function Dashboard() {
             }])
           }
           break
+        
+        case 'addTrade':
+          if (data.instrument && data.profitLoss) {
+            setTrades(prev => [...prev, {
+              id: Date.now() + Math.random(),
+              date: getValidDate(data.date),
+              instrument: data.instrument,
+              direction: data.direction || 'long',
+              entryPrice: data.entryPrice || '',
+              exitPrice: data.exitPrice || '',
+              profitLoss: data.profitLoss.toString().replace(/[$,]/g, ''),
+              notes: data.notes || ''
+            }])
+          }
+          break
+
+        // ===== UPDATE ACTIONS =====
+        case 'updateIncome':
+          if (data.id) {
+            setIncomeStreams(prev => prev.map(item => {
+              if (item.id === data.id || Math.floor(item.id) === Math.floor(data.id)) {
+                return {
+                  ...item,
+                  ...(data.name && { name: data.name }),
+                  ...(data.amount && { amount: data.amount.toString().replace(/[$,]/g, '') }),
+                  ...(data.frequency && { frequency: data.frequency }),
+                  ...(data.type && { type: data.type }),
+                  ...(data.startDate && { startDate: data.startDate })
+                }
+              }
+              return item
+            }))
+          }
+          break
           
+        case 'updateExpense':
+          if (data.id) {
+            setExpenses(prev => prev.map(item => {
+              if (item.id === data.id || Math.floor(item.id) === Math.floor(data.id)) {
+                return {
+                  ...item,
+                  ...(data.name && { name: data.name }),
+                  ...(data.amount && { amount: data.amount.toString().replace(/[$,]/g, '') }),
+                  ...(data.frequency && { frequency: data.frequency }),
+                  ...(data.category && { category: data.category }),
+                  ...(data.dueDate && { dueDate: data.dueDate })
+                }
+              }
+              return item
+            }))
+          }
+          break
+          
+        case 'updateDebt':
+          if (data.id) {
+            setDebts(prev => prev.map(item => {
+              if (item.id === data.id || Math.floor(item.id) === Math.floor(data.id)) {
+                return {
+                  ...item,
+                  ...(data.name && { name: data.name }),
+                  ...(data.balance && { balance: data.balance.toString().replace(/[$,]/g, '') }),
+                  ...(data.interestRate && { interestRate: data.interestRate }),
+                  ...(data.minPayment && { minPayment: data.minPayment.toString().replace(/[$,]/g, '') }),
+                  ...(data.paymentDate && { paymentDate: data.paymentDate })
+                }
+              }
+              return item
+            }))
+          }
+          break
+          
+        case 'updateGoal':
+          if (data.id) {
+            setGoals(prev => prev.map(item => {
+              if (item.id === data.id || Math.floor(item.id) === Math.floor(data.id)) {
+                return {
+                  ...item,
+                  ...(data.name && { name: data.name }),
+                  ...(data.target && { target: data.target.toString().replace(/[$,]/g, '') }),
+                  ...(data.saved && { saved: data.saved.toString().replace(/[$,]/g, '') }),
+                  ...(data.deadline && { deadline: data.deadline }),
+                  ...(data.savingsFrequency && { savingsFrequency: data.savingsFrequency }),
+                  ...(data.paymentAmount && { paymentAmount: data.paymentAmount.toString().replace(/[$,]/g, '') })
+                }
+              }
+              return item
+            }))
+          }
+          break
+
+        // ===== DELETE ACTIONS =====
+        case 'deleteIncome':
+          if (data.id) {
+            setIncomeStreams(prev => prev.filter(item => item.id !== data.id && Math.floor(item.id) !== Math.floor(data.id)))
+          }
+          break
+          
+        case 'deleteExpense':
+          if (data.id) {
+            setExpenses(prev => prev.filter(item => item.id !== data.id && Math.floor(item.id) !== Math.floor(data.id)))
+          }
+          break
+          
+        case 'deleteDebt':
+          if (data.id) {
+            setDebts(prev => prev.filter(item => item.id !== data.id && Math.floor(item.id) !== Math.floor(data.id)))
+          }
+          break
+          
+        case 'deleteGoal':
+          if (data.id) {
+            setGoals(prev => prev.filter(item => item.id !== data.id && Math.floor(item.id) !== Math.floor(data.id)))
+          }
+          break
+
+        // ===== MEMORY ACTIONS =====
         case 'setMemory':
-          if (data.name) {
-            setBudgetMemory((prev: any) => ({ ...prev, name: data.name }))
-          }
-          if (data.lifeEvents) {
-            setBudgetMemory((prev: any) => ({ ...prev, lifeEvents: data.lifeEvents }))
-          }
-          if (data.currentStep) {
-            setBudgetMemory((prev: any) => ({ ...prev, currentStep: data.currentStep }))
-          }
+          setBudgetMemory((prev: any) => {
+            const updated = { ...prev }
+            if (data.name) updated.name = data.name
+            if (data.payDay) updated.payDay = data.payDay
+            if (data.lifeEvents) updated.lifeEvents = data.lifeEvents
+            if (data.currentStep) updated.currentStep = data.currentStep
+            if (data.preferences) updated.preferences = { ...prev.preferences, ...data.preferences }
+            if (data.patterns) updated.patterns = [...(prev.patterns || []), ...data.patterns]
+            if (data.notes) updated.notes = [...(prev.notes || []), ...data.notes]
+            return updated
+          })
           break
       }
     })
@@ -968,14 +1156,34 @@ export default function Dashboard() {
                   <input placeholder="Amount" type="number" value={newIncome.amount} onChange={e => setNewIncome({...newIncome, amount: e.target.value})} style={{...inputStyle, width: '100px'}} />
                   <select value={newIncome.frequency} onChange={e => setNewIncome({...newIncome, frequency: e.target.value})} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select>
                   <select value={newIncome.type} onChange={e => setNewIncome({...newIncome, type: e.target.value})} style={inputStyle}><option value="active">Active</option><option value="passive">Passive</option></select>
+                  <input type="date" value={newIncome.startDate} onChange={e => setNewIncome({...newIncome, startDate: e.target.value})} style={{...inputStyle, width: '130px'}} />
                   <button onClick={addIncome} style={btnSuccess}>+</button>
                 </div>
                 <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>
                   {incomeStreams.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No income yet</p> : incomeStreams.map(inc => (
-                    <div key={inc.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div><div style={{ color: theme.text, fontWeight: 600 }}>{inc.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{inc.frequency} • {inc.type}</div></div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: theme.success, fontWeight: 700 }}>${inc.amount}</span><button onClick={() => deleteIncome(inc.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>×</button></div>
-                    </div>
+                    editingItem?.type === 'income' && editingItem.id === inc.id ? (
+                      <div key={inc.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px' }}>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
+                          <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
+                          <input type="number" value={editingItem.data.amount} onChange={e => updateEditField('amount', e.target.value)} style={{...inputStyle, width: '80px'}} />
+                          <select value={editingItem.data.frequency} onChange={e => updateEditField('frequency', e.target.value)} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
+                          <input type="date" value={editingItem.data.startDate} onChange={e => updateEditField('startDate', e.target.value)} style={{...inputStyle, width: '130px'}} />
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={saveEdit} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Save</button>
+                          <button onClick={cancelEdit} style={{...btnDanger, padding: '6px 12px', fontSize: '12px'}}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={inc.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div><div style={{ color: theme.text, fontWeight: 600 }}>{inc.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{inc.frequency} • {inc.type} • {inc.startDate}</div></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ color: theme.success, fontWeight: 700 }}>${inc.amount}</span>
+                          <button onClick={() => startEdit('income', inc)} style={{ padding: '4px 8px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
+                          <button onClick={() => deleteIncome(inc.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>×</button>
+                        </div>
+                      </div>
+                    )
                   ))}
                 </div>
               </div>
@@ -1000,14 +1208,34 @@ export default function Dashboard() {
                   <input placeholder="Expense" value={newExpense.name} onChange={e => setNewExpense({...newExpense, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '120px'}} />
                   <input placeholder="Amount" type="number" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{...inputStyle, width: '100px'}} />
                   <select value={newExpense.frequency} onChange={e => setNewExpense({...newExpense, frequency: e.target.value})} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select>
+                  <input type="date" value={newExpense.dueDate} onChange={e => setNewExpense({...newExpense, dueDate: e.target.value})} style={{...inputStyle, width: '130px'}} />
                   <button onClick={addExpense} style={btnDanger}>+</button>
                 </div>
                 <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>
                   {expenses.filter(e => !e.targetDebtId && !e.targetGoalId).length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No expenses yet</p> : expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(exp => (
-                    <div key={exp.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div><div style={{ color: theme.text, fontWeight: 600 }}>{exp.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{exp.frequency}</div></div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: theme.danger, fontWeight: 700 }}>${exp.amount}</span><button onClick={() => deleteExpense(exp.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>×</button></div>
-                    </div>
+                    editingItem?.type === 'expense' && editingItem.id === exp.id ? (
+                      <div key={exp.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '8px' }}>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
+                          <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
+                          <input type="number" value={editingItem.data.amount} onChange={e => updateEditField('amount', e.target.value)} style={{...inputStyle, width: '80px'}} />
+                          <select value={editingItem.data.frequency} onChange={e => updateEditField('frequency', e.target.value)} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option></select>
+                          <input type="date" value={editingItem.data.dueDate} onChange={e => updateEditField('dueDate', e.target.value)} style={{...inputStyle, width: '130px'}} />
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={saveEdit} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Save</button>
+                          <button onClick={cancelEdit} style={{...btnDanger, padding: '6px 12px', fontSize: '12px'}}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={exp.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div><div style={{ color: theme.text, fontWeight: 600 }}>{exp.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{exp.frequency} • due {exp.dueDate}</div></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ color: theme.danger, fontWeight: 700 }}>${exp.amount}</span>
+                          <button onClick={() => startEdit('expense', exp)} style={{ padding: '4px 8px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
+                          <button onClick={() => deleteExpense(exp.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>×</button>
+                        </div>
+                      </div>
+                    )
                   ))}
                 </div>
               </div>
@@ -1117,22 +1345,62 @@ export default function Dashboard() {
                 <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🎯 Goals</h3>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
                   <input placeholder="Goal name" value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
-                  <input placeholder="Target" type="number" value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})} style={{...inputStyle, width: '90px'}} />
-                  <input placeholder="Saved" type="number" value={newGoal.saved} onChange={e => setNewGoal({...newGoal, saved: e.target.value})} style={{...inputStyle, width: '80px'}} />
-                  <input placeholder="$/period" type="number" value={newGoal.paymentAmount} onChange={e => setNewGoal({...newGoal, paymentAmount: e.target.value})} style={{...inputStyle, width: '80px'}} />
+                  <input placeholder="Target $" type="number" value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})} style={{...inputStyle, width: '90px'}} />
+                  <input placeholder="Already saved" type="number" value={newGoal.saved} onChange={e => setNewGoal({...newGoal, saved: e.target.value})} style={{...inputStyle, width: '90px'}} />
+                  <input type="date" placeholder="Deadline" value={newGoal.deadline} onChange={e => setNewGoal({...newGoal, deadline: e.target.value})} style={{...inputStyle, width: '130px'}} title="Deadline" />
+                  <select value={newGoal.savingsFrequency} onChange={e => setNewGoal({...newGoal, savingsFrequency: e.target.value})} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
                   <button onClick={addGoal} style={btnPurple}>+</button>
                 </div>
                 <div style={{ maxHeight: '250px', overflowY: 'auto' as const }}>
                   {goals.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No goals yet</p> : goals.map(goal => {
                     const progress = (parseFloat(goal.saved || '0') / parseFloat(goal.target || '1')) * 100
                     const remaining = parseFloat(goal.target || '0') - parseFloat(goal.saved || '0')
-                    return (
+                    // Calculate payment needed
+                    const deadline = goal.deadline ? new Date(goal.deadline) : null
+                    const now = new Date()
+                    const monthsLeft = deadline ? Math.max(1, Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30))) : 0
+                    const weeksLeft = deadline ? Math.max(1, Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 7))) : 0
+                    const fortnightsLeft = deadline ? Math.max(1, Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 14))) : 0
+                    let paymentNeeded = 0
+                    if (deadline && remaining > 0) {
+                      if (goal.savingsFrequency === 'weekly') paymentNeeded = remaining / weeksLeft
+                      else if (goal.savingsFrequency === 'fortnightly') paymentNeeded = remaining / fortnightsLeft
+                      else paymentNeeded = remaining / monthsLeft
+                    }
+                    
+                    return editingItem?.type === 'goal' && editingItem.id === goal.id ? (
+                      <div key={goal.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#2e1e3a' : '#faf5ff', borderRadius: '8px' }}>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
+                          <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} placeholder="Name" style={{...inputStyle, flex: 1, minWidth: '100px'}} />
+                          <input type="number" value={editingItem.data.target} onChange={e => updateEditField('target', e.target.value)} placeholder="Target" style={{...inputStyle, width: '80px'}} />
+                          <input type="number" value={editingItem.data.saved} onChange={e => updateEditField('saved', e.target.value)} placeholder="Saved" style={{...inputStyle, width: '80px'}} />
+                          <input type="date" value={editingItem.data.deadline} onChange={e => updateEditField('deadline', e.target.value)} style={{...inputStyle, width: '130px'}} />
+                          <select value={editingItem.data.savingsFrequency} onChange={e => updateEditField('savingsFrequency', e.target.value)} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={saveEdit} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Save</button>
+                          <button onClick={cancelEdit} style={{...btnDanger, padding: '6px 12px', fontSize: '12px'}}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
                       <div key={goal.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#2e1e3a' : '#faf5ff', borderRadius: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <div><div style={{ color: theme.text, fontWeight: 600 }}>{goal.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${remaining.toFixed(0)} to go</div></div>
+                          <div>
+                            <div style={{ color: theme.text, fontWeight: 600 }}>{goal.name}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px' }}>
+                              ${parseFloat(goal.saved || '0').toFixed(0)} / ${parseFloat(goal.target || '0').toFixed(0)}
+                              {goal.deadline && ` • by ${goal.deadline}`}
+                            </div>
+                            {paymentNeeded > 0 && (
+                              <div style={{ color: theme.purple, fontSize: '12px', fontWeight: 600 }}>
+                                Save ${paymentNeeded.toFixed(0)}/{goal.savingsFrequency} to reach goal
+                              </div>
+                            )}
+                          </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ color: theme.purple, fontWeight: 700 }}>{progress.toFixed(0)}%</span>
-                            <button onClick={() => addGoalToCalendar(goal)} style={{ padding: '4px 8px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>📅</button>
+                            <button onClick={() => startEdit('goal', goal)} style={{ padding: '4px 8px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
+                            <button onClick={() => addGoalToCalendar(goal)} style={{ padding: '4px 8px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>📅</button>
                             <button onClick={() => deleteGoal(goal.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>×</button>
                           </div>
                         </div>
@@ -1370,4 +1638,3 @@ export default function Dashboard() {
     </div>
   )
 }
-
