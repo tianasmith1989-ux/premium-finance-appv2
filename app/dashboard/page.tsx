@@ -608,13 +608,25 @@ export default function Dashboard() {
         const goalAdded = data.actions.filter((a: any) => a.type === 'addGoal')
         
         const parts = []
-        if (incomeAdded.length > 0) parts.push(`${incomeAdded.length} income`)
-        if (expenseAdded.length > 0) parts.push(`${expenseAdded.length} expense${expenseAdded.length > 1 ? 's' : ''}`)
-        if (debtAdded.length > 0) parts.push(`${debtAdded.length} debt${debtAdded.length > 1 ? 's' : ''}`)
-        if (goalAdded.length > 0) parts.push(`${goalAdded.length} goal${goalAdded.length > 1 ? 's' : ''}`)
+        if (incomeAdded.length > 0) {
+          const names = incomeAdded.map((a: any) => a.data?.name || 'Income').join(', ')
+          parts.push(`💰 Income: ${names}`)
+        }
+        if (expenseAdded.length > 0) {
+          const names = expenseAdded.map((a: any) => a.data?.name || 'Expense').join(', ')
+          parts.push(`💸 Expense: ${names}`)
+        }
+        if (debtAdded.length > 0) {
+          const names = debtAdded.map((a: any) => a.data?.name || 'Debt').join(', ')
+          parts.push(`💳 Debt: ${names}`)
+        }
+        if (goalAdded.length > 0) {
+          const names = goalAdded.map((a: any) => a.data?.name || 'Goal').join(', ')
+          parts.push(`🎯 Goal: ${names}`)
+        }
         
         if (parts.length > 0) {
-          addedSummary = `\n\n✅ Added: ${parts.join(', ')}`
+          addedSummary = `\n\n✅ Added: ${parts.join(' | ')}`
         }
       }
       
