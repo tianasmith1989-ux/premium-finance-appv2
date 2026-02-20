@@ -93,80 +93,78 @@ export async function POST(request: NextRequest) {
 TODAY: ${today}
 CURRENT STEP: ${onboardingStep}
 
-=== ALREADY ADDED TO SYSTEM ===
+=== ALREADY IN SYSTEM ===
 ${buildFinancialContext()}
 
 === RECENT CONVERSATION ===
 ${conversationHistory || 'No previous messages'}
 
-=== GOLDEN RULE ===
+=== CRITICAL: ACTIONS ARRAY ===
 
-DO NOT ADD ANYTHING until you have ALL required information:
-- For income: name, amount, DATE, and frequency
-- For expenses: name, amount, DATE, and frequency
-- For debts: name, balance, interest rate, min payment, DATE
-- For goals: name, target, DEADLINE, frequency
+When you say you're adding something, you MUST include it in the actions array!
+If you say "Adding credit card" but actions: [] is empty, IT WON'T BE ADDED!
 
-If you're missing the DATE → ASK FOR IT, actions: []
-If item already exists in "ALREADY ADDED" → DON'T add again, actions: []
-If user says "no"/"done"/"thats it" → Move to next step, actions: []
+WRONG: "I'll add these now" with actions: []
+RIGHT: "Added!" with actions: [{...}, {...}, {...}]
 
 === STEP: ${onboardingStep} ===
 
-${onboardingStep === 'greeting' ? `Get their name. Action: {"type": "setMemory", "data": {"name": "..."}}` : ''}
+${onboardingStep === 'greeting' ? `
+Get their name.
+Action: {"type": "setMemory", "data": {"name": "TheirName"}}
+` : ''}
 
 ${onboardingStep === 'income' ? `
-Collect: source name, amount, PAYMENT DATE (what day of month), frequency (weekly/fortnightly/monthly)
+Collect: source, amount, date (day of month), frequency
+DON'T add until you have ALL 4 pieces of info!
 
-Example flow:
-User: "411 from centrelink" 
-You: "Got it, $411 Centrelink! What day does that hit your account?" 
-actions: [] (WAITING FOR DATE!)
-
-User: "the 27th"
-You: "And is that weekly, fortnightly, or monthly?"
-actions: [] (WAITING FOR FREQUENCY!)
-
-User: "fortnightly"
-You: "Perfect! Added your Centrelink - $411 fortnightly on the 27th. Any other income?"
-actions: [{"type": "addIncome", "data": {"name": "Centrelink", "amount": "411", "frequency": "fortnightly", "type": "active", "startDate": "${currentYear}-${currentMonth}-27"}}]
+When ready:
+{"type": "addIncome", "data": {"name": "Centrelink", "amount": "411", "frequency": "fortnightly", "type": "active", "startDate": "${currentYear}-${currentMonth}-27"}}
 ` : ''}
 
 ${onboardingStep === 'expenses' ? `
-Collect: expense name, amount, DUE DATE, frequency
+Collect: name, amount, date (day of month), frequency
+Can add MULTIPLE expenses at once if user gives several!
 
-Example: "rent $200 weekly on Fridays" → Ask which day, then add
+When ready:
+{"type": "addExpense", "data": {"name": "Credit Card", "amount": "120", "frequency": "monthly", "category": "other", "dueDate": "${currentYear}-${currentMonth}-27"}}
+{"type": "addExpense", "data": {"name": "Child Support", "amount": "60", "frequency": "fortnightly", "category": "other", "dueDate": "${currentYear}-${currentMonth}-27"}}
 ` : ''}
 
 ${onboardingStep === 'debts' ? `
-Collect: debt name, total balance, APR interest rate, minimum payment amount, payment date
+Collect: name, total balance owed, APR %, minimum payment, payment date
+{"type": "addDebt", "data": {"name": "Credit Card", "balance": "2000", "interestRate": "20", "minPayment": "120", "paymentDate": "${currentYear}-${currentMonth}-27"}}
 ` : ''}
 
 ${onboardingStep === 'goals' ? `
-Collect: goal name, target amount, deadline date, how often to save (weekly/fortnightly/monthly)
-Then calculate paymentAmount = remaining / periods until deadline
+Collect: goal name, target $, deadline, save frequency
+Calculate: paymentAmount = target / periods until deadline
+{"type": "addGoal", "data": {"name": "Holiday", "target": "1000", "saved": "0", "deadline": "${currentYear}-08-27", "savingsFrequency": "fortnightly", "paymentAmount": "77"}}
 ` : ''}
 
-=== DATE FORMATS ===
-"27th" or "the 27th" → "${currentYear}-${currentMonth}-27"
-"1st of march" → "${currentYear}-03-01"
-"15th" → "${currentYear}-${currentMonth}-15"
+=== DATE FORMAT ===
+"27th" → "${currentYear}-${currentMonth}-27"
+"1st" → "${currentYear}-${currentMonth}-01"
+"15th of march" → "${currentYear}-03-15"
 
 === STEP PROGRESSION ===
 greeting → income → expenses → debts → goals → complete
-"no"/"done"/"thats it"/"nothing else" = move to next step with actions: []
+"no" / "done" / "thats it" = move to next step, actions: []
 
-=== RESPONSE FORMAT (raw JSON only, no markdown) ===
-{"message": "Your response", "nextStep": "${onboardingStep}", "actions": [], "isComplete": false}`
+=== RESPONSE FORMAT ===
+Raw JSON only (no markdown):
+{"message": "Your response", "nextStep": "${onboardingStep}", "actions": [...], "isComplete": false}
+
+REMEMBER: If you tell the user you're adding items, PUT THEM IN ACTIONS!`
 
       userPrompt = `Step: ${onboardingStep}
 User said: "${userResponse}"
 
-CHECKLIST:
-1. Is user saying they're done? → actions: [], next step
-2. Is item already in system? → Don't re-add
-3. Do we have ALL info (including DATE)? → Only then add
-4. Missing info? → Ask for it, actions: []
+BEFORE RESPONDING:
+1. Did user give enough info to add items? (name + amount + date + frequency)
+2. If YES → Include the items in actions array!
+3. If NO → Ask for missing info, actions: []
+4. Is user done with this step? → Move to next, actions: []
 
 Respond with JSON only.`
 
