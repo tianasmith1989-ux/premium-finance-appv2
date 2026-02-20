@@ -574,7 +574,8 @@ export default function Dashboard() {
 
   const handleOnboardingResponse = async (response: string, mode: 'budget' | 'trading') => {
     setIsLoading(true)
-    setChatMessages(prev => [...prev, { role: 'user', content: response }])
+    const newUserMessage = { role: 'user' as const, content: response }
+    setChatMessages(prev => [...prev, newUserMessage])
     setChatInput('')
     
     try {
@@ -582,13 +583,19 @@ export default function Dashboard() {
       const currentStep = mode === 'budget' ? budgetOnboarding.step : tradingOnboarding.step
       const memory = mode === 'budget' ? budgetMemory : tradingMemory
       
+      // Include recent conversation history so AI has context
+      const recentHistory = [...chatMessages.slice(-10), newUserMessage]
+        .map(m => `${m.role === 'user' ? 'User' : 'Aureus'}: ${m.content}`)
+        .join('\n')
+      
       const apiResponse = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           mode: 'onboarding', 
           onboardingStep: currentStep, 
-          userResponse: response, 
+          userResponse: response,
+          conversationHistory: recentHistory,
           memory,
           financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }
         })
