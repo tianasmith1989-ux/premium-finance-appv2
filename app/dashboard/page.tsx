@@ -12,6 +12,11 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'overview' | 'path' | 'trading'>('dashboard')
   const [darkMode, setDarkMode] = useState(true)
   
+  // ==================== TOUR STATE ====================
+  const [showTour, setShowTour] = useState(false)
+  const [tourStep, setTourStep] = useState(0)
+  const [tourCompleted, setTourCompleted] = useState(false)
+  
   // ==================== BUDGET STATE ====================
   const [incomeStreams, setIncomeStreams] = useState<any[]>([])
   const [newIncome, setNewIncome] = useState({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0] })
@@ -233,10 +238,18 @@ export default function Dashboard() {
   const monthlyIncome = incomeStreams.reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0)
   const passiveIncome = incomeStreams.filter(i => i.type === 'passive').reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0)
   const activeIncome = monthlyIncome - passiveIncome
-  const monthlyExpenses = expenses.filter(e => !e.targetDebtId && !e.targetGoalId).reduce((sum, exp) => sum + convertToMonthly(parseFloat(exp.amount || '0'), exp.frequency), 0)
+  
+  // Expenses that are NOT linked to a debt (to avoid double-counting debt payments)
+  const monthlyExpenses = expenses.filter(e => !e.targetDebtId && !e.targetGoalId && !e.isDebtPayment).reduce((sum, exp) => sum + convertToMonthly(parseFloat(exp.amount || '0'), exp.frequency), 0)
+  
+  // Debt payments (from the debts themselves)
   const monthlyDebtPayments = debts.reduce((sum, debt) => sum + convertToMonthly(parseFloat(debt.minPayment || '0'), debt.frequency || 'monthly'), 0)
+  
+  // Goal savings contributions
+  const monthlyGoalSavings = goals.reduce((sum, goal) => sum + convertToMonthly(parseFloat(goal.paymentAmount || '0'), goal.savingsFrequency || 'monthly'), 0)
+  
   const totalDebtBalance = debts.reduce((sum, d) => sum + parseFloat(d.balance || '0'), 0)
-  const totalOutgoing = monthlyExpenses + monthlyDebtPayments
+  const totalOutgoing = monthlyExpenses + monthlyDebtPayments + monthlyGoalSavings
   const monthlySurplus = monthlyIncome - totalOutgoing
   const totalAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || '0'), 0)
   const totalLiabilities = liabilities.reduce((sum, l) => sum + parseFloat(l.value || '0'), 0)
@@ -249,9 +262,11 @@ export default function Dashboard() {
     const month = calendarMonth.getMonth()
     const year = calendarMonth.getFullYear()
     const incomeTotal = incomeStreams.reduce((sum, inc) => sum + parseFloat(inc.amount || '0') * getOccurrencesInMonth(inc.startDate, inc.frequency, month, year), 0)
-    const expenseTotal = expenses.filter(e => !e.targetDebtId && !e.targetGoalId).reduce((sum, exp) => sum + parseFloat(exp.amount || '0') * getOccurrencesInMonth(exp.dueDate, exp.frequency, month, year), 0)
+    // Exclude debt-linked expenses to avoid double counting
+    const expenseTotal = expenses.filter(e => !e.targetDebtId && !e.targetGoalId && !e.isDebtPayment).reduce((sum, exp) => sum + parseFloat(exp.amount || '0') * getOccurrencesInMonth(exp.dueDate, exp.frequency, month, year), 0)
     const debtTotal = debts.reduce((sum, debt) => sum + parseFloat(debt.minPayment || '0') * getOccurrencesInMonth(debt.paymentDate, debt.frequency || 'monthly', month, year), 0)
-    return { incomeTotal, expenseTotal, debtTotal, total: incomeTotal - expenseTotal - debtTotal }
+    const goalTotal = goals.reduce((sum, goal) => sum + parseFloat(goal.paymentAmount || '0') * getOccurrencesInMonth(goal.startDate, goal.savingsFrequency || 'monthly', month, year), 0)
+    return { incomeTotal, expenseTotal, debtTotal, goalTotal, total: incomeTotal - expenseTotal - debtTotal - goalTotal }
   })()
 
   // Trading calculations
@@ -1050,6 +1065,122 @@ export default function Dashboard() {
   const futuresPropResults = calculateFuturesProp()
   const tradingResults = calculateTradingCompound()
 
+  // Tour content
+  const tourSteps = [
+    {
+      title: "Welcome to Aureus! 🌟",
+      content: "I'm your AI financial companion, here to help you achieve financial freedom - where your passive income covers all your expenses so you can live life on YOUR terms.",
+      icon: "✨"
+    },
+    {
+      title: "The FIRE Number 🔥",
+      content: "FIRE = Financial Independence, Retire Early. Your FIRE number is 25x your annual expenses. When your investments reach this amount, you can live off the returns forever!",
+      icon: "🔥",
+      highlight: "path"
+    },
+    {
+      title: "Baby Steps 👶",
+      content: "We follow Dave Ramsey's proven Baby Steps: 1) $1,000 emergency fund, 2) Pay off debt, 3) 3-6 months savings, 4) Invest 15%, 5) Kids' education, 6) Pay off home, 7) Build wealth!",
+      icon: "👶",
+      highlight: "path"
+    },
+    {
+      title: "Escape the Rat Race 🐀",
+      content: "The goal: Passive Income > Monthly Expenses = FREEDOM! I'll help you track income streams, find opportunities, and build toward the day your money works harder than you do.",
+      icon: "🚀",
+      highlight: "path"
+    },
+    {
+      title: "Let's Get Started! 💪",
+      content: "I'll ask you about your income, expenses, debts, and goals through a friendly chat. You can also upload payslips or bank statements to speed things up. Ready?",
+      icon: "💬"
+    }
+  ]
+
+  // ==================== RENDER: TOUR ====================
+  if (showTour && appMode === 'budget') {
+    const currentTourStep = tourSteps[tourStep]
+    return (
+      <div style={{ minHeight: '100vh', background: darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)' : 'linear-gradient(135deg, #f0f9ff 0%, #faf5ff 100%)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div style={{ maxWidth: '600px', width: '100%', background: theme.cardBg, borderRadius: '24px', padding: '48px', textAlign: 'center' as const, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+          {/* Progress dots */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '32px' }}>
+            {tourSteps.map((_, i) => (
+              <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', background: i === tourStep ? theme.accent : theme.border, transition: 'all 0.3s' }} />
+            ))}
+          </div>
+          
+          {/* Icon */}
+          <div style={{ fontSize: '72px', marginBottom: '24px' }}>{currentTourStep.icon}</div>
+          
+          {/* Title */}
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: theme.text, margin: '0 0 16px 0' }}>{currentTourStep.title}</h1>
+          
+          {/* Content */}
+          <p style={{ fontSize: '16px', color: theme.textMuted, lineHeight: 1.7, margin: '0 0 32px 0' }}>{currentTourStep.content}</p>
+          
+          {/* Visual highlight based on step */}
+          {tourStep === 1 && (
+            <div style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', borderRadius: '16px', padding: '20px', marginBottom: '24px' }}>
+              <div style={{ color: 'white', fontSize: '14px', opacity: 0.9 }}>Your FIRE Number</div>
+              <div style={{ color: 'white', fontSize: '36px', fontWeight: 700 }}>$750,000</div>
+              <div style={{ color: 'white', fontSize: '12px', opacity: 0.8 }}>Based on $2,500/month expenses × 12 × 25</div>
+            </div>
+          )}
+          
+          {tourStep === 2 && (
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' as const, marginBottom: '24px' }}>
+              {['1. $1K Fund', '2. Kill Debt', '3. Full Fund', '4. Invest 15%', '5. Education', '6. Pay Home', '7. Wealth'].map((step, i) => (
+                <span key={i} style={{ padding: '8px 12px', background: i === 0 ? theme.success : theme.border, color: i === 0 ? 'white' : theme.textMuted, borderRadius: '8px', fontSize: '11px', fontWeight: 600 }}>{step}</span>
+              ))}
+            </div>
+          )}
+          
+          {tourStep === 3 && (
+            <div style={{ background: theme.bg, borderRadius: '16px', padding: '20px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <span style={{ color: theme.textMuted }}>Monthly Expenses</span>
+                <span style={{ color: theme.danger, fontWeight: 600 }}>$2,500</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <span style={{ color: theme.textMuted }}>Passive Income</span>
+                <span style={{ color: theme.success, fontWeight: 600 }}>$500</span>
+              </div>
+              <div style={{ height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ width: '20%', height: '100%', background: theme.success }} />
+              </div>
+              <div style={{ color: theme.purple, fontSize: '14px', marginTop: '8px', fontWeight: 600 }}>20% to Freedom! 🎯</div>
+            </div>
+          )}
+          
+          {/* Buttons */}
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            {tourStep > 0 && (
+              <button onClick={() => setTourStep(tourStep - 1)} style={{ padding: '14px 28px', background: 'transparent', border: '2px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontWeight: 600 }}>
+                ← Back
+              </button>
+            )}
+            
+            {tourStep < tourSteps.length - 1 ? (
+              <button onClick={() => setTourStep(tourStep + 1)} style={{ padding: '14px 28px', background: theme.accent, border: 'none', borderRadius: '12px', color: 'white', cursor: 'pointer', fontWeight: 600 }}>
+                Next →
+              </button>
+            ) : (
+              <button onClick={() => { setShowTour(false); setTourCompleted(true); setBudgetOnboarding({ isActive: true, step: 'greeting' }); setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" }]) }} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', borderRadius: '12px', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>
+                Let's Go! 🚀
+              </button>
+            )}
+          </div>
+          
+          {/* Skip link */}
+          <button onClick={() => { setShowTour(false); setTourCompleted(true); setBudgetOnboarding({ isActive: true, step: 'greeting' }); setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" }]) }} style={{ marginTop: '24px', background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
+            Skip tour
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // ==================== RENDER: MODE SELECTOR ====================
   if (showModeSelector) {
     return (
@@ -1061,7 +1192,17 @@ export default function Dashboard() {
         </div>
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', maxWidth: '700px', width: '100%' }}>
-          <button onClick={() => handleModeSelect('budget')} style={{ padding: '32px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left' as const }}>
+          <button onClick={() => { 
+            setAppMode('budget')
+            setShowModeSelector(false)
+            // Show tour for new users, skip for returning users
+            if (!budgetMemory.onboardingComplete && !tourCompleted) {
+              setShowTour(true)
+            } else if (!budgetMemory.onboardingComplete) {
+              setBudgetOnboarding({ isActive: true, step: 'greeting' })
+              setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" }])
+            }
+          }} style={{ padding: '32px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left' as const }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>💰</div>
             <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 700, margin: '0 0 8px 0' }}>Budget Mode</h2>
             <p style={{ color: 'rgba(255,255,255,0.9)', margin: '0 0 16px 0', fontSize: '14px' }}>{budgetMemory.onboardingComplete ? `Welcome back${budgetMemory.name ? ', ' + budgetMemory.name : ''}!` : 'Get set up in 5 minutes'}</p>
@@ -1184,10 +1325,11 @@ export default function Dashboard() {
         {appMode === 'budget' && activeTab === 'dashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             {/* This Month Summary */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Income This Month</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>${currentMonthTotals.incomeTotal.toFixed(0)}</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Expenses This Month</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 700 }}>${currentMonthTotals.expenseTotal.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Expenses</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 700 }}>${currentMonthTotals.expenseTotal.toFixed(0)}</div></div>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Debt Payments</div><div style={{ color: theme.warning, fontSize: '28px', fontWeight: 700 }}>${currentMonthTotals.debtTotal.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Goal Savings</div><div style={{ color: theme.purple, fontSize: '28px', fontWeight: 700 }}>${currentMonthTotals.goalTotal.toFixed(0)}</div></div>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Net This Month</div><div style={{ color: currentMonthTotals.total >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>${currentMonthTotals.total.toFixed(0)}</div></div>
             </div>
 
