@@ -342,7 +342,7 @@ RESPOND WITH RAW JSON ONLY! No explanation, no markdown, no code blocks.
 {"message": "Your helpful response", "actions": []}
 
 WRONG: Here's my response: {"message": "..."}
-WRONG: ```json {"message": "..."} ```
+WRONG: \`\`\`json {"message": "..."} \`\`\`
 RIGHT: {"message": "Your response here", "actions": []}
 
 Keep responses short and friendly. Use their name occasionally.`
