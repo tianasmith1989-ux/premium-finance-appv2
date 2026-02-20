@@ -17,6 +17,40 @@ export default function Dashboard() {
   const [tourStep, setTourStep] = useState(0)
   const [tourCompleted, setTourCompleted] = useState(false)
   
+  // ==================== UPLOAD STATE ====================
+  const [showPayslipUpload, setShowPayslipUpload] = useState(false)
+  const [payslipProcessing, setPayslipProcessing] = useState(false)
+  const [extractedPayslip, setExtractedPayslip] = useState<any>(null)
+  const payslipInputRef = useRef<HTMLInputElement>(null)
+  
+  // ==================== AUTOMATION STATE ====================
+  const [showAutomation, setShowAutomation] = useState(false)
+  const [automationSetup, setAutomationSetup] = useState<{
+    billsAccount: boolean
+    savingsAccount: boolean
+    autoTransferBills: boolean
+    autoTransferSavings: boolean
+    directDebits: string[]
+  }>({
+    billsAccount: false,
+    savingsAccount: false,
+    autoTransferBills: false,
+    autoTransferSavings: false,
+    directDebits: []
+  })
+  
+  // ==================== PASSIVE QUEST STATE ====================
+  const [passiveQuests, setPassiveQuests] = useState<any[]>([
+    { id: 1, name: 'High-Interest Savings', category: 'beginner', description: 'Earn $5-20/mo passive interest', status: 'not_started', progress: 0, monthlyIncome: 0, steps: ['Research high-interest accounts', 'Open account (Up, ING, Ubank)', 'Transfer emergency fund', 'Watch interest grow!'] },
+    { id: 2, name: 'Cashback Cards', category: 'beginner', description: 'Earn $10-50/mo from spending', status: 'not_started', progress: 0, monthlyIncome: 0, steps: ['Research cashback cards', 'Apply for card', 'Set as default payment', 'Redeem cashback monthly'] },
+    { id: 3, name: 'Bank Account Bonuses', category: 'beginner', description: 'One-time $50-200 bonuses', status: 'not_started', progress: 0, monthlyIncome: 0, steps: ['Find current bonus offers', 'Meet requirements', 'Collect bonus', 'Repeat with next bank'] },
+    { id: 4, name: 'Dividend ETFs', category: 'intermediate', description: 'Earn quarterly dividends', status: 'locked', progress: 0, monthlyIncome: 0, unlockRequirement: 'Complete emergency fund', steps: ['Open brokerage (Stake, CMC)', 'Research dividend ETFs (VAS, VHY)', 'Start with $500+', 'Reinvest dividends'] },
+    { id: 5, name: 'Micro-Investing', category: 'intermediate', description: 'Round-ups grow wealth', status: 'locked', progress: 0, monthlyIncome: 0, unlockRequirement: 'Complete emergency fund', steps: ['Sign up (Raiz, Spaceship)', 'Connect bank account', 'Enable round-ups', 'Add weekly boost'] },
+    { id: 6, name: 'Side Hustle Income', category: 'intermediate', description: 'Turn skills into $$$', status: 'not_started', progress: 0, monthlyIncome: 0, steps: ['Identify your skills', 'Create Airtasker/Fiverr profile', 'Complete first job', 'Build reviews & repeat'] },
+    { id: 7, name: 'Content Creation', category: 'advanced', description: 'YouTube/Blog passive income', status: 'locked', progress: 0, monthlyIncome: 0, unlockRequirement: '$500/mo passive income', steps: ['Choose your niche', 'Create content consistently', 'Monetize (ads, affiliate)', 'Scale & automate'] },
+    { id: 8, name: 'Rental Income', category: 'advanced', description: 'Property or room rental', status: 'locked', progress: 0, monthlyIncome: 0, unlockRequirement: 'Net worth $50k+', steps: ['Save deposit (5-20%)', 'Get pre-approval', 'Find investment property', 'Rent out for cashflow'] }
+  ])
+  
   // ==================== BUDGET STATE ====================
   const [incomeStreams, setIncomeStreams] = useState<any[]>([])
   const [newIncome, setNewIncome] = useState({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0] })
@@ -288,15 +322,63 @@ export default function Dashboard() {
     yearsToFI: monthlySurplus > 0 ? Math.ceil(((totalOutgoing * 12) * 25) / (monthlySurplus * 12)) : 999
   }
 
-  // Baby Steps calculation
+  // Australian Baby Steps calculation (adapted from Dave Ramsey for AU context)
+  const australianBabySteps = [
+    { step: 1, title: 'Starter Emergency Fund', desc: 'Save $2,000 for emergencies', target: 2000, icon: '🛡️' },
+    { step: 2, title: 'Kill Bad Debt', desc: 'Pay off credit cards, personal loans, BNPL', icon: '💳' },
+    { step: 3, title: 'Full Emergency Fund', desc: '3-6 months expenses saved', icon: '🏦' },
+    { step: 4, title: 'Invest 15% + Super', desc: 'Salary sacrifice + investments', icon: '📈' },
+    { step: 5, title: 'Home Deposit', desc: 'Save 10-20% for your home', icon: '🏠' },
+    { step: 6, title: 'Pay Off Home Early', desc: 'Extra mortgage payments', icon: '🔑' },
+    { step: 7, title: 'Build Wealth & Give', desc: 'Invest, enjoy, and be generous', icon: '💎' }
+  ]
+  
   const getBabyStep = () => {
     const emergencyFund = assets.filter(a => a.type === 'savings').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
-    const highInterestDebt = debts.filter(d => parseFloat(d.interestRate || '0') > 7)
-    if (emergencyFund < 1000) return { step: 1, title: 'Baby Step 1', desc: 'Save $1,000 Emergency Fund', progress: (emergencyFund / 1000) * 100 }
-    if (highInterestDebt.length > 0) return { step: 2, title: 'Baby Step 2', desc: 'Pay off high-interest debt', progress: 0 }
-    if (emergencyFund < monthlyExpenses * 3) return { step: 3, title: 'Baby Step 3', desc: '3-6 months expenses saved', progress: (emergencyFund / (monthlyExpenses * 3)) * 100 }
-    if (totalDebtBalance > 0) return { step: 4, title: 'Baby Step 4', desc: 'Pay off all debt', progress: 0 }
-    return { step: 5, title: 'Baby Step 5+', desc: 'Build wealth!', progress: 100 }
+    const badDebt = debts.filter(d => parseFloat(d.interestRate || '0') > 5) // Credit cards, personal loans
+    const allDebt = debts.filter(d => d.name?.toLowerCase() !== 'mortgage' && d.name?.toLowerCase() !== 'hecs' && d.name?.toLowerCase() !== 'help')
+    const mortgageDebt = debts.filter(d => d.name?.toLowerCase().includes('mortgage'))
+    const monthlyExpenses3 = monthlyExpenses * 3
+    const monthlyExpenses6 = monthlyExpenses * 6
+    
+    // Step 1: $2,000 starter emergency fund (higher for AU cost of living)
+    if (emergencyFund < 2000) {
+      return { step: 1, title: 'Starter Emergency Fund', desc: 'Save $2,000 for emergencies', progress: (emergencyFund / 2000) * 100, icon: '🛡️', target: 2000, current: emergencyFund }
+    }
+    
+    // Step 2: Pay off bad debt (credit cards, personal loans, BNPL - NOT HECS/HELP)
+    if (badDebt.length > 0) {
+      const totalBadDebt = badDebt.reduce((s, d) => s + parseFloat(d.balance || '0'), 0)
+      const paidOff = 0 // Would need to track original balances
+      return { step: 2, title: 'Kill Bad Debt', desc: 'Pay off credit cards, personal loans, BNPL', progress: 0, icon: '💳', target: totalBadDebt, current: 0, debts: badDebt }
+    }
+    
+    // Step 3: Full emergency fund (3-6 months expenses)
+    if (emergencyFund < monthlyExpenses3) {
+      return { step: 3, title: 'Full Emergency Fund', desc: '3-6 months expenses saved', progress: (emergencyFund / monthlyExpenses3) * 100, icon: '🏦', target: monthlyExpenses3, current: emergencyFund }
+    }
+    
+    // Step 4: Invest 15% (Super + extra)
+    const investmentGoalMet = passiveIncome > 0 || assets.filter(a => a.type === 'investment').length > 0
+    if (!investmentGoalMet) {
+      return { step: 4, title: 'Invest 15% + Super', desc: 'Salary sacrifice + investments', progress: 50, icon: '📈', target: monthlyIncome * 0.15, current: 0 }
+    }
+    
+    // Step 5: Home deposit (if no mortgage)
+    if (mortgageDebt.length === 0 && !assets.some(a => a.type === 'property')) {
+      const depositGoal = 100000 // Example target
+      const currentDeposit = assets.filter(a => a.name?.toLowerCase().includes('deposit') || a.name?.toLowerCase().includes('house')).reduce((s, a) => s + parseFloat(a.value || '0'), 0)
+      return { step: 5, title: 'Home Deposit', desc: 'Save 10-20% for your home', progress: (currentDeposit / depositGoal) * 100, icon: '🏠', target: depositGoal, current: currentDeposit }
+    }
+    
+    // Step 6: Pay off home early
+    if (mortgageDebt.length > 0) {
+      const mortgageBalance = mortgageDebt.reduce((s, d) => s + parseFloat(d.balance || '0'), 0)
+      return { step: 6, title: 'Pay Off Home Early', desc: 'Extra mortgage payments', progress: 0, icon: '🔑', target: mortgageBalance, current: 0 }
+    }
+    
+    // Step 7: Build wealth
+    return { step: 7, title: 'Build Wealth & Give', desc: 'Invest, enjoy, and be generous', progress: 100, icon: '💎', target: 0, current: 0 }
   }
   const currentBabyStep = getBabyStep()
 
@@ -342,6 +424,155 @@ export default function Dashboard() {
     setNewLiability({ name: '', value: '', type: 'loan' })
   }
   const deleteLiability = (id: number) => setLiabilities(liabilities.filter(l => l.id !== id))
+
+  // ==================== PAYSLIP UPLOAD ====================
+  const handlePayslipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    setPayslipProcessing(true)
+    
+    try {
+      // Convert to base64 for API
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.readAsDataURL(file)
+      })
+      
+      // Send to AI for extraction
+      const response = await fetch('/api/extract-payslip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, filename: file.name })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setExtractedPayslip(data)
+        setShowPayslipUpload(true)
+      } else {
+        alert('Could not process payslip. Please try again or enter manually.')
+      }
+    } catch (error) {
+      console.error('Payslip upload error:', error)
+      alert('Could not process payslip. Please try again or enter manually.')
+    }
+    
+    setPayslipProcessing(false)
+  }
+  
+  const confirmPayslipIncome = () => {
+    if (extractedPayslip) {
+      setIncomeStreams([...incomeStreams, {
+        id: Date.now(),
+        name: extractedPayslip.employer || 'Salary',
+        amount: extractedPayslip.netPay || extractedPayslip.amount || '',
+        frequency: extractedPayslip.frequency || 'fortnightly',
+        type: 'active',
+        startDate: extractedPayslip.payDate || new Date().toISOString().split('T')[0]
+      }])
+      setExtractedPayslip(null)
+      setShowPayslipUpload(false)
+    }
+  }
+
+  // ==================== AUTOMATION CALCULATOR ====================
+  const calculateAutomation = () => {
+    // Calculate how much should go to each "bucket" per pay period
+    const payFrequency = incomeStreams[0]?.frequency || 'fortnightly'
+    const payAmount = parseFloat(incomeStreams[0]?.amount || '0')
+    
+    // Convert all expenses to match pay frequency
+    const convertToPayPeriod = (amount: number, freq: string) => {
+      if (freq === payFrequency) return amount
+      if (payFrequency === 'fortnightly') {
+        if (freq === 'weekly') return amount * 2
+        if (freq === 'monthly') return amount / 2
+      }
+      if (payFrequency === 'weekly') {
+        if (freq === 'fortnightly') return amount / 2
+        if (freq === 'monthly') return amount / 4
+      }
+      if (payFrequency === 'monthly') {
+        if (freq === 'weekly') return amount * 4
+        if (freq === 'fortnightly') return amount * 2
+      }
+      return amount
+    }
+    
+    // Bills bucket: all expenses + debt payments
+    const billsTotal = expenses.filter(e => !e.targetDebtId && !e.targetGoalId).reduce((sum, exp) => 
+      sum + convertToPayPeriod(parseFloat(exp.amount || '0'), exp.frequency), 0)
+    const debtTotal = debts.reduce((sum, debt) => 
+      sum + convertToPayPeriod(parseFloat(debt.minPayment || '0'), debt.frequency || 'monthly'), 0)
+    const billsBucket = billsTotal + debtTotal
+    
+    // Savings bucket: all goal contributions
+    const savingsBucket = goals.reduce((sum, goal) => 
+      sum + convertToPayPeriod(parseFloat(goal.paymentAmount || '0'), goal.savingsFrequency || 'monthly'), 0)
+    
+    // Spending: what's left
+    const spendingBucket = payAmount - billsBucket - savingsBucket
+    
+    return {
+      payFrequency,
+      payAmount,
+      bills: {
+        total: billsBucket,
+        breakdown: [
+          ...expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(e => ({ 
+            name: e.name, 
+            amount: convertToPayPeriod(parseFloat(e.amount || '0'), e.frequency),
+            original: `$${e.amount}/${e.frequency}`
+          })),
+          ...debts.map(d => ({ 
+            name: `${d.name} payment`, 
+            amount: convertToPayPeriod(parseFloat(d.minPayment || '0'), d.frequency || 'monthly'),
+            original: `$${d.minPayment}/${d.frequency || 'monthly'}`
+          }))
+        ]
+      },
+      savings: {
+        total: savingsBucket,
+        breakdown: goals.map(g => ({ 
+          name: g.name, 
+          amount: convertToPayPeriod(parseFloat(g.paymentAmount || '0'), g.savingsFrequency || 'monthly'),
+          original: `$${g.paymentAmount}/${g.savingsFrequency}`
+        }))
+      },
+      spending: spendingBucket
+    }
+  }
+
+  // ==================== QUEST FUNCTIONS ====================
+  const startQuest = (questId: number) => {
+    setPassiveQuests(passiveQuests.map(q => 
+      q.id === questId ? { ...q, status: 'in_progress', progress: 10 } : q
+    ))
+  }
+  
+  const updateQuestProgress = (questId: number, stepIndex: number) => {
+    setPassiveQuests(passiveQuests.map(q => {
+      if (q.id === questId) {
+        const newProgress = Math.min(100, ((stepIndex + 1) / q.steps.length) * 100)
+        return { 
+          ...q, 
+          progress: newProgress,
+          status: newProgress >= 100 ? 'completed' : 'in_progress'
+        }
+      }
+      return q
+    }))
+  }
+  
+  const completeQuest = (questId: number, monthlyIncome: number) => {
+    setPassiveQuests(passiveQuests.map(q => 
+      q.id === questId ? { ...q, status: 'completed', progress: 100, monthlyIncome } : q
+    ))
+  }
+  
+  const totalPassiveQuestIncome = passiveQuests.filter(q => q.status === 'completed').reduce((sum, q) => sum + q.monthlyIncome, 0)
 
   const addTrade = () => {
     if (!newTrade.instrument) return
@@ -1080,25 +1311,30 @@ export default function Dashboard() {
     },
     {
       title: "The FIRE Number 🔥",
-      content: "FIRE = Financial Independence, Retire Early. Your FIRE number is 25x your annual expenses. When your investments reach this amount, you can live off the returns forever!",
+      content: "FIRE = Financial Independence, Retire Early. Your FIRE number is 25x your annual expenses. When your Super + investments reach this amount, you can live off the returns forever!",
       icon: "🔥",
       highlight: "path"
     },
     {
-      title: "Baby Steps 👶",
-      content: "We follow Dave Ramsey's proven Baby Steps: 1) $1,000 emergency fund, 2) Pay off debt, 3) 3-6 months savings, 4) Invest 15%, 5) Kids' education, 6) Pay off home, 7) Build wealth!",
+      title: "Australian Baby Steps 👶",
+      content: "We follow localised Baby Steps: 1) $2K emergency fund, 2) Kill bad debt (not HECS!), 3) 3-6 months savings, 4) Invest 15% + Super, 5) Home deposit, 6) Pay off mortgage, 7) Build wealth!",
       icon: "👶",
       highlight: "path"
     },
     {
       title: "Escape the Rat Race 🐀",
-      content: "The goal: Passive Income > Monthly Expenses = FREEDOM! I'll help you track income streams, find opportunities, and build toward the day your money works harder than you do.",
+      content: "The goal: Passive Income > Monthly Expenses = FREEDOM! I'll suggest passive income 'quests' - from high-interest savings to dividend ETFs - and help you automate your money.",
       icon: "🚀",
       highlight: "path"
     },
     {
+      title: "Set & Forget Automation 🤖",
+      content: "Once we know your budget, I'll help you set up automatic transfers so your bills pay themselves and savings grow without thinking about it. No more manual transfers!",
+      icon: "🤖"
+    },
+    {
       title: "Let's Get Started! 💪",
-      content: "I'll ask you about your income, expenses, debts, and goals through a friendly chat. You can also upload payslips or bank statements to speed things up. Ready?",
+      content: "I'll ask about your income, expenses, debts, and goals. You can upload a payslip to speed things up! Just tell me what you know - I'll ask for anything I need.",
       icon: "💬"
     }
   ]
@@ -1275,6 +1511,66 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Payslip Confirmation Modal */}
+      {showPayslipUpload && extractedPayslip && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPayslipUpload(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '24px', maxWidth: '500px', width: '95%' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '20px' }}>📄 Payslip Detected!</h3>
+            <p style={{ color: theme.textMuted, fontSize: '14px', marginBottom: '20px' }}>Please confirm or edit the extracted details:</p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Employer</label>
+                <input 
+                  value={extractedPayslip.employer || ''} 
+                  onChange={e => setExtractedPayslip({...extractedPayslip, employer: e.target.value})}
+                  style={{ ...inputStyle, width: '100%' }} 
+                  placeholder="Company name"
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Net Pay</label>
+                  <input 
+                    type="number"
+                    value={extractedPayslip.netPay || ''} 
+                    onChange={e => setExtractedPayslip({...extractedPayslip, netPay: e.target.value})}
+                    style={{ ...inputStyle, width: '100%' }} 
+                    placeholder="Amount"
+                  />
+                </div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Frequency</label>
+                  <select 
+                    value={extractedPayslip.frequency || 'fortnightly'} 
+                    onChange={e => setExtractedPayslip({...extractedPayslip, frequency: e.target.value})}
+                    style={{ ...inputStyle, width: '100%' }}
+                  >
+                    <option value="weekly">Weekly</option>
+                    <option value="fortnightly">Fortnightly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Pay Date</label>
+                <input 
+                  type="date"
+                  value={extractedPayslip.payDate || new Date().toISOString().split('T')[0]} 
+                  onChange={e => setExtractedPayslip({...extractedPayslip, payDate: e.target.value})}
+                  style={{ ...inputStyle, width: '100%' }} 
+                />
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={confirmPayslipIncome} style={{ ...btnSuccess, flex: 1 }}>✓ Add Income</button>
+              <button onClick={() => { setShowPayslipUpload(false); setExtractedPayslip(null) }} style={{ ...btnPrimary, background: theme.textMuted }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header style={{ padding: '12px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky' as const, top: 0, zIndex: 100 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -1344,7 +1640,13 @@ export default function Dashboard() {
               <div style={cardStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{ margin: 0, color: theme.success, fontSize: '18px' }}>💰 Income</h3>
-                  <span style={{ color: theme.success, fontWeight: 700 }}>${monthlyIncome.toFixed(0)}/mo</span>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input type="file" ref={payslipInputRef} accept="image/*,.pdf" onChange={handlePayslipUpload} style={{ display: 'none' }} />
+                    <button onClick={() => payslipInputRef.current?.click()} style={{ padding: '4px 12px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} disabled={payslipProcessing}>
+                      {payslipProcessing ? '⏳' : '📄'} Payslip
+                    </button>
+                    <span style={{ color: theme.success, fontWeight: 700 }}>${monthlyIncome.toFixed(0)}/mo</span>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
                   <input placeholder="Source" value={newIncome.name} onChange={e => setNewIncome({...newIncome, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '120px'}} />
@@ -1658,16 +1960,117 @@ export default function Dashboard() {
         {/* PATH TAB */}
         {appMode === 'budget' && activeTab === 'path' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
+            {/* Current Status */}
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>📍 Where You Are Now</h2>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
                 <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>💎 Net Worth</div><div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${netWorth.toFixed(0)}</div></div>
                 <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>📈 Surplus</div><div style={{ color: monthlySurplus >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${monthlySurplus.toFixed(0)}</div></div>
                 <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>💳 Total Debt</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${totalDebtBalance.toFixed(0)}</div></div>
-                <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>🌴 Passive Income</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 'bold' }}>${passiveIncome.toFixed(0)}/mo</div></div>
+                <div style={{ padding: '20px', background: darkMode ? '#334155' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>🌴 Passive Income</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 'bold' }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}/mo</div></div>
               </div>
             </div>
 
+            {/* Money Automation System */}
+            {incomeStreams.length > 0 && (
+              <div style={{ padding: '24px', background: 'linear-gradient(135deg, #3b82f615, #8b5cf615)', borderRadius: '16px', border: '2px solid ' + theme.accent }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🤖 Set & Forget Automation</h2>
+                  <button onClick={() => setShowAutomation(!showAutomation)} style={{ padding: '8px 16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                    {showAutomation ? 'Hide Details' : 'Setup Guide'}
+                  </button>
+                </div>
+                
+                {(() => {
+                  const auto = calculateAutomation()
+                  return (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: showAutomation ? '20px' : 0 }}>
+                        <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                          <div style={{ fontSize: '32px', marginBottom: '8px' }}>💳</div>
+                          <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '4px' }}>Bills Account</div>
+                          <div style={{ color: theme.warning, fontSize: '24px', fontWeight: 'bold' }}>${auto.bills.total.toFixed(0)}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>per {auto.payFrequency}</div>
+                        </div>
+                        <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                          <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎯</div>
+                          <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '4px' }}>Savings Account</div>
+                          <div style={{ color: theme.purple, fontSize: '24px', fontWeight: 'bold' }}>${auto.savings.total.toFixed(0)}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>per {auto.payFrequency}</div>
+                        </div>
+                        <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                          <div style={{ fontSize: '32px', marginBottom: '8px' }}>💵</div>
+                          <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '4px' }}>Spending Money</div>
+                          <div style={{ color: theme.success, fontSize: '24px', fontWeight: 'bold' }}>${auto.spending.toFixed(0)}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>per {auto.payFrequency}</div>
+                        </div>
+                      </div>
+                      
+                      {showAutomation && (
+                        <div style={{ background: theme.cardBg, borderRadius: '12px', padding: '20px' }}>
+                          <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '16px' }}>📋 Setup Instructions</h3>
+                          
+                          <div style={{ marginBottom: '20px' }}>
+                            <h4 style={{ color: theme.warning, margin: '0 0 8px 0', fontSize: '14px' }}>Step 1: Create Sub-Accounts</h4>
+                            <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 8px 0' }}>
+                              Open these accounts at your bank (most AU banks support this):
+                            </p>
+                            <ul style={{ color: theme.text, fontSize: '13px', margin: 0, paddingLeft: '20px' }}>
+                              <li><strong>Bills Account</strong> - For all fixed expenses</li>
+                              <li><strong>Savings Account</strong> - For goals (consider Up, ING, or Ubank for better rates)</li>
+                              <li><strong>Spending Account</strong> - Your everyday account</li>
+                            </ul>
+                          </div>
+                          
+                          <div style={{ marginBottom: '20px' }}>
+                            <h4 style={{ color: theme.purple, margin: '0 0 8px 0', fontSize: '14px' }}>Step 2: Set Up Auto-Transfers</h4>
+                            <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 8px 0' }}>
+                              When your ${auto.payAmount} {auto.payFrequency} pay hits, automatically split it:
+                            </p>
+                            <div style={{ background: darkMode ? '#1e293b' : '#f1f5f9', padding: '12px', borderRadius: '8px', fontSize: '13px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <span style={{ color: theme.textMuted }}>→ Bills Account:</span>
+                                <span style={{ color: theme.warning, fontWeight: 600 }}>${auto.bills.total.toFixed(0)}</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <span style={{ color: theme.textMuted }}>→ Savings Account:</span>
+                                <span style={{ color: theme.purple, fontWeight: 600 }}>${auto.savings.total.toFixed(0)}</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid ' + theme.border, paddingTop: '4px', marginTop: '4px' }}>
+                                <span style={{ color: theme.textMuted }}>= Spending (stays in main):</span>
+                                <span style={{ color: theme.success, fontWeight: 600 }}>${auto.spending.toFixed(0)}</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <h4 style={{ color: theme.success, margin: '0 0 8px 0', fontSize: '14px' }}>Step 3: Set Up Direct Debits</h4>
+                            <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 8px 0' }}>
+                              From your Bills Account, set these to auto-pay:
+                            </p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
+                              {auto.bills.breakdown.map((item, i) => (
+                                <span key={i} style={{ padding: '6px 12px', background: darkMode ? '#1e293b' : '#f1f5f9', borderRadius: '6px', fontSize: '12px', color: theme.text }}>
+                                  {item.name}: ${item.amount.toFixed(0)}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div style={{ marginTop: '16px', padding: '12px', background: theme.success + '20', borderRadius: '8px' }}>
+                            <p style={{ color: theme.success, margin: 0, fontSize: '13px', fontWeight: 500 }}>
+                              💡 Once set up, your bills and savings happen automatically every payday. No more manual transfers!
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
+              </div>
+            )}
+
+            {/* FIRE Progress */}
             <div style={{ padding: '24px', background: 'linear-gradient(135deg, ' + theme.purple + '15, ' + theme.success + '15)', borderRadius: '16px', border: '2px solid ' + theme.purple }}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>🔥 Escape the Rat Race</h2>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
@@ -1675,43 +2078,126 @@ export default function Dashboard() {
                   <h3 style={{ margin: '0 0 12px 0', color: theme.purple, fontSize: '18px' }}>🌴 Freedom Target</h3>
                   <div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}>
                     <div>Monthly need: <strong>${fiPath.monthlyNeed.toFixed(0)}</strong></div>
-                    <div>Passive income: <strong style={{ color: theme.success }}>${passiveIncome.toFixed(0)}</strong></div>
-                    <div>Gap to fill: <strong style={{ color: theme.danger }}>${Math.max(0, fiPath.passiveGap).toFixed(0)}</strong></div>
-                    <div>Coverage: <strong style={{ color: theme.purple }}>{fiPath.passiveCoverage.toFixed(1)}%</strong></div>
+                    <div>Passive income: <strong style={{ color: theme.success }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</strong></div>
+                    <div>Gap to fill: <strong style={{ color: theme.danger }}>${Math.max(0, fiPath.passiveGap - totalPassiveQuestIncome).toFixed(0)}</strong></div>
+                    <div>Coverage: <strong style={{ color: theme.purple }}>{((passiveIncome + totalPassiveQuestIncome) / fiPath.monthlyNeed * 100).toFixed(1)}%</strong></div>
                   </div>
                   <div style={{ marginTop: '16px', height: '12px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '6px', overflow: 'hidden' }}>
-                    <div style={{ width: Math.min(fiPath.passiveCoverage, 100) + '%', height: '100%', background: 'linear-gradient(90deg, ' + theme.purple + ', ' + theme.success + ')', borderRadius: '6px' }} />
+                    <div style={{ width: Math.min(((passiveIncome + totalPassiveQuestIncome) / fiPath.monthlyNeed * 100), 100) + '%', height: '100%', background: 'linear-gradient(90deg, ' + theme.purple + ', ' + theme.success + ')', borderRadius: '6px' }} />
                   </div>
                 </div>
                 <div style={{ ...cardStyle, padding: '20px' }}>
                   <h3 style={{ margin: '0 0 12px 0', color: theme.success, fontSize: '18px' }}>🔥 FIRE Number</h3>
                   <div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}>
                     <div>Target: <strong>${fiPath.fireNumber.toLocaleString()}</strong></div>
-                    <div>Investments: <strong style={{ color: theme.success }}>${fiPath.currentInvestments.toLocaleString()}</strong></div>
+                    <div>Investments + Super: <strong style={{ color: theme.success }}>${fiPath.currentInvestments.toLocaleString()}</strong></div>
                     <div>Years to FI: <strong style={{ color: theme.purple }}>{fiPath.yearsToFI >= 999 ? '∞' : fiPath.yearsToFI}</strong></div>
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* Passive Income Quest Board */}
             <div style={cardStyle}>
-              <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>👶 The Baby Steps</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🎯 Passive Income Quests</h2>
+                <div style={{ padding: '8px 16px', background: theme.success + '20', borderRadius: '8px' }}>
+                  <span style={{ color: theme.success, fontWeight: 700 }}>${totalPassiveQuestIncome.toFixed(0)}/mo earned</span>
+                </div>
+              </div>
+              
+              {/* Beginner Quests */}
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ color: theme.success, fontSize: '16px', margin: '0 0 12px 0' }}>🌱 Beginner Quests</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                  {passiveQuests.filter(q => q.category === 'beginner').map(quest => (
+                    <div key={quest.id} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: quest.status === 'completed' ? '2px solid ' + theme.success : quest.status === 'in_progress' ? '2px solid ' + theme.accent : '1px solid ' + theme.border }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                        <div style={{ fontWeight: 600, color: theme.text }}>{quest.name}</div>
+                        {quest.status === 'completed' && <span style={{ color: theme.success }}>✓</span>}
+                      </div>
+                      <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>{quest.description}</div>
+                      {quest.status === 'in_progress' && (
+                        <div style={{ marginBottom: '12px' }}>
+                          <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{ width: quest.progress + '%', height: '100%', background: theme.accent }} />
+                          </div>
+                          <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '4px' }}>{quest.progress}% complete</div>
+                        </div>
+                      )}
+                      {quest.status === 'completed' && quest.monthlyIncome > 0 && (
+                        <div style={{ color: theme.success, fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>+${quest.monthlyIncome}/mo</div>
+                      )}
+                      {quest.status === 'not_started' && (
+                        <button onClick={() => startQuest(quest.id)} style={{ padding: '8px 16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', width: '100%' }}>Start Quest →</button>
+                      )}
+                      {quest.status === 'in_progress' && (
+                        <button onClick={() => updateQuestProgress(quest.id, Math.floor(quest.progress / 25))} style={{ padding: '8px 16px', background: theme.purple, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', width: '100%' }}>Continue →</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Intermediate Quests */}
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ color: theme.warning, fontSize: '16px', margin: '0 0 12px 0' }}>📈 Intermediate Quests</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                  {passiveQuests.filter(q => q.category === 'intermediate').map(quest => (
+                    <div key={quest.id} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: quest.status === 'locked' ? '1px dashed ' + theme.border : quest.status === 'completed' ? '2px solid ' + theme.success : '1px solid ' + theme.border, opacity: quest.status === 'locked' ? 0.6 : 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                        <div style={{ fontWeight: 600, color: theme.text }}>{quest.status === 'locked' ? '🔒 ' : ''}{quest.name}</div>
+                      </div>
+                      <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>{quest.description}</div>
+                      {quest.status === 'locked' && (
+                        <div style={{ fontSize: '12px', color: theme.warning }}>Unlock: {quest.unlockRequirement}</div>
+                      )}
+                      {quest.status === 'not_started' && (
+                        <button onClick={() => startQuest(quest.id)} style={{ padding: '8px 16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', width: '100%' }}>Start Quest →</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Advanced Quests */}
+              <div>
+                <h3 style={{ color: theme.purple, fontSize: '16px', margin: '0 0 12px 0' }}>💎 Advanced Quests</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                  {passiveQuests.filter(q => q.category === 'advanced').map(quest => (
+                    <div key={quest.id} style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px dashed ' + theme.border, opacity: 0.6 }}>
+                      <div style={{ fontWeight: 600, color: theme.text, marginBottom: '8px' }}>🔒 {quest.name}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }}>{quest.description}</div>
+                      <div style={{ fontSize: '12px', color: theme.purple }}>Unlock: {quest.unlockRequirement}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Australian Baby Steps */}
+            <div style={cardStyle}>
+              <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>👶 Australian Baby Steps</h2>
+              <p style={{ color: theme.textMuted, fontSize: '13px', margin: '-12px 0 20px 0' }}>Adapted for Australia - HECS/HELP debt is okay, Super counts toward investing!</p>
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
-                {[
-                  { step: 1, title: '$1,000 Emergency Fund', desc: 'Starter emergency fund', check: () => assets.filter(a => a.type === 'savings').reduce((s, a) => s + parseFloat(a.value || '0'), 0) >= 1000 },
-                  { step: 2, title: 'Pay Off High-Interest Debt', desc: 'Debt snowball/avalanche', check: () => debts.filter(d => parseFloat(d.interestRate || '0') > 7).length === 0 },
-                  { step: 3, title: '3-6 Months Emergency Fund', desc: 'Full emergency fund', check: () => assets.filter(a => a.type === 'savings').reduce((s, a) => s + parseFloat(a.value || '0'), 0) >= monthlyExpenses * 3 },
-                  { step: 4, title: 'Invest 15% for Retirement', desc: 'Build wealth', check: () => false },
-                  { step: 5, title: "Save for Kids' College", desc: 'Education fund', check: () => false },
-                  { step: 6, title: 'Pay Off Home Early', desc: 'Mortgage freedom', check: () => false },
-                  { step: 7, title: 'Build Wealth & Give', desc: 'Live generously', check: () => fiPath.passiveCoverage >= 100 }
-                ].map((item) => {
-                  const done = item.check()
+                {australianBabySteps.map((item) => {
                   const isCurrent = item.step === currentBabyStep.step
+                  const done = item.step < currentBabyStep.step
                   return (
                     <div key={item.step} style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '16px', background: done ? (darkMode ? '#1e3a32' : '#f0fdf4') : isCurrent ? (darkMode ? '#2e2a1e' : '#fefce8') : (darkMode ? '#334155' : '#f8fafc'), borderRadius: '12px', border: done ? '2px solid ' + theme.success : isCurrent ? '2px solid ' + theme.warning : '1px solid ' + theme.border }}>
-                      <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' }}>{done ? '✓' : item.step}</div>
-                      <div style={{ flex: 1 }}><div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{item.title}</div><div style={{ color: theme.textMuted, fontSize: '13px' }}>{item.desc}</div></div>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' }}>{done ? '✓' : item.icon}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{item.title}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '13px' }}>{item.desc}</div>
+                        {isCurrent && currentBabyStep.target > 0 && (
+                          <div style={{ marginTop: '8px' }}>
+                            <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: Math.min(currentBabyStep.progress, 100) + '%', height: '100%', background: theme.warning }} />
+                            </div>
+                            <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '4px' }}>${currentBabyStep.current?.toFixed(0) || 0} / ${currentBabyStep.target?.toFixed(0) || 0}</div>
+                          </div>
+                        )}
+                      </div>
                       <div style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, background: done ? theme.success : isCurrent ? theme.warning : theme.border, color: done || isCurrent ? 'white' : theme.textMuted }}>{done ? '✓ Complete' : isCurrent ? '→ Current' : 'Pending'}</div>
                     </div>
                   )
@@ -1833,4 +2319,3 @@ export default function Dashboard() {
     </div>
   )
 }
-
