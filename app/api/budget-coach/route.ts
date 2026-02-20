@@ -2,46 +2,38 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // Financial frameworks the AI knows about
 const FINANCIAL_FRAMEWORKS = `
-=== FINANCIAL FRAMEWORKS YOU USE ===
+=== FINANCIAL FRAMEWORKS ===
 
-**BABY STEPS (Dave Ramsey inspired):**
-1. $1,000 Emergency Fund - starter emergency fund
-2. Pay off all debt (except mortgage) - debt snowball method
-3. 3-6 months expenses in savings - full emergency fund
-4. Invest 15% of income for retirement
-5. Save for children's education
+**BABY STEPS (Dave Ramsey):**
+1. $1,000 Emergency Fund
+2. Pay off all debt (snowball method)
+3. 3-6 months emergency fund
+4. Invest 15% for retirement
+5. Save for kids' education
 6. Pay off home early
-7. Build wealth and give generously
+7. Build wealth & give
 
-**RAT RACE ESCAPE / FIRE PATH:**
-- Calculate monthly expenses (the "nut" to crack)
-- Build passive income streams to cover expenses
+**FIRE PATH (Financial Independence):**
+- Monthly expenses = your "freedom number"
+- Passive income >= expenses = FREEDOM
 - FIRE Number = Annual Expenses × 25
-- Track passive income coverage percentage
-- Goal: Passive Income >= Monthly Expenses = FREEDOM
+- Track passive income coverage %
 
-**DEBT PAYOFF METHODS:**
-- Avalanche: Highest interest first (mathematically optimal)
-- Snowball: Smallest balance first (psychologically motivating)
-
-**KEY METRICS TO TRACK:**
-- Monthly Surplus = Income - Expenses - Debt Payments
-- Savings Rate = (Income - Expenses) / Income × 100
-- Debt-to-Income Ratio
-- Passive Income Coverage = Passive Income / Monthly Expenses × 100
-- Emergency Fund Months = Savings / Monthly Expenses
+**KEY METRICS:**
+- Savings Rate = (Income - Expenses) / Income
+- Passive Coverage = Passive Income / Expenses
+- Emergency Fund = Savings / Monthly Expenses (in months)
 `
 
 export async function POST(request: NextRequest) {
   try {
     const { 
-      mode,           // 'onboarding' | 'proactive' | 'question' | 'legacy'
-      question,       // user's question (for question mode)
-      onboardingStep, // current step in onboarding
-      userResponse,   // user's response during onboarding
-      financialData,  // all financial data (income, expenses, debts, goals, assets, liabilities)
-      memory,         // persistent memory (life events, preferences, patterns)
-      financialContext // legacy support for old API calls
+      mode,
+      question,
+      onboardingStep,
+      userResponse,
+      financialData,
+      memory
     } = await request.json()
 
     const apiKey = process.env.ANTHROPIC_API_KEY
@@ -50,341 +42,212 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
     }
 
-    // Legacy support - if old format, use simple response
-    if (financialContext && question && !mode) {
-      const legacyPrompt = `${financialContext}
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    const currentYear = new Date().getFullYear()
+    const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0')
 
-You are Aureus, a professional yet friendly financial advisor. Based on the user's actual financial data above, provide specific, actionable advice. Use their real numbers in your response. Be encouraging but honest. Keep responses concise and practical.
-
-User's question: ${question}`
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1500,
-          messages: [{ role: 'user', content: legacyPrompt }]
+    // Helper to build context from financial data
+    const buildFinancialContext = () => {
+      if (!financialData) return 'No financial data yet.'
+      
+      let context = '=== CURRENT FINANCIAL DATA ===\n'
+      
+      if (financialData.income?.length > 0) {
+        context += '\nINCOME:\n'
+        financialData.income.forEach((inc: any) => {
+          context += `  - ID:${inc.id} "${inc.name}" $${inc.amount}/${inc.frequency} (${inc.type}) on ${inc.startDate}\n`
         })
-      })
-
-      const data = await response.json()
-      const advice = data.content?.[0]?.text || 'I apologize, but I could not generate advice.'
-      return NextResponse.json({ advice })
+      }
+      
+      if (financialData.expenses?.length > 0) {
+        context += '\nEXPENSES:\n'
+        financialData.expenses.forEach((exp: any) => {
+          context += `  - ID:${exp.id} "${exp.name}" $${exp.amount}/${exp.frequency} [${exp.category}] due ${exp.dueDate}\n`
+        })
+      }
+      
+      if (financialData.debts?.length > 0) {
+        context += '\nDEBTS:\n'
+        financialData.debts.forEach((debt: any) => {
+          context += `  - ID:${debt.id} "${debt.name}" $${debt.balance} @ ${debt.interestRate}% (min $${debt.minPayment}) due ${debt.paymentDate}\n`
+        })
+      }
+      
+      if (financialData.goals?.length > 0) {
+        context += '\nGOALS:\n'
+        financialData.goals.forEach((goal: any) => {
+          context += `  - ID:${goal.id} "${goal.name}" $${goal.saved}/$${goal.target} by ${goal.deadline} ($${goal.paymentAmount}/${goal.savingsFrequency})\n`
+        })
+      }
+      
+      return context
     }
 
     let systemPrompt = ''
     let userPrompt = ''
 
-    // Financial frameworks the AI knows about
-    const FINANCIAL_FRAMEWORKS = `
-=== FINANCIAL FRAMEWORKS YOU USE ===
-
-**BABY STEPS (Dave Ramsey inspired):**
-1. $1,000 Emergency Fund - starter emergency fund
-2. Pay off all debt (except mortgage) - debt snowball method
-3. 3-6 months expenses in savings - full emergency fund
-4. Invest 15% of income for retirement
-5. Save for children's education
-6. Pay off home early
-7. Build wealth and give generously
-
-**RAT RACE ESCAPE / FIRE PATH:**
-- Calculate monthly expenses (the "nut" to crack)
-- Build passive income streams to cover expenses
-- FIRE Number = Annual Expenses × 25
-- Track passive income coverage percentage
-- Goal: Passive Income >= Monthly Expenses = FREEDOM
-
-**DEBT PAYOFF METHODS:**
-- Avalanche: Highest interest first (mathematically optimal)
-- Snowball: Smallest balance first (psychologically motivating)
-
-**KEY METRICS TO TRACK:**
-- Monthly Surplus = Income - Expenses - Debt Payments
-- Savings Rate = (Income - Expenses) / Income × 100
-- Debt-to-Income Ratio
-- Passive Income Coverage = Passive Income / Monthly Expenses × 100
-- Emergency Fund Months = Savings / Monthly Expenses
-`
-
-    // Build context from financial data
-    const buildFinancialContext = () => {
-      if (!financialData) return 'No financial data provided yet.'
-      
-      const { income, expenses, debts, goals, assets, liabilities } = financialData
-      
-      let context = '=== CURRENT FINANCIAL SNAPSHOT ===\n'
-      
-      // Income
-      if (income?.length > 0) {
-        let totalIncome = 0
-        let passiveIncome = 0
-        income.forEach((i: any) => {
-          const amt = parseFloat(i.amount || '0')
-          let monthly = amt
-          if (i.frequency === 'weekly') monthly = amt * 4.33
-          if (i.frequency === 'fortnightly') monthly = amt * 2.17
-          if (i.frequency === 'yearly') monthly = amt / 12
-          totalIncome += monthly
-          if (i.type === 'passive') passiveIncome += monthly
-        })
-        context += `\nINCOME: $${totalIncome.toFixed(0)}/month (Passive: $${passiveIncome.toFixed(0)})\n`
-        income.forEach((i: any) => {
-          context += `  - ${i.name}: $${i.amount}/${i.frequency} (${i.type})\n`
-        })
-      }
-      
-      // Expenses
-      if (expenses?.length > 0) {
-        const totalExpenses = expenses.reduce((sum: number, e: any) => {
-          const amt = parseFloat(e.amount || '0')
-          if (e.frequency === 'weekly') return sum + amt * 4.33
-          if (e.frequency === 'fortnightly') return sum + amt * 2.17
-          if (e.frequency === 'yearly') return sum + amt / 12
-          return sum + amt
-        }, 0)
-        context += `\nEXPENSES: $${totalExpenses.toFixed(0)}/month\n`
-        expenses.slice(0, 10).forEach((e: any) => {
-          context += `  - ${e.name}: $${e.amount}/${e.frequency}${e.category ? ` [${e.category}]` : ''}\n`
-        })
-        if (expenses.length > 10) context += `  ... and ${expenses.length - 10} more\n`
-      }
-      
-      // Debts
-      if (debts?.length > 0) {
-        const totalDebt = debts.reduce((sum: number, d: any) => sum + parseFloat(d.balance || '0'), 0)
-        const monthlyDebtPayments = debts.reduce((sum: number, d: any) => sum + parseFloat(d.minPayment || '0'), 0)
-        context += `\nDEBTS: $${totalDebt.toFixed(0)} total, $${monthlyDebtPayments.toFixed(0)}/month in payments\n`
-        debts.forEach((d: any) => {
-          context += `  - ${d.name}: $${d.balance} @ ${d.interestRate}% (min: $${d.minPayment}/mo)\n`
-        })
-      }
-      
-      // Goals
-      if (goals?.length > 0) {
-        context += `\nGOALS:\n`
-        goals.forEach((g: any) => {
-          const progress = (parseFloat(g.saved || '0') / parseFloat(g.target || '1') * 100).toFixed(0)
-          const remaining = parseFloat(g.target || '0') - parseFloat(g.saved || '0')
-          context += `  - ${g.name}: $${g.saved}/$${g.target} (${progress}%) - $${remaining.toFixed(0)} to go\n`
-          if (g.deadline) context += `    Deadline: ${g.deadline}\n`
-        })
-      }
-      
-      // Assets & Liabilities (if provided)
-      if (assets?.length > 0) {
-        const totalAssets = assets.reduce((sum: number, a: any) => sum + parseFloat(a.value || '0'), 0)
-        context += `\nASSETS: $${totalAssets.toFixed(0)} total\n`
-        assets.forEach((a: any) => {
-          context += `  - ${a.name}: $${a.value} (${a.type})\n`
-        })
-      }
-      
-      if (liabilities?.length > 0) {
-        const totalLiabilities = liabilities.reduce((sum: number, l: any) => sum + parseFloat(l.value || '0'), 0)
-        context += `\nLIABILITIES: $${totalLiabilities.toFixed(0)} total\n`
-      }
-      
-      // Calculate key metrics
-      const totalIncome = income?.reduce((sum: number, i: any) => {
-        const amt = parseFloat(i.amount || '0')
-        if (i.frequency === 'weekly') return sum + amt * 4.33
-        if (i.frequency === 'fortnightly') return sum + amt * 2.17
-        return sum + amt
-      }, 0) || 0
-      
-      const totalExpenses = expenses?.reduce((sum: number, e: any) => {
-        const amt = parseFloat(e.amount || '0')
-        if (e.frequency === 'weekly') return sum + amt * 4.33
-        if (e.frequency === 'fortnightly') return sum + amt * 2.17
-        return sum + amt
-      }, 0) || 0
-      
-      const totalDebtPayments = debts?.reduce((sum: number, d: any) => sum + parseFloat(d.minPayment || '0'), 0) || 0
-      const surplus = totalIncome - totalExpenses - totalDebtPayments
-      const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100) : 0
-      
-      const passiveIncome = income?.filter((i: any) => i.type === 'passive').reduce((sum: number, i: any) => {
-        const amt = parseFloat(i.amount || '0')
-        if (i.frequency === 'weekly') return sum + amt * 4.33
-        if (i.frequency === 'fortnightly') return sum + amt * 2.17
-        return sum + amt
-      }, 0) || 0
-      
-      const passiveCoverage = totalExpenses > 0 ? (passiveIncome / totalExpenses * 100) : 0
-      const fireNumber = (totalExpenses * 12) * 25
-      
-      context += `\n=== KEY METRICS ===\n`
-      context += `Monthly Surplus: $${surplus.toFixed(0)}\n`
-      context += `Savings Rate: ${savingsRate.toFixed(1)}%\n`
-      context += `Passive Income Coverage: ${passiveCoverage.toFixed(1)}%\n`
-      context += `FIRE Number: $${fireNumber.toFixed(0)}\n`
-      
-      return context
-    }
-
-    // Build memory context
-    const buildMemoryContext = () => {
-      if (!memory) return ''
-      
-      let context = '\n=== WHAT I REMEMBER ABOUT YOU ===\n'
-      
-      if (memory.name) context += `Name: ${memory.name}\n`
-      
-      if (memory.lifeEvents?.length > 0) {
-        context += '\nIMPORTANT DATES:\n'
-        memory.lifeEvents.forEach((event: any) => {
-          context += `  - ${event.name}: ${event.date}${event.budget ? ` (budget: $${event.budget})` : ''}\n`
-        })
-      }
-      
-      if (memory.patterns?.length > 0) {
-        context += '\nPATTERNS I\'VE NOTICED:\n'
-        memory.patterns.forEach((p: string) => context += `  - ${p}\n`)
-      }
-      
-      if (memory.preferences) {
-        context += '\nYOUR PREFERENCES:\n'
-        if (memory.preferences.communicationStyle) context += `  - Communication: ${memory.preferences.communicationStyle}\n`
-        if (memory.preferences.checkInFrequency) context += `  - Check-ins: ${memory.preferences.checkInFrequency}\n`
-        if (memory.preferences.motivators) context += `  - Motivated by: ${memory.preferences.motivators.join(', ')}\n`
-      }
-      
-      if (memory.notes?.length > 0) {
-        context += '\nNOTES:\n'
-        memory.notes.slice(-5).forEach((n: string) => context += `  - ${n}\n`)
-      }
-      
-      return context
-    }
-
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-
     if (mode === 'onboarding') {
-      systemPrompt = `You are Aureus, a warm, friendly financial companion helping a new user set up their financial profile.
+      systemPrompt = `You are Aureus, a friendly Australian financial coach. You're onboarding a new user.
 
 ${FINANCIAL_FRAMEWORKS}
 
-CRITICAL RULE - READ THIS FIRST:
-You must ALWAYS ask for the payment/due DATE before adding ANY income, expense, or debt.
-DO NOT add items to the actions array until you know WHEN they occur.
+TODAY: ${today}
+CURRENT STEP: ${onboardingStep}
 
-Flow for EVERY financial item:
-1. User mentions amount → You acknowledge and ASK for the date
-2. User provides date → THEN you add to actions array
+=== ONBOARDING RULES ===
 
-Example conversation:
-User: "I make $5000 from my job"
-You: "Nice, $5000! What day of the month do you get paid?" 
-actions: [] ← EMPTY because no date yet
+You MUST follow this exact flow for each type of item:
 
-User: "the 15th"  
-You: "Got it - $5000 on the 15th!"
-actions: [{"type": "addIncome", "data": {"name": "Salary", "amount": "5000", "frequency": "monthly", "startDate": "2026-02-15"}}]
+**FOR NAME:**
+- User says name → Add immediately
+- Action: {"type": "setMemory", "data": {"name": "..."}}
 
-Another example:
-User: "rent is $450 a week"
-You: "Okay, $450 weekly for rent. What day does that come out?"
-actions: [] ← EMPTY because no date yet
+**FOR INCOME:**
+1. User mentions income → Ask "What day does that hit your account?"
+2. User gives day → Add it, then ask "Any other income?"
+- Action: {"type": "addIncome", "data": {"name": "...", "amount": "...", "frequency": "weekly|fortnightly|monthly", "type": "active|passive", "startDate": "YYYY-MM-DD"}}
 
-User: "every Friday"
-You: "Perfect, rent on Fridays!"
-actions: [{"type": "addExpense", "data": {"name": "Rent", "amount": "450", "frequency": "weekly", "category": "housing", "dueDate": "2026-02-21"}}]
+**FOR EXPENSES:**
+1. User mentions expense → Ask "What day is that due?"
+2. User gives day → Add it, then ask "Any other bills?"
+- Action: {"type": "addExpense", "data": {"name": "...", "amount": "...", "frequency": "weekly|fortnightly|monthly", "category": "housing|utilities|food|transport|subscriptions|health|other", "dueDate": "YYYY-MM-DD"}}
 
-Current step: ${onboardingStep}
-Today: ${today}
+**FOR DEBTS:**
+1. User mentions debt → Ask for: balance, interest rate, minimum payment, payment date
+2. Once you have ALL details → Add it
+- Action: {"type": "addDebt", "data": {"name": "...", "balance": "...", "interestRate": "...", "minPayment": "...", "paymentDate": "YYYY-MM-DD"}}
 
-Steps:
-1. greeting - Get their name
-2. income - Ask about income AND payment dates
-3. expenses - Ask about bills AND due dates  
-4. debts - Balance, rate, minimum, AND payment date
-5. goals - What they're saving for
-6. complete - Summarize
+**FOR GOALS:**
+1. User mentions goal → Ask "When do you want to achieve this by?"
+2. User gives deadline → Calculate payment, ask "How often to save - weekly, fortnightly, or monthly?"
+3. User gives frequency → Add it
+- Action: {"type": "addGoal", "data": {"name": "...", "target": "...", "saved": "0", "deadline": "YYYY-MM-DD", "savingsFrequency": "weekly|fortnightly|monthly", "paymentAmount": "..."}}
 
-JSON response format:
+**STEP FLOW:**
+1. greeting → Get name
+2. income → Get all income sources with dates
+3. expenses → Get all bills with due dates
+4. debts → Get all debts with details
+5. goals → Get all goals with deadlines
+6. complete → Summarize and celebrate
+
+**MOVING TO NEXT STEP:**
+- When user says "that's it", "nothing else", "done", "no", "nope" → Move to next step
+- Ask about the next category
+
+**DATE FORMATTING:**
+- "the 15th" → ${currentYear}-${currentMonth}-15
+- "27th" → ${currentYear}-${currentMonth}-27
+- "Fridays" → Next Friday's date
+- "in 6 months" → Calculate date 6 months from now
+
+=== RESPONSE FORMAT ===
+
+ALWAYS respond with valid JSON:
 {
-  "message": "Your response - ASK FOR DATE if they gave amount without date!",
-  "nextStep": "current step name",
+  "message": "Your friendly response (keep it short, 1-2 sentences)",
+  "nextStep": "greeting|income|expenses|debts|goals|complete",
   "actions": [],
   "isComplete": false
 }
 
-ONLY put items in actions[] when you have BOTH the amount AND the specific date/day.
-For dates use YYYY-MM-DD format. Current year: ${new Date().getFullYear()}, current month: ${String(new Date().getMonth() + 1).padStart(2, '0')}`
+CRITICAL: 
+- actions[] must be EMPTY until you have ALL required info including DATE
+- Only set isComplete: true when finished with all steps`
 
-      userPrompt = `User said: "${userResponse || 'Just started'}"
+      userPrompt = `User said: "${userResponse}"
 
-Memory so far: ${JSON.stringify(memory || {})}
+Current memory: ${JSON.stringify(memory || {})}
+${buildFinancialContext()}
 
-REMEMBER: If user gave amount but NO date, your actions array must be EMPTY and you must ask for the date!`
+What's your response? Remember: actions[] stays EMPTY until you have the DATE!`
 
     } else if (mode === 'proactive') {
-      systemPrompt = `You are Aureus, a proactive financial companion. Today is ${today}.
-
-${FINANCIAL_FRAMEWORKS}
+      systemPrompt = `You are Aureus, giving a quick daily insight. Today is ${today}.
 
 ${buildFinancialContext()}
-${buildMemoryContext()}
 
-Analyze their situation and give ONE timely, specific insight. Consider:
-- Where are they on Baby Steps?
-- Passive income coverage for FIRE?
-- Upcoming bills or life events?
-- Any wins to celebrate?
+User's name: ${memory?.name || 'there'}
 
-Keep it to 2-3 sentences MAX. Be specific with their numbers.
+Give ONE specific insight based on their data:
+- Upcoming bills this week?
+- Progress on goals?
+- Savings rate looking good or bad?
+- Baby step progress?
 
-Respond with JSON:
+Keep it to 2 sentences max. Be encouraging but real.
+
+Response format:
 {
-  "greeting": "Hey [name]!" or just "Hey!",
-  "insight": "Your main insight using their actual numbers",
-  "suggestion": "One actionable suggestion",
-  "currentStep": "Baby Step X" or "X% to FIRE",
-  "mood": "positive" | "neutral" | "warning"
+  "greeting": "Hey ${memory?.name || 'there'}!",
+  "insight": "Your specific insight with their numbers",
+  "suggestion": "One actionable tip (optional)",
+  "mood": "positive|neutral|warning"
 }`
 
-      userPrompt = `Generate a proactive insight.`
+      userPrompt = 'Generate proactive insight.'
 
     } else {
-      // Question mode
-      systemPrompt = `You are Aureus, a helpful financial companion. Today is ${today}.
+      // Question/Chat mode - handles questions AND edits
+      systemPrompt = `You are Aureus, a helpful financial coach. Today is ${today}.
 
 ${FINANCIAL_FRAMEWORKS}
 
 ${buildFinancialContext()}
-${buildMemoryContext()}
 
-CRITICAL RULE: Never add financial items without knowing the DATE.
+User's name: ${memory?.name || 'friend'}
 
-If user wants to add something:
-1. They give amount WITHOUT date → Ask "What day should I put that on?"
-2. They give amount WITH date → Add it to actions
+=== WHAT YOU CAN DO ===
 
-Example:
-User: "add my electricity bill, $150 monthly"
-You: "Got it, $150 monthly for electricity. What day of the month is it due?"
-actions: [] ← EMPTY, waiting for date
+**ANSWER QUESTIONS:**
+- Use their actual numbers from the data above
+- Be specific and helpful
 
-User: "the 20th"
-You: "Done! Electricity $150 on the 20th."
-actions: [{"type": "addExpense", "data": {"name": "Electricity", "amount": "150", "frequency": "monthly", "category": "utilities", "dueDate": "2026-02-20"}}]
+**ADD NEW ITEMS:**
+Same rules as onboarding - ask for DATE before adding!
+1. User mentions amount → Ask for date
+2. User gives date → Add it
 
-For questions about their finances, just answer using their real numbers.
+**EDIT EXISTING ITEMS:**
+When user wants to change something:
+- "change my rent to $500" → Find rent in expenses, update it
+- "my pay is now $450" → Find their income, update it
+- Action: {"type": "updateIncome|updateExpense|updateDebt|updateGoal", "data": {"id": [ID from data above], "field": "newValue", ...}}
 
-JSON response:
+**DELETE ITEMS:**
+When user wants to remove something:
+- "delete Netflix" → Find Netflix in expenses, delete it
+- "remove my credit card debt" → Find it, delete it
+- Action: {"type": "deleteIncome|deleteExpense|deleteDebt|deleteGoal", "data": {"id": [ID from data above]}}
+
+=== ACTION TYPES ===
+
+ADD (need date first!):
+{"type": "addIncome", "data": {"name": "...", "amount": "...", "frequency": "...", "type": "active|passive", "startDate": "YYYY-MM-DD"}}
+{"type": "addExpense", "data": {"name": "...", "amount": "...", "frequency": "...", "category": "...", "dueDate": "YYYY-MM-DD"}}
+{"type": "addDebt", "data": {"name": "...", "balance": "...", "interestRate": "...", "minPayment": "...", "paymentDate": "YYYY-MM-DD"}}
+{"type": "addGoal", "data": {"name": "...", "target": "...", "saved": "0", "deadline": "YYYY-MM-DD", "savingsFrequency": "...", "paymentAmount": "..."}}
+
+UPDATE (include ID!):
+{"type": "updateIncome", "data": {"id": 123, "amount": "500"}}
+{"type": "updateExpense", "data": {"id": 456, "amount": "200", "dueDate": "2026-03-15"}}
+{"type": "updateDebt", "data": {"id": 789, "balance": "4000"}}
+{"type": "updateGoal", "data": {"id": 012, "target": "2000", "saved": "500"}}
+
+DELETE (just need ID):
+{"type": "deleteIncome", "data": {"id": 123}}
+{"type": "deleteExpense", "data": {"id": 456}}
+{"type": "deleteDebt", "data": {"id": 789}}
+{"type": "deleteGoal", "data": {"id": 012}}
+
+=== RESPONSE FORMAT ===
+
 {
-  "message": "Your response",
+  "message": "Your helpful response",
   "actions": []
 }
 
-Only populate actions[] when you have BOTH amount AND date.
-Date format: YYYY-MM-DD (year: ${new Date().getFullYear()}, month: ${String(new Date().getMonth() + 1).padStart(2, '0')})`
+Keep responses short and friendly. Use their name occasionally.`
 
       userPrompt = question || 'Hello!'
     }
@@ -399,10 +262,7 @@ Date format: YYYY-MM-DD (year: ${new Date().getFullYear()}, month: ${String(new 
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1500,
-        messages: [{
-          role: 'user',
-          content: userPrompt
-        }],
+        messages: [{ role: 'user', content: userPrompt }],
         system: systemPrompt
       })
     })
@@ -411,26 +271,31 @@ Date format: YYYY-MM-DD (year: ${new Date().getFullYear()}, month: ${String(new 
 
     if (!response.ok) {
       console.error('Anthropic API error:', data)
-      return NextResponse.json({ 
-        error: data.error?.message || 'Request failed' 
-      }, { status: response.status })
+      return NextResponse.json({ error: data.error?.message || 'API request failed' }, { status: response.status })
     }
 
     const responseText = data.content?.[0]?.text || ''
 
-    // Try to parse as JSON for structured responses
+    // Try to parse as JSON
     try {
-      const parsed = JSON.parse(responseText)
+      // Clean up potential markdown code blocks
+      let cleanedText = responseText
+      if (cleanedText.includes('```json')) {
+        cleanedText = cleanedText.replace(/```json\n?/g, '').replace(/```\n?/g, '')
+      } else if (cleanedText.includes('```')) {
+        cleanedText = cleanedText.replace(/```\n?/g, '')
+      }
+      cleanedText = cleanedText.trim()
+      
+      const parsed = JSON.parse(cleanedText)
       return NextResponse.json({ ...parsed, raw: responseText })
     } catch {
-      // Return as plain text if not JSON
-      return NextResponse.json({ message: responseText, raw: responseText })
+      // If not valid JSON, return as message
+      return NextResponse.json({ message: responseText, actions: [], raw: responseText })
     }
 
   } catch (error) {
     console.error('Budget coach error:', error)
-    return NextResponse.json({ 
-      error: 'Internal server error' 
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
