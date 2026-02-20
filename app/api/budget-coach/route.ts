@@ -53,18 +53,19 @@ export async function POST(request: NextRequest) {
       
       let context = '=== CURRENT FINANCIAL DATA ===\n'
       
-      // Calculate totals for the AI
+      // Calculate totals for the AI - use simple intuitive conversions
       let totalIncomeFortnightly = 0
       let totalExpensesFortnightly = 0
       let totalDebtPaymentsFortnightly = 0
       let totalGoalSavingsFortnightly = 0
       
+      // Simple conversions that match how people actually think about money
       const convertToFortnightly = (amount: number, frequency: string) => {
-        if (frequency === 'weekly') return amount * 2
-        if (frequency === 'fortnightly') return amount
-        if (frequency === 'monthly') return amount / 2.17
-        if (frequency === 'quarterly') return amount / 6.5
-        if (frequency === 'yearly') return amount / 26
+        if (frequency === 'weekly') return amount * 2          // 2 weeks
+        if (frequency === 'fortnightly') return amount         // already fortnightly
+        if (frequency === 'monthly') return amount / 2         // half a month
+        if (frequency === 'quarterly') return amount / 6       // ~6 fortnights in a quarter
+        if (frequency === 'yearly') return amount / 26         // 26 fortnights in a year
         return amount
       }
       
