@@ -93,62 +93,82 @@ export async function POST(request: NextRequest) {
 TODAY: ${today}
 CURRENT STEP: ${onboardingStep}
 
-=== YOUR JOB ===
-
-Collect financial info through conversation. Read the history to see what's already been said AND added.
+=== ALREADY ADDED TO SYSTEM ===
+${buildFinancialContext()}
 
 === RECENT CONVERSATION ===
 ${conversationHistory || 'No previous messages'}
 
-=== ALREADY ADDED TO SYSTEM ===
-${buildFinancialContext()}
+=== GOLDEN RULE ===
 
-=== CRITICAL RULES ===
+DO NOT ADD ANYTHING until you have ALL required information:
+- For income: name, amount, DATE, and frequency
+- For expenses: name, amount, DATE, and frequency
+- For debts: name, balance, interest rate, min payment, DATE
+- For goals: name, target, DEADLINE, frequency
 
-1. **DON'T DUPLICATE**: If an item is already in "ALREADY ADDED TO SYSTEM" above, DO NOT add it again!
-2. **"no thats it" / "done" / "no more"** = Just move to next step, actions: []
-3. Only add NEW items that aren't already in the system
-4. Respond with raw JSON only - no markdown code blocks
+If you're missing the DATE → ASK FOR IT, actions: []
+If item already exists in "ALREADY ADDED" → DON'T add again, actions: []
+If user says "no"/"done"/"thats it" → Move to next step, actions: []
 
-=== WHEN TO ADD vs NOT ADD ===
+=== STEP: ${onboardingStep} ===
 
-User says "no thats it" after adding income?
-→ actions: [], nextStep: "expenses" (move on, don't re-add!)
+${onboardingStep === 'greeting' ? `Get their name. Action: {"type": "setMemory", "data": {"name": "..."}}` : ''}
 
-User mentions NEW income not in the system?
-→ Collect amount, date, frequency, then add it
+${onboardingStep === 'income' ? `
+Collect: source name, amount, PAYMENT DATE (what day of month), frequency (weekly/fortnightly/monthly)
 
-=== FOR INCOME ===
-Need: name, amount, date, frequency
-Action: {"type": "addIncome", "data": {"name": "...", "amount": "...", "frequency": "fortnightly", "type": "active", "startDate": "${currentYear}-${currentMonth}-DD"}}
+Example flow:
+User: "411 from centrelink" 
+You: "Got it, $411 Centrelink! What day does that hit your account?" 
+actions: [] (WAITING FOR DATE!)
 
-=== FOR EXPENSES ===
-Need: name, amount, date, frequency
-Action: {"type": "addExpense", "data": {"name": "...", "amount": "...", "frequency": "...", "category": "housing|utilities|food|transport|subscriptions|other", "dueDate": "..."}}
+User: "the 27th"
+You: "And is that weekly, fortnightly, or monthly?"
+actions: [] (WAITING FOR FREQUENCY!)
 
-=== FOR DEBTS ===
-Need: name, balance, interest rate, minimum payment, payment date
-Action: {"type": "addDebt", "data": {"name": "...", "balance": "...", "interestRate": "...", "minPayment": "...", "paymentDate": "..."}}
+User: "fortnightly"
+You: "Perfect! Added your Centrelink - $411 fortnightly on the 27th. Any other income?"
+actions: [{"type": "addIncome", "data": {"name": "Centrelink", "amount": "411", "frequency": "fortnightly", "type": "active", "startDate": "${currentYear}-${currentMonth}-27"}}]
+` : ''}
 
-=== FOR GOALS ===
-Need: name, target amount, deadline, savings frequency
-Then calculate: paymentAmount = target / periods until deadline
-Action: {"type": "addGoal", "data": {"name": "...", "target": "...", "saved": "0", "deadline": "...", "savingsFrequency": "...", "paymentAmount": "..."}}
+${onboardingStep === 'expenses' ? `
+Collect: expense name, amount, DUE DATE, frequency
+
+Example: "rent $200 weekly on Fridays" → Ask which day, then add
+` : ''}
+
+${onboardingStep === 'debts' ? `
+Collect: debt name, total balance, APR interest rate, minimum payment amount, payment date
+` : ''}
+
+${onboardingStep === 'goals' ? `
+Collect: goal name, target amount, deadline date, how often to save (weekly/fortnightly/monthly)
+Then calculate paymentAmount = remaining / periods until deadline
+` : ''}
+
+=== DATE FORMATS ===
+"27th" or "the 27th" → "${currentYear}-${currentMonth}-27"
+"1st of march" → "${currentYear}-03-01"
+"15th" → "${currentYear}-${currentMonth}-15"
 
 === STEP PROGRESSION ===
 greeting → income → expenses → debts → goals → complete
+"no"/"done"/"thats it"/"nothing else" = move to next step with actions: []
 
-=== RESPONSE FORMAT ===
-{"message": "Short friendly response", "nextStep": "...", "actions": [], "isComplete": false}`
+=== RESPONSE FORMAT (raw JSON only, no markdown) ===
+{"message": "Your response", "nextStep": "${onboardingStep}", "actions": [], "isComplete": false}`
 
-      userPrompt = `Current step: ${onboardingStep}
-User just said: "${userResponse}"
+      userPrompt = `Step: ${onboardingStep}
+User said: "${userResponse}"
 
-CHECK: Is the user saying they're done with this step? ("no", "thats it", "done", "nothing else")
-- If YES: actions: [] and move to next step
-- If NO: Check if they're providing NEW info to add
+CHECKLIST:
+1. Is user saying they're done? → actions: [], next step
+2. Is item already in system? → Don't re-add
+3. Do we have ALL info (including DATE)? → Only then add
+4. Missing info? → Ask for it, actions: []
 
-DO NOT re-add items already shown in "ALREADY ADDED TO SYSTEM"!`
+Respond with JSON only.`
 
     } else if (mode === 'proactive') {
       systemPrompt = `You are Aureus, giving a quick daily insight. Today is ${today}.
