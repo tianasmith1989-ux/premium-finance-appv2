@@ -1142,7 +1142,22 @@ export default function Dashboard() {
   const addTrade = () => {
     if (!newTrade.instrument) return
     setTrades([...trades, { ...newTrade, id: Date.now() }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()))
-    setNewTrade({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '' })
+    setNewTrade({ 
+      date: new Date().toISOString().split('T')[0], 
+      instrument: '', 
+      direction: 'long', 
+      entryPrice: '', 
+      exitPrice: '', 
+      profitLoss: '', 
+      riskAmount: '',
+      accountId: 0,
+      setupGrade: 'A',
+      emotionBefore: 'neutral',
+      emotionAfter: 'neutral',
+      followedPlan: true,
+      notes: '',
+      screenshot: ''
+    })
   }
   const deleteTrade = (id: number) => setTrades(trades.filter(t => t.id !== id))
 
