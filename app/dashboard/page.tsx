@@ -330,8 +330,207 @@ export default function Dashboard() {
   
   // ==================== TRADING STATE ====================
   const [trades, setTrades] = useState<any[]>([])
-  const [newTrade, setNewTrade] = useState({ date: new Date().toISOString().split('T')[0], instrument: '', direction: 'long', entryPrice: '', exitPrice: '', profitLoss: '', notes: '' })
+  const [newTrade, setNewTrade] = useState({ 
+    date: new Date().toISOString().split('T')[0], 
+    instrument: '', 
+    direction: 'long', 
+    entryPrice: '', 
+    exitPrice: '', 
+    profitLoss: '', 
+    riskAmount: '',
+    accountId: 0,
+    setupGrade: 'A', // A, B, C setup quality
+    emotionBefore: 'neutral', // confident, neutral, anxious, fomo, revenge
+    emotionAfter: 'neutral',
+    followedPlan: true,
+    notes: '',
+    screenshot: ''
+  })
   const [tradingCalendarMonth, setTradingCalendarMonth] = useState(new Date())
+  
+  // ==================== PROP FIRM PROFILES ====================
+  const propFirmProfiles: {[key: string]: any} = {
+    'FTMO': {
+      name: 'FTMO',
+      phases: {
+        challenge: { profitTarget: 10, maxDrawdown: 10, dailyDrawdown: 5, minDays: 4, maxDays: 30 },
+        verification: { profitTarget: 5, maxDrawdown: 10, dailyDrawdown: 5, minDays: 4, maxDays: 60 },
+        funded: { maxDrawdown: 10, dailyDrawdown: 5, profitSplit: 80 }
+      },
+      rules: [
+        'No trading during high-impact news (2 min before/after)',
+        'No holding trades over weekend',
+        'Must trade minimum 4 days',
+        'Stop loss required on all trades'
+      ],
+      accountSizes: [10000, 25000, 50000, 100000, 200000]
+    },
+    'MyFundedFX': {
+      name: 'MyFundedFX',
+      phases: {
+        evaluation: { profitTarget: 8, maxDrawdown: 8, dailyDrawdown: 5, minDays: 5, maxDays: null },
+        funded: { maxDrawdown: 8, dailyDrawdown: 5, profitSplit: 80 }
+      },
+      rules: [
+        'No news trading restrictions',
+        'Can hold over weekend',
+        'Must trade minimum 5 days',
+        'Scaling plan available'
+      ],
+      accountSizes: [5000, 10000, 25000, 50000, 100000, 200000]
+    },
+    'The5ers': {
+      name: 'The5ers',
+      phases: {
+        evaluation: { profitTarget: 6, maxDrawdown: 4, dailyDrawdown: null, minDays: null, maxDays: null },
+        funded: { maxDrawdown: 4, profitSplit: 50 }
+      },
+      rules: [
+        'Low drawdown requirement (4%)',
+        'No time limit',
+        'Can scale up to $4M',
+        'Lower profit split (50-100%)'
+      ],
+      accountSizes: [6000, 20000, 60000, 100000]
+    },
+    'Funded Next': {
+      name: 'Funded Next',
+      phases: {
+        challenge: { profitTarget: 10, maxDrawdown: 10, dailyDrawdown: 5, minDays: null, maxDays: null },
+        verification: { profitTarget: 5, maxDrawdown: 10, dailyDrawdown: 5, minDays: null, maxDays: null },
+        funded: { maxDrawdown: 10, dailyDrawdown: 5, profitSplit: 90 }
+      },
+      rules: [
+        '90% profit split',
+        'No time limits',
+        'News trading allowed',
+        '15% consistency rule'
+      ],
+      accountSizes: [6000, 15000, 25000, 50000, 100000, 200000]
+    },
+    'Personal': {
+      name: 'Personal Account',
+      phases: {
+        active: { profitTarget: null, maxDrawdown: null, dailyDrawdown: null, minDays: null, maxDays: null }
+      },
+      rules: [
+        'Your money, your rules!',
+        'Focus on consistent compounding',
+        'Risk 1-2% per trade recommended',
+        'Withdraw or compound profits monthly'
+      ],
+      accountSizes: []
+    }
+  }
+  
+  // ==================== TRADING ACCOUNTS ====================
+  const [tradingAccounts, setTradingAccounts] = useState<any[]>([
+    // Example structure - user will add their own
+  ])
+  const [newAccount, setNewAccount] = useState({
+    name: '',
+    type: 'personal', // personal, prop_challenge, prop_funded
+    propFirm: '',
+    phase: '',
+    startingBalance: '',
+    currentBalance: '',
+    maxDrawdown: '',
+    dailyDrawdown: '',
+    profitTarget: '',
+    riskPerTrade: '1',
+    isActive: true
+  })
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
+  const [showAddAccount, setShowAddAccount] = useState(false)
+  
+  // ==================== TRADING RULES ====================
+  const [tradingRules, setTradingRules] = useState<any[]>([
+    { id: 1, rule: 'Max 3 trades per day', enabled: true, category: 'risk' },
+    { id: 2, rule: 'No trading after a loss', enabled: false, category: 'psychology' },
+    { id: 3, rule: 'No trading in first 15 mins', enabled: true, category: 'timing' },
+    { id: 4, rule: 'Stop loss on every trade', enabled: true, category: 'risk' },
+    { id: 5, rule: 'No trading during news', enabled: true, category: 'timing' },
+    { id: 6, rule: 'Max 1% risk per trade', enabled: true, category: 'risk' },
+    { id: 7, rule: 'No revenge trading', enabled: true, category: 'psychology' },
+    { id: 8, rule: 'Journal every trade', enabled: true, category: 'discipline' }
+  ])
+  const [showRuleEditor, setShowRuleEditor] = useState(false)
+  
+  // ==================== PSYCHOLOGY TRACKING ====================
+  const [dailyMood, setDailyMood] = useState<{[date: string]: { mood: string, notes: string, tiltRisk: number }}>({})
+  const [todaysMood, setTodaysMood] = useState({ mood: 'neutral', notes: '', tiltRisk: 0 })
+  
+  // Tilt detection based on trading patterns
+  const detectTilt = () => {
+    const today = new Date().toISOString().split('T')[0]
+    const todaysTrades = trades.filter(t => t.date === today)
+    const recentLosses = todaysTrades.filter(t => parseFloat(t.profitLoss || '0') < 0)
+    
+    let tiltScore = 0
+    let warnings: string[] = []
+    
+    // Check for revenge trading (multiple trades after a loss)
+    if (recentLosses.length >= 2) {
+      tiltScore += 30
+      warnings.push('Multiple losses today - consider stepping away')
+    }
+    
+    // Check for overtrading
+    if (todaysTrades.length > 5) {
+      tiltScore += 25
+      warnings.push('High trade count - are you overtrading?')
+    }
+    
+    // Check for increasing position sizes after losses
+    const positionSizes = todaysTrades.map(t => Math.abs(parseFloat(t.riskAmount || t.profitLoss || '0')))
+    if (positionSizes.length >= 2) {
+      const increasing = positionSizes.slice(1).every((size, i) => size > positionSizes[i])
+      if (increasing && recentLosses.length > 0) {
+        tiltScore += 35
+        warnings.push('⚠️ Position sizes increasing after losses - TILT WARNING')
+      }
+    }
+    
+    // Check for broken rules
+    const brokenRules = tradingRules.filter(r => r.enabled && !checkRuleCompliance(r, todaysTrades))
+    if (brokenRules.length > 0) {
+      tiltScore += brokenRules.length * 10
+      warnings.push(`${brokenRules.length} trading rules broken today`)
+    }
+    
+    return { tiltScore: Math.min(tiltScore, 100), warnings, todaysTrades: todaysTrades.length, todaysLosses: recentLosses.length }
+  }
+  
+  const checkRuleCompliance = (rule: any, todaysTrades: any[]) => {
+    if (rule.rule.includes('Max') && rule.rule.includes('trades')) {
+      const maxTrades = parseInt(rule.rule.match(/\d+/)?.[0] || '3')
+      return todaysTrades.length <= maxTrades
+    }
+    if (rule.rule.includes('Stop loss')) {
+      return todaysTrades.every(t => t.notes?.toLowerCase().includes('sl') || t.riskAmount)
+    }
+    return true // Can't verify other rules automatically
+  }
+  
+  // ==================== COMPOUNDING CALCULATOR ====================
+  const calculateCompounding = (starting: number, monthlyAdd: number, dailyReturn: number, tradingDays: number, months: number) => {
+    let balance = starting
+    const history: {month: number, balance: number}[] = [{ month: 0, balance: starting }]
+    
+    for (let m = 1; m <= months; m++) {
+      // Add monthly contribution at start of month
+      balance += monthlyAdd
+      
+      // Apply daily returns for trading days
+      for (let d = 0; d < tradingDays; d++) {
+        balance *= (1 + dailyReturn / 100)
+      }
+      
+      history.push({ month: m, balance: Math.round(balance) })
+    }
+    
+    return { finalBalance: Math.round(balance), history, totalGain: Math.round(balance - starting - (monthlyAdd * months)) }
+  }
   
   // Forex Prop Calculator
   const [forexPropPhase, setForexPropPhase] = useState<'phase1' | 'phase2' | 'funded'>('phase1')
@@ -391,11 +590,36 @@ export default function Dashboard() {
   const [tradingMemory, setTradingMemory] = useState<any>({
     name: '',
     onboardingComplete: false,
+    tradingStyle: '', // scalper, day_trader, swing_trader
+    experience: '', // beginner, intermediate, advanced
+    instruments: [], // forex, futures, stocks, crypto
     tradingRules: [],
     patterns: [],
-    psychology: { strengths: [], weaknesses: [], triggers: [] },
-    preferences: { tradingStyle: '', favoriteInstruments: [], riskPerTrade: 1 },
-    propFirmGoals: { targetFirm: '', accountSizeGoal: 0 }
+    psychology: { 
+      strengths: [], 
+      weaknesses: [], 
+      triggers: [],
+      biggestMistake: '',
+      whatWorksForYou: ''
+    },
+    preferences: { 
+      tradingStyle: '', 
+      favoriteInstruments: [], 
+      riskPerTrade: 1,
+      maxTradesPerDay: 3,
+      tradingHours: { start: '09:00', end: '16:00' }
+    },
+    propFirmGoals: { 
+      targetFirm: '', 
+      accountSizeGoal: 0,
+      currentPhase: '',
+      fundedBy: '' // target date
+    },
+    personalAccountGoals: {
+      targetBalance: 0,
+      monthlyTarget: 0,
+      compoundingStrategy: '' // full_compound, withdraw_50, withdraw_profits
+    }
   })
   
   const [budgetOnboarding, setBudgetOnboarding] = useState({ isActive: false, step: 'greeting' })
@@ -2993,16 +3217,305 @@ export default function Dashboard() {
         {/* TRADING TAB */}
         {appMode === 'trading' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Total P&L</div><div style={{ color: totalPL >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>${totalPL.toFixed(2)}</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Win Rate</div><div style={{ color: winRate >= 50 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>{winRate.toFixed(1)}%</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Avg Win</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>${avgWin.toFixed(0)}</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Avg Loss</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 700 }}>${avgLoss.toFixed(0)}</div></div>
+            
+            {/* TILT DETECTOR & DAILY STATUS */}
+            {(() => {
+              const tilt = detectTilt()
+              return (
+                <div style={{ 
+                  padding: '20px', 
+                  background: tilt.tiltScore > 50 ? 'linear-gradient(135deg, #ef444430, #f59e0b30)' : 'linear-gradient(135deg, #10b98130, #3b82f630)', 
+                  borderRadius: '16px', 
+                  border: '2px solid ' + (tilt.tiltScore > 50 ? theme.danger : theme.success) 
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ fontSize: '32px' }}>{tilt.tiltScore > 70 ? '🚨' : tilt.tiltScore > 40 ? '⚠️' : '✅'}</div>
+                      <div>
+                        <div style={{ color: theme.text, fontWeight: 700, fontSize: '18px' }}>
+                          {tilt.tiltScore > 70 ? 'HIGH TILT RISK - STEP AWAY!' : tilt.tiltScore > 40 ? 'Caution - Monitor Yourself' : 'Clear to Trade'}
+                        </div>
+                        <div style={{ color: theme.textMuted, fontSize: '13px' }}>
+                          {tilt.todaysTrades} trades today • {tilt.todaysLosses} losses
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' as const }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px' }}>TILT SCORE</div>
+                      <div style={{ 
+                        color: tilt.tiltScore > 70 ? theme.danger : tilt.tiltScore > 40 ? theme.warning : theme.success, 
+                        fontSize: '28px', 
+                        fontWeight: 700 
+                      }}>{tilt.tiltScore}%</div>
+                    </div>
+                  </div>
+                  
+                  {tilt.warnings.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
+                      {tilt.warnings.map((warning, i) => (
+                        <div key={i} style={{ padding: '8px 12px', background: theme.warning + '20', borderRadius: '6px', color: theme.warning, fontSize: '13px' }}>
+                          {warning}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+            
+            {/* MAIN STATS */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Total P&L</div>
+                <div style={{ color: totalPL >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>${totalPL.toFixed(0)}</div>
+              </div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Win Rate</div>
+                <div style={{ color: winRate >= 50 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>{winRate.toFixed(1)}%</div>
+              </div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Avg Win</div>
+                <div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>${avgWin.toFixed(0)}</div>
+              </div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Avg Loss</div>
+                <div style={{ color: theme.danger, fontSize: '28px', fontWeight: 700 }}>${avgLoss.toFixed(0)}</div>
+              </div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Profit Factor</div>
+                <div style={{ color: avgLoss > 0 ? (avgWin / avgLoss >= 1 ? theme.success : theme.danger) : theme.textMuted, fontSize: '28px', fontWeight: 700 }}>
+                  {avgLoss > 0 ? (avgWin / avgLoss).toFixed(2) : '-'}
+                </div>
+              </div>
             </div>
 
-            {/* Forex Prop Calculator */}
+            {/* TRADING ACCOUNTS */}
             <div style={cardStyle}>
-              <h2 style={{ margin: '0 0 16px 0', color: theme.accent, fontSize: '20px' }}>💱 Forex/CFD Prop Calculator</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>💼 Trading Accounts</h2>
+                <button onClick={() => setShowAddAccount(!showAddAccount)} style={{ padding: '8px 16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                  + Add Account
+                </button>
+              </div>
+              
+              {/* Add Account Form */}
+              {showAddAccount && (
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', marginBottom: '20px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '12px' }}>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Account Name</label>
+                      <input value={newAccount.name} onChange={e => setNewAccount({...newAccount, name: e.target.value})} placeholder="My FTMO 100k" style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Type</label>
+                      <select value={newAccount.type} onChange={e => setNewAccount({...newAccount, type: e.target.value})} style={{...inputStyle, width: '100%'}}>
+                        <option value="personal">Personal</option>
+                        <option value="prop_challenge">Prop Challenge</option>
+                        <option value="prop_funded">Prop Funded</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Prop Firm</label>
+                      <select value={newAccount.propFirm} onChange={e => {
+                        const firm = propFirmProfiles[e.target.value]
+                        setNewAccount({
+                          ...newAccount, 
+                          propFirm: e.target.value,
+                          maxDrawdown: firm?.phases?.challenge?.maxDrawdown?.toString() || '',
+                          dailyDrawdown: firm?.phases?.challenge?.dailyDrawdown?.toString() || '',
+                          profitTarget: firm?.phases?.challenge?.profitTarget?.toString() || ''
+                        })
+                      }} style={{...inputStyle, width: '100%'}}>
+                        <option value="">Select...</option>
+                        {Object.keys(propFirmProfiles).map(firm => (
+                          <option key={firm} value={firm}>{firm}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Starting Balance</label>
+                      <input type="number" value={newAccount.startingBalance} onChange={e => setNewAccount({...newAccount, startingBalance: e.target.value, currentBalance: e.target.value})} placeholder="100000" style={{...inputStyle, width: '100%'}} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '12px' }}>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Max Drawdown %</label>
+                      <input type="number" value={newAccount.maxDrawdown} onChange={e => setNewAccount({...newAccount, maxDrawdown: e.target.value})} placeholder="10" style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Daily Drawdown %</label>
+                      <input type="number" value={newAccount.dailyDrawdown} onChange={e => setNewAccount({...newAccount, dailyDrawdown: e.target.value})} placeholder="5" style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Profit Target %</label>
+                      <input type="number" value={newAccount.profitTarget} onChange={e => setNewAccount({...newAccount, profitTarget: e.target.value})} placeholder="10" style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Risk Per Trade %</label>
+                      <input type="number" value={newAccount.riskPerTrade} onChange={e => setNewAccount({...newAccount, riskPerTrade: e.target.value})} placeholder="1" style={{...inputStyle, width: '100%'}} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => {
+                      if (newAccount.name && newAccount.startingBalance) {
+                        setTradingAccounts([...tradingAccounts, { ...newAccount, id: Date.now(), currentBalance: newAccount.startingBalance }])
+                        setNewAccount({ name: '', type: 'personal', propFirm: '', phase: '', startingBalance: '', currentBalance: '', maxDrawdown: '', dailyDrawdown: '', profitTarget: '', riskPerTrade: '1', isActive: true })
+                        setShowAddAccount(false)
+                      }
+                    }} style={btnSuccess}>Add Account</button>
+                    <button onClick={() => setShowAddAccount(false)} style={{ ...btnPrimary, background: theme.textMuted }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Account Cards */}
+              {tradingAccounts.length === 0 ? (
+                <div style={{ textAlign: 'center' as const, padding: '40px', color: theme.textMuted }}>
+                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>💼</div>
+                  <p>No accounts yet. Add your first trading account to get started!</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                  {tradingAccounts.map(account => {
+                    const startBal = parseFloat(account.startingBalance || '0')
+                    const currBal = parseFloat(account.currentBalance || '0')
+                    const pnl = currBal - startBal
+                    const pnlPercent = startBal > 0 ? (pnl / startBal) * 100 : 0
+                    const maxDD = parseFloat(account.maxDrawdown || '0')
+                    const dailyDD = parseFloat(account.dailyDrawdown || '0')
+                    const profitTarget = parseFloat(account.profitTarget || '0')
+                    const progressToTarget = profitTarget > 0 ? Math.min((pnlPercent / profitTarget) * 100, 100) : 0
+                    const drawdownUsed = pnl < 0 ? Math.abs(pnlPercent) : 0
+                    const drawdownRemaining = maxDD - drawdownUsed
+                    
+                    return (
+                      <div key={account.id} style={{ 
+                        padding: '20px', 
+                        background: darkMode ? '#1e293b' : '#f8fafc', 
+                        borderRadius: '12px',
+                        border: '2px solid ' + (account.type === 'personal' ? theme.purple : account.type === 'prop_funded' ? theme.success : theme.warning)
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                              <span style={{ fontSize: '20px' }}>{account.type === 'personal' ? '👤' : account.type === 'prop_funded' ? '🏆' : '🎯'}</span>
+                              <span style={{ fontWeight: 600, color: theme.text }}>{account.name}</span>
+                            </div>
+                            <div style={{ fontSize: '12px', color: theme.textMuted }}>
+                              {account.propFirm || 'Personal Account'} {account.type === 'prop_challenge' ? '• Challenge' : account.type === 'prop_funded' ? '• Funded' : ''}
+                            </div>
+                          </div>
+                          <div style={{ 
+                            padding: '4px 10px', 
+                            background: pnl >= 0 ? theme.success + '20' : theme.danger + '20', 
+                            color: pnl >= 0 ? theme.success : theme.danger,
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            fontWeight: 600
+                          }}>
+                            {pnl >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%
+                          </div>
+                        </div>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                          <div>
+                            <div style={{ color: theme.textMuted, fontSize: '11px' }}>Balance</div>
+                            <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>${currBal.toLocaleString()}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: theme.textMuted, fontSize: '11px' }}>P&L</div>
+                            <div style={{ color: pnl >= 0 ? theme.success : theme.danger, fontSize: '20px', fontWeight: 700 }}>${pnl.toFixed(0)}</div>
+                          </div>
+                        </div>
+                        
+                        {account.type !== 'personal' && (
+                          <>
+                            {/* Progress to Target */}
+                            {profitTarget > 0 && (
+                              <div style={{ marginBottom: '12px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
+                                  <span style={{ color: theme.textMuted }}>Target: {profitTarget}%</span>
+                                  <span style={{ color: theme.success }}>{progressToTarget.toFixed(1)}%</span>
+                                </div>
+                                <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
+                                  <div style={{ width: progressToTarget + '%', height: '100%', background: theme.success }} />
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Drawdown Warning */}
+                            <div style={{ 
+                              padding: '8px 12px', 
+                              background: drawdownRemaining < maxDD * 0.3 ? theme.danger + '20' : theme.warning + '20', 
+                              borderRadius: '6px',
+                              display: 'flex',
+                              justifyContent: 'space-between'
+                            }}>
+                              <span style={{ color: theme.textMuted, fontSize: '12px' }}>Drawdown Remaining</span>
+                              <span style={{ color: drawdownRemaining < maxDD * 0.3 ? theme.danger : theme.warning, fontWeight: 600, fontSize: '12px' }}>
+                                {drawdownRemaining.toFixed(2)}% (${(startBal * drawdownRemaining / 100).toFixed(0)})
+                              </span>
+                            </div>
+                          </>
+                        )}
+                        
+                        {account.type === 'personal' && (
+                          <div style={{ 
+                            padding: '8px 12px', 
+                            background: theme.purple + '20', 
+                            borderRadius: '6px',
+                            textAlign: 'center' as const
+                          }}>
+                            <span style={{ color: theme.purple, fontSize: '12px' }}>💡 Compound your profits for faster growth!</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* TRADING RULES COMPLIANCE */}
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📋 My Trading Rules</h2>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ color: theme.success, fontSize: '14px', fontWeight: 600 }}>
+                    {tradingRules.filter(r => r.enabled).length} active rules
+                  </span>
+                </div>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                {tradingRules.map(rule => (
+                  <div key={rule.id} style={{ 
+                    padding: '12px 16px', 
+                    background: darkMode ? '#1e293b' : '#f8fafc', 
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    opacity: rule.enabled ? 1 : 0.5
+                  }}>
+                    <input 
+                      type="checkbox" 
+                      checked={rule.enabled} 
+                      onChange={() => setTradingRules(tradingRules.map(r => r.id === rule.id ? {...r, enabled: !r.enabled} : r))}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: theme.text, fontSize: '14px' }}>{rule.rule}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>{rule.category}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* PROP FIRM CALCULATOR */}
+            <div style={cardStyle}>
+              <h2 style={{ margin: '0 0 16px 0', color: theme.accent, fontSize: '20px' }}>💱 Prop Firm Calculator</h2>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
                 {[{ id: 'phase1', label: 'Phase 1', color: theme.warning }, { id: 'phase2', label: 'Phase 2', color: theme.purple }, { id: 'funded', label: 'Funded', color: theme.success }].map(p => (
                   <button key={p.id} onClick={() => setForexPropPhase(p.id as any)} style={{ padding: '8px 16px', background: forexPropPhase === p.id ? p.color : 'transparent', color: forexPropPhase === p.id ? 'white' : theme.text, border: '1px solid ' + p.color, borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>{p.label}</button>
@@ -3021,45 +3534,53 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Futures Prop Calculator */}
-            <div style={cardStyle}>
-              <h2 style={{ margin: '0 0 16px 0', color: theme.warning, fontSize: '20px' }}>📊 Futures Prop Calculator</h2>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                {[{ id: 'evaluation', label: 'Evaluation', color: theme.warning }, { id: 'funded', label: 'Funded', color: theme.success }].map(p => (
-                  <button key={p.id} onClick={() => setFuturesPropPhase(p.id as any)} style={{ padding: '8px 16px', background: futuresPropPhase === p.id ? p.color : 'transparent', color: futuresPropPhase === p.id ? 'white' : theme.text, border: '1px solid ' + p.color, borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>{p.label}</button>
-                ))}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Account Size</label><input type="number" value={futuresProp.accountSize} onChange={e => setFuturesProp({...futuresProp, accountSize: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Profit Target $</label><input type="number" value={futuresProp.profitTarget} onChange={e => setFuturesProp({...futuresProp, profitTarget: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Max Drawdown $</label><input type="number" value={futuresProp.maxDrawdown} onChange={e => setFuturesProp({...futuresProp, maxDrawdown: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Current Balance</label><input type="number" value={futuresProp.currentBalance} onChange={e => setFuturesProp({...futuresProp, currentBalance: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                <div style={{ padding: '16px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Progress</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 700 }}>{futuresPropResults.progressPercent.toFixed(1)}%</div></div>
-                <div style={{ padding: '16px', background: darkMode ? '#2e2a1e' : '#fefce8', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Remaining</div><div style={{ color: theme.warning, fontSize: '24px', fontWeight: 700 }}>${futuresPropResults.remainingProfit.toFixed(0)}</div></div>
-                <div style={{ padding: '16px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Drawdown Left</div><div style={{ color: theme.danger, fontSize: '24px', fontWeight: 700 }}>${futuresPropResults.drawdownRemaining.toFixed(0)}</div></div>
-              </div>
-            </div>
-
-            {/* Compound Calculator */}
-            <div style={cardStyle}>
-              <h2 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '20px' }}>📈 Compound Calculator</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '16px' }}>
+            {/* PERSONAL ACCOUNT COMPOUNDING */}
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #8b5cf615, #10b98115)', borderRadius: '16px', border: '2px solid ' + theme.purple }}>
+              <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '20px' }}>📈 Personal Account Compounding</h2>
+              <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 20px 0' }}>See the power of consistent, compounded returns</p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '20px' }}>
                 <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Starting Capital</label><input type="number" value={tradingCalculator.startingCapital} onChange={e => setTradingCalculator({...tradingCalculator, startingCapital: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
                 <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Monthly Add</label><input type="number" value={tradingCalculator.monthlyContribution} onChange={e => setTradingCalculator({...tradingCalculator, monthlyContribution: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Return % (Daily)</label><input type="number" value={tradingCalculator.returnRate} onChange={e => setTradingCalculator({...tradingCalculator, returnRate: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
+                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Daily Return %</label><input type="number" step="0.1" value={tradingCalculator.returnRate} onChange={e => setTradingCalculator({...tradingCalculator, returnRate: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
                 <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Months</label><input type="number" value={tradingCalculator.months} onChange={e => setTradingCalculator({...tradingCalculator, months: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Reinvest %</label><input type="number" value={tradingCalculator.reinvestRate} onChange={e => setTradingCalculator({...tradingCalculator, reinvestRate: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
+                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Trading Days/Mo</label><input type="number" value="20" style={{...inputStyle, width: '100%'}} disabled /></div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                <div style={{ padding: '20px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Future Value</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>${tradingResults.futureValue.toFixed(2)}</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{tradingResults.totalCalendarDays} / {tradingResults.totalTradingDays} days</div></div>
-                <div style={{ padding: '20px', background: darkMode ? '#2e1e3a' : '#faf5ff', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Total Contributed</div><div style={{ color: theme.purple, fontSize: '28px', fontWeight: 700 }}>${tradingResults.totalContributed.toFixed(0)}</div></div>
-                <div style={{ padding: '20px', background: darkMode ? '#2e2a1e' : '#fefce8', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Profit</div><div style={{ color: theme.warning, fontSize: '28px', fontWeight: 700 }}>${tradingResults.profit.toFixed(2)}</div></div>
+              
+              {(() => {
+                const result = calculateCompounding(
+                  parseFloat(tradingCalculator.startingCapital) || 0,
+                  parseFloat(tradingCalculator.monthlyContribution) || 0,
+                  parseFloat(tradingCalculator.returnRate) || 0,
+                  20, // trading days per month
+                  parseInt(tradingCalculator.months) || 0
+                )
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                    <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Future Balance</div>
+                      <div style={{ color: theme.success, fontSize: '32px', fontWeight: 700 }}>${result.finalBalance.toLocaleString()}</div>
+                    </div>
+                    <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Total Deposited</div>
+                      <div style={{ color: theme.purple, fontSize: '32px', fontWeight: 700 }}>${((parseFloat(tradingCalculator.startingCapital) || 0) + ((parseFloat(tradingCalculator.monthlyContribution) || 0) * (parseInt(tradingCalculator.months) || 0))).toLocaleString()}</div>
+                    </div>
+                    <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Pure Profit</div>
+                      <div style={{ color: theme.warning, fontSize: '32px', fontWeight: 700 }}>${result.totalGain.toLocaleString()}</div>
+                    </div>
+                  </div>
+                )
+              })()}
+              
+              <div style={{ marginTop: '16px', padding: '12px', background: theme.success + '20', borderRadius: '8px' }}>
+                <p style={{ color: theme.success, margin: 0, fontSize: '13px' }}>
+                  💡 <strong>Aureus says:</strong> Even 0.5% daily compounded over 12 months turns $10,000 into over $30,000. Consistency beats big wins!
+                </p>
               </div>
             </div>
 
-            {/* Trade Journal */}
+            {/* TRADE JOURNAL */}
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '20px' }}>📓 Trade Journal</h2>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' as const }}>
