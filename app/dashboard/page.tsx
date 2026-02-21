@@ -9,13 +9,14 @@ export default function Dashboard() {
   // ==================== APP MODE & NAVIGATION ====================
   const [appMode, setAppMode] = useState<'budget' | 'trading' | null>(null)
   const [showModeSelector, setShowModeSelector] = useState(true)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'overview' | 'path' | 'trading'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'trading'>('chat')
   const [darkMode, setDarkMode] = useState(true)
   
   // ==================== TOUR STATE ====================
   const [showTour, setShowTour] = useState(false)
   const [tourStep, setTourStep] = useState(0)
-  const [tourCompleted, setTourCompleted] = useState(false)
+  const [budgetTourCompleted, setBudgetTourCompleted] = useState(false)
+  const [tradingTourCompleted, setTradingTourCompleted] = useState(false)
   
   // ==================== UPLOAD STATE ====================
   const [showPayslipUpload, setShowPayslipUpload] = useState(false)
@@ -261,6 +262,8 @@ export default function Dashboard() {
   // Selected quest for detail view
   const [showQuestDetail, setShowQuestDetail] = useState(false)
   const [selectedBabyStep, setSelectedBabyStep] = useState<number | null>(null)
+  const [homeBuyingPrice, setHomeBuyingPrice] = useState('')
+  const [selectedQuestForWalkthrough, setSelectedQuestForWalkthrough] = useState<number | null>(null)
   
   // ==================== BUDGET STATE ====================
   const [incomeStreams, setIncomeStreams] = useState<any[]>([])
@@ -1590,8 +1593,19 @@ export default function Dashboard() {
         }
         setTimeout(() => fetchProactiveInsight(mode), 500)
       } else if (data.nextStep) {
-        if (mode === 'budget') setBudgetOnboarding(prev => ({ ...prev, step: data.nextStep }))
-        else setTradingOnboarding(prev => ({ ...prev, step: data.nextStep }))
+        if (mode === 'budget') {
+          setBudgetOnboarding(prev => ({ ...prev, step: data.nextStep }))
+          // When moving to 'choice' step, switch to dashboard/command centre
+          if (data.nextStep === 'choice' || data.nextStep === 'income') {
+            setActiveTab('dashboard')
+          }
+        }
+        else {
+          setTradingOnboarding(prev => ({ ...prev, step: data.nextStep }))
+          if (data.nextStep === 'choice') {
+            setActiveTab('trading')
+          }
+        }
       }
     } catch (error) {
       setChatMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I had trouble with that. Let's try again!" }])
@@ -1879,20 +1893,23 @@ export default function Dashboard() {
   const handleModeSelect = (mode: 'budget' | 'trading') => {
     setAppMode(mode)
     setShowModeSelector(false)
-    setActiveTab(mode === 'budget' ? 'dashboard' : 'trading')
     setChatMessages([])
     setProactiveInsight(null)
     setTourStep(0) // Reset tour step
     
     const memory = mode === 'budget' ? budgetMemory : tradingMemory
-    if (!memory.onboardingComplete && !tourCompleted) {
-      // Show tour for new users
+    const tourDone = mode === 'budget' ? budgetTourCompleted : tradingTourCompleted
+    
+    if (!memory.onboardingComplete && !tourDone) {
+      // Show tour for new users of THIS mode
       setShowTour(true)
     } else if (!memory.onboardingComplete) {
-      // Tour completed but onboarding not done
+      // Tour completed but onboarding not done - go to chat
+      setActiveTab('chat')
       startOnboarding(mode)
     } else {
-      // Returning user
+      // Returning user - go to quickview
+      setActiveTab('quickview')
       fetchProactiveInsight(mode)
     }
   }
@@ -2148,13 +2165,15 @@ export default function Dashboard() {
             ) : (
               <button onClick={() => { 
                 setShowTour(false); 
-                setTourCompleted(true); 
+                setActiveTab('chat'); // Go to dedicated chat page
                 if (isBudgetMode) {
+                  setBudgetTourCompleted(true);
                   setBudgetOnboarding({ isActive: true, step: 'greeting' }); 
-                  setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial operations coach. I'll help you optimize your cash flow, eliminate liabilities, and build automated revenue streams.\n\nLet's get to know each other. What should I call you?" }])
+                  setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial operations coach.\n\nI'll help you optimize cash flow, eliminate liabilities, and build automated revenue streams that work while you sleep.\n\nLet's get started. What should I call you?" }])
                 } else {
+                  setTradingTourCompleted(true);
                   setTradingOnboarding({ isActive: true, step: 'greeting' }); 
-                  setChatMessages([{ role: 'assistant', content: "Hey! 📈 I'm Aureus, your trading operations coach. I'll help you optimize your trading capital, maintain discipline, and scale your accounts systematically.\n\nWhat's your name, and how long have you been trading?" }])
+                  setChatMessages([{ role: 'assistant', content: "Hey! 📈 I'm Aureus, your trading operations coach.\n\nI'll help you optimize capital deployment, maintain psychological discipline, and systematically scale your accounts.\n\nWhat's your name?" }])
                 }
               }} style={{ padding: '14px 32px', background: isBudgetMode ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', border: 'none', borderRadius: '12px', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>
                 Let's Go! 🚀
@@ -2165,13 +2184,15 @@ export default function Dashboard() {
           {/* Skip link */}
           <button onClick={() => { 
             setShowTour(false); 
-            setTourCompleted(true); 
+            setActiveTab('chat'); // Go to dedicated chat page
             if (isBudgetMode) {
+              setBudgetTourCompleted(true);
               setBudgetOnboarding({ isActive: true, step: 'greeting' }); 
-              setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial operations coach. I'll help you optimize your cash flow, eliminate liabilities, and build automated revenue streams.\n\nLet's get to know each other. What should I call you?" }])
+              setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial operations coach.\n\nI'll help you optimize cash flow, eliminate liabilities, and build automated revenue streams that work while you sleep.\n\nLet's get started. What should I call you?" }])
             } else {
+              setTradingTourCompleted(true);
               setTradingOnboarding({ isActive: true, step: 'greeting' }); 
-              setChatMessages([{ role: 'assistant', content: "Hey! 📈 I'm Aureus, your trading operations coach. I'll help you optimize your trading capital, maintain discipline, and scale your accounts systematically.\n\nWhat's your name, and how long have you been trading?" }])
+              setChatMessages([{ role: 'assistant', content: "Hey! 📈 I'm Aureus, your trading operations coach.\n\nI'll help you optimize capital deployment, maintain psychological discipline, and systematically scale your accounts.\n\nWhat's your name?" }])
             }
           }} style={{ marginTop: '24px', background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
             Skip tour
@@ -2356,12 +2377,21 @@ export default function Dashboard() {
           </button>
         </div>
         
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '6px' }}>
           {appMode === 'budget' && (
             <>
-              <button onClick={() => setActiveTab('dashboard')} style={{ padding: '8px 16px', background: activeTab === 'dashboard' ? theme.accent : 'transparent', color: activeTab === 'dashboard' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>🎛️ Command Centre</button>
-              <button onClick={() => setActiveTab('path')} style={{ padding: '8px 16px', background: activeTab === 'path' ? theme.accent : 'transparent', color: activeTab === 'path' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>🛤️ Path</button>
-              <button onClick={() => setActiveTab('overview')} style={{ padding: '8px 16px', background: activeTab === 'overview' ? theme.accent : 'transparent', color: activeTab === 'overview' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>📊 Overview</button>
+              <button onClick={() => setActiveTab('chat')} style={{ padding: '8px 14px', background: activeTab === 'chat' ? theme.accent : 'transparent', color: activeTab === 'chat' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>💬 Aureus</button>
+              <button onClick={() => setActiveTab('quickview')} style={{ padding: '8px 14px', background: activeTab === 'quickview' ? theme.accent : 'transparent', color: activeTab === 'quickview' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>⚡ Quick</button>
+              <button onClick={() => setActiveTab('dashboard')} style={{ padding: '8px 14px', background: activeTab === 'dashboard' ? theme.accent : 'transparent', color: activeTab === 'dashboard' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>🎛️ Centre</button>
+              <button onClick={() => setActiveTab('path')} style={{ padding: '8px 14px', background: activeTab === 'path' ? theme.accent : 'transparent', color: activeTab === 'path' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>🛤️ Path</button>
+              <button onClick={() => setActiveTab('overview')} style={{ padding: '8px 14px', background: activeTab === 'overview' ? theme.accent : 'transparent', color: activeTab === 'overview' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>📊 Metrics</button>
+            </>
+          )}
+          {appMode === 'trading' && (
+            <>
+              <button onClick={() => setActiveTab('chat')} style={{ padding: '8px 14px', background: activeTab === 'chat' ? theme.warning : 'transparent', color: activeTab === 'chat' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>💬 Aureus</button>
+              <button onClick={() => setActiveTab('quickview')} style={{ padding: '8px 14px', background: activeTab === 'quickview' ? theme.warning : 'transparent', color: activeTab === 'quickview' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>⚡ Quick</button>
+              <button onClick={() => setActiveTab('trading')} style={{ padding: '8px 14px', background: activeTab === 'trading' ? theme.warning : 'transparent', color: activeTab === 'trading' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>📈 Trading</button>
             </>
           )}
           <button onClick={() => setDarkMode(!darkMode)} style={{ padding: '8px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>{darkMode ? '☀️' : '🌙'}</button>
@@ -2369,16 +2399,16 @@ export default function Dashboard() {
       </header>
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
-        {/* MOTIVATIONAL QUOTE */}
-        {appMode === 'budget' && !budgetOnboarding.isActive && (
+        {/* MOTIVATIONAL QUOTE - Only show on quickview */}
+        {activeTab === 'quickview' && !budgetOnboarding.isActive && !tradingOnboarding.isActive && (
           <div style={{ background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', padding: '16px 20px', marginBottom: '16px', borderLeft: `4px solid ${theme.purple}` }}>
             <p style={{ color: theme.text, fontSize: '14px', fontStyle: 'italic', margin: 0 }}>"{currentQuote.quote}"</p>
             <p style={{ color: theme.textMuted, fontSize: '12px', margin: '8px 0 0 0', textAlign: 'right' as const }}>— {currentQuote.author}</p>
           </div>
         )}
 
-        {/* UPCOMING PAYMENT ALERTS */}
-        {appMode === 'budget' && alertsEnabled && !budgetOnboarding.isActive && (() => {
+        {/* UPCOMING PAYMENT ALERTS - Only show on quickview */}
+        {activeTab === 'quickview' && alertsEnabled && !budgetOnboarding.isActive && (() => {
           const today = new Date()
           const upcomingDays = alertDaysBefore
           const upcoming: any[] = []
@@ -2427,42 +2457,344 @@ export default function Dashboard() {
           )
         })()}
 
-        {/* AI AGENT CARD */}
-        <div style={{ background: `linear-gradient(135deg, ${appMode === 'budget' ? theme.success : theme.warning}15, ${theme.purple}15)`, border: `2px solid ${appMode === 'budget' ? theme.success : theme.warning}`, borderRadius: '20px', padding: '24px', marginBottom: '24px' }}>
-          {proactiveInsight && !budgetOnboarding.isActive && !tradingOnboarding.isActive && (
-            <div style={{ marginBottom: chatMessages.length > 0 ? '16px' : '0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: appMode === 'budget' ? theme.success : theme.warning, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>{appMode === 'budget' ? '💰' : '📈'}</div>
+        {/* CHAT TAB - Dedicated Aureus Conversation */}
+        {activeTab === 'chat' && (
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ background: `linear-gradient(135deg, ${appMode === 'budget' ? theme.success : theme.warning}15, ${theme.purple}15)`, border: `2px solid ${appMode === 'budget' ? theme.success : theme.warning}`, borderRadius: '20px', padding: '24px', minHeight: '70vh', display: 'flex', flexDirection: 'column' as const }}>
+              {/* Aureus Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid ' + theme.border }}>
+                <div style={{ 
+                  width: '64px', 
+                  height: '64px', 
+                  borderRadius: '50%', 
+                  background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+                  border: '3px solid #fcd34d'
+                }}>
+                  <span style={{ color: '#78350f', fontWeight: 800, fontSize: '28px' }}>A</span>
+                </div>
                 <div>
-                  <div style={{ color: theme.text, fontWeight: 700, fontSize: '18px' }}>{proactiveInsight.greeting || `Hey${budgetMemory.name ? ' ' + budgetMemory.name : ''}!`}</div>
-                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>Aureus • {appMode === 'budget' ? (currentBabyStep.title) : `${winRate.toFixed(0)}% win rate`}</div>
+                  <div style={{ color: theme.text, fontWeight: 700, fontSize: '22px' }}>Aureus</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>
+                    {budgetOnboarding.isActive || tradingOnboarding.isActive 
+                      ? '🟢 Getting to know you...' 
+                      : appMode === 'budget' 
+                        ? `Your financial operations coach • ${currentBabyStep.title}`
+                        : `Your trading coach • ${winRate.toFixed(0)}% win rate`
+                    }
+                  </div>
                 </div>
               </div>
-              <p style={{ color: theme.text, fontSize: '15px', lineHeight: 1.6, margin: '0 0 8px 0' }}>{proactiveInsight.insight || proactiveInsight.message || "Ready to help you today!"}</p>
-              {proactiveInsight.suggestion && <p style={{ color: theme.purple, fontSize: '14px', margin: 0 }}>💡 {proactiveInsight.suggestion}</p>}
+
+              {/* Chat Messages */}
+              <div ref={chatContainerRef} style={{ flex: 1, overflowY: 'auto' as const, marginBottom: '16px', padding: '8px' }}>
+                {proactiveInsight && !budgetOnboarding.isActive && !tradingOnboarding.isActive && chatMessages.length === 0 && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ padding: '16px 20px', borderRadius: '16px', background: theme.cardBg, color: theme.text, fontSize: '15px', lineHeight: 1.6 }}>
+                      <p style={{ margin: '0 0 8px 0' }}>{proactiveInsight.greeting || `Hey${budgetMemory.name ? ' ' + budgetMemory.name : ''}!`}</p>
+                      <p style={{ margin: '0 0 8px 0' }}>{proactiveInsight.insight || proactiveInsight.message || "Ready to help you optimize your finances today!"}</p>
+                      {proactiveInsight.suggestion && <p style={{ color: theme.purple, margin: 0 }}>💡 {proactiveInsight.suggestion}</p>}
+                    </div>
+                  </div>
+                )}
+                
+                {chatMessages.map((msg, idx) => (
+                  <div key={idx} style={{ marginBottom: '16px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                    <div style={{ 
+                      maxWidth: '85%', 
+                      padding: '14px 18px', 
+                      borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px', 
+                      background: msg.role === 'user' ? (appMode === 'budget' ? theme.accent : theme.warning) : theme.cardBg, 
+                      color: msg.role === 'user' ? 'white' : theme.text, 
+                      fontSize: '15px', 
+                      lineHeight: 1.6, 
+                      whiteSpace: 'pre-wrap' as const 
+                    }}>
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                {isLoading && (
+                  <div style={{ display: 'flex', gap: '6px', padding: '16px' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} />
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} />
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} />
+                  </div>
+                )}
+              </div>
+              
+              {/* Chat Input */}
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <input 
+                  type="text" 
+                  value={chatInput} 
+                  onChange={e => setChatInput(e.target.value)} 
+                  onKeyPress={e => e.key === 'Enter' && handleChatMessage()} 
+                  placeholder={budgetOnboarding.isActive || tradingOnboarding.isActive ? "Type your response..." : "Ask Aureus anything..."} 
+                  style={{ ...inputStyle, flex: 1, padding: '14px 18px', fontSize: '15px' }} 
+                  disabled={isLoading} 
+                />
+                <button 
+                  onClick={handleChatMessage} 
+                  disabled={isLoading || !chatInput.trim()} 
+                  style={{ 
+                    padding: '14px 24px', 
+                    background: appMode === 'budget' ? theme.success : theme.warning, 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '12px', 
+                    cursor: 'pointer', 
+                    fontWeight: 600,
+                    opacity: isLoading || !chatInput.trim() ? 0.5 : 1 
+                  }}
+                >
+                  {isLoading ? '...' : 'Send'}
+                </button>
+              </div>
             </div>
-          )}
-          
-          {chatMessages.length > 0 && (
-            <div ref={chatContainerRef} style={{ maxHeight: '250px', overflowY: 'auto' as const, marginBottom: '16px', padding: '16px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '12px' }}>
-              {chatMessages.map((msg, idx) => (
-                <div key={idx} style={{ marginBottom: '12px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                  <div style={{ maxWidth: '80%', padding: '12px 16px', borderRadius: '16px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '14px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
-                </div>
-              ))}
-              {isLoading && <div style={{ display: 'flex', gap: '4px', padding: '12px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}
-            </div>
-          )}
-          
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder={budgetOnboarding.isActive || tradingOnboarding.isActive ? "Type your response..." : "Ask Aureus anything..."} style={{ ...inputStyle, flex: 1 }} disabled={isLoading} />
-            <button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ ...btnPrimary, background: appMode === 'budget' ? theme.success : theme.warning, opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button>
           </div>
-        </div>
+        )}
+
+        {/* QUICK VIEW TAB - Mobile-friendly metrics dashboard */}
+        {activeTab === 'quickview' && (
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
+            
+            {/* Aureus Message Card */}
+            {proactiveInsight && (
+              <div style={{ padding: '20px', background: `linear-gradient(135deg, ${appMode === 'budget' ? theme.success : theme.warning}15, ${theme.purple}15)`, borderRadius: '16px', border: '1px solid ' + (appMode === 'budget' ? theme.success : theme.warning) }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                  <div style={{ 
+                    width: '40px', 
+                    height: '40px', 
+                    borderRadius: '50%', 
+                    background: 'linear-gradient(135deg, #fbbf24, #d97706)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '18px',
+                    fontWeight: 800,
+                    color: '#78350f'
+                  }}>A</div>
+                  <div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div>
+                </div>
+                <p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>
+                {proactiveInsight.suggestion && (
+                  <p style={{ color: theme.purple, fontSize: '13px', margin: '8px 0 0 0' }}>💡 {proactiveInsight.suggestion}</p>
+                )}
+                <button onClick={() => setActiveTab('chat')} style={{ marginTop: '12px', padding: '8px 16px', background: appMode === 'budget' ? theme.success : theme.warning, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
+                  💬 Chat with Aureus
+                </button>
+              </div>
+            )}
+
+            {appMode === 'budget' && (
+              <>
+                {/* Key Metrics Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                  <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Monthly Revenue</div>
+                    <div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>${monthlyIncome.toFixed(0)}</div>
+                  </div>
+                  <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Operating Costs</div>
+                    <div style={{ color: theme.danger, fontSize: '28px', fontWeight: 700 }}>${totalOutgoing.toFixed(0)}</div>
+                  </div>
+                  <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Net Profit</div>
+                    <div style={{ color: monthlySurplus >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>${monthlySurplus.toFixed(0)}</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px' }}>{savingsRate.toFixed(0)}% margin</div>
+                  </div>
+                  <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Net Worth</div>
+                    <div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>${netWorth.toLocaleString()}</div>
+                  </div>
+                </div>
+
+                {/* Operations Score */}
+                <div style={{ padding: '20px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '16px', border: '1px solid #334155' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Operations Score</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>Overall efficiency</div>
+                    </div>
+                    <div style={{ fontSize: '40px', fontWeight: 700, color: financialHealthScore >= 70 ? theme.success : financialHealthScore >= 40 ? theme.warning : theme.danger }}>
+                      {financialHealthScore}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Freedom Progress */}
+                <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>🐀 Rat Race Escape</div>
+                    <div style={{ color: theme.warning, fontWeight: 700, fontSize: '20px' }}>
+                      {monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) * 100).toFixed(0) : 0}%
+                    </div>
+                  </div>
+                  <div style={{ height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: Math.min(((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100, 100) + '%', height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #10b981)' }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', color: theme.textMuted, fontSize: '12px' }}>
+                    <span>Automated: ${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}/mo</span>
+                    <span>Need: ${monthlyExpenses.toFixed(0)}/mo</span>
+                  </div>
+                </div>
+
+                {/* Current Baby Step */}
+                <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: theme.warning, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>{currentBabyStep.icon}</div>
+                    <div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>Current Step</div>
+                      <div style={{ color: theme.text, fontWeight: 600 }}>Step {currentBabyStep.step}: {currentBabyStep.title}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                  <button onClick={() => setActiveTab('dashboard')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>🎛️</div>
+                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Command Centre</div>
+                  </button>
+                  <button onClick={() => setActiveTab('path')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>🛤️</div>
+                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Path & Quests</div>
+                  </button>
+                </div>
+              </>
+            )}
+
+            {appMode === 'trading' && (
+              <>
+                {/* Trading Key Metrics */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                  <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Total P&L</div>
+                    <div style={{ color: totalPL >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>${totalPL.toFixed(0)}</div>
+                  </div>
+                  <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Win Rate</div>
+                    <div style={{ color: winRate >= 50 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>{winRate.toFixed(0)}%</div>
+                  </div>
+                  <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Total Trades</div>
+                    <div style={{ color: theme.text, fontSize: '28px', fontWeight: 700 }}>{trades.length}</div>
+                  </div>
+                  <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Profit Factor</div>
+                    <div style={{ color: (avgWin * winningTrades.length) / Math.max(avgLoss * losingTrades.length, 1) >= 1 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>
+                      {losingTrades.length > 0 ? ((avgWin * winningTrades.length) / (avgLoss * losingTrades.length)).toFixed(2) : '∞'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tilt Status */}
+                {(() => {
+                  const tilt = detectTilt()
+                  return (
+                    <div style={{ padding: '20px', background: tilt.tiltScore > 50 ? theme.danger + '20' : theme.success + '20', borderRadius: '16px', border: '1px solid ' + (tilt.tiltScore > 50 ? theme.danger : theme.success) }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ fontSize: '28px' }}>{tilt.tiltScore > 70 ? '🚨' : tilt.tiltScore > 40 ? '⚠️' : '✅'}</div>
+                          <div>
+                            <div style={{ color: theme.text, fontWeight: 600 }}>
+                              {tilt.tiltScore > 70 ? 'HIGH TILT - STOP!' : tilt.tiltScore > 40 ? 'Caution' : 'Clear to Trade'}
+                            </div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px' }}>{tilt.todaysTrades} trades today • {tilt.todaysLosses} losses</div>
+                          </div>
+                        </div>
+                        <div style={{ color: tilt.tiltScore > 50 ? theme.danger : theme.success, fontSize: '28px', fontWeight: 700 }}>{tilt.tiltScore}%</div>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Quick Action */}
+                <button onClick={() => setActiveTab('trading')} style={{ padding: '16px', background: theme.warning, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
+                  <div style={{ color: 'white', fontWeight: 600, fontSize: '16px' }}>📈 Open Trading Dashboard</div>
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {/* BUDGET DASHBOARD TAB */}
         {appMode === 'budget' && activeTab === 'dashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
+            
+            {/* Aureus Onboarding Chat - Shows when onboarding is active */}
+            {budgetOnboarding.isActive && (
+              <div style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, border: `2px solid ${theme.success}`, borderRadius: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ 
+                    width: '48px', 
+                    height: '48px', 
+                    borderRadius: '50%', 
+                    background: 'linear-gradient(135deg, #fbbf24, #d97706)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '20px',
+                    fontWeight: 800,
+                    color: '#78350f'
+                  }}>A</div>
+                  <div>
+                    <div style={{ color: theme.text, fontWeight: 700 }}>Aureus</div>
+                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>Setting up your operations...</div>
+                  </div>
+                </div>
+                
+                <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '16px' }}>
+                  {chatMessages.map((msg, idx) => (
+                    <div key={idx} style={{ marginBottom: '12px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                      <div style={{ 
+                        maxWidth: '85%', 
+                        padding: '12px 16px', 
+                        borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px', 
+                        background: msg.role === 'user' ? theme.accent : theme.cardBg, 
+                        color: msg.role === 'user' ? 'white' : theme.text, 
+                        fontSize: '14px', 
+                        lineHeight: 1.5, 
+                        whiteSpace: 'pre-wrap' as const 
+                      }}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div style={{ display: 'flex', gap: '4px', padding: '12px' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} />
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} />
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} />
+                    </div>
+                  )}
+                </div>
+                
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <input 
+                    type="text" 
+                    value={chatInput} 
+                    onChange={e => setChatInput(e.target.value)} 
+                    onKeyPress={e => e.key === 'Enter' && handleChatMessage()} 
+                    placeholder="Type your response..." 
+                    style={{ ...inputStyle, flex: 1 }} 
+                    disabled={isLoading} 
+                  />
+                  <button 
+                    onClick={handleChatMessage} 
+                    disabled={isLoading || !chatInput.trim()} 
+                    style={{ ...btnSuccess, opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}
+                  >
+                    {isLoading ? '...' : 'Send'}
+                  </button>
+                </div>
+              </div>
+            )}
+            
             {/* This Month Summary */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Income This Month</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>${currentMonthTotals.incomeTotal.toFixed(0)}</div></div>
@@ -2774,78 +3106,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* RAT RACE ESCAPE TRACKER */}
-            <div style={{ padding: '32px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
-              <div style={{ textAlign: 'center' as const, marginBottom: '24px' }}>
-                <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px', marginBottom: '8px' }}>RAT RACE ESCAPE TRACKER</div>
-                <div style={{ fontSize: '64px', fontWeight: 'bold', color: monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) >= 1 ? theme.success : '#f59e0b') : theme.textMuted }}>
-                  {monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) * 100).toFixed(1) : '0.0'}%
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '20px' }}>{((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? '🎉' : '🐀'}</span>
-                  <span style={{ color: ((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? theme.success : '#ef4444', fontSize: '16px' }}>
-                    {((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? 'FINANCIALLY FREE!' : 'Still in the Rat Race'}
-                  </span>
-                </div>
-              </div>
-              
-              {/* Progress Bar with Milestones */}
-              <div style={{ position: 'relative' as const, marginBottom: '32px' }}>
-                <div style={{ height: '8px', background: '#334155', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ 
-                    width: Math.min(((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100, 100) + '%', 
-                    height: '100%', 
-                    background: 'linear-gradient(90deg, #8b5cf6, #10b981)',
-                    borderRadius: '4px',
-                    transition: 'width 0.5s ease'
-                  }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-                  {[
-                    { pct: 0, icon: '🌱', label: 'Start' },
-                    { pct: 25, icon: '🌿', label: 'Seed' },
-                    { pct: 50, icon: '🌳', label: 'Growing' },
-                    { pct: 75, icon: '⚡', label: 'Almost' },
-                    { pct: 100, icon: '💎', label: 'FREE!' }
-                  ].map((m, i) => {
-                    const reached = ((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100 >= m.pct
-                    return (
-                      <div key={i} style={{ textAlign: 'center' as const, flex: 1 }}>
-                        <div style={{ fontSize: '20px', opacity: reached ? 1 : 0.4 }}>{m.icon}</div>
-                        <div style={{ fontSize: '10px', color: reached ? theme.text : '#64748b' }}>{m.label}</div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-              
-              {/* Stats Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-                <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
-                  <div style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Passive Income</div>
-                  <div style={{ color: theme.success, fontSize: '24px', fontWeight: 'bold' }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</div>
-                  <div style={{ color: '#64748b', fontSize: '11px' }}>/month</div>
-                </div>
-                <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
-                  <div style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Expenses</div>
-                  <div style={{ color: theme.danger, fontSize: '24px', fontWeight: 'bold' }}>${monthlyExpenses.toFixed(0)}</div>
-                  <div style={{ color: '#64748b', fontSize: '11px' }}>/month</div>
-                </div>
-                <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
-                  <div style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Money Works 24/7</div>
-                  <div style={{ color: theme.purple, fontSize: '24px', fontWeight: 'bold' }}>${((passiveIncome + totalPassiveQuestIncome) / 720).toFixed(2)}</div>
-                  <div style={{ color: '#64748b', fontSize: '11px' }}>/hour sleeping</div>
-                </div>
-                <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
-                  <div style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Gap to Freedom</div>
-                  <div style={{ color: (passiveIncome + totalPassiveQuestIncome) >= monthlyExpenses ? theme.success : theme.warning, fontSize: '24px', fontWeight: 'bold' }}>
-                    ${Math.max(0, monthlyExpenses - passiveIncome - totalPassiveQuestIncome).toFixed(0)}
-                  </div>
-                  <div style={{ color: '#64748b', fontSize: '11px' }}>{(passiveIncome + totalPassiveQuestIncome) >= monthlyExpenses ? 'COVERED! 🎉' : 'still needed'}</div>
-                </div>
-              </div>
-            </div>
-
             {/* CASH FLOW QUADRANT */}
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -2920,42 +3180,10 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* FIRE PATH */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', borderRadius: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-                <div>
-                  <h2 style={{ margin: 0, color: 'white', fontSize: '22px' }}>🔥 FIRE Number</h2>
-                  <p style={{ margin: '4px 0 0 0', color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>Financial Independence, Retire Early</p>
-                </div>
-                <div style={{ textAlign: 'right' as const }}>
-                  <div style={{ color: 'white', fontSize: '36px', fontWeight: 700 }}>${fiPath.fireNumber.toLocaleString()}</div>
-                  <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>{fiPath.yearsToFI < 999 ? `~${fiPath.yearsToFI} years away` : 'Start saving to calculate'}</div>
-                </div>
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.15)', borderRadius: '12px', textAlign: 'center' as const }}>
-                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>Current Investments</div>
-                  <div style={{ color: 'white', fontSize: '24px', fontWeight: 700 }}>${fiPath.currentInvestments.toLocaleString()}</div>
-                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>{fiPath.fireNumber > 0 ? ((fiPath.currentInvestments / fiPath.fireNumber) * 100).toFixed(1) : 0}% of FIRE</div>
-                </div>
-                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.15)', borderRadius: '12px', textAlign: 'center' as const }}>
-                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>Annual Expenses</div>
-                  <div style={{ color: 'white', fontSize: '24px', fontWeight: 700 }}>${(totalOutgoing * 12).toLocaleString()}</div>
-                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>× 25 = FIRE Number</div>
-                </div>
-                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.15)', borderRadius: '12px', textAlign: 'center' as const }}>
-                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>4% Safe Withdrawal</div>
-                  <div style={{ color: 'white', fontSize: '24px', fontWeight: 700 }}>${(fiPath.fireNumber * 0.04 / 12).toFixed(0)}/mo</div>
-                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>At FIRE number</div>
-                </div>
-              </div>
-            </div>
-
-            {/* ADVANCED METRICS DASHBOARD */}
+            {/* ADVANCED METRICS DASHBOARD - Under Financial Operations Score */}
             <div style={cardStyle}>
-              <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>📊 Advanced Financial Metrics</h2>
-              <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>Scientific measurements of your financial progress</p>
+              <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>📊 Performance Metrics</h2>
+              <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>KPIs that drive your Financial Operations Score</p>
               
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
                 {/* Capital Efficiency Ratio */}
@@ -3413,97 +3641,301 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* AUSTRALIAN HOME BUYING GUIDE */}
+            {/* AUSTRALIAN HOME BUYING ROADMAP */}
             <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                <div style={{ width: '56px', height: '56px', borderRadius: '12px', background: 'linear-gradient(135deg, #f59e0b, #10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🏠</div>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '32px' }}>🏠</span>
-                    <div>
-                      <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>Australian Home Buying Guide</h2>
-                      <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Your roadmap to property ownership</p>
-                    </div>
+                  <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>Australian Home Buying Roadmap</h2>
+                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Complete step-by-step guide to buying property in Australia</p>
+                </div>
+              </div>
+              
+              {/* Phase 1: Get Financially Ready */}
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '20px' }}>💰</span>
+                  <h3 style={{ margin: 0, color: theme.warning, fontSize: '16px' }}>Phase 1: Get Financially Ready</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', paddingLeft: '20px', borderLeft: '2px solid #334155' }}>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Check your credit score</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Get your free credit report from Equifax, Experian, or Illion. Score above 700 is good. Fix any errors before applying for a loan.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Save your deposit</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>20% deposit avoids Lenders Mortgage Insurance (LMI). On a $600K home = $120K. Use FHSS scheme to boost savings via super.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>First Home Super Saver Scheme (FHSS)</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Salary sacrifice up to $15K/year (max $50K total) into super, then withdraw for your first home deposit. Saves tax and grows faster.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Reduce existing debts</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Lenders check your debt-to-income ratio. Pay off credit cards, BNPL, and personal loans. Close unused credit cards — even $0 balance counts against you.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Build genuine savings</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Lenders want to see 3+ months of consistent saving. Regular deposits into a dedicated savings account shows financial discipline.</div>
                   </div>
                 </div>
               </div>
               
-              {/* Deposit Comparison */}
+              {/* Phase 2: Understand the Costs */}
               <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ color: theme.warning, fontSize: '16px', margin: '0 0 12px 0' }}>💰 Deposit Options (on $600k home)</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                  <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
-                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>5% Deposit</div>
-                    <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>$30,000</div>
-                    <div style={{ color: theme.danger, fontSize: '12px' }}>+ $15,000 LMI</div>
-                    <div style={{ marginTop: '8px', padding: '4px 8px', background: theme.success + '20', borderRadius: '4px', fontSize: '11px', color: theme.success }}>First Home Guarantee: No LMI!</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '20px' }}>🧾</span>
+                  <h3 style={{ margin: 0, color: theme.purple, fontSize: '16px' }}>Phase 2: Understand the Costs</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', paddingLeft: '20px', borderLeft: '2px solid #334155' }}>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Stamp duty</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Varies by state. QLD: $0 on first home under $500K (house) or $550K (land). NSW: $0 under $800K for first home. VIC: $0 under $600K. Use your state's calculator.</div>
                   </div>
-                  <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
-                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>10% Deposit</div>
-                    <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>$60,000</div>
-                    <div style={{ color: theme.warning, fontSize: '12px' }}>+ $8,000 LMI</div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Lenders Mortgage Insurance (LMI)</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Charged when deposit is under 20%. Can add $10K-$30K+ to your loan. Avoid with 20% deposit, or use government guarantee schemes.</div>
                   </div>
-                  <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const, border: '2px solid ' + theme.success }}>
-                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>20% Deposit</div>
-                    <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>$120,000</div>
-                    <div style={{ color: theme.success, fontSize: '12px' }}>No LMI! ✓</div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Legal/conveyancing fees</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Solicitor or conveyancer: $1,500-$3,000. They handle contracts, title searches, settlement. Essential — never skip this.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Building & pest inspections</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>$400-$800. Non-negotiable for houses. Finds structural issues, termites, and defects before you buy. Can save tens of thousands.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Ongoing costs</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Council rates ($1,500-$3,000/yr), insurance ($1,500-$3,000/yr), body corp/strata if unit ($2,000-$8,000/yr), maintenance (budget 1% of home value/yr).</div>
                   </div>
                 </div>
               </div>
               
-              {/* First Home Buyer Grants */}
+              {/* Phase 3: Government Schemes */}
               <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ color: theme.success, fontSize: '16px', margin: '0 0 12px 0' }}>🎁 First Home Buyer Grants</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                  {Object.entries(australianHomeData.firstHomeBuyerGrants).map(([state, grant]) => (
-                    <div key={state} style={{ padding: '12px', background: '#334155', borderRadius: '8px' }}>
-                      <div style={{ color: theme.warning, fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' as const }}>{state}</div>
-                      <div style={{ color: theme.text, fontSize: '13px', marginTop: '4px' }}>{grant}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '20px' }}>🏛️</span>
+                  <h3 style={{ margin: 0, color: theme.accent, fontSize: '16px' }}>Phase 3: Government Schemes</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', paddingLeft: '20px', borderLeft: '2px solid #334155' }}>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>First Home Owner Grant (FHOG)</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>QLD: $30,000 for new homes under $750K. NSW: $10,000 new homes under $600K. VIC: $10,000 new homes under $750K. Must be new build or substantially renovated.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>First Home Guarantee (FHG)</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Buy with 5% deposit, government guarantees the rest — NO LMI. 35,000 places/year. Income cap: $125K single, $200K couple. Price caps vary by region.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Regional First Home Buyer Guarantee</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>10,000 places/year for regional areas. Same benefits as FHG but for regional property purchases.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Family Home Guarantee</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>For single parents. Buy with just 2% deposit, no LMI. 5,000 places/year.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Help to Buy (coming)</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Government co-owns up to 40% (new) or 30% (existing). You need just 2% deposit. 10,000 places/year when it launches.</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Phase 4: Get Pre-Approved */}
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '20px' }}>🏦</span>
+                  <h3 style={{ margin: 0, color: theme.success, fontSize: '16px' }}>Phase 4: Get Pre-Approved</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', paddingLeft: '20px', borderLeft: '2px solid #334155' }}>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Gather your documents</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Last 2 payslips, 3 months bank statements, tax returns (if self-employed), ID, and details of all debts and expenses.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Use a mortgage broker</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Free for you (paid by lender). They compare 30+ lenders, know which ones suit your situation, and handle paperwork. Worth it.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Get pre-approval</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Shows sellers you're serious. Usually valid 3-6 months. Gives you a budget to house hunt within. Doesn't commit you to that lender.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Understand borrowing power</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Rule of thumb: 5-6x gross income. $100K income ≈ $500-600K borrowing. But consider if repayments work for YOUR budget, not just what the bank allows.</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Phase 5: Buy Smart */}
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '20px' }}>🎯</span>
+                  <h3 style={{ margin: 0, color: theme.danger, fontSize: '16px' }}>Phase 5: Buy Smart</h3>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', paddingLeft: '20px', borderLeft: '2px solid #334155' }}>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Research areas thoroughly</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Check flood maps, future development plans, school zones, transport, crime stats. Use Domain, REA, SQM Research for price data.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Attend inspections</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Go to open homes. Take notes. Check water pressure, power points, storage, natural light, noise levels. Visit at different times of day.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Get building & pest inspection</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>BEFORE making an offer or going to auction. $400-$800 can save you from a $50K+ nightmare.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Negotiate or bid smart</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Private treaty: always offer below asking. Auction: set your max and DO NOT go over. Emotion is expensive at auctions.</div>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Settlement</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Usually 30-90 days after contract. Your conveyancer handles everything. Final inspection before settlement. Then you get the keys!</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Home Buying Cost Calculator */}
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '20px' }}>🧮</span>
+                  <h3 style={{ margin: 0, color: theme.warning, fontSize: '16px' }}>Home Buying Cost Calculator</h3>
+                </div>
+                <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 12px 0' }}>Enter a property price to see all the costs involved</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <span style={{ color: theme.warning, fontWeight: 700 }}>$</span>
+                  <input 
+                    type="number" 
+                    placeholder="Property price (e.g. 600000)" 
+                    value={homeBuyingPrice}
+                    onChange={e => setHomeBuyingPrice(e.target.value)}
+                    style={{ flex: 1, padding: '12px 16px', background: darkMode ? '#334155' : '#e2e8f0', border: 'none', borderRadius: '8px', color: theme.text, fontSize: '16px' }}
+                  />
+                </div>
+                {homeBuyingPrice && parseFloat(homeBuyingPrice) > 0 && (() => {
+                  const price = parseFloat(homeBuyingPrice)
+                  const deposit5 = price * 0.05
+                  const deposit10 = price * 0.10
+                  const deposit20 = price * 0.20
+                  const lmi5 = price * 0.025 // ~2.5% LMI estimate for 5%
+                  const lmi10 = price * 0.013 // ~1.3% LMI estimate for 10%
+                  const stampDuty = price > 800000 ? price * 0.045 : 0 // Simplified first home exemption
+                  const conveyancing = 2000
+                  const inspection = 600
+                  const total5 = deposit5 + lmi5 + stampDuty + conveyancing + inspection
+                  const total10 = deposit10 + lmi10 + stampDuty + conveyancing + inspection
+                  const total20 = deposit20 + stampDuty + conveyancing + inspection
+                  
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                      <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>5% Deposit</div>
+                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>${deposit5.toLocaleString()}</div>
+                        <div style={{ color: theme.danger, fontSize: '11px', marginTop: '4px' }}>+ ${lmi5.toLocaleString()} LMI</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px', borderTop: '1px solid #475569', paddingTop: '8px' }}>Total: ${total5.toLocaleString()}</div>
+                      </div>
+                      <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>10% Deposit</div>
+                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>${deposit10.toLocaleString()}</div>
+                        <div style={{ color: theme.warning, fontSize: '11px', marginTop: '4px' }}>+ ${lmi10.toLocaleString()} LMI</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px', borderTop: '1px solid #475569', paddingTop: '8px' }}>Total: ${total10.toLocaleString()}</div>
+                      </div>
+                      <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const, border: '2px solid ' + theme.success }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>20% Deposit</div>
+                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>${deposit20.toLocaleString()}</div>
+                        <div style={{ color: theme.success, fontSize: '11px', marginTop: '4px' }}>No LMI! ✓</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px', borderTop: '1px solid #475569', paddingTop: '8px' }}>Total: ${total20.toLocaleString()}</div>
+                      </div>
                     </div>
+                  )
+                })()}
+              </div>
+              
+              {/* Ready to Start CTA */}
+              <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', borderRadius: '12px', textAlign: 'center' as const }}>
+                <div style={{ fontSize: '24px', marginBottom: '8px' }}>🎯</div>
+                <h4 style={{ color: theme.text, margin: '0 0 8px 0' }}>Ready to start?</h4>
+                <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 16px 0' }}>Create a home deposit goal and add it to your calendar</p>
+                <button 
+                  onClick={() => {
+                    const targetDeposit = homeBuyingPrice ? parseFloat(homeBuyingPrice) * 0.2 : 120000
+                    setNewGoal({ 
+                      name: 'Home Deposit', 
+                      target: targetDeposit.toString(), 
+                      saved: '0', 
+                      deadline: '', 
+                      savingsFrequency: 'monthly', 
+                      startDate: new Date().toISOString().split('T')[0], 
+                      paymentAmount: '' 
+                    })
+                    setActiveTab('dashboard')
+                  }}
+                  style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}
+                >
+                  🏠 Create Home Deposit Goal
+                </button>
+              </div>
+            </div>
+
+            {/* RAT RACE ESCAPE TRACKER - Connected to Automated Revenue */}
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px', marginBottom: '4px' }}>RAT RACE ESCAPE TRACKER</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Automated revenue ÷ Operating costs = Freedom %</div>
+                </div>
+                <div style={{ textAlign: 'right' as const }}>
+                  <div style={{ fontSize: '48px', fontWeight: 'bold', color: monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) >= 1 ? theme.success : '#f59e0b') : theme.textMuted }}>
+                    {monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) * 100).toFixed(1) : '0.0'}%
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                    <span style={{ fontSize: '16px' }}>{((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? '🎉' : '🐀'}</span>
+                    <span style={{ color: ((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? theme.success : theme.textMuted, fontSize: '14px' }}>
+                      {((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? 'FINANCIALLY FREE!' : 'Building freedom...'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Progress Bar */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ height: '12px', background: '#334155', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ 
+                    width: Math.min(((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100, 100) + '%', 
+                    height: '100%', 
+                    background: 'linear-gradient(90deg, #8b5cf6, #10b981)',
+                    borderRadius: '6px',
+                    transition: 'width 0.5s ease'
+                  }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+                  {[0, 25, 50, 75, 100].map(pct => (
+                    <div key={pct} style={{ color: ((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100 >= pct ? theme.text : '#64748b', fontSize: '11px' }}>{pct}%</div>
                   ))}
                 </div>
               </div>
               
-              {/* Government Schemes */}
-              <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ color: theme.purple, fontSize: '16px', margin: '0 0 12px 0' }}>🏛️ Government Schemes</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  {australianHomeData.schemes.map((scheme, idx) => (
-                    <div key={idx} style={{ padding: '16px', background: '#334155', borderRadius: '12px', borderLeft: '4px solid ' + theme.purple }}>
-                      <div style={{ color: theme.text, fontWeight: 600, marginBottom: '4px' }}>{scheme.name}</div>
-                      <div style={{ color: theme.textMuted, fontSize: '13px' }}>{scheme.description}</div>
-                    </div>
-                  ))}
+              {/* Stats Row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                <div style={{ padding: '12px', background: '#334155', borderRadius: '8px', textAlign: 'center' as const }}>
+                  <div style={{ color: theme.success, fontSize: '20px', fontWeight: 700 }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</div>
+                  <div style={{ color: '#64748b', fontSize: '11px' }}>Automated Revenue/mo</div>
+                </div>
+                <div style={{ padding: '12px', background: '#334155', borderRadius: '8px', textAlign: 'center' as const }}>
+                  <div style={{ color: theme.danger, fontSize: '20px', fontWeight: 700 }}>${monthlyExpenses.toFixed(0)}</div>
+                  <div style={{ color: '#64748b', fontSize: '11px' }}>Operating Costs/mo</div>
+                </div>
+                <div style={{ padding: '12px', background: '#334155', borderRadius: '8px', textAlign: 'center' as const }}>
+                  <div style={{ color: theme.warning, fontSize: '20px', fontWeight: 700 }}>${Math.max(0, monthlyExpenses - passiveIncome - totalPassiveQuestIncome).toFixed(0)}</div>
+                  <div style={{ color: '#64748b', fontSize: '11px' }}>Gap to Freedom</div>
                 </div>
               </div>
               
-              {/* Stamp Duty by State */}
-              <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ color: theme.accent, fontSize: '16px', margin: '0 0 12px 0' }}>📋 Stamp Duty by State</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
-                  {Object.entries(australianHomeData.stampDuty).map(([state, data]: [string, any]) => (
-                    <div key={state} style={{ padding: '12px', background: '#334155', borderRadius: '8px', textAlign: 'center' as const }}>
-                      <div style={{ color: theme.warning, fontSize: '14px', fontWeight: 700, marginBottom: '8px' }}>{state}</div>
-                      <div style={{ color: theme.success, fontSize: '11px', marginBottom: '4px' }}>First Home:</div>
-                      <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '8px' }}>{data.firstHome}</div>
-                      <div style={{ color: theme.danger, fontSize: '11px', marginBottom: '4px' }}>Investor:</div>
-                      <div style={{ color: theme.textMuted, fontSize: '10px' }}>{data.investor}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* LMI Explainer */}
-              <div style={{ padding: '16px', background: theme.warning + '20', borderRadius: '12px', border: '1px solid ' + theme.warning }}>
-                <h4 style={{ color: theme.warning, margin: '0 0 8px 0', fontSize: '14px' }}>⚠️ What is LMI (Lender's Mortgage Insurance)?</h4>
-                <p style={{ color: theme.text, fontSize: '13px', margin: '0 0 8px 0' }}>{australianHomeData.lmi.description}</p>
-                <p style={{ color: theme.textMuted, fontSize: '12px', margin: '0 0 8px 0' }}>Cost: {australianHomeData.lmi.cost}</p>
-                <p style={{ color: theme.success, fontSize: '12px', margin: 0 }}>How to avoid: {australianHomeData.lmi.avoid}</p>
-              </div>
-              
-              {/* Aureus Advice */}
-              <div style={{ marginTop: '20px', padding: '16px', background: theme.success + '15', borderRadius: '12px', borderLeft: '4px solid ' + theme.success }}>
-                <p style={{ color: theme.text, fontSize: '14px', margin: 0, lineHeight: 1.6 }}>
-                  💡 <strong>Aureus says:</strong> Home ownership is a major capital deployment decision. Run the numbers: compare renting + investing vs buying. In some markets, renting and investing the difference wins. In others, buying builds more wealth. I can help you analyze your specific situation - just ask!
+              <div style={{ marginTop: '16px', padding: '12px', background: theme.purple + '20', borderRadius: '8px', borderLeft: '4px solid ' + theme.purple }}>
+                <p style={{ color: theme.text, fontSize: '13px', margin: 0 }}>
+                  💡 <strong>Build automated revenue below</strong> — each strategy you complete brings you closer to escaping the rat race.
                 </p>
               </div>
             </div>
@@ -3641,22 +4073,49 @@ export default function Dashboard() {
                             ))}
                           </div>
                           
-                          {quest.status === 'not_started' && (
-                            <button onClick={() => {
-                              setPassiveQuests(passiveQuests.map(q => q.id === quest.id ? { ...q, status: 'in_progress', currentStep: 0, progress: 0 } : q))
-                            }} style={{ marginTop: '16px', padding: '10px 20px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, width: '100%' }}>
-                              🚀 Start This Quest
-                            </button>
-                          )}
+                          <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                            {quest.status === 'not_started' && (
+                              <>
+                                <button onClick={() => {
+                                  setPassiveQuests(passiveQuests.map(q => q.id === quest.id ? { ...q, status: 'in_progress', currentStep: 0, progress: 0 } : q))
+                                }} style={{ flex: 1, padding: '10px 20px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                                  🚀 Start Quest
+                                </button>
+                                <button onClick={() => {
+                                  setActiveTab('dashboard')
+                                  setSelectedQuestForWalkthrough(quest.id)
+                                  setChatMessages([{ 
+                                    role: 'assistant', 
+                                    content: `Great choice! Let's build your ${quest.title} strategy together. 💪\n\n**${quest.aureusAdvice}**\n\nI'll walk you through each step personally. Here's our plan:\n\n${quest.steps?.map((s: any, i: number) => `${i + 1}. **${s.title}** - ${s.description}`).join('\n')}\n\nReady to start with Step 1: **${quest.steps?.[0]?.title}**?\n\nTell me about your current situation and I'll give you specific guidance for YOUR finances.`
+                                  }])
+                                }} style={{ flex: 1, padding: '10px 20px', background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                                  🤖 Build with Aureus
+                                </button>
+                              </>
+                            )}
+                          </div>
                           
                           {quest.status === 'in_progress' && (
-                            <button onClick={() => {
-                              const newStep = (quest.currentStep || 0) + 1
-                              const newProgress = (newStep / (quest.steps?.length || 4)) * 100
-                              setPassiveQuests(passiveQuests.map(q => q.id === quest.id ? { ...q, currentStep: newStep, progress: newProgress, status: newProgress >= 100 ? 'completed' : 'in_progress' } : q))
-                            }} style={{ marginTop: '16px', padding: '10px 20px', background: theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, width: '100%' }}>
-                              ✓ Complete Current Step
-                            </button>
+                            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                              <button onClick={() => {
+                                const newStep = (quest.currentStep || 0) + 1
+                                const newProgress = (newStep / (quest.steps?.length || 4)) * 100
+                                setPassiveQuests(passiveQuests.map(q => q.id === quest.id ? { ...q, currentStep: newStep, progress: newProgress, status: newProgress >= 100 ? 'completed' : 'in_progress' } : q))
+                              }} style={{ flex: 1, padding: '10px 20px', background: theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                                ✓ Complete Step {(quest.currentStep || 0) + 1}
+                              </button>
+                              <button onClick={() => {
+                                const currentStep = quest.steps?.[quest.currentStep || 0]
+                                setActiveTab('dashboard')
+                                setSelectedQuestForWalkthrough(quest.id)
+                                setChatMessages([{ 
+                                  role: 'assistant', 
+                                  content: `Welcome back! Let's continue your ${quest.title} journey. 🎯\n\nYou're on **Step ${(quest.currentStep || 0) + 1}: ${currentStep?.title}**\n\n${currentStep?.description}\n\nHow's it going? Tell me what you've done so far and any challenges you're facing.`
+                                }])
+                              }} style={{ flex: 1, padding: '10px 20px', background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                                💬 Get Aureus Help
+                              </button>
+                            </div>
                           )}
                         </div>
                       )}
