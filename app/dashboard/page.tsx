@@ -789,6 +789,62 @@ export default function Dashboard() {
     yearsToFI: monthlySurplus > 0 ? Math.ceil(((totalOutgoing * 12) * 25) / (monthlySurplus * 12)) : 999
   }
 
+  // ==================== ADVANCED FINANCIAL METRICS ====================
+  // These metrics help users understand their financial progress scientifically
+  
+  // 1️⃣ Capital Efficiency Ratio (CER) - How much of income is being deployed productively
+  const productiveCapital = (monthlyGoalSavings + passiveIncome) // Money working for you
+  const capitalEfficiencyRatio = monthlyIncome > 0 ? (productiveCapital / monthlyIncome) * 100 : 0
+  
+  // 2️⃣ Risk Management Factor - Measures financial safety buffers
+  const emergencyFund = assets.filter(a => a.type === 'savings').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
+  const emergencyMonths = monthlyExpenses > 0 ? emergencyFund / monthlyExpenses : 0
+  const riskManagementFactor = Math.min(emergencyMonths / 6, 1) // 1.0 = 6+ months saved
+  
+  // 3️⃣ Liquidity Factor - How accessible are your assets
+  const liquidAssets = assets.filter(a => a.type === 'savings' || a.type === 'investment').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
+  const illiquidAssets = assets.filter(a => a.type === 'property' || a.type === 'vehicle').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
+  const liquidityFactor = (liquidAssets + illiquidAssets) > 0 ? liquidAssets / (liquidAssets + illiquidAssets) : 0
+  
+  // 4️⃣ Allocation Optimality - Based on diversification (simplified)
+  const assetTypes = [...new Set(assets.map(a => a.type))]
+  const allocationOptimality = Math.min(assetTypes.length / 4, 1) // Target 4+ asset types
+  
+  // 5️⃣ Adjusted Capital Efficiency (ACE) - Sophisticated deployment metric
+  const adjustedCapitalEfficiency = capitalEfficiencyRatio * riskManagementFactor * liquidityFactor * (allocationOptimality || 0.25)
+  
+  // 6️⃣ Drawdown-Adjusted Efficiency (DAE) - Risk-adjusted based on debt load
+  const debtToIncomeRatio = monthlyIncome > 0 ? monthlyDebtPayments / monthlyIncome : 0
+  const drawdownAdjustedEfficiency = capitalEfficiencyRatio * (1 - Math.min(debtToIncomeRatio, 0.5) * 2)
+  
+  // 7️⃣ Compounding Velocity (CV) - Would need historical data, using proxy
+  // Using savings rate as proxy for potential compounding velocity
+  const compoundingVelocity = savingsRate > 0 ? savingsRate * (1 + (passiveIncome / Math.max(monthlyIncome, 1))) : 0
+  
+  // 8️⃣ Allocation Diversity Score (ADS) - 0-100 score
+  const incomeStreamCount = incomeStreams.length
+  const assetTypeCount = assetTypes.length
+  const allocationDiversityScore = Math.min(((incomeStreamCount * 15) + (assetTypeCount * 20)), 100)
+  
+  // 9️⃣ Forecast Accuracy Index (FAI) - Would need historical projections vs actuals
+  // Placeholder based on whether user is hitting savings targets
+  const forecastAccuracyIndex = goals.length > 0 
+    ? goals.reduce((sum, g) => {
+        const progress = parseFloat(g.saved || '0') / parseFloat(g.target || '1')
+        return sum + Math.min(progress * 100, 100)
+      }, 0) / goals.length
+    : 50 // Default if no goals
+
+  // Overall Financial Health Score (0-100)
+  const financialHealthScore = Math.round(
+    (capitalEfficiencyRatio * 0.2) +
+    (riskManagementFactor * 100 * 0.2) +
+    (liquidityFactor * 100 * 0.15) +
+    (allocationDiversityScore * 0.15) +
+    ((100 - debtToIncomeRatio * 100) * 0.15) +
+    (Math.min(passiveCoverage, 100) * 0.15)
+  )
+
   // Australian Baby Steps with detailed content
   const australianBabySteps = [
     { 
@@ -1907,8 +1963,8 @@ export default function Dashboard() {
   const futuresPropResults = calculateFuturesProp()
   const tradingResults = calculateTradingCompound()
 
-  // Tour content
-  const tourSteps = [
+  // Budget Tour content
+  const budgetTourSteps = [
     {
       title: "Welcome to Aureus! 🌟",
       content: "I'm your AI financial companion, here to help you achieve financial freedom - where your passive income covers all your expenses so you can live life on YOUR terms.",
@@ -1944,16 +2000,53 @@ export default function Dashboard() {
     }
   ]
 
+  // Trading Tour content
+  const tradingTourSteps = [
+    {
+      title: "Welcome, Trader! 📈",
+      content: "I'm Aureus, your AI trading mentor. I'll help you stay disciplined, track your psychology, manage prop firm challenges, and compound your personal account.",
+      icon: "✨"
+    },
+    {
+      title: "Prop Firm Mastery 🏆",
+      content: "I know the rules for FTMO, MyFundedFX, The5ers, Funded Next, and more. I'll track your progress, warn you about drawdown limits, and keep you compliant.",
+      icon: "🏆"
+    },
+    {
+      title: "Psychology & Tilt Detection 🧠",
+      content: "Trading is 80% psychology. I monitor for revenge trading, overtrading, and emotional decisions. When you're tilting, I'll tell you to step away before you blow an account.",
+      icon: "🧠"
+    },
+    {
+      title: "Personal Account Compounding 💎",
+      content: "For your personal capital, consistency beats big wins. 0.5% daily = 214% yearly. I'll show you the power of compounding and help you stay patient.",
+      icon: "💎"
+    },
+    {
+      title: "Trading Rules & Discipline 📋",
+      content: "Set your own trading rules and I'll track compliance. Max trades per day, risk per trade, no trading during news - whatever keeps you profitable.",
+      icon: "📋"
+    },
+    {
+      title: "Let's Build Your Edge! 🚀",
+      content: "I'll learn your trading style, experience level, and psychological weaknesses. Then I'll be your accountability partner every trading day.",
+      icon: "💬"
+    }
+  ]
+
+  const tourSteps = appMode === 'budget' ? budgetTourSteps : tradingTourSteps
+
   // ==================== RENDER: TOUR ====================
-  if (showTour && appMode === 'budget') {
+  if (showTour) {
     const currentTourStep = tourSteps[tourStep]
+    const isBudgetMode = appMode === 'budget'
     return (
       <div style={{ minHeight: '100vh', background: darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)' : 'linear-gradient(135deg, #f0f9ff 0%, #faf5ff 100%)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ maxWidth: '600px', width: '100%', background: theme.cardBg, borderRadius: '24px', padding: '48px', textAlign: 'center' as const, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
           {/* Progress dots */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '32px' }}>
             {tourSteps.map((_, i) => (
-              <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', background: i === tourStep ? theme.accent : theme.border, transition: 'all 0.3s' }} />
+              <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', background: i === tourStep ? (isBudgetMode ? theme.accent : theme.warning) : theme.border, transition: 'all 0.3s' }} />
             ))}
           </div>
           
@@ -1966,8 +2059,8 @@ export default function Dashboard() {
           {/* Content */}
           <p style={{ fontSize: '16px', color: theme.textMuted, lineHeight: 1.7, margin: '0 0 32px 0' }}>{currentTourStep.content}</p>
           
-          {/* Visual highlight based on step */}
-          {tourStep === 1 && (
+          {/* Visual highlights for BUDGET mode */}
+          {isBudgetMode && tourStep === 1 && (
             <div style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', borderRadius: '16px', padding: '20px', marginBottom: '24px' }}>
               <div style={{ color: 'white', fontSize: '14px', opacity: 0.9 }}>Your FIRE Number</div>
               <div style={{ color: 'white', fontSize: '36px', fontWeight: 700 }}>$750,000</div>
@@ -1975,15 +2068,15 @@ export default function Dashboard() {
             </div>
           )}
           
-          {tourStep === 2 && (
+          {isBudgetMode && tourStep === 2 && (
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' as const, marginBottom: '24px' }}>
-              {['1. $1K Fund', '2. Kill Debt', '3. Full Fund', '4. Invest 15%', '5. Education', '6. Pay Home', '7. Wealth'].map((step, i) => (
+              {['1. $2K Fund', '2. Kill Debt', '3. Full Fund', '4. Invest 15%', '5. Home', '6. Pay Home', '7. Wealth'].map((step, i) => (
                 <span key={i} style={{ padding: '8px 12px', background: i === 0 ? theme.success : theme.border, color: i === 0 ? 'white' : theme.textMuted, borderRadius: '8px', fontSize: '11px', fontWeight: 600 }}>{step}</span>
               ))}
             </div>
           )}
           
-          {tourStep === 3 && (
+          {isBudgetMode && tourStep === 3 && (
             <div style={{ background: theme.bg, borderRadius: '16px', padding: '20px', marginBottom: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <span style={{ color: theme.textMuted }}>Monthly Expenses</span>
@@ -2000,6 +2093,40 @@ export default function Dashboard() {
             </div>
           )}
           
+          {/* Visual highlights for TRADING mode */}
+          {!isBudgetMode && tourStep === 1 && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+              <div style={{ background: theme.warning + '20', borderRadius: '12px', padding: '16px', border: '1px solid ' + theme.warning }}>
+                <div style={{ fontSize: '24px', marginBottom: '8px' }}>🎯</div>
+                <div style={{ color: theme.warning, fontWeight: 600 }}>FTMO</div>
+                <div style={{ color: theme.textMuted, fontSize: '12px' }}>10% target, 5% daily DD</div>
+              </div>
+              <div style={{ background: theme.purple + '20', borderRadius: '12px', padding: '16px', border: '1px solid ' + theme.purple }}>
+                <div style={{ fontSize: '24px', marginBottom: '8px' }}>💎</div>
+                <div style={{ color: theme.purple, fontWeight: 600 }}>Funded Next</div>
+                <div style={{ color: theme.textMuted, fontSize: '12px' }}>90% profit split</div>
+              </div>
+            </div>
+          )}
+          
+          {!isBudgetMode && tourStep === 2 && (
+            <div style={{ background: theme.danger + '20', borderRadius: '16px', padding: '20px', marginBottom: '24px', border: '1px solid ' + theme.danger }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: theme.text, fontWeight: 600 }}>🚨 Tilt Score</span>
+                <span style={{ color: theme.danger, fontSize: '28px', fontWeight: 700 }}>75%</span>
+              </div>
+              <div style={{ color: theme.danger, fontSize: '13px', marginTop: '8px' }}>⚠️ 4 trades after a loss - STEP AWAY!</div>
+            </div>
+          )}
+          
+          {!isBudgetMode && tourStep === 3 && (
+            <div style={{ background: theme.success + '20', borderRadius: '16px', padding: '20px', marginBottom: '24px', border: '1px solid ' + theme.success }}>
+              <div style={{ color: theme.textMuted, fontSize: '12px' }}>$5,000 → 12 months → 0.5% daily</div>
+              <div style={{ color: theme.success, fontSize: '32px', fontWeight: 700, margin: '8px 0' }}>$18,389</div>
+              <div style={{ color: theme.success, fontSize: '14px' }}>+268% growth through compounding 📈</div>
+            </div>
+          )}
+          
           {/* Buttons */}
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
             {tourStep > 0 && (
@@ -2009,18 +2136,38 @@ export default function Dashboard() {
             )}
             
             {tourStep < tourSteps.length - 1 ? (
-              <button onClick={() => setTourStep(tourStep + 1)} style={{ padding: '14px 28px', background: theme.accent, border: 'none', borderRadius: '12px', color: 'white', cursor: 'pointer', fontWeight: 600 }}>
+              <button onClick={() => setTourStep(tourStep + 1)} style={{ padding: '14px 28px', background: isBudgetMode ? theme.accent : theme.warning, border: 'none', borderRadius: '12px', color: 'white', cursor: 'pointer', fontWeight: 600 }}>
                 Next →
               </button>
             ) : (
-              <button onClick={() => { setShowTour(false); setTourCompleted(true); setBudgetOnboarding({ isActive: true, step: 'greeting' }); setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" }]) }} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', borderRadius: '12px', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>
+              <button onClick={() => { 
+                setShowTour(false); 
+                setTourCompleted(true); 
+                if (isBudgetMode) {
+                  setBudgetOnboarding({ isActive: true, step: 'greeting' }); 
+                  setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" }])
+                } else {
+                  setTradingOnboarding({ isActive: true, step: 'greeting' }); 
+                  setChatMessages([{ role: 'assistant', content: "Hey trader! 📈 I'm Aureus, your trading mentor. I'll help you stay disciplined, track your performance, and crush those prop firm challenges.\n\nWhat's your name, and how long have you been trading?" }])
+                }
+              }} style={{ padding: '14px 32px', background: isBudgetMode ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', border: 'none', borderRadius: '12px', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>
                 Let's Go! 🚀
               </button>
             )}
           </div>
           
           {/* Skip link */}
-          <button onClick={() => { setShowTour(false); setTourCompleted(true); setBudgetOnboarding({ isActive: true, step: 'greeting' }); setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" }]) }} style={{ marginTop: '24px', background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
+          <button onClick={() => { 
+            setShowTour(false); 
+            setTourCompleted(true); 
+            if (isBudgetMode) {
+              setBudgetOnboarding({ isActive: true, step: 'greeting' }); 
+              setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" }])
+            } else {
+              setTradingOnboarding({ isActive: true, step: 'greeting' }); 
+              setChatMessages([{ role: 'assistant', content: "Hey trader! 📈 I'm Aureus, your trading mentor. I'll help you stay disciplined, track your performance, and crush those prop firm challenges.\n\nWhat's your name, and how long have you been trading?" }])
+            }
+          }} style={{ marginTop: '24px', background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
             Skip tour
           </button>
         </div>
@@ -2033,7 +2180,21 @@ export default function Dashboard() {
     return (
       <div style={{ minHeight: '100vh', background: darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)' : 'linear-gradient(135deg, #f0f9ff 0%, #faf5ff 100%)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ textAlign: 'center' as const, marginBottom: '48px' }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>✨</div>
+          {/* Gold Coin Logo */}
+          <div style={{ 
+            width: '80px', 
+            height: '80px', 
+            borderRadius: '50%', 
+            background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 8px 32px rgba(245, 158, 11, 0.4)',
+            border: '4px solid #fcd34d',
+            margin: '0 auto 24px auto'
+          }}>
+            <span style={{ color: '#78350f', fontWeight: 800, fontSize: '40px' }}>A</span>
+          </div>
           <h1 style={{ fontSize: '42px', fontWeight: 800, color: theme.text, margin: '0 0 12px 0' }}>Welcome to Aureus</h1>
           <p style={{ fontSize: '18px', color: theme.textMuted, margin: 0 }}>Your AI-powered financial companion</p>
         </div>
@@ -2178,17 +2339,35 @@ export default function Dashboard() {
 
       {/* Header */}
       <header style={{ padding: '12px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky' as const, top: 0, zIndex: 100 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button onClick={() => setShowModeSelector(true)} style={{ padding: '8px 16px', background: appMode === 'budget' ? theme.success : theme.warning, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Gold Coin Logo */}
+          <div style={{ 
+            width: '36px', 
+            height: '36px', 
+            borderRadius: '50%', 
+            background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(245, 158, 11, 0.4)',
+            border: '2px solid #fcd34d'
+          }}>
+            <span style={{ color: '#78350f', fontWeight: 800, fontSize: '18px' }}>A</span>
+          </div>
+          <span style={{ color: theme.text, fontWeight: 700, fontSize: '20px' }}>Aureus</span>
+          <button onClick={() => setShowModeSelector(true)} style={{ padding: '6px 12px', background: appMode === 'budget' ? theme.success + '20' : theme.warning + '20', color: appMode === 'budget' ? theme.success : theme.warning, border: '1px solid ' + (appMode === 'budget' ? theme.success : theme.warning), borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
             {appMode === 'budget' ? '💰 Budget' : '📈 Trading'} ▼
           </button>
-          <span style={{ color: theme.text, fontWeight: 700, fontSize: '20px' }}>Aureus</span>
         </div>
         
         <div style={{ display: 'flex', gap: '8px' }}>
-          {appMode === 'budget' && ['dashboard', 'overview', 'path'].map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab as any)} style={{ padding: '8px 16px', background: activeTab === tab ? theme.accent : 'transparent', color: activeTab === tab ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, textTransform: 'capitalize' as const }}>{tab}</button>
-          ))}
+          {appMode === 'budget' && (
+            <>
+              <button onClick={() => setActiveTab('dashboard')} style={{ padding: '8px 16px', background: activeTab === 'dashboard' ? theme.accent : 'transparent', color: activeTab === 'dashboard' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>🎛️ Command Centre</button>
+              <button onClick={() => setActiveTab('path')} style={{ padding: '8px 16px', background: activeTab === 'path' ? theme.accent : 'transparent', color: activeTab === 'path' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>🛤️ Path</button>
+              <button onClick={() => setActiveTab('overview')} style={{ padding: '8px 16px', background: activeTab === 'overview' ? theme.accent : 'transparent', color: activeTab === 'overview' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>📊 Overview</button>
+            </>
+          )}
           <button onClick={() => setDarkMode(!darkMode)} style={{ padding: '8px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>{darkMode ? '☀️' : '🌙'}</button>
         </div>
       </header>
@@ -2573,11 +2752,327 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* OVERVIEW TAB */}
+        {/* OVERVIEW TAB - Financial Freedom Dashboard */}
         {appMode === 'budget' && activeTab === 'overview' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
+            
+            {/* FINANCIAL HEALTH SCORE */}
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px', marginBottom: '4px' }}>FINANCIAL HEALTH SCORE</div>
+                  <div style={{ color: theme.text, fontSize: '14px' }}>Your overall financial wellness</div>
+                </div>
+                <div style={{ textAlign: 'right' as const }}>
+                  <div style={{ 
+                    fontSize: '48px', 
+                    fontWeight: 'bold', 
+                    color: financialHealthScore >= 70 ? theme.success : financialHealthScore >= 40 ? theme.warning : theme.danger 
+                  }}>
+                    {financialHealthScore}
+                  </div>
+                  <div style={{ color: financialHealthScore >= 70 ? theme.success : financialHealthScore >= 40 ? theme.warning : theme.danger, fontSize: '14px' }}>
+                    {financialHealthScore >= 80 ? '🌟 Excellent' : financialHealthScore >= 60 ? '✅ Good' : financialHealthScore >= 40 ? '⚠️ Fair' : '🔴 Needs Work'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RAT RACE ESCAPE TRACKER */}
+            <div style={{ padding: '32px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
+              <div style={{ textAlign: 'center' as const, marginBottom: '24px' }}>
+                <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px', marginBottom: '8px' }}>RAT RACE ESCAPE TRACKER</div>
+                <div style={{ fontSize: '64px', fontWeight: 'bold', color: monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) >= 1 ? theme.success : '#f59e0b') : theme.textMuted }}>
+                  {monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) * 100).toFixed(1) : '0.0'}%
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '20px' }}>{((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? '🎉' : '🐀'}</span>
+                  <span style={{ color: ((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? theme.success : '#ef4444', fontSize: '16px' }}>
+                    {((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? 'FINANCIALLY FREE!' : 'Still in the Rat Race'}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Progress Bar with Milestones */}
+              <div style={{ position: 'relative' as const, marginBottom: '32px' }}>
+                <div style={{ height: '8px', background: '#334155', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ 
+                    width: Math.min(((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100, 100) + '%', 
+                    height: '100%', 
+                    background: 'linear-gradient(90deg, #8b5cf6, #10b981)',
+                    borderRadius: '4px',
+                    transition: 'width 0.5s ease'
+                  }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+                  {[
+                    { pct: 0, icon: '🌱', label: 'Start' },
+                    { pct: 25, icon: '🌿', label: 'Seed' },
+                    { pct: 50, icon: '🌳', label: 'Growing' },
+                    { pct: 75, icon: '⚡', label: 'Almost' },
+                    { pct: 100, icon: '💎', label: 'FREE!' }
+                  ].map((m, i) => {
+                    const reached = ((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100 >= m.pct
+                    return (
+                      <div key={i} style={{ textAlign: 'center' as const, flex: 1 }}>
+                        <div style={{ fontSize: '20px', opacity: reached ? 1 : 0.4 }}>{m.icon}</div>
+                        <div style={{ fontSize: '10px', color: reached ? theme.text : '#64748b' }}>{m.label}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              
+              {/* Stats Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                  <div style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Passive Income</div>
+                  <div style={{ color: theme.success, fontSize: '24px', fontWeight: 'bold' }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</div>
+                  <div style={{ color: '#64748b', fontSize: '11px' }}>/month</div>
+                </div>
+                <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                  <div style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Expenses</div>
+                  <div style={{ color: theme.danger, fontSize: '24px', fontWeight: 'bold' }}>${monthlyExpenses.toFixed(0)}</div>
+                  <div style={{ color: '#64748b', fontSize: '11px' }}>/month</div>
+                </div>
+                <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                  <div style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Money Works 24/7</div>
+                  <div style={{ color: theme.purple, fontSize: '24px', fontWeight: 'bold' }}>${((passiveIncome + totalPassiveQuestIncome) / 720).toFixed(2)}</div>
+                  <div style={{ color: '#64748b', fontSize: '11px' }}>/hour sleeping</div>
+                </div>
+                <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                  <div style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Gap to Freedom</div>
+                  <div style={{ color: (passiveIncome + totalPassiveQuestIncome) >= monthlyExpenses ? theme.success : theme.warning, fontSize: '24px', fontWeight: 'bold' }}>
+                    ${Math.max(0, monthlyExpenses - passiveIncome - totalPassiveQuestIncome).toFixed(0)}
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '11px' }}>{(passiveIncome + totalPassiveQuestIncome) >= monthlyExpenses ? 'COVERED! 🎉' : 'still needed'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* CASH FLOW QUADRANT */}
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>💡 Cash Flow Quadrant</h2>
+                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Move income from left → right to build freedom</p>
+                </div>
+                <div style={{ display: 'flex', gap: '16px' }}>
+                  <div style={{ textAlign: 'right' as const }}>
+                    <div style={{ fontSize: '11px', color: theme.danger }}>📊 You work</div>
+                    <div style={{ color: theme.danger, fontWeight: 700 }}>${activeIncome.toFixed(0)}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' as const }}>
+                    <div style={{ fontSize: '11px', color: theme.success }}>📈 Money works</div>
+                    <div style={{ color: theme.success, fontWeight: 700 }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</div>
+                  </div>
+                </div>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '28px' }}>👔</div>
+                    <div style={{ textAlign: 'right' as const }}>
+                      <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>${activeIncome.toFixed(0)}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>{monthlyIncome > 0 ? ((activeIncome / monthlyIncome) * 100).toFixed(0) : 0}%</div>
+                    </div>
+                  </div>
+                  <div style={{ color: theme.textMuted, fontSize: '24px', fontWeight: 300 }}>E</div>
+                  <div style={{ color: theme.text, fontWeight: 600 }}>Employee</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>You work for money</div>
+                </div>
+                
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #8b5cf6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '28px' }}>🏢</div>
+                    <div style={{ textAlign: 'right' as const }}>
+                      <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>$0</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>0%</div>
+                    </div>
+                  </div>
+                  <div style={{ color: theme.textMuted, fontSize: '24px', fontWeight: 300 }}>B</div>
+                  <div style={{ color: theme.text, fontWeight: 600 }}>Business Owner</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Systems work for you</div>
+                </div>
+                
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #f59e0b' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '28px' }}>🔧</div>
+                    <div style={{ textAlign: 'right' as const }}>
+                      <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>$0</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>0%</div>
+                    </div>
+                  </div>
+                  <div style={{ color: theme.textMuted, fontSize: '24px', fontWeight: 300 }}>S</div>
+                  <div style={{ color: theme.text, fontWeight: 600 }}>Self-Employed</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>You own a job</div>
+                </div>
+                
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #10b981' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '28px' }}>📈</div>
+                    <div style={{ textAlign: 'right' as const }}>
+                      <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>{monthlyIncome > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyIncome) * 100).toFixed(0) : 0}%</div>
+                    </div>
+                  </div>
+                  <div style={{ color: theme.textMuted, fontSize: '24px', fontWeight: 300 }}>I</div>
+                  <div style={{ color: theme.text, fontWeight: 600 }}>Investor</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Money works for you</div>
+                </div>
+              </div>
+            </div>
+
+            {/* FIRE PATH */}
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', borderRadius: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                <div>
+                  <h2 style={{ margin: 0, color: 'white', fontSize: '22px' }}>🔥 FIRE Number</h2>
+                  <p style={{ margin: '4px 0 0 0', color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>Financial Independence, Retire Early</p>
+                </div>
+                <div style={{ textAlign: 'right' as const }}>
+                  <div style={{ color: 'white', fontSize: '36px', fontWeight: 700 }}>${fiPath.fireNumber.toLocaleString()}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>{fiPath.yearsToFI < 999 ? `~${fiPath.yearsToFI} years away` : 'Start saving to calculate'}</div>
+                </div>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.15)', borderRadius: '12px', textAlign: 'center' as const }}>
+                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>Current Investments</div>
+                  <div style={{ color: 'white', fontSize: '24px', fontWeight: 700 }}>${fiPath.currentInvestments.toLocaleString()}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>{fiPath.fireNumber > 0 ? ((fiPath.currentInvestments / fiPath.fireNumber) * 100).toFixed(1) : 0}% of FIRE</div>
+                </div>
+                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.15)', borderRadius: '12px', textAlign: 'center' as const }}>
+                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>Annual Expenses</div>
+                  <div style={{ color: 'white', fontSize: '24px', fontWeight: 700 }}>${(totalOutgoing * 12).toLocaleString()}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>× 25 = FIRE Number</div>
+                </div>
+                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.15)', borderRadius: '12px', textAlign: 'center' as const }}>
+                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>4% Safe Withdrawal</div>
+                  <div style={{ color: 'white', fontSize: '24px', fontWeight: 700 }}>${(fiPath.fireNumber * 0.04 / 12).toFixed(0)}/mo</div>
+                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>At FIRE number</div>
+                </div>
+              </div>
+            </div>
+
+            {/* ADVANCED METRICS DASHBOARD */}
+            <div style={cardStyle}>
+              <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>📊 Advanced Financial Metrics</h2>
+              <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>Scientific measurements of your financial progress</p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                {/* Capital Efficiency Ratio */}
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>CER</div>
+                    <div style={{ color: capitalEfficiencyRatio >= 30 ? theme.success : capitalEfficiencyRatio >= 15 ? theme.warning : theme.danger, fontSize: '28px', fontWeight: 700 }}>
+                      {capitalEfficiencyRatio.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Capital Efficiency Ratio</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>Productive capital ÷ Income</div>
+                  <div style={{ height: '4px', background: theme.border, borderRadius: '2px', marginTop: '12px', overflow: 'hidden' }}>
+                    <div style={{ width: Math.min(capitalEfficiencyRatio, 100) + '%', height: '100%', background: theme.accent }} />
+                  </div>
+                </div>
+
+                {/* Risk Management Factor */}
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>RMF</div>
+                    <div style={{ color: riskManagementFactor >= 0.8 ? theme.success : riskManagementFactor >= 0.4 ? theme.warning : theme.danger, fontSize: '28px', fontWeight: 700 }}>
+                      {(riskManagementFactor * 100).toFixed(0)}%
+                    </div>
+                  </div>
+                  <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Risk Management Factor</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{emergencyMonths.toFixed(1)} months emergency fund</div>
+                  <div style={{ height: '4px', background: theme.border, borderRadius: '2px', marginTop: '12px', overflow: 'hidden' }}>
+                    <div style={{ width: (riskManagementFactor * 100) + '%', height: '100%', background: theme.purple }} />
+                  </div>
+                </div>
+
+                {/* Liquidity Factor */}
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>LF</div>
+                    <div style={{ color: liquidityFactor >= 0.5 ? theme.success : liquidityFactor >= 0.25 ? theme.warning : theme.danger, fontSize: '28px', fontWeight: 700 }}>
+                      {(liquidityFactor * 100).toFixed(0)}%
+                    </div>
+                  </div>
+                  <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Liquidity Factor</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>Liquid vs illiquid assets</div>
+                  <div style={{ height: '4px', background: theme.border, borderRadius: '2px', marginTop: '12px', overflow: 'hidden' }}>
+                    <div style={{ width: (liquidityFactor * 100) + '%', height: '100%', background: theme.success }} />
+                  </div>
+                </div>
+
+                {/* Adjusted Capital Efficiency */}
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>ACE</div>
+                    <div style={{ color: adjustedCapitalEfficiency >= 10 ? theme.success : adjustedCapitalEfficiency >= 5 ? theme.warning : theme.danger, fontSize: '28px', fontWeight: 700 }}>
+                      {adjustedCapitalEfficiency.toFixed(1)}
+                    </div>
+                  </div>
+                  <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Adjusted Capital Efficiency</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>CER × Risk × Liquidity × Allocation</div>
+                  <div style={{ height: '4px', background: theme.border, borderRadius: '2px', marginTop: '12px', overflow: 'hidden' }}>
+                    <div style={{ width: Math.min(adjustedCapitalEfficiency * 2, 100) + '%', height: '100%', background: theme.warning }} />
+                  </div>
+                </div>
+
+                {/* Compounding Velocity */}
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>CV</div>
+                    <div style={{ color: compoundingVelocity >= 25 ? theme.success : compoundingVelocity >= 10 ? theme.warning : theme.danger, fontSize: '28px', fontWeight: 700 }}>
+                      {compoundingVelocity.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Compounding Velocity</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>Growth acceleration potential</div>
+                  <div style={{ height: '4px', background: theme.border, borderRadius: '2px', marginTop: '12px', overflow: 'hidden' }}>
+                    <div style={{ width: Math.min(compoundingVelocity, 100) + '%', height: '100%', background: theme.accent }} />
+                  </div>
+                </div>
+
+                {/* Allocation Diversity Score */}
+                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>ADS</div>
+                    <div style={{ color: allocationDiversityScore >= 60 ? theme.success : allocationDiversityScore >= 30 ? theme.warning : theme.danger, fontSize: '28px', fontWeight: 700 }}>
+                      {allocationDiversityScore}
+                    </div>
+                  </div>
+                  <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Allocation Diversity Score</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{incomeStreamCount} income streams, {assetTypeCount} asset types</div>
+                  <div style={{ height: '4px', background: theme.border, borderRadius: '2px', marginTop: '12px', overflow: 'hidden' }}>
+                    <div style={{ width: allocationDiversityScore + '%', height: '100%', background: theme.purple }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Forecast Accuracy */}
+              <div style={{ marginTop: '16px', padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>📎 Forecast Accuracy Index (FAI)</div>
+                    <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>How well you're tracking toward your goals</div>
+                  </div>
+                  <div style={{ color: forecastAccuracyIndex >= 70 ? theme.success : forecastAccuracyIndex >= 40 ? theme.warning : theme.danger, fontSize: '32px', fontWeight: 700 }}>
+                    {forecastAccuracyIndex.toFixed(0)}%
+                  </div>
+                </div>
+                <div style={{ height: '8px', background: theme.border, borderRadius: '4px', marginTop: '16px', overflow: 'hidden' }}>
+                  <div style={{ width: forecastAccuracyIndex + '%', height: '100%', background: 'linear-gradient(90deg, ' + theme.warning + ', ' + theme.success + ')' }} />
+                </div>
+              </div>
+            </div>
+
+            {/* NET WORTH & ASSETS/LIABILITIES */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Monthly Income</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 700 }}>${monthlyIncome.toFixed(0)}</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>Active: ${activeIncome.toFixed(0)} | Passive: ${passiveIncome.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Monthly Income</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 700 }}>${monthlyIncome.toFixed(0)}</div></div>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Monthly Outgoing</div><div style={{ color: theme.danger, fontSize: '24px', fontWeight: 700 }}>${totalOutgoing.toFixed(0)}</div></div>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Monthly Surplus</div><div style={{ color: monthlySurplus >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${monthlySurplus.toFixed(0)}</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{savingsRate.toFixed(0)}% savings rate</div></div>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Net Worth</div><div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${netWorth.toFixed(0)}</div></div>
@@ -2589,7 +3084,7 @@ export default function Dashboard() {
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                   <input placeholder="Asset name" value={newAsset.name} onChange={e => setNewAsset({...newAsset, name: e.target.value})} style={{...inputStyle, flex: 1}} />
                   <input placeholder="Value" type="number" value={newAsset.value} onChange={e => setNewAsset({...newAsset, value: e.target.value})} style={{...inputStyle, width: '100px'}} />
-                  <select value={newAsset.type} onChange={e => setNewAsset({...newAsset, type: e.target.value})} style={inputStyle}><option value="savings">Savings</option><option value="investment">Investment</option><option value="property">Property</option><option value="other">Other</option></select>
+                  <select value={newAsset.type} onChange={e => setNewAsset({...newAsset, type: e.target.value})} style={inputStyle}><option value="savings">Savings</option><option value="investment">Investment</option><option value="property">Property</option><option value="vehicle">Vehicle</option><option value="other">Other</option></select>
                   <button onClick={addAsset} style={btnSuccess}>+</button>
                 </div>
                 {assets.map(a => (
@@ -2619,178 +3114,31 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* PATH TAB */}
+        {/* PATH TAB - Baby Steps & Quest Board */}
         {appMode === 'budget' && activeTab === 'path' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             
-            {/* RAT RACE ESCAPE TRACKER */}
-            <div style={{ padding: '32px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
-              <div style={{ textAlign: 'center' as const, marginBottom: '24px' }}>
-                <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px', marginBottom: '8px' }}>RAT RACE ESCAPE TRACKER</div>
-                <div style={{ fontSize: '64px', fontWeight: 'bold', color: monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) >= 1 ? theme.success : '#f59e0b') : theme.textMuted }}>
-                  {monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) * 100).toFixed(1) : '0.0'}%
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '20px' }}>{((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? '🎉' : '🐀'}</span>
-                  <span style={{ color: ((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? theme.success : '#ef4444', fontSize: '16px' }}>
-                    {((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) >= 1 ? 'FINANCIALLY FREE!' : 'Still in the Rat Race'}
-                  </span>
-                </div>
+            {/* Current Progress Summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Current Baby Step</div>
+                <div style={{ color: theme.accent, fontSize: '32px', fontWeight: 700 }}>{currentBabyStep.step}</div>
+                <div style={{ color: theme.text, fontSize: '13px' }}>{currentBabyStep.title}</div>
               </div>
-              
-              {/* Progress Bar with Milestones */}
-              <div style={{ position: 'relative' as const, marginBottom: '32px' }}>
-                <div style={{ height: '8px', background: '#334155', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ 
-                    width: Math.min(((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100, 100) + '%', 
-                    height: '100%', 
-                    background: 'linear-gradient(90deg, #8b5cf6, #10b981)',
-                    borderRadius: '4px',
-                    transition: 'width 0.5s ease'
-                  }} />
-                </div>
-                {/* Milestones */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', position: 'relative' as const }}>
-                  {[
-                    { pct: 0, icon: '🌱', label: 'Start' },
-                    { pct: 25, icon: '🌿', label: 'Seed Planted' },
-                    { pct: 50, icon: '🌳', label: 'Growing' },
-                    { pct: 75, icon: '⚡', label: 'Almost There' },
-                    { pct: 100, icon: '💎', label: 'FREE!' }
-                  ].map((m, i) => {
-                    const reached = ((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100 >= m.pct
-                    return (
-                      <div key={i} style={{ textAlign: 'center' as const, flex: 1 }}>
-                        <div style={{ fontSize: '20px', opacity: reached ? 1 : 0.4 }}>{m.icon}</div>
-                        <div style={{ fontSize: '10px', color: reached ? theme.text : '#64748b', marginTop: '4px' }}>{m.label}</div>
-                      </div>
-                    )
-                  })}
-                </div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Passive Income</div>
+                <div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</div>
+                <div style={{ color: theme.textMuted, fontSize: '11px' }}>/month</div>
               </div>
-              
-              {/* Stats Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '20px' }}>
-                <div style={{ padding: '20px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
-                  <div style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Passive Income</div>
-                  <div style={{ color: theme.success, fontSize: '28px', fontWeight: 'bold' }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</div>
-                  <div style={{ color: '#64748b', fontSize: '12px' }}>/month</div>
-                </div>
-                <div style={{ padding: '20px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
-                  <div style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Total Outgoing</div>
-                  <div style={{ color: theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${monthlyExpenses.toFixed(0)}</div>
-                  <div style={{ color: '#64748b', fontSize: '12px' }}>/month</div>
-                </div>
-                <div style={{ padding: '20px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
-                  <div style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Money Works 24/7</div>
-                  <div style={{ color: theme.purple, fontSize: '28px', fontWeight: 'bold' }}>${((passiveIncome + totalPassiveQuestIncome) / 720).toFixed(2)}</div>
-                  <div style={{ color: '#64748b', fontSize: '12px' }}>/hour while you sleep</div>
-                </div>
-                <div style={{ padding: '20px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
-                  <div style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Gap to Freedom</div>
-                  <div style={{ color: (passiveIncome + totalPassiveQuestIncome) >= monthlyExpenses ? theme.success : theme.warning, fontSize: '28px', fontWeight: 'bold' }}>
-                    ${Math.max(0, monthlyExpenses - passiveIncome - totalPassiveQuestIncome).toFixed(0)}
-                  </div>
-                  <div style={{ color: '#64748b', fontSize: '12px' }}>{(passiveIncome + totalPassiveQuestIncome) >= monthlyExpenses ? 'COVERED! 🎉' : 'still needed'}</div>
-                </div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Quest Progress</div>
+                <div style={{ color: theme.purple, fontSize: '28px', fontWeight: 700 }}>{passiveQuests.filter(q => q.status === 'completed').length}/{passiveQuests.length}</div>
+                <div style={{ color: theme.textMuted, fontSize: '11px' }}>completed</div>
               </div>
-              
-              {/* Next Milestone */}
-              {(() => {
-                const coverage = ((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100
-                const nextMilestone = coverage < 25 ? { pct: 25, icon: '🌱', name: 'Seed Planted' } 
-                  : coverage < 50 ? { pct: 50, icon: '🌳', name: 'Growing' }
-                  : coverage < 75 ? { pct: 75, icon: '⚡', name: 'Almost There' }
-                  : coverage < 100 ? { pct: 100, icon: '💎', name: 'Financial Freedom' }
-                  : null
-                if (!nextMilestone) return null
-                const needed = (nextMilestone.pct / 100) * monthlyExpenses - (passiveIncome + totalPassiveQuestIncome)
-                return (
-                  <div style={{ padding: '16px', background: 'linear-gradient(90deg, #8b5cf620, #10b98120)', borderRadius: '12px', textAlign: 'center' as const }}>
-                    <span style={{ color: '#64748b' }}>Next: </span>
-                    <span style={{ fontSize: '16px' }}>{nextMilestone.icon}</span>
-                    <span style={{ color: theme.purple, fontWeight: 600 }}> {nextMilestone.name}</span>
-                    <span style={{ color: '#64748b' }}> — need ${needed.toFixed(0)} more passive income</span>
-                  </div>
-                )
-              })()}
-            </div>
-
-            {/* CASH FLOW QUADRANT */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <div>
-                  <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>💡 Cash Flow Quadrant</h2>
-                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Move income from left → right to build freedom</p>
-                </div>
-                <div style={{ display: 'flex', gap: '16px' }}>
-                  <div style={{ textAlign: 'right' as const }}>
-                    <div style={{ fontSize: '11px', color: theme.danger }}>📊 You work</div>
-                    <div style={{ color: theme.danger, fontWeight: 700 }}>${activeIncome.toFixed(0)}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' as const }}>
-                    <div style={{ fontSize: '11px', color: theme.success }}>📈 Money works</div>
-                    <div style={{ color: theme.success, fontWeight: 700 }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</div>
-                  </div>
-                </div>
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                {/* Employee */}
-                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                    <div style={{ fontSize: '28px' }}>👔</div>
-                    <div style={{ textAlign: 'right' as const }}>
-                      <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>${incomeStreams.filter(i => i.type === 'active').reduce((sum, i) => sum + convertToMonthly(parseFloat(i.amount || '0'), i.frequency), 0).toFixed(0)}</div>
-                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>{monthlyIncome > 0 ? ((incomeStreams.filter(i => i.type === 'active').reduce((sum, i) => sum + convertToMonthly(parseFloat(i.amount || '0'), i.frequency), 0) / monthlyIncome) * 100).toFixed(0) : 0}%</div>
-                    </div>
-                  </div>
-                  <div style={{ color: theme.textMuted, fontSize: '24px', fontWeight: 300, marginBottom: '4px' }}>E</div>
-                  <div style={{ color: theme.text, fontWeight: 600 }}>Employee</div>
-                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>You work for money</div>
-                </div>
-                
-                {/* Business Owner */}
-                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #8b5cf6' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                    <div style={{ fontSize: '28px' }}>🏢</div>
-                    <div style={{ textAlign: 'right' as const }}>
-                      <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>$0</div>
-                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>0%</div>
-                    </div>
-                  </div>
-                  <div style={{ color: theme.textMuted, fontSize: '24px', fontWeight: 300, marginBottom: '4px' }}>B</div>
-                  <div style={{ color: theme.text, fontWeight: 600 }}>Business Owner</div>
-                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Systems work for you</div>
-                </div>
-                
-                {/* Self-Employed */}
-                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #f59e0b' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                    <div style={{ fontSize: '28px' }}>🔧</div>
-                    <div style={{ textAlign: 'right' as const }}>
-                      <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>$0</div>
-                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>0%</div>
-                    </div>
-                  </div>
-                  <div style={{ color: theme.textMuted, fontSize: '24px', fontWeight: 300, marginBottom: '4px' }}>S</div>
-                  <div style={{ color: theme.text, fontWeight: 600 }}>Self-Employed</div>
-                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>You own a job</div>
-                </div>
-                
-                {/* Investor */}
-                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #10b981' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                    <div style={{ fontSize: '28px' }}>📈</div>
-                    <div style={{ textAlign: 'right' as const }}>
-                      <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</div>
-                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>{monthlyIncome > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyIncome) * 100).toFixed(0) : 0}%</div>
-                    </div>
-                  </div>
-                  <div style={{ color: theme.textMuted, fontSize: '24px', fontWeight: 300, marginBottom: '4px' }}>I</div>
-                  <div style={{ color: theme.text, fontWeight: 600 }}>Investor</div>
-                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Money works for you</div>
-                </div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
+                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Freedom Progress</div>
+                <div style={{ color: theme.warning, fontSize: '28px', fontWeight: 700 }}>{monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) * 100).toFixed(0) : 0}%</div>
+                <div style={{ color: theme.textMuted, fontSize: '11px' }}>passive coverage</div>
               </div>
             </div>
 
