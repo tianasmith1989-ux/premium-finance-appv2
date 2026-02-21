@@ -1869,10 +1869,10 @@ export default function Dashboard() {
     setChatMessages([])
     if (mode === 'budget') {
       setBudgetOnboarding({ isActive: true, step: 'greeting' })
-      setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" }])
+      setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial operations coach. I'll help you optimize your cash flow, eliminate liabilities, and build automated revenue streams.\n\nLet's get to know each other. What should I call you?" }])
     } else {
       setTradingOnboarding({ isActive: true, step: 'greeting' })
-      setChatMessages([{ role: 'assistant', content: "Hey trader! 📈 I'm Aureus, your trading mentor. I'll help you stay disciplined, track your performance, and crush those prop firm challenges.\n\nWhat's your name, and how long have you been trading?" }])
+      setChatMessages([{ role: 'assistant', content: "Hey! 📈 I'm Aureus, your trading operations coach. I'll help you optimize your trading capital, maintain discipline, and scale your accounts systematically.\n\nWhat's your name, and how long have you been trading?" }])
     }
   }
 
@@ -1882,11 +1882,17 @@ export default function Dashboard() {
     setActiveTab(mode === 'budget' ? 'dashboard' : 'trading')
     setChatMessages([])
     setProactiveInsight(null)
+    setTourStep(0) // Reset tour step
     
     const memory = mode === 'budget' ? budgetMemory : tradingMemory
-    if (!memory.onboardingComplete) {
+    if (!memory.onboardingComplete && !tourCompleted) {
+      // Show tour for new users
+      setShowTour(true)
+    } else if (!memory.onboardingComplete) {
+      // Tour completed but onboarding not done
       startOnboarding(mode)
     } else {
+      // Returning user
       fetchProactiveInsight(mode)
     }
   }
@@ -2145,10 +2151,10 @@ export default function Dashboard() {
                 setTourCompleted(true); 
                 if (isBudgetMode) {
                   setBudgetOnboarding({ isActive: true, step: 'greeting' }); 
-                  setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" }])
+                  setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial operations coach. I'll help you optimize your cash flow, eliminate liabilities, and build automated revenue streams.\n\nLet's get to know each other. What should I call you?" }])
                 } else {
                   setTradingOnboarding({ isActive: true, step: 'greeting' }); 
-                  setChatMessages([{ role: 'assistant', content: "Hey trader! 📈 I'm Aureus, your trading mentor. I'll help you stay disciplined, track your performance, and crush those prop firm challenges.\n\nWhat's your name, and how long have you been trading?" }])
+                  setChatMessages([{ role: 'assistant', content: "Hey! 📈 I'm Aureus, your trading operations coach. I'll help you optimize your trading capital, maintain discipline, and scale your accounts systematically.\n\nWhat's your name, and how long have you been trading?" }])
                 }
               }} style={{ padding: '14px 32px', background: isBudgetMode ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', border: 'none', borderRadius: '12px', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>
                 Let's Go! 🚀
@@ -2162,10 +2168,10 @@ export default function Dashboard() {
             setTourCompleted(true); 
             if (isBudgetMode) {
               setBudgetOnboarding({ isActive: true, step: 'greeting' }); 
-              setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" }])
+              setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial operations coach. I'll help you optimize your cash flow, eliminate liabilities, and build automated revenue streams.\n\nLet's get to know each other. What should I call you?" }])
             } else {
               setTradingOnboarding({ isActive: true, step: 'greeting' }); 
-              setChatMessages([{ role: 'assistant', content: "Hey trader! 📈 I'm Aureus, your trading mentor. I'll help you stay disciplined, track your performance, and crush those prop firm challenges.\n\nWhat's your name, and how long have you been trading?" }])
+              setChatMessages([{ role: 'assistant', content: "Hey! 📈 I'm Aureus, your trading operations coach. I'll help you optimize your trading capital, maintain discipline, and scale your accounts systematically.\n\nWhat's your name, and how long have you been trading?" }])
             }
           }} style={{ marginTop: '24px', background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
             Skip tour
@@ -2196,35 +2202,25 @@ export default function Dashboard() {
             <span style={{ color: '#78350f', fontWeight: 800, fontSize: '40px' }}>A</span>
           </div>
           <h1 style={{ fontSize: '42px', fontWeight: 800, color: theme.text, margin: '0 0 12px 0' }}>Welcome to Aureus</h1>
-          <p style={{ fontSize: '18px', color: theme.textMuted, margin: 0 }}>Your AI-powered financial companion</p>
+          <p style={{ fontSize: '18px', color: theme.textMuted, margin: 0 }}>Optimize the tool we call money</p>
         </div>
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', maxWidth: '700px', width: '100%' }}>
-          <button onClick={() => { 
-            setAppMode('budget')
-            setShowModeSelector(false)
-            // Show tour for new users, skip for returning users
-            if (!budgetMemory.onboardingComplete && !tourCompleted) {
-              setShowTour(true)
-            } else if (!budgetMemory.onboardingComplete) {
-              setBudgetOnboarding({ isActive: true, step: 'greeting' })
-              setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial companion. I'm here to help you take control of your money - whether that's crushing debt, building savings, or escaping the rat race.\n\nLet's get to know each other. What should I call you?" }])
-            }
-          }} style={{ padding: '32px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left' as const }}>
+          <button onClick={() => handleModeSelect('budget')} style={{ padding: '32px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left' as const }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>💰</div>
             <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 700, margin: '0 0 8px 0' }}>Budget Mode</h2>
-            <p style={{ color: 'rgba(255,255,255,0.9)', margin: '0 0 16px 0', fontSize: '14px' }}>{budgetMemory.onboardingComplete ? `Welcome back${budgetMemory.name ? ', ' + budgetMemory.name : ''}!` : 'Get set up in 5 minutes'}</p>
+            <p style={{ color: 'rgba(255,255,255,0.9)', margin: '0 0 16px 0', fontSize: '14px' }}>{budgetMemory.onboardingComplete ? `Welcome back${budgetMemory.name ? ', ' + budgetMemory.name : ''}!` : 'Optimize your financial operations'}</p>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-              {['Baby Steps', 'FIRE Path', 'Calendar', 'Goals'].map(tag => <span key={tag} style={{ padding: '4px 10px', background: 'rgba(255,255,255,0.2)', borderRadius: '12px', fontSize: '11px', color: 'white' }}>{tag}</span>)}
+              {['Baby Steps', 'FIRE Path', 'Automation', 'Growth'].map(tag => <span key={tag} style={{ padding: '4px 10px', background: 'rgba(255,255,255,0.2)', borderRadius: '12px', fontSize: '11px', color: 'white' }}>{tag}</span>)}
             </div>
           </button>
           
           <button onClick={() => handleModeSelect('trading')} style={{ padding: '32px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left' as const }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>📈</div>
             <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 700, margin: '0 0 8px 0' }}>Trading Mode</h2>
-            <p style={{ color: 'rgba(255,255,255,0.9)', margin: '0 0 16px 0', fontSize: '14px' }}>{tradingMemory.onboardingComplete ? `Welcome back${tradingMemory.name ? ', ' + tradingMemory.name : ''}!` : 'Get set up in 5 minutes'}</p>
+            <p style={{ color: 'rgba(255,255,255,0.9)', margin: '0 0 16px 0', fontSize: '14px' }}>{tradingMemory.onboardingComplete ? `Welcome back${tradingMemory.name ? ', ' + tradingMemory.name : ''}!` : 'Master your trading operations'}</p>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-              {['Prop Firms', 'Journal', 'Calculator'].map(tag => <span key={tag} style={{ padding: '4px 10px', background: 'rgba(255,255,255,0.2)', borderRadius: '12px', fontSize: '11px', color: 'white' }}>{tag}</span>)}
+              {['Prop Firms', 'Psychology', 'Compounding'].map(tag => <span key={tag} style={{ padding: '4px 10px', background: 'rgba(255,255,255,0.2)', borderRadius: '12px', fontSize: '11px', color: 'white' }}>{tag}</span>)}
             </div>
           </button>
         </div>
@@ -2477,10 +2473,10 @@ export default function Dashboard() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-              {/* Income */}
+              {/* Revenue Streams */}
               <div style={cardStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ margin: 0, color: theme.success, fontSize: '18px' }}>💰 Income</h3>
+                  <h3 style={{ margin: 0, color: theme.success, fontSize: '18px' }}>💰 Revenue Streams</h3>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <input type="file" ref={payslipInputRef} accept="image/*,.pdf" onChange={handlePayslipUpload} style={{ display: 'none' }} />
                     <button onClick={() => payslipInputRef.current?.click()} style={{ padding: '4px 12px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} disabled={payslipProcessing}>
@@ -2490,15 +2486,15 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
-                  <input placeholder="Source" value={newIncome.name} onChange={e => setNewIncome({...newIncome, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '120px'}} />
+                  <input placeholder="Revenue source" value={newIncome.name} onChange={e => setNewIncome({...newIncome, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '120px'}} />
                   <input placeholder="Amount" type="number" value={newIncome.amount} onChange={e => setNewIncome({...newIncome, amount: e.target.value})} style={{...inputStyle, width: '100px'}} />
                   <select value={newIncome.frequency} onChange={e => setNewIncome({...newIncome, frequency: e.target.value})} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select>
-                  <select value={newIncome.type} onChange={e => setNewIncome({...newIncome, type: e.target.value})} style={inputStyle}><option value="active">Active</option><option value="passive">Passive</option></select>
+                  <select value={newIncome.type} onChange={e => setNewIncome({...newIncome, type: e.target.value})} style={inputStyle}><option value="active">Active</option><option value="passive">Automated</option></select>
                   <input type="date" value={newIncome.startDate} onChange={e => setNewIncome({...newIncome, startDate: e.target.value})} style={{...inputStyle, width: '130px'}} />
                   <button onClick={addIncome} style={btnSuccess}>+</button>
                 </div>
                 <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>
-                  {incomeStreams.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No income yet</p> : incomeStreams.map(inc => (
+                  {incomeStreams.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No revenue streams yet</p> : incomeStreams.map(inc => (
                     editingItem?.type === 'income' && editingItem.id === inc.id ? (
                       <div key={inc.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px' }}>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
@@ -2514,7 +2510,7 @@ export default function Dashboard() {
                       </div>
                     ) : (
                       <div key={inc.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div><div style={{ color: theme.text, fontWeight: 600 }}>{inc.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{inc.frequency} • {inc.type} • {inc.startDate}</div></div>
+                        <div><div style={{ color: theme.text, fontWeight: 600 }}>{inc.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{inc.frequency} • {inc.type === 'passive' ? 'automated' : inc.type} • {inc.startDate}</div></div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ color: theme.success, fontWeight: 700 }}>${inc.amount}</span>
                           <button onClick={() => startEdit('income', inc)} style={{ padding: '4px 8px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
@@ -2526,10 +2522,10 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Expenses */}
+              {/* Operating Costs */}
               <div style={cardStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ margin: 0, color: theme.danger, fontSize: '18px' }}>💸 Expenses</h3>
+                  <h3 style={{ margin: 0, color: theme.danger, fontSize: '18px' }}>💸 Operating Costs</h3>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => setShowPresets(!showPresets)} style={{ padding: '4px 12px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Presets</button>
                     <input type="file" ref={fileInputRef} accept=".csv" onChange={handleCsvUpload} style={{ display: 'none' }} />
@@ -2611,7 +2607,7 @@ export default function Dashboard() {
               {/* Debts with Payoff Calculator */}
               <div style={cardStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ margin: 0, color: theme.warning, fontSize: '18px' }}>💳 Debts</h3>
+                  <h3 style={{ margin: 0, color: theme.warning, fontSize: '18px' }}>💳 Liabilities</h3>
                   <span style={{ color: theme.warning, fontWeight: 700 }}>${totalDebtBalance.toFixed(0)}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
@@ -2680,7 +2676,7 @@ export default function Dashboard() {
 
               {/* Goals */}
               <div style={cardStyle}>
-                <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🎯 Goals</h3>
+                <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🎯 Capital Targets</h3>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
                   <input placeholder="Goal name" value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
                   <input placeholder="Target $" type="number" value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})} style={{...inputStyle, width: '90px'}} />
@@ -2756,12 +2752,12 @@ export default function Dashboard() {
         {appMode === 'budget' && activeTab === 'overview' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             
-            {/* FINANCIAL HEALTH SCORE */}
+            {/* FINANCIAL OPERATIONS SCORE */}
             <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px', marginBottom: '4px' }}>FINANCIAL HEALTH SCORE</div>
-                  <div style={{ color: theme.text, fontSize: '14px' }}>Your overall financial wellness</div>
+                  <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px', marginBottom: '4px' }}>FINANCIAL OPERATIONS SCORE</div>
+                  <div style={{ color: theme.text, fontSize: '14px' }}>How efficiently your money machine is running</div>
                 </div>
                 <div style={{ textAlign: 'right' as const }}>
                   <div style={{ 
@@ -3072,9 +3068,9 @@ export default function Dashboard() {
 
             {/* NET WORTH & ASSETS/LIABILITIES */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Monthly Income</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 700 }}>${monthlyIncome.toFixed(0)}</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Monthly Outgoing</div><div style={{ color: theme.danger, fontSize: '24px', fontWeight: 700 }}>${totalOutgoing.toFixed(0)}</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Monthly Surplus</div><div style={{ color: monthlySurplus >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${monthlySurplus.toFixed(0)}</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{savingsRate.toFixed(0)}% savings rate</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Monthly Revenue</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 700 }}>${monthlyIncome.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Operating Costs</div><div style={{ color: theme.danger, fontSize: '24px', fontWeight: 700 }}>${totalOutgoing.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Net Profit</div><div style={{ color: monthlySurplus >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${monthlySurplus.toFixed(0)}</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{savingsRate.toFixed(0)}% profit margin</div></div>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Net Worth</div><div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${netWorth.toFixed(0)}</div></div>
             </div>
 
@@ -3268,15 +3264,259 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Passive Income Quest Board - Professional Design */}
+            {/* Australian Baby Steps - Enhanced Interactive */}
+            <div style={cardStyle}>
+              <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>👶 Australian Baby Steps</h2>
+              <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 20px 0' }}>Click any step for detailed guidance from Aureus!</p>
+              
+              {/* Baby Step Detail Modal */}
+              {selectedBabyStep !== null && (() => {
+                const step = australianBabySteps.find(s => s.step === selectedBabyStep)
+                if (!step) return null
+                const isCurrent = step.step === currentBabyStep.step
+                const done = step.step < currentBabyStep.step
+                return (
+                  <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setSelectedBabyStep(null)}>
+                    <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '650px', width: '100%', maxHeight: '85vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>{done ? '✓' : step.icon}</div>
+                          <div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Step {step.step} of 7</div>
+                            <h3 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>{step.title}</h3>
+                          </div>
+                        </div>
+                        <button onClick={() => setSelectedBabyStep(null)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
+                      </div>
+                      
+                      {done && (
+                        <div style={{ background: theme.success + '20', borderRadius: '12px', padding: '16px', marginBottom: '20px', textAlign: 'center' as const }}>
+                          <span style={{ fontSize: '24px' }}>🎉</span>
+                          <span style={{ color: theme.success, fontWeight: 700, marginLeft: '8px' }}>You've completed this step!</span>
+                        </div>
+                      )}
+                      
+                      {isCurrent && currentBabyStep.target && currentBabyStep.target > 0 && (
+                        <div style={{ background: theme.warning + '20', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <span style={{ color: theme.warning, fontWeight: 600 }}>Your Progress</span>
+                            <span style={{ color: theme.text, fontWeight: 700 }}>${currentBabyStep.current?.toFixed(0) || 0} / ${currentBabyStep.target?.toFixed(0)}</span>
+                          </div>
+                          <div style={{ height: '10px', background: theme.border, borderRadius: '5px', overflow: 'hidden' }}>
+                            <div style={{ width: Math.min(currentBabyStep.progress || 0, 100) + '%', height: '100%', background: theme.warning }} />
+                          </div>
+                          <div style={{ textAlign: 'right' as const, marginTop: '4px', fontSize: '12px', color: theme.textMuted }}>{(currentBabyStep.progress || 0).toFixed(1)}% complete</div>
+                        </div>
+                      )}
+                      
+                      <div style={{ background: darkMode ? '#1e293b' : '#f0fdf4', borderRadius: '12px', padding: '16px', marginBottom: '20px', borderLeft: '4px solid ' + theme.success }}>
+                        <p style={{ margin: 0, color: theme.text, fontSize: '14px', lineHeight: 1.7 }}>💡 <strong>Aureus says:</strong> {step.aureusAdvice}</p>
+                      </div>
+                      
+                      <h4 style={{ color: theme.text, margin: '0 0 12px 0' }}>✅ Tips for this step:</h4>
+                      <ul style={{ margin: 0, paddingLeft: '20px', color: theme.text, lineHeight: 2 }}>
+                        {step.tips?.map((tip: string, idx: number) => (
+                          <li key={idx} style={{ marginBottom: '4px' }}>{tip}</li>
+                        ))}
+                      </ul>
+                      
+                      {/* Home Ownership Calculator for Step 5 */}
+                      {step.step === 5 && (
+                        <div style={{ marginTop: '24px', padding: '20px', background: darkMode ? '#1e293b' : '#fef3c7', borderRadius: '12px', border: '2px solid ' + theme.warning }}>
+                          <h4 style={{ color: theme.warning, margin: '0 0 16px 0' }}>🏠 Australian Home Buying Calculator</h4>
+                          
+                          <div style={{ marginBottom: '16px' }}>
+                            <div style={{ fontWeight: 600, color: theme.text, marginBottom: '8px' }}>Example: $600,000 Home</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '13px' }}>
+                              <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px' }}>
+                                <div style={{ color: theme.textMuted, marginBottom: '4px' }}>5% Deposit</div>
+                                <div style={{ color: theme.text, fontWeight: 700 }}>$30,000</div>
+                                <div style={{ color: theme.danger, fontSize: '11px' }}>+ ~$15k LMI</div>
+                              </div>
+                              <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px' }}>
+                                <div style={{ color: theme.textMuted, marginBottom: '4px' }}>10% Deposit</div>
+                                <div style={{ color: theme.text, fontWeight: 700 }}>$60,000</div>
+                                <div style={{ color: theme.warning, fontSize: '11px' }}>+ ~$8k LMI</div>
+                              </div>
+                              <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px' }}>
+                                <div style={{ color: theme.textMuted, marginBottom: '4px' }}>20% Deposit</div>
+                                <div style={{ color: theme.text, fontWeight: 700 }}>$120,000</div>
+                                <div style={{ color: theme.success, fontSize: '11px' }}>No LMI! ✓</div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div style={{ marginBottom: '16px' }}>
+                            <div style={{ fontWeight: 600, color: theme.text, marginBottom: '8px' }}>🎁 First Home Buyer Grants</div>
+                            <div style={{ fontSize: '13px', color: theme.text, lineHeight: 1.8 }}>
+                              {Object.entries(australianHomeData.firstHomeBuyerGrants).map(([state, grant]) => (
+                                <div key={state} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <span style={{ fontWeight: 500 }}>{state.toUpperCase()}:</span>
+                                  <span>{grant}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div style={{ fontWeight: 600, color: theme.text, marginBottom: '8px' }}>🏛️ Government Schemes</div>
+                            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                              {australianHomeData.schemes.map((scheme, idx) => (
+                                <div key={idx} style={{ padding: '10px', background: theme.cardBg, borderRadius: '8px', fontSize: '13px' }}>
+                                  <span style={{ fontWeight: 600, color: theme.accent }}>{scheme.name}:</span>
+                                  <span style={{ color: theme.textMuted, marginLeft: '8px' }}>{scheme.description}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <button onClick={() => {
+                        setSelectedBabyStep(null)
+                        // Send message to Aureus about this step
+                        setChatInput(`Tell me more about ${step.title}`)
+                      }} style={{ width: '100%', marginTop: '20px', padding: '14px', background: theme.accent, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}>
+                        💬 Ask Aureus About This Step
+                      </button>
+                    </div>
+                  </div>
+                )
+              })()}
+              
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                {australianBabySteps.map((item) => {
+                  const isCurrent = item.step === currentBabyStep.step
+                  const done = item.step < currentBabyStep.step
+                  return (
+                    <div key={item.step} onClick={() => setSelectedBabyStep(item.step)} style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '16px', background: done ? (darkMode ? '#1e3a32' : '#f0fdf4') : isCurrent ? (darkMode ? '#2e2a1e' : '#fefce8') : (darkMode ? '#334155' : '#f8fafc'), borderRadius: '12px', border: done ? '2px solid ' + theme.success : isCurrent ? '2px solid ' + theme.warning : '1px solid ' + theme.border, cursor: 'pointer', transition: 'transform 0.2s' }}>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' }}>{done ? '✓' : item.icon}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{item.title}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '13px' }}>{item.desc}</div>
+                        {isCurrent && currentBabyStep.target && currentBabyStep.target > 0 && (
+                          <div style={{ marginTop: '8px' }}>
+                            <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: Math.min(currentBabyStep.progress || 0, 100) + '%', height: '100%', background: theme.warning }} />
+                            </div>
+                            <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '4px' }}>${currentBabyStep.current?.toFixed(0) || 0} / ${currentBabyStep.target?.toFixed(0) || 0}</div>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '4px' }}>
+                        <div style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, background: done ? theme.success : isCurrent ? theme.warning : theme.border, color: done || isCurrent ? 'white' : theme.textMuted }}>{done ? '✓ Complete' : isCurrent ? '→ Current' : 'Pending'}</div>
+                        <div style={{ color: theme.accent, fontSize: '12px' }}>Click for details →</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* AUSTRALIAN HOME BUYING GUIDE */}
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '32px' }}>🏠</span>
+                    <div>
+                      <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>Australian Home Buying Guide</h2>
+                      <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Your roadmap to property ownership</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Deposit Comparison */}
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ color: theme.warning, fontSize: '16px', margin: '0 0 12px 0' }}>💰 Deposit Options (on $600k home)</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                  <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>5% Deposit</div>
+                    <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>$30,000</div>
+                    <div style={{ color: theme.danger, fontSize: '12px' }}>+ $15,000 LMI</div>
+                    <div style={{ marginTop: '8px', padding: '4px 8px', background: theme.success + '20', borderRadius: '4px', fontSize: '11px', color: theme.success }}>First Home Guarantee: No LMI!</div>
+                  </div>
+                  <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>10% Deposit</div>
+                    <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>$60,000</div>
+                    <div style={{ color: theme.warning, fontSize: '12px' }}>+ $8,000 LMI</div>
+                  </div>
+                  <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const, border: '2px solid ' + theme.success }}>
+                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>20% Deposit</div>
+                    <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>$120,000</div>
+                    <div style={{ color: theme.success, fontSize: '12px' }}>No LMI! ✓</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* First Home Buyer Grants */}
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ color: theme.success, fontSize: '16px', margin: '0 0 12px 0' }}>🎁 First Home Buyer Grants</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                  {Object.entries(australianHomeData.firstHomeBuyerGrants).map(([state, grant]) => (
+                    <div key={state} style={{ padding: '12px', background: '#334155', borderRadius: '8px' }}>
+                      <div style={{ color: theme.warning, fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' as const }}>{state}</div>
+                      <div style={{ color: theme.text, fontSize: '13px', marginTop: '4px' }}>{grant}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Government Schemes */}
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ color: theme.purple, fontSize: '16px', margin: '0 0 12px 0' }}>🏛️ Government Schemes</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  {australianHomeData.schemes.map((scheme, idx) => (
+                    <div key={idx} style={{ padding: '16px', background: '#334155', borderRadius: '12px', borderLeft: '4px solid ' + theme.purple }}>
+                      <div style={{ color: theme.text, fontWeight: 600, marginBottom: '4px' }}>{scheme.name}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '13px' }}>{scheme.description}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Stamp Duty by State */}
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ color: theme.accent, fontSize: '16px', margin: '0 0 12px 0' }}>📋 Stamp Duty by State</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+                  {Object.entries(australianHomeData.stampDuty).map(([state, data]: [string, any]) => (
+                    <div key={state} style={{ padding: '12px', background: '#334155', borderRadius: '8px', textAlign: 'center' as const }}>
+                      <div style={{ color: theme.warning, fontSize: '14px', fontWeight: 700, marginBottom: '8px' }}>{state}</div>
+                      <div style={{ color: theme.success, fontSize: '11px', marginBottom: '4px' }}>First Home:</div>
+                      <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '8px' }}>{data.firstHome}</div>
+                      <div style={{ color: theme.danger, fontSize: '11px', marginBottom: '4px' }}>Investor:</div>
+                      <div style={{ color: theme.textMuted, fontSize: '10px' }}>{data.investor}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* LMI Explainer */}
+              <div style={{ padding: '16px', background: theme.warning + '20', borderRadius: '12px', border: '1px solid ' + theme.warning }}>
+                <h4 style={{ color: theme.warning, margin: '0 0 8px 0', fontSize: '14px' }}>⚠️ What is LMI (Lender's Mortgage Insurance)?</h4>
+                <p style={{ color: theme.text, fontSize: '13px', margin: '0 0 8px 0' }}>{australianHomeData.lmi.description}</p>
+                <p style={{ color: theme.textMuted, fontSize: '12px', margin: '0 0 8px 0' }}>Cost: {australianHomeData.lmi.cost}</p>
+                <p style={{ color: theme.success, fontSize: '12px', margin: 0 }}>How to avoid: {australianHomeData.lmi.avoid}</p>
+              </div>
+              
+              {/* Aureus Advice */}
+              <div style={{ marginTop: '20px', padding: '16px', background: theme.success + '15', borderRadius: '12px', borderLeft: '4px solid ' + theme.success }}>
+                <p style={{ color: theme.text, fontSize: '14px', margin: 0, lineHeight: 1.6 }}>
+                  💡 <strong>Aureus says:</strong> Home ownership is a major capital deployment decision. Run the numbers: compare renting + investing vs buying. In some markets, renting and investing the difference wins. In others, buying builds more wealth. I can help you analyze your specific situation - just ask!
+                </p>
+              </div>
+            </div>
+
+            {/* Automated Revenue Strategies - Professional Design */}
             <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', border: '1px solid ' + theme.border }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
                     <span style={{ fontSize: '24px' }}>💰</span>
-                    <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>Passive Income Quest Board</h2>
+                    <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>Automated Revenue Strategies</h2>
                   </div>
-                  <p style={{ margin: 0, color: theme.textMuted, fontSize: '13px' }}>10 paths to $5K/month — unlock by adding income streams</p>
+                  <p style={{ margin: 0, color: theme.textMuted, fontSize: '13px' }}>10 strategies to build $5K/month in automated revenue</p>
                 </div>
                 <div style={{ padding: '8px 16px', background: theme.warning + '20', borderRadius: '8px', border: '1px solid ' + theme.warning }}>
                   <span style={{ color: theme.warning, fontWeight: 700, fontSize: '18px' }}>{passiveQuests.filter(q => q.status !== 'locked').length}/{passiveQuests.length}</span>
@@ -3426,154 +3666,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Australian Baby Steps - Enhanced Interactive */}
-            <div style={cardStyle}>
-              <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>👶 Australian Baby Steps</h2>
-              <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 20px 0' }}>Click any step for detailed guidance from Aureus!</p>
-              
-              {/* Baby Step Detail Modal */}
-              {selectedBabyStep !== null && (() => {
-                const step = australianBabySteps.find(s => s.step === selectedBabyStep)
-                if (!step) return null
-                const isCurrent = step.step === currentBabyStep.step
-                const done = step.step < currentBabyStep.step
-                return (
-                  <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setSelectedBabyStep(null)}>
-                    <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '650px', width: '100%', maxHeight: '85vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>{done ? '✓' : step.icon}</div>
-                          <div>
-                            <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Step {step.step} of 7</div>
-                            <h3 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>{step.title}</h3>
-                          </div>
-                        </div>
-                        <button onClick={() => setSelectedBabyStep(null)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
-                      </div>
-                      
-                      {done && (
-                        <div style={{ background: theme.success + '20', borderRadius: '12px', padding: '16px', marginBottom: '20px', textAlign: 'center' as const }}>
-                          <span style={{ fontSize: '24px' }}>🎉</span>
-                          <span style={{ color: theme.success, fontWeight: 700, marginLeft: '8px' }}>You've completed this step!</span>
-                        </div>
-                      )}
-                      
-                      {isCurrent && currentBabyStep.target && currentBabyStep.target > 0 && (
-                        <div style={{ background: theme.warning + '20', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ color: theme.warning, fontWeight: 600 }}>Your Progress</span>
-                            <span style={{ color: theme.text, fontWeight: 700 }}>${currentBabyStep.current?.toFixed(0) || 0} / ${currentBabyStep.target?.toFixed(0)}</span>
-                          </div>
-                          <div style={{ height: '10px', background: theme.border, borderRadius: '5px', overflow: 'hidden' }}>
-                            <div style={{ width: Math.min(currentBabyStep.progress || 0, 100) + '%', height: '100%', background: theme.warning }} />
-                          </div>
-                          <div style={{ textAlign: 'right' as const, marginTop: '4px', fontSize: '12px', color: theme.textMuted }}>{(currentBabyStep.progress || 0).toFixed(1)}% complete</div>
-                        </div>
-                      )}
-                      
-                      <div style={{ background: darkMode ? '#1e293b' : '#f0fdf4', borderRadius: '12px', padding: '16px', marginBottom: '20px', borderLeft: '4px solid ' + theme.success }}>
-                        <p style={{ margin: 0, color: theme.text, fontSize: '14px', lineHeight: 1.7 }}>💡 <strong>Aureus says:</strong> {step.aureusAdvice}</p>
-                      </div>
-                      
-                      <h4 style={{ color: theme.text, margin: '0 0 12px 0' }}>✅ Tips for this step:</h4>
-                      <ul style={{ margin: 0, paddingLeft: '20px', color: theme.text, lineHeight: 2 }}>
-                        {step.tips?.map((tip: string, idx: number) => (
-                          <li key={idx} style={{ marginBottom: '4px' }}>{tip}</li>
-                        ))}
-                      </ul>
-                      
-                      {/* Home Ownership Calculator for Step 5 */}
-                      {step.step === 5 && (
-                        <div style={{ marginTop: '24px', padding: '20px', background: darkMode ? '#1e293b' : '#fef3c7', borderRadius: '12px', border: '2px solid ' + theme.warning }}>
-                          <h4 style={{ color: theme.warning, margin: '0 0 16px 0' }}>🏠 Australian Home Buying Calculator</h4>
-                          
-                          <div style={{ marginBottom: '16px' }}>
-                            <div style={{ fontWeight: 600, color: theme.text, marginBottom: '8px' }}>Example: $600,000 Home</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', fontSize: '13px' }}>
-                              <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px' }}>
-                                <div style={{ color: theme.textMuted, marginBottom: '4px' }}>5% Deposit</div>
-                                <div style={{ color: theme.text, fontWeight: 700 }}>$30,000</div>
-                                <div style={{ color: theme.danger, fontSize: '11px' }}>+ ~$15k LMI</div>
-                              </div>
-                              <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px' }}>
-                                <div style={{ color: theme.textMuted, marginBottom: '4px' }}>10% Deposit</div>
-                                <div style={{ color: theme.text, fontWeight: 700 }}>$60,000</div>
-                                <div style={{ color: theme.warning, fontSize: '11px' }}>+ ~$8k LMI</div>
-                              </div>
-                              <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px' }}>
-                                <div style={{ color: theme.textMuted, marginBottom: '4px' }}>20% Deposit</div>
-                                <div style={{ color: theme.text, fontWeight: 700 }}>$120,000</div>
-                                <div style={{ color: theme.success, fontSize: '11px' }}>No LMI! ✓</div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div style={{ marginBottom: '16px' }}>
-                            <div style={{ fontWeight: 600, color: theme.text, marginBottom: '8px' }}>🎁 First Home Buyer Grants</div>
-                            <div style={{ fontSize: '13px', color: theme.text, lineHeight: 1.8 }}>
-                              {Object.entries(australianHomeData.firstHomeBuyerGrants).map(([state, grant]) => (
-                                <div key={state} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <span style={{ fontWeight: 500 }}>{state.toUpperCase()}:</span>
-                                  <span>{grant}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <div style={{ fontWeight: 600, color: theme.text, marginBottom: '8px' }}>🏛️ Government Schemes</div>
-                            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                              {australianHomeData.schemes.map((scheme, idx) => (
-                                <div key={idx} style={{ padding: '10px', background: theme.cardBg, borderRadius: '8px', fontSize: '13px' }}>
-                                  <span style={{ fontWeight: 600, color: theme.accent }}>{scheme.name}:</span>
-                                  <span style={{ color: theme.textMuted, marginLeft: '8px' }}>{scheme.description}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <button onClick={() => {
-                        setSelectedBabyStep(null)
-                        // Send message to Aureus about this step
-                        setChatInput(`Tell me more about ${step.title}`)
-                      }} style={{ width: '100%', marginTop: '20px', padding: '14px', background: theme.accent, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}>
-                        💬 Ask Aureus About This Step
-                      </button>
-                    </div>
-                  </div>
-                )
-              })()}
-              
-              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
-                {australianBabySteps.map((item) => {
-                  const isCurrent = item.step === currentBabyStep.step
-                  const done = item.step < currentBabyStep.step
-                  return (
-                    <div key={item.step} onClick={() => setSelectedBabyStep(item.step)} style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '16px', background: done ? (darkMode ? '#1e3a32' : '#f0fdf4') : isCurrent ? (darkMode ? '#2e2a1e' : '#fefce8') : (darkMode ? '#334155' : '#f8fafc'), borderRadius: '12px', border: done ? '2px solid ' + theme.success : isCurrent ? '2px solid ' + theme.warning : '1px solid ' + theme.border, cursor: 'pointer', transition: 'transform 0.2s' }}>
-                      <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' }}>{done ? '✓' : item.icon}</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{item.title}</div>
-                        <div style={{ color: theme.textMuted, fontSize: '13px' }}>{item.desc}</div>
-                        {isCurrent && currentBabyStep.target && currentBabyStep.target > 0 && (
-                          <div style={{ marginTop: '8px' }}>
-                            <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
-                              <div style={{ width: Math.min(currentBabyStep.progress || 0, 100) + '%', height: '100%', background: theme.warning }} />
-                            </div>
-                            <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '4px' }}>${currentBabyStep.current?.toFixed(0) || 0} / ${currentBabyStep.target?.toFixed(0) || 0}</div>
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '4px' }}>
-                        <div style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, background: done ? theme.success : isCurrent ? theme.warning : theme.border, color: done || isCurrent ? 'white' : theme.textMuted }}>{done ? '✓ Complete' : isCurrent ? '→ Current' : 'Pending'}</div>
-                        <div style={{ color: theme.accent, fontSize: '12px' }}>Click for details →</div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
           </div>
         )}
 
