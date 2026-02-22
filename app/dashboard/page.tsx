@@ -704,16 +704,26 @@ export default function Dashboard() {
   // Scroll chat to bottom - use scrollTop instead of scrollIntoView to avoid page jump
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const aureusChatRef = useRef<HTMLDivElement>(null)
+  const prevMessageCount = useRef(0)
   
-  // Scroll chat to bottom when messages change
+  // Scroll chat to bottom when messages change AND scroll Aureus into view
   useEffect(() => {
+    // Scroll chat container to bottom
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
     }
-    // Also scroll the Aureus card into view when new messages arrive
-    if (aureusChatRef.current && chatMessages.length > 0) {
-      aureusChatRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    
+    // Only scroll into view when NEW messages arrive (not on initial render)
+    if (chatMessages.length > prevMessageCount.current && chatMessages.length > 0) {
+      // Find the Aureus chat card on the current page and scroll to it
+      setTimeout(() => {
+        const aureusCard = document.querySelector('[data-aureus-chat]')
+        if (aureusCard) {
+          aureusCard.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }, 100)
     }
+    prevMessageCount.current = chatMessages.length
   }, [chatMessages])
 
   // ==================== CALCULATIONS ====================
@@ -1602,15 +1612,20 @@ export default function Dashboard() {
       } else if (data.nextStep) {
         if (mode === 'budget') {
           setBudgetOnboarding(prev => ({ ...prev, step: data.nextStep }))
-          // When moving to 'choice' step, switch to dashboard/command centre
+          // When moving to 'choice' or 'income' step, switch to dashboard/command centre AFTER a delay
+          // This ensures user sees the message first
           if (data.nextStep === 'choice' || data.nextStep === 'income') {
-            setActiveTab('dashboard')
+            setTimeout(() => {
+              setActiveTab('dashboard')
+            }, 1500) // Wait 1.5 seconds so user sees the message
           }
         }
         else {
           setTradingOnboarding(prev => ({ ...prev, step: data.nextStep }))
           if (data.nextStep === 'choice') {
-            setActiveTab('trading')
+            setTimeout(() => {
+              setActiveTab('trading')
+            }, 1500)
           }
         }
       }
@@ -2570,7 +2585,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
             
             {/* Aureus Chat Card - Always visible */}
-            <div ref={aureusChatRef} style={{ padding: '20px', background: `linear-gradient(135deg, ${appMode === 'budget' ? theme.success : theme.warning}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + (appMode === 'budget' ? theme.success : theme.warning) }}>
+            <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${appMode === 'budget' ? theme.success : theme.warning}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + (appMode === 'budget' ? theme.success : theme.warning) }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
                 <div style={{ 
                   width: '44px', 
@@ -2800,7 +2815,7 @@ export default function Dashboard() {
             
             {/* Aureus Onboarding Chat - Shows when onboarding is active */}
             {budgetOnboarding.isActive && (
-              <div style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, border: `2px solid ${theme.success}`, borderRadius: '16px' }}>
+              <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, border: `2px solid ${theme.success}`, borderRadius: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                   <div style={{ 
                     width: '48px', 
@@ -2864,6 +2879,19 @@ export default function Dashboard() {
                     {isLoading ? '...' : 'Send'}
                   </button>
                 </div>
+              </div>
+            )}
+            
+            {/* Aureus Chat - Shows when NOT onboarding (at TOP of page) */}
+            {!budgetOnboarding.isActive && (
+              <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
+                  <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{currentBabyStep.title}</div></div>
+                </div>
+                {proactiveInsight && chatMessages.length === 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>{proactiveInsight.suggestion && <p style={{ color: theme.purple, fontSize: '13px', margin: '8px 0 0 0' }}>💡 {proactiveInsight.suggestion}</p>}</div>}
+                {chatMessages.length > 0 && <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>{chatMessages.map((msg, idx) => <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>)}{isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}</div>}
+                <div style={{ display: 'flex', gap: '8px' }}><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button></div>
               </div>
             )}
             
@@ -3015,10 +3043,16 @@ export default function Dashboard() {
                   <span style={{ color: theme.warning, fontWeight: 700 }}>${totalDebtBalance.toFixed(0)}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
-                  <input placeholder="Debt name" value={newDebt.name} onChange={e => setNewDebt({...newDebt, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
-                  <input placeholder="Balance" type="number" value={newDebt.balance} onChange={e => setNewDebt({...newDebt, balance: e.target.value})} style={{...inputStyle, width: '90px'}} />
-                  <input placeholder="APR %" type="number" value={newDebt.interestRate} onChange={e => setNewDebt({...newDebt, interestRate: e.target.value})} style={{...inputStyle, width: '70px'}} />
-                  <input placeholder="Min payment" type="number" value={newDebt.minPayment} onChange={e => setNewDebt({...newDebt, minPayment: e.target.value})} style={{...inputStyle, width: '90px'}} />
+                  <input placeholder="Debt name" value={newDebt.name} onChange={e => setNewDebt({...newDebt, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '80px'}} />
+                  <input placeholder="Balance" type="number" value={newDebt.balance} onChange={e => setNewDebt({...newDebt, balance: e.target.value})} style={{...inputStyle, width: '80px'}} />
+                  <input placeholder="APR %" type="number" value={newDebt.interestRate} onChange={e => setNewDebt({...newDebt, interestRate: e.target.value})} style={{...inputStyle, width: '60px'}} />
+                  <input placeholder="Payment" type="number" value={newDebt.minPayment} onChange={e => setNewDebt({...newDebt, minPayment: e.target.value})} style={{...inputStyle, width: '75px'}} />
+                  <select value={newDebt.frequency} onChange={e => setNewDebt({...newDebt, frequency: e.target.value})} style={{...inputStyle, width: '95px'}}>
+                    <option value="weekly">Weekly</option>
+                    <option value="fortnightly">Fortnightly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                  <input type="date" value={newDebt.paymentDate} onChange={e => setNewDebt({...newDebt, paymentDate: e.target.value})} style={{...inputStyle, width: '130px'}} title="Next payment date" />
                   <button onClick={addDebt} style={btnWarning}>+</button>
                 </div>
                 <div style={{ maxHeight: '350px', overflowY: 'auto' as const }}>
@@ -3027,19 +3061,49 @@ export default function Dashboard() {
                     const progress = debt.originalBalance ? ((parseFloat(debt.originalBalance) - parseFloat(debt.balance)) / parseFloat(debt.originalBalance)) * 100 : 0
                     const extraPaymentData = debtExtraPayment[debt.id] || { amount: '', frequency: 'monthly' }
                     
+                    // Edit mode
+                    if (editingItem?.type === 'debt' && editingItem.id === debt.id) {
+                      return (
+                        <div key={debt.id} style={{ padding: '16px', marginBottom: '12px', background: darkMode ? '#3a2e1e' : '#fefce8', borderRadius: '12px', border: '2px solid ' + theme.warning }}>
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '12px' }}>
+                            <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} placeholder="Name" style={{...inputStyle, flex: 1, minWidth: '100px'}} />
+                            <input type="number" value={editingItem.data.balance} onChange={e => updateEditField('balance', e.target.value)} placeholder="Balance" style={{...inputStyle, width: '90px'}} />
+                            <input type="number" value={editingItem.data.interestRate} onChange={e => updateEditField('interestRate', e.target.value)} placeholder="APR%" style={{...inputStyle, width: '70px'}} />
+                            <input type="number" value={editingItem.data.minPayment} onChange={e => updateEditField('minPayment', e.target.value)} placeholder="Payment" style={{...inputStyle, width: '80px'}} />
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '12px' }}>
+                            <select value={editingItem.data.frequency || 'monthly'} onChange={e => updateEditField('frequency', e.target.value)} style={inputStyle}>
+                              <option value="weekly">Weekly</option>
+                              <option value="fortnightly">Fortnightly</option>
+                              <option value="monthly">Monthly</option>
+                            </select>
+                            <input type="date" value={editingItem.data.paymentDate || ''} onChange={e => updateEditField('paymentDate', e.target.value)} style={{...inputStyle, width: '130px'}} title="Payment date" />
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={saveEdit} style={{...btnSuccess, padding: '8px 16px', fontSize: '12px'}}>Save</button>
+                            <button onClick={cancelEdit} style={{...btnDanger, padding: '8px 16px', fontSize: '12px'}}>Cancel</button>
+                          </div>
+                        </div>
+                      )
+                    }
+                    
                     return (
                       <div key={debt.id} style={{ padding: '16px', marginBottom: '12px', background: darkMode ? '#3a2e1e' : '#fefce8', borderRadius: '12px', border: '1px solid ' + theme.border }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                           <div>
                             <div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{debt.name}</div>
                             <div style={{ color: theme.textMuted, fontSize: '12px' }}>
-                              {debt.interestRate}% APR • ${debt.minPayment}/{debt.frequency || 'mo'}
+                              {debt.interestRate}% APR • ${debt.minPayment}/{debt.frequency || 'monthly'}
+                              {debt.paymentDate && ` • Due ${debt.paymentDate}`}
                               {payoff.extraPayments > 0 && <span style={{ color: theme.success }}> + ${payoff.extraPayments.toFixed(0)} extra</span>}
                             </div>
                           </div>
                           <div style={{ textAlign: 'right' as const }}>
                             <div style={{ color: theme.warning, fontWeight: 700, fontSize: '18px' }}>${parseFloat(debt.balance).toFixed(0)}</div>
-                            <button onClick={() => deleteDebt(debt.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', marginTop: '4px' }}>Delete</button>
+                            <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                              <button onClick={() => startEdit('debt', debt)} style={{ padding: '4px 8px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>✏️</button>
+                              <button onClick={() => deleteDebt(debt.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button>
+                            </div>
                           </div>
                         </div>
                         
@@ -3082,38 +3146,113 @@ export default function Dashboard() {
               <div style={cardStyle}>
                 <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🎯 Capital Targets</h3>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
-                  <input placeholder="Goal name" value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
-                  <input placeholder="Target $" type="number" value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})} style={{...inputStyle, width: '90px'}} />
-                  <input placeholder="Already saved" type="number" value={newGoal.saved} onChange={e => setNewGoal({...newGoal, saved: e.target.value})} style={{...inputStyle, width: '90px'}} />
-                  <input type="date" placeholder="Deadline" value={newGoal.deadline} onChange={e => setNewGoal({...newGoal, deadline: e.target.value})} style={{...inputStyle, width: '130px'}} title="Deadline" />
-                  <select value={newGoal.savingsFrequency} onChange={e => setNewGoal({...newGoal, savingsFrequency: e.target.value})} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
+                  <input placeholder="Goal name" value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '90px'}} />
+                  <input placeholder="Target $" type="number" value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})} style={{...inputStyle, width: '80px'}} />
+                  <input placeholder="Saved $" type="number" value={newGoal.saved} onChange={e => setNewGoal({...newGoal, saved: e.target.value})} style={{...inputStyle, width: '80px'}} />
+                  <input placeholder="Save $" type="number" value={newGoal.paymentAmount} onChange={e => setNewGoal({...newGoal, paymentAmount: e.target.value})} style={{...inputStyle, width: '70px'}} title="Amount to save each period" />
+                  <select value={newGoal.savingsFrequency} onChange={e => setNewGoal({...newGoal, savingsFrequency: e.target.value})} style={{...inputStyle, width: '100px'}}>
+                    <option value="weekly">Weekly</option>
+                    <option value="fortnightly">Fortnightly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                  <input type="date" placeholder="Deadline (optional)" value={newGoal.deadline} onChange={e => setNewGoal({...newGoal, deadline: e.target.value})} style={{...inputStyle, width: '130px'}} title="Deadline (optional)" />
                   <button onClick={addGoal} style={btnPurple}>+</button>
                 </div>
+                
+                {/* Time to Goal Preview */}
+                {newGoal.target && newGoal.paymentAmount && parseFloat(newGoal.paymentAmount) > 0 && (
+                  <div style={{ padding: '12px', marginBottom: '12px', background: theme.purple + '15', borderRadius: '8px', border: '1px solid ' + theme.purple }}>
+                    {(() => {
+                      const remaining = parseFloat(newGoal.target) - parseFloat(newGoal.saved || '0')
+                      const payment = parseFloat(newGoal.paymentAmount)
+                      const periods = Math.ceil(remaining / payment)
+                      let timeStr = ''
+                      let reachDate = new Date()
+                      
+                      if (newGoal.savingsFrequency === 'weekly') {
+                        const weeks = periods
+                        const months = Math.floor(weeks / 4.33)
+                        const years = Math.floor(months / 12)
+                        timeStr = years > 0 ? `${years}y ${months % 12}m` : months > 0 ? `${months} months` : `${weeks} weeks`
+                        reachDate.setDate(reachDate.getDate() + (weeks * 7))
+                      } else if (newGoal.savingsFrequency === 'fortnightly') {
+                        const fortnights = periods
+                        const months = Math.floor(fortnights / 2.17)
+                        const years = Math.floor(months / 12)
+                        timeStr = years > 0 ? `${years}y ${months % 12}m` : months > 0 ? `${months} months` : `${fortnights} fortnights`
+                        reachDate.setDate(reachDate.getDate() + (fortnights * 14))
+                      } else {
+                        const months = periods
+                        const years = Math.floor(months / 12)
+                        timeStr = years > 0 ? `${years}y ${months % 12}m` : `${months} months`
+                        reachDate.setMonth(reachDate.getMonth() + months)
+                      }
+                      
+                      return (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: '8px' }}>
+                          <div>
+                            <span style={{ color: theme.textMuted, fontSize: '12px' }}>At ${payment}/{newGoal.savingsFrequency}: </span>
+                            <span style={{ color: theme.purple, fontWeight: 700 }}>{timeStr}</span>
+                            <span style={{ color: theme.textMuted, fontSize: '12px' }}> to goal</span>
+                          </div>
+                          <div style={{ color: theme.text, fontSize: '12px' }}>
+                            Est. {reachDate.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
+                
                 <div style={{ maxHeight: '250px', overflowY: 'auto' as const }}>
                   {goals.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No goals yet</p> : goals.map(goal => {
                     const progress = (parseFloat(goal.saved || '0') / parseFloat(goal.target || '1')) * 100
                     const remaining = parseFloat(goal.target || '0') - parseFloat(goal.saved || '0')
-                    // Calculate payment needed
-                    const deadline = goal.deadline ? new Date(goal.deadline) : null
-                    const now = new Date()
-                    const monthsLeft = deadline ? Math.max(1, Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30))) : 0
-                    const weeksLeft = deadline ? Math.max(1, Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 7))) : 0
-                    const fortnightsLeft = deadline ? Math.max(1, Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 14))) : 0
+                    
+                    // Calculate time to goal based on payment amount
+                    let timeToGoal = ''
                     let paymentNeeded = 0
-                    if (deadline && remaining > 0) {
-                      if (goal.savingsFrequency === 'weekly') paymentNeeded = remaining / weeksLeft
-                      else if (goal.savingsFrequency === 'fortnightly') paymentNeeded = remaining / fortnightsLeft
-                      else paymentNeeded = remaining / monthsLeft
+                    const payment = parseFloat(goal.paymentAmount || '0')
+                    
+                    if (payment > 0 && remaining > 0) {
+                      const periods = Math.ceil(remaining / payment)
+                      if (goal.savingsFrequency === 'weekly') {
+                        const months = Math.floor(periods / 4.33)
+                        timeToGoal = months > 12 ? `${Math.floor(months/12)}y ${months%12}m` : months > 0 ? `${months} months` : `${periods} weeks`
+                      } else if (goal.savingsFrequency === 'fortnightly') {
+                        const months = Math.floor(periods / 2.17)
+                        timeToGoal = months > 12 ? `${Math.floor(months/12)}y ${months%12}m` : months > 0 ? `${months} months` : `${periods} fortnights`
+                      } else {
+                        timeToGoal = periods > 12 ? `${Math.floor(periods/12)}y ${periods%12}m` : `${periods} months`
+                      }
+                    }
+                    
+                    // Calculate payment needed for deadline (if set and no payment amount)
+                    const deadline = goal.deadline ? new Date(goal.deadline) : null
+                    if (deadline && remaining > 0 && !payment) {
+                      const now = new Date()
+                      const msLeft = deadline.getTime() - now.getTime()
+                      if (goal.savingsFrequency === 'weekly') {
+                        const weeks = Math.max(1, Math.ceil(msLeft / (7 * 24 * 60 * 60 * 1000)))
+                        paymentNeeded = remaining / weeks
+                      } else if (goal.savingsFrequency === 'fortnightly') {
+                        const fortnights = Math.max(1, Math.ceil(msLeft / (14 * 24 * 60 * 60 * 1000)))
+                        paymentNeeded = remaining / fortnights
+                      } else {
+                        const months = Math.max(1, Math.ceil(msLeft / (30 * 24 * 60 * 60 * 1000)))
+                        paymentNeeded = remaining / months
+                      }
                     }
                     
                     return editingItem?.type === 'goal' && editingItem.id === goal.id ? (
-                      <div key={goal.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#2e1e3a' : '#faf5ff', borderRadius: '8px' }}>
+                      <div key={goal.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#2e1e3a' : '#faf5ff', borderRadius: '8px', border: '2px solid ' + theme.purple }}>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
                           <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} placeholder="Name" style={{...inputStyle, flex: 1, minWidth: '100px'}} />
                           <input type="number" value={editingItem.data.target} onChange={e => updateEditField('target', e.target.value)} placeholder="Target" style={{...inputStyle, width: '80px'}} />
                           <input type="number" value={editingItem.data.saved} onChange={e => updateEditField('saved', e.target.value)} placeholder="Saved" style={{...inputStyle, width: '80px'}} />
-                          <input type="date" value={editingItem.data.deadline} onChange={e => updateEditField('deadline', e.target.value)} style={{...inputStyle, width: '130px'}} />
+                          <input type="number" value={editingItem.data.paymentAmount || ''} onChange={e => updateEditField('paymentAmount', e.target.value)} placeholder="Save $" style={{...inputStyle, width: '70px'}} />
                           <select value={editingItem.data.savingsFrequency} onChange={e => updateEditField('savingsFrequency', e.target.value)} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
+                          <input type="date" value={editingItem.data.deadline} onChange={e => updateEditField('deadline', e.target.value)} style={{...inputStyle, width: '130px'}} />
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button onClick={saveEdit} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Save</button>
@@ -3129,6 +3268,11 @@ export default function Dashboard() {
                               ${parseFloat(goal.saved || '0').toFixed(0)} / ${parseFloat(goal.target || '0').toFixed(0)}
                               {goal.deadline && ` • by ${goal.deadline}`}
                             </div>
+                            {payment > 0 && timeToGoal && (
+                              <div style={{ color: theme.success, fontSize: '12px', fontWeight: 600 }}>
+                                ${payment.toFixed(0)}/{goal.savingsFrequency} → {timeToGoal} to goal
+                              </div>
+                            )}
                             {paymentNeeded > 0 && (
                               <div style={{ color: theme.purple, fontSize: '12px', fontWeight: 600 }}>
                                 Save ${paymentNeeded.toFixed(0)}/{goal.savingsFrequency} to reach goal
@@ -3149,59 +3293,23 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            
-            {/* Aureus Chat - Shows when NOT onboarding */}
-            {!budgetOnboarding.isActive && (
-              <div ref={aureusChatRef} style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
-                  <div style={{ 
-                    width: '44px', 
-                    height: '44px', 
-                    borderRadius: '50%', 
-                    background: 'linear-gradient(135deg, #fbbf24, #d97706)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '20px',
-                    fontWeight: 800,
-                    color: '#78350f'
-                  }}>A</div>
-                  <div>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div>
-                    <div style={{ color: theme.textMuted, fontSize: '11px' }}>{currentBabyStep.title}</div>
-                  </div>
-                </div>
-                
-                {proactiveInsight && chatMessages.length === 0 && (
-                  <div style={{ marginBottom: '12px' }}>
-                    <p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>
-                    {proactiveInsight.suggestion && <p style={{ color: theme.purple, fontSize: '13px', margin: '8px 0 0 0' }}>💡 {proactiveInsight.suggestion}</p>}
-                  </div>
-                )}
-                
-                {chatMessages.length > 0 && (
-                  <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
-                    {chatMessages.map((msg, idx) => (
-                      <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                        <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
-                      </div>
-                    ))}
-                    {isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}
-                  </div>
-                )}
-                
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} />
-                  <button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
         {/* OVERVIEW TAB - Financial Freedom Dashboard */}
         {appMode === 'budget' && activeTab === 'overview' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
+            
+            {/* Aureus Chat - At TOP */}
+            <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
+                <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>Operations Score: {financialHealthScore}</div></div>
+              </div>
+              {proactiveInsight && chatMessages.length === 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>{proactiveInsight.suggestion && <p style={{ color: theme.purple, fontSize: '13px', margin: '8px 0 0 0' }}>💡 {proactiveInsight.suggestion}</p>}</div>}
+              {chatMessages.length > 0 && <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>{chatMessages.map((msg, idx) => <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>)}{isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}</div>}
+              <div style={{ display: 'flex', gap: '8px' }}><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button></div>
+            </div>
             
             {/* FINANCIAL OPERATIONS SCORE */}
             <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
@@ -3454,23 +3562,23 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
-            
-            {/* Aureus Chat */}
-            <div ref={aureusChatRef} style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
-                <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>Operations Score: {financialHealthScore}</div></div>
-              </div>
-              {proactiveInsight && chatMessages.length === 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>{proactiveInsight.suggestion && <p style={{ color: theme.purple, fontSize: '13px', margin: '8px 0 0 0' }}>💡 {proactiveInsight.suggestion}</p>}</div>}
-              {chatMessages.length > 0 && <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>{chatMessages.map((msg, idx) => <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>)}{isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}</div>}
-              <div style={{ display: 'flex', gap: '8px' }}><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button></div>
-            </div>
           </div>
         )}
 
         {/* PATH TAB - Baby Steps & Quest Board */}
         {appMode === 'budget' && activeTab === 'path' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
+            
+            {/* Aureus Chat - At TOP */}
+            <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
+                <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{currentBabyStep.title}</div></div>
+              </div>
+              {proactiveInsight && chatMessages.length === 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>{proactiveInsight.suggestion && <p style={{ color: theme.purple, fontSize: '13px', margin: '8px 0 0 0' }}>💡 {proactiveInsight.suggestion}</p>}</div>}
+              {chatMessages.length > 0 && <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>{chatMessages.map((msg, idx) => <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>)}{isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}</div>}
+              <div style={{ display: 'flex', gap: '8px' }}><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button></div>
+            </div>
             
             {/* Current Progress Summary */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
@@ -4254,17 +4362,6 @@ export default function Dashboard() {
                 })}
               </div>
             </div>
-            
-            {/* Aureus Chat */}
-            <div ref={aureusChatRef} style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
-                <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>Your financial guide</div></div>
-              </div>
-              {proactiveInsight && chatMessages.length === 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>{proactiveInsight.suggestion && <p style={{ color: theme.purple, fontSize: '13px', margin: '8px 0 0 0' }}>💡 {proactiveInsight.suggestion}</p>}</div>}
-              {chatMessages.length > 0 && <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>{chatMessages.map((msg, idx) => <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>)}{isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}</div>}
-              <div style={{ display: 'flex', gap: '8px' }}><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button></div>
-            </div>
 
           </div>
         )}
@@ -4272,6 +4369,17 @@ export default function Dashboard() {
         {/* TRADING TAB */}
         {appMode === 'trading' && activeTab === 'trading' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
+            
+            {/* Aureus Chat - At TOP */}
+            <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.warning}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.warning }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
+                <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{winRate.toFixed(0)}% win rate • {trades.length} trades</div></div>
+              </div>
+              {proactiveInsight && chatMessages.length === 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>{proactiveInsight.suggestion && <p style={{ color: theme.purple, fontSize: '13px', margin: '8px 0 0 0' }}>💡 {proactiveInsight.suggestion}</p>}</div>}
+              {chatMessages.length > 0 && <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>{chatMessages.map((msg, idx) => <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.warning : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>)}{isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}</div>}
+              <div style={{ display: 'flex', gap: '8px' }}><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus about your trading..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.warning, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button></div>
+            </div>
             
             {/* TILT DETECTOR & DAILY STATUS */}
             {(() => {
@@ -4664,17 +4772,6 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
-            </div>
-            
-            {/* Aureus Chat - Trading Mode */}
-            <div ref={aureusChatRef} style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.warning}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.warning }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
-                <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{winRate.toFixed(0)}% win rate • {trades.length} trades</div></div>
-              </div>
-              {proactiveInsight && chatMessages.length === 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>{proactiveInsight.suggestion && <p style={{ color: theme.purple, fontSize: '13px', margin: '8px 0 0 0' }}>💡 {proactiveInsight.suggestion}</p>}</div>}
-              {chatMessages.length > 0 && <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>{chatMessages.map((msg, idx) => <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.warning : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>)}{isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}</div>}
-              <div style={{ display: 'flex', gap: '8px' }}><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus about your trading..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.warning, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button></div>
             </div>
           </div>
         )}
