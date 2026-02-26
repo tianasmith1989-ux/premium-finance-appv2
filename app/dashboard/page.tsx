@@ -1264,10 +1264,17 @@ export default function Dashboard() {
       return 
     }
     
-    // Open the date picker for this goal
+    // Check if already added to calendar
+    if (goal.addedToCalendar) {
+      alert('This goal is already on your calendar!')
+      return
+    }
+    
+    // Open the date picker for this goal - default to today
+    const today = new Date().toISOString().split('T')[0]
     setGoalCalendarPicker({
       goalId: goal.id,
-      startDate: new Date().toISOString().split('T')[0]
+      startDate: today
     })
   }
   
@@ -1280,22 +1287,12 @@ export default function Dashboard() {
     const payment = parseFloat(goal.paymentAmount || '0')
     const startDate = goalCalendarPicker.startDate
     
-    // Update the goal with the new startDate
-    setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, startDate } : g))
-    
-    // Add as a recurring expense entry (category: goal) so it appears on calendar
-    setExpenses(prev => [...prev, {
-      id: Date.now(),
-      name: `💰 ${goal.name}`,
-      amount: payment.toString(),
-      frequency: goal.savingsFrequency || 'monthly',
-      category: 'goal',
-      dueDate: startDate,
-      goalId: goal.id
-    }])
+    // Update the goal with the new startDate AND mark as added to calendar
+    setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, startDate, addedToCalendar: true } : g))
     
     setGoalCalendarPicker(null)
     alert(`✅ ${goal.name} added to calendar starting ${startDate}!`)
+  }
   }
 
   // Debt payoff calculator - calculates months to payoff
@@ -1516,7 +1513,7 @@ export default function Dashboard() {
       }
     })
 
-    goals.filter(g => g.paymentAmount && g.startDate).forEach(goal => {
+    goals.filter(g => g.paymentAmount && g.startDate && g.addedToCalendar).forEach(goal => {
       if (shouldShowItem(goal.startDate, goal.savingsFrequency)) {
         const id = `goal-${goal.id}-${year}-${month}-${day}`
         items.push({ ...goal, amount: goal.paymentAmount, itemId: id, itemType: 'goal', isPaid: paidOccurrences.has(id) })
