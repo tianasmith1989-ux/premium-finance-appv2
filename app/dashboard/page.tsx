@@ -597,6 +597,8 @@ export default function Dashboard() {
   const [budgetMemory, setBudgetMemory] = useState<any>({
     name: '',
     onboardingComplete: false,
+    financialPath: '', // babysteps, fire, home, automated, optimise
+    bigGoals: {}, // { home: '', fire: '', debtFree: '', wealthTarget: '', passiveTarget: '' }
     lifeEvents: [],
     patterns: [],
     preferences: { communicationStyle: 'direct', checkInFrequency: 'when-needed', motivators: [] },
@@ -878,6 +880,47 @@ export default function Dashboard() {
     ((100 - debtToIncomeRatio * 100) * 0.15) +
     (Math.min(passiveCoverage, 100) * 0.15)
   )
+
+  // ==================== DYNAMIC QUEST UNLOCK LOGIC ====================
+  // Compute quest unlock status based on actual user financial data
+  const getQuestUnlockStatus = (questId: number): { isUnlocked: boolean, reason?: string } => {
+    const totalSavings = assets.filter(a => a.type === 'savings').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
+    const totalInvestments = assets.filter(a => a.type === 'investment').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
+    const totalPassive = passiveIncome + totalPassiveQuestIncome
+    const hasEmergencyFund = totalSavings >= 2000
+    const has50kSaved = totalSavings + totalInvestments >= 50000
+    const has500PassiveIncome = totalPassive >= 500
+    
+    switch (questId) {
+      case 1: // High-Interest Savings - always unlocked
+      case 2: // Cashback & Rewards - always unlocked
+      case 3: // Bank Bonus Hunting - always unlocked
+      case 6: // Side Hustle - always unlocked
+        return { isUnlocked: true }
+      
+      case 4: // Dividend ETFs - requires $2k emergency fund
+      case 5: // Micro-Investing - requires $2k emergency fund
+        return { 
+          isUnlocked: hasEmergencyFund, 
+          reason: hasEmergencyFund ? undefined : 'Complete $2k emergency fund' 
+        }
+      
+      case 7: // Content Creation - requires $500/mo passive income
+        return { 
+          isUnlocked: has500PassiveIncome, 
+          reason: has500PassiveIncome ? undefined : '$500/mo passive income' 
+        }
+      
+      case 8: // Investment Property - requires $50k deposit saved
+        return { 
+          isUnlocked: has50kSaved, 
+          reason: has50kSaved ? undefined : '$50k deposit saved' 
+        }
+      
+      default:
+        return { isUnlocked: true }
+    }
+  }
 
   // Australian Baby Steps with detailed content
   const australianBabySteps = [
@@ -1909,6 +1952,7 @@ export default function Dashboard() {
             if (data.currentStep) updated.currentStep = data.currentStep
             if (data.financialPath) updated.financialPath = data.financialPath
             if (data.targetGoal) updated.targetGoal = data.targetGoal
+            if (data.bigGoals) updated.bigGoals = { ...(prev.bigGoals || {}), ...data.bigGoals }
             if (data.preferences) updated.preferences = { ...prev.preferences, ...data.preferences }
             if (data.patterns) updated.patterns = [...(prev.patterns || []), ...data.patterns]
             if (data.notes) updated.notes = [...(prev.notes || []), ...data.notes]
@@ -3780,6 +3824,72 @@ export default function Dashboard() {
               </div>
             )}
             
+            {/* Big Goals Display */}
+            {budgetMemory.bigGoals && Object.keys(budgetMemory.bigGoals).length > 0 && (
+              <div style={{ padding: '20px', background: 'linear-gradient(135deg, #8b5cf615, #f59e0b15)', borderRadius: '16px', border: '2px solid ' + theme.purple }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <div>
+                    <div style={{ fontSize: '24px', marginBottom: '4px' }}>🎯</div>
+                    <h3 style={{ margin: 0, color: theme.text, fontSize: '18px' }}>Your Big Dreams</h3>
+                    <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '12px' }}>The goals that drive your daily financial decisions</p>
+                  </div>
+                  <button 
+                    onClick={() => sendQuickMessage("I want to update my big goals")}
+                    style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    Update Goals
+                  </button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                  {budgetMemory.bigGoals.home && (
+                    <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '20px' }}>🏠</span>
+                        <span style={{ color: theme.accent, fontWeight: 600 }}>Home Ownership</span>
+                      </div>
+                      <div style={{ color: theme.text, fontSize: '14px' }}>{budgetMemory.bigGoals.home}</div>
+                    </div>
+                  )}
+                  {budgetMemory.bigGoals.fire && (
+                    <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '20px' }}>🔥</span>
+                        <span style={{ color: theme.warning, fontWeight: 600 }}>Financial Independence</span>
+                      </div>
+                      <div style={{ color: theme.text, fontSize: '14px' }}>{budgetMemory.bigGoals.fire}</div>
+                    </div>
+                  )}
+                  {budgetMemory.bigGoals.debtFree && (
+                    <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '20px' }}>💳</span>
+                        <span style={{ color: theme.success, fontWeight: 600 }}>Debt Freedom</span>
+                      </div>
+                      <div style={{ color: theme.text, fontSize: '14px' }}>{budgetMemory.bigGoals.debtFree}</div>
+                    </div>
+                  )}
+                  {budgetMemory.bigGoals.wealthTarget && (
+                    <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '20px' }}>💰</span>
+                        <span style={{ color: theme.purple, fontWeight: 600 }}>Wealth Target</span>
+                      </div>
+                      <div style={{ color: theme.text, fontSize: '14px' }}>{budgetMemory.bigGoals.wealthTarget}</div>
+                    </div>
+                  )}
+                  {budgetMemory.bigGoals.passiveTarget && (
+                    <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '20px' }}>🌴</span>
+                        <span style={{ color: theme.success, fontWeight: 600 }}>Passive Income</span>
+                      </div>
+                      <div style={{ color: theme.text, fontSize: '14px' }}>{budgetMemory.bigGoals.passiveTarget}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
             {/* Current Progress Summary */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
@@ -4498,7 +4608,7 @@ export default function Dashboard() {
                   <p style={{ margin: 0, color: theme.textMuted, fontSize: '13px' }}>10 strategies to build $5K/month in automated revenue</p>
                 </div>
                 <div style={{ padding: '8px 16px', background: theme.warning + '20', borderRadius: '8px', border: '1px solid ' + theme.warning }}>
-                  <span style={{ color: theme.warning, fontWeight: 700, fontSize: '18px' }}>{passiveQuests.filter(q => q.status !== 'locked').length}/{passiveQuests.length}</span>
+                  <span style={{ color: theme.warning, fontWeight: 700, fontSize: '18px' }}>{passiveQuests.filter(q => getQuestUnlockStatus(q.id).isUnlocked || q.status === 'in_progress' || q.status === 'completed').length}/{passiveQuests.length}</span>
                   <div style={{ color: theme.warning, fontSize: '11px' }}>UNLOCKED</div>
                 </div>
               </div>
@@ -4506,7 +4616,9 @@ export default function Dashboard() {
               {/* All Quests in Professional 2-column Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {passiveQuests.map(quest => {
-                  const isLocked = quest.status === 'locked'
+                  // Use dynamic unlock status based on actual user data
+                  const unlockStatus = getQuestUnlockStatus(quest.id)
+                  const isLocked = !unlockStatus.isUnlocked && quest.status !== 'in_progress' && quest.status !== 'completed'
                   const isExpanded = activeQuestId === quest.id
                   const difficultyStars = quest.difficulty === 'Easy' ? 1 : quest.difficulty === 'Medium' ? 2 : quest.difficulty === 'Hard' ? 3 : 4
                   
@@ -4588,7 +4700,7 @@ export default function Dashboard() {
                         }}
                       >
                         {isLocked ? (
-                          <span style={{ color: theme.warning, fontSize: '12px' }}>🔐 {quest.unlockRequirement}</span>
+                          <span style={{ color: theme.warning, fontSize: '12px' }}>🔐 {unlockStatus.reason || quest.unlockRequirement}</span>
                         ) : (
                           <>▼ {isExpanded ? 'Hide' : 'Expand'} guide</>
                         )}
