@@ -285,6 +285,7 @@ export default function Dashboard() {
   
   const [goals, setGoals] = useState<any[]>([])
   const [newGoal, setNewGoal] = useState({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: new Date().toISOString().split('T')[0], paymentAmount: '' })
+  const [goalCalendarPicker, setGoalCalendarPicker] = useState<{goalId: number, startDate: string} | null>(null)
   
   const [assets, setAssets] = useState<any[]>([])
   const [newAsset, setNewAsset] = useState({ name: '', value: '', type: 'savings' })
@@ -1255,8 +1256,24 @@ export default function Dashboard() {
       return 
     }
     
-    // Use the goal's startDate if set, otherwise use today
-    const startDate = goal.startDate || new Date().toISOString().split('T')[0]
+    // Open the date picker for this goal
+    setGoalCalendarPicker({
+      goalId: goal.id,
+      startDate: new Date().toISOString().split('T')[0]
+    })
+  }
+  
+  const confirmGoalToCalendar = () => {
+    if (!goalCalendarPicker) return
+    
+    const goal = goals.find(g => g.id === goalCalendarPicker.goalId)
+    if (!goal) return
+    
+    const payment = parseFloat(goal.paymentAmount || '0')
+    const startDate = goalCalendarPicker.startDate
+    
+    // Update the goal with the new startDate
+    setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, startDate } : g))
     
     // Add as a recurring expense entry (category: goal) so it appears on calendar
     setExpenses(prev => [...prev, {
@@ -1266,10 +1283,11 @@ export default function Dashboard() {
       frequency: goal.savingsFrequency || 'monthly',
       category: 'goal',
       dueDate: startDate,
-      goalId: goal.id // Link to the goal
+      goalId: goal.id
     }])
     
-    alert(`✅ ${goal.name} added to calendar!\n\nYou'll see $${payment.toFixed(0)}/${goal.savingsFrequency || 'monthly'} starting ${startDate}`)
+    setGoalCalendarPicker(null)
+    alert(`✅ ${goal.name} added to calendar starting ${startDate}!`)
   }
 
   // Debt payoff calculator - calculates months to payoff
@@ -3340,7 +3358,28 @@ export default function Dashboard() {
                             <button onClick={() => deleteGoal(goal.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>×</button>
                           </div>
                         </div>
-                        <div style={{ height: '8px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}><div style={{ width: `${Math.min(progress, 100)}%`, height: '100%', background: theme.purple, borderRadius: '4px' }} /></div>
+                        
+                        {/* Date picker for adding to calendar */}
+                        {goalCalendarPicker?.goalId === goal.id && (
+                          <div style={{ marginTop: '12px', padding: '12px', background: theme.cardBg, borderRadius: '8px', border: '1px solid ' + theme.purple }}>
+                            <div style={{ color: theme.text, fontSize: '13px', marginBottom: '8px', fontWeight: 600 }}>📅 When do you want to start saving?</div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <input 
+                                type="date" 
+                                value={goalCalendarPicker.startDate} 
+                                onChange={e => setGoalCalendarPicker({...goalCalendarPicker, startDate: e.target.value})}
+                                style={{...inputStyle, width: '150px'}}
+                              />
+                              <button onClick={confirmGoalToCalendar} style={{ padding: '8px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>✓ Add to Calendar</button>
+                              <button onClick={() => setGoalCalendarPicker(null)} style={{ padding: '8px 12px', background: theme.danger, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
+                            </div>
+                            <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px' }}>
+                              Will add ${payment.toFixed(0)}/{goal.savingsFrequency} recurring payment
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div style={{ height: '8px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginTop: goalCalendarPicker?.goalId === goal.id ? '12px' : '0' }}><div style={{ width: `${Math.min(progress, 100)}%`, height: '100%', background: theme.purple, borderRadius: '4px' }} /></div>
                       </div>
                     )
                   })}
