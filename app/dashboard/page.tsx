@@ -3754,7 +3754,7 @@ export default function Dashboard() {
                        budgetMemory.financialPath === 'fire' ? `FIRE Number: $${(monthlyExpenses * 12 * 25).toLocaleString()} • ${monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) * 100).toFixed(0) : 0}% freedom` :
                        budgetMemory.financialPath === 'home' ? 'Building towards your home deposit' :
                        budgetMemory.financialPath === 'automated' ? `${passiveIncome > 0 ? ((passiveIncome / (activeIncome || 1)) * 100).toFixed(0) : 0}% passive income ratio` : 
-                       `CER: ${totalMonthlyExpenses > 0 && totalMonthlyIncome > 0 ? ((totalMonthlyExpenses / totalMonthlyIncome) * 100).toFixed(0) : 0}%`}
+                       `CER: ${monthlyExpenses > 0 && monthlyIncome > 0 ? ((monthlyExpenses / monthlyIncome) * 100).toFixed(0) : 0}%`}
                     </div>
                   </div>
                   <button 
