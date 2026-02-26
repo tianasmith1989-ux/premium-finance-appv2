@@ -336,7 +336,65 @@ CRITICAL: Use their EXACT payment amount - don't recalculate!
 When ready:
 {"type": "addGoal", "data": {"name": "Emergency Fund", "target": "1000", "saved": "0", "deadline": "${currentYear}-12-27", "savingsFrequency": "fortnightly", "paymentAmount": "50", "startDate": "${currentYear}-${currentMonth}-27"}}
 
-After adding: "Added! Any other savings goals? Or say 'done' to see your budget summary."
+After adding: "Added! Any other savings goals? Or say 'done' to choose your financial path."
+` : ''}
+
+${onboardingStep === 'path' ? `
+Now present the user with their FINANCIAL PATH OPTIONS. This is where they choose their journey.
+
+Present it like this:
+
+"Excellent, [Name]! Your budget is set up. Now let's talk about where you want to go.
+
+**Choose Your Financial Path:**
+
+🏠 **Home Ownership Path**
+Focus on saving for a house deposit. I'll help you understand LMI, government schemes (First Home Guarantee, Help to Buy), stamp duty, and create a deposit savings plan. Great if buying a home is your #1 goal.
+
+👶 **Baby Steps Path (Dave Ramsey)**
+A proven 7-step system: $1K emergency fund → Pay off all debt → 3-6 months expenses → Invest 15% → Kids' education → Pay off home → Build wealth. Great for getting out of debt systematically.
+
+🔥 **FIRE Path (Financial Independence)**
+Calculate your 'FIRE Number' - the amount needed to never work again. Track passive income vs expenses until passive income wins. Great if early retirement or financial freedom is the goal.
+
+💰 **Automated Income Path**
+Build revenue streams that work while you sleep. Side hustles, dividends, rentals, online income. I'll track your passive vs active income ratio. Great for building multiple income streams.
+
+📊 **Optimise Operations Path**
+Focus on your financial metrics: CER (Cost Efficiency), Savings Rate, Asset Coverage. I'll help you optimize spending and maximize efficiency. Great for data-driven money management.
+
+**OR tell me your target:**
+Give me a specific goal (e.g., '$5,000 emergency fund', '$50K house deposit', '$500/month passive income', 'debt-free by 2027') and I'll recommend the best path for you.
+
+Which path calls to you?"
+
+Wait for their response:
+- If they choose a path → Store it: {"type": "setMemory", "data": {"financialPath": "babysteps|fire|home|automated|optimise"}}
+- If they give a target → Analyze and recommend a path, then store it
+- After path is selected → Move to complete
+` : ''}
+
+${onboardingStep === 'complete' ? `
+User has chosen their path: ${memory?.financialPath || 'not set'}
+
+WRAP UP the onboarding with enthusiasm! 
+
+Based on their chosen path, give them:
+1. A summary of their financial position (income, expenses, net)
+2. Their current Baby Step or path milestone
+3. One specific FIRST ACTION they should take this week
+4. Mention the PATH tab where they can track their journey
+
+If they chose:
+- babysteps: Tell them which Baby Step they're on based on their data
+- fire: Calculate their FIRE number (annual expenses × 25) and passive income coverage %
+- home: Estimate how long to save for different deposit amounts (5%, 10%, 20%)
+- automated: Show their passive vs active income split
+- optimise: Show their CER (essentials ÷ income) and savings rate
+
+End with: "You can find all this in the 📊 Metrics and 🛤️ Path tabs. Let's build your empire, [Name]! 💪"
+
+Set isComplete: true
 ` : ''}
 
 === DATE FORMAT ===
@@ -345,11 +403,13 @@ After adding: "Added! Any other savings goals? Or say 'done' to see your budget 
 "15th of march" → "${currentYear}-03-15"
 
 === STEP PROGRESSION ===
-greeting → choice → income → expenses → debts → goals → complete
+greeting → choice → income → expenses → debts → goals → path → complete
 
 - After greeting (got name) → nextStep: "choice"
 - If user says they want to enter themselves / self-service → isComplete: true (end onboarding, they'll use forms)
 - If user wants guided help / Aureus to help → nextStep: "income"
+- After goals done → nextStep: "path"
+- After path selected → nextStep: "complete"
 - "no" / "done" / "that's it" / "move on" = move to next step, actions: []
 
 === RESPONSE FORMAT ===
