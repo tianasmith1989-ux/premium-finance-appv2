@@ -1281,18 +1281,34 @@ export default function Dashboard() {
   const confirmGoalToCalendar = () => {
     if (!goalCalendarPicker) return
     
-    const goal = goals.find(g => g.id === goalCalendarPicker.goalId)
-    if (!goal) return
+    const goalId = goalCalendarPicker.goalId
+    const selectedDate = goalCalendarPicker.startDate
     
-    const payment = parseFloat(goal.paymentAmount || '0')
-    const startDate = goalCalendarPicker.startDate
+    const goal = goals.find(g => g.id === goalId)
+    if (!goal) {
+      alert('Goal not found!')
+      return
+    }
     
-    // Update the goal with the new startDate AND mark as added to calendar
-    setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, startDate, addedToCalendar: true } : g))
+    // Update the goal with the SELECTED date AND mark as added to calendar
+    setGoals(prevGoals => {
+      return prevGoals.map(g => {
+        if (g.id === goalId) {
+          console.log(`Updating goal ${g.name}: startDate from ${g.startDate} to ${selectedDate}`)
+          return { 
+            ...g, 
+            startDate: selectedDate,  // Use the date from the picker
+            addedToCalendar: true 
+          }
+        }
+        return g
+      })
+    })
+    
+    const alertMsg = `✅ ${goal.name} added to calendar!\n\nFirst payment: ${selectedDate}\nFrequency: ${goal.savingsFrequency}\nAmount: $${goal.paymentAmount}`
+    alert(alertMsg)
     
     setGoalCalendarPicker(null)
-    alert(`✅ ${goal.name} added to calendar starting ${startDate}!`)
-  }
   }
 
   // Debt payoff calculator - calculates months to payoff
