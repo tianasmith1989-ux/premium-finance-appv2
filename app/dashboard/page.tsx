@@ -301,6 +301,14 @@ export default function Dashboard() {
   // Edit State - for inline editing
   const [editingItem, setEditingItem] = useState<{type: string, id: number, data: any} | null>(null)
   
+  // Home Buying Guide State
+  const [homeGuideExpanded, setHomeGuideExpanded] = useState<string | null>(null)
+  const [homeCalcState, setHomeCalcState] = useState('QLD')
+  const [homeCalcFirstHome, setHomeCalcFirstHome] = useState(true)
+  const [homeCalcNewBuild, setHomeCalcNewBuild] = useState(false)
+  const [homeDocuments, setHomeDocuments] = useState<{name: string, type: string, uploadedAt: string}[]>([])
+  const homeDocInputRef = useRef<HTMLInputElement>(null)
+  
   // Alerts & Reminders
   const [alertsEnabled, setAlertsEnabled] = useState(true)
   const [alertDaysBefore, setAlertDaysBefore] = useState(2)
@@ -1660,6 +1668,12 @@ export default function Dashboard() {
               setActiveTab('dashboard')
             }, 1500) // Wait 1.5 seconds so user sees the message
           }
+          // When moving to 'path' step, switch to path tab to show options
+          if (data.nextStep === 'path') {
+            setTimeout(() => {
+              setActiveTab('path')
+            }, 1500)
+          }
         }
         else {
           setTradingOnboarding(prev => ({ ...prev, step: data.nextStep }))
@@ -1880,6 +1894,8 @@ export default function Dashboard() {
             if (data.payDay) updated.payDay = data.payDay
             if (data.lifeEvents) updated.lifeEvents = data.lifeEvents
             if (data.currentStep) updated.currentStep = data.currentStep
+            if (data.financialPath) updated.financialPath = data.financialPath
+            if (data.targetGoal) updated.targetGoal = data.targetGoal
             if (data.preferences) updated.preferences = { ...prev.preferences, ...data.preferences }
             if (data.patterns) updated.patterns = [...(prev.patterns || []), ...data.patterns]
             if (data.notes) updated.notes = [...(prev.notes || []), ...data.notes]
@@ -3673,6 +3689,56 @@ export default function Dashboard() {
               <div style={{ display: 'flex', gap: '8px' }}><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button></div>
             </div>
             
+            {/* Selected Financial Path */}
+            {budgetMemory.financialPath && (
+              <div style={{ padding: '20px', background: `linear-gradient(135deg, ${
+                budgetMemory.financialPath === 'babysteps' ? '#10b98120' :
+                budgetMemory.financialPath === 'fire' ? '#f5920b20' :
+                budgetMemory.financialPath === 'home' ? '#3b82f620' :
+                budgetMemory.financialPath === 'automated' ? '#8b5cf620' :
+                '#6366f120'
+              }, transparent)`, borderRadius: '16px', border: '2px solid ' + (
+                budgetMemory.financialPath === 'babysteps' ? theme.success :
+                budgetMemory.financialPath === 'fire' ? theme.warning :
+                budgetMemory.financialPath === 'home' ? theme.accent :
+                budgetMemory.financialPath === 'automated' ? theme.purple :
+                '#6366f1'
+              ) }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '28px', marginBottom: '8px' }}>
+                      {budgetMemory.financialPath === 'babysteps' ? '👶' :
+                       budgetMemory.financialPath === 'fire' ? '🔥' :
+                       budgetMemory.financialPath === 'home' ? '🏠' :
+                       budgetMemory.financialPath === 'automated' ? '💰' : '📊'}
+                    </div>
+                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '20px' }}>
+                      {budgetMemory.financialPath === 'babysteps' ? 'Baby Steps Path' :
+                       budgetMemory.financialPath === 'fire' ? 'FIRE Path' :
+                       budgetMemory.financialPath === 'home' ? 'Home Ownership Path' :
+                       budgetMemory.financialPath === 'automated' ? 'Automated Income Path' : 'Optimise Operations Path'}
+                    </div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>
+                      {budgetMemory.financialPath === 'babysteps' ? `Currently on Step ${currentBabyStep.step}: ${currentBabyStep.title}` :
+                       budgetMemory.financialPath === 'fire' ? `FIRE Number: $${(monthlyExpenses * 12 * 25).toLocaleString()} • ${monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) * 100).toFixed(0) : 0}% freedom` :
+                       budgetMemory.financialPath === 'home' ? 'Building towards your home deposit' :
+                       budgetMemory.financialPath === 'automated' ? `${passiveIncome > 0 ? ((passiveIncome / (activeIncome || 1)) * 100).toFixed(0) : 0}% passive income ratio` : 
+                       `CER: ${totalMonthlyExpenses > 0 && totalMonthlyIncome > 0 ? ((totalMonthlyExpenses / totalMonthlyIncome) * 100).toFixed(0) : 0}%`}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setChatMessages(prev => [...prev, { role: 'user', content: "I'd like to change my financial path" }])
+                      handleChatMessage()
+                    }}
+                    style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    Change Path
+                  </button>
+                </div>
+              </div>
+            )}
+            
             {/* Current Progress Summary */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
@@ -3976,212 +4042,321 @@ export default function Dashboard() {
             <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
                 <div style={{ width: '56px', height: '56px', borderRadius: '12px', background: 'linear-gradient(135deg, #f59e0b, #10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🏠</div>
-                <div>
+                <div style={{ flex: 1 }}>
                   <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>Australian Home Buying Roadmap</h2>
-                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Complete step-by-step guide to buying property in Australia</p>
+                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Click each phase to expand • Aureus can help with each step</p>
                 </div>
+                <input type="file" ref={homeDocInputRef} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={e => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    setHomeDocuments(prev => [...prev, { name: file.name, type: file.type, uploadedAt: new Date().toISOString() }])
+                  }
+                }} style={{ display: 'none' }} />
+                <button onClick={() => homeDocInputRef.current?.click()} style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>
+                  📎 Upload Document
+                </button>
               </div>
               
+              {/* Uploaded Documents */}
+              {homeDocuments.length > 0 && (
+                <div style={{ marginBottom: '16px', padding: '12px', background: theme.cardBg, borderRadius: '8px' }}>
+                  <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '8px' }}>YOUR DOCUMENTS ({homeDocuments.length})</div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                    {homeDocuments.map((doc, idx) => (
+                      <div key={idx} style={{ padding: '6px 12px', background: '#334155', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '14px' }}>{doc.type.includes('pdf') ? '📄' : doc.type.includes('image') ? '🖼️' : '📝'}</span>
+                        <span style={{ color: theme.text, fontSize: '12px' }}>{doc.name}</span>
+                        <button onClick={() => setHomeDocuments(prev => prev.filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '12px' }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               {/* Phase 1: Get Financially Ready */}
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                  <span style={{ fontSize: '20px' }}>💰</span>
-                  <h3 style={{ margin: 0, color: theme.warning, fontSize: '16px' }}>Phase 1: Get Financially Ready</h3>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', paddingLeft: '20px', borderLeft: '2px solid #334155' }}>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Check your credit score</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Get your free credit report from Equifax, Experian, or Illion. Score above 700 is good. Fix any errors before applying for a loan.</div>
+              <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + theme.border }}>
+                <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === 'phase1' ? null : 'phase1')} style={{ width: '100%', padding: '16px 20px', background: homeGuideExpanded === 'phase1' ? 'linear-gradient(135deg, #f59e0b20, transparent)' : theme.cardBg, border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '24px' }}>💰</span>
+                    <div style={{ textAlign: 'left' as const }}>
+                      <div style={{ color: theme.warning, fontWeight: 700 }}>Phase 1: Get Financially Ready</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>Credit score, deposit, FHSS, reduce debts</div>
+                    </div>
                   </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Save your deposit</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>20% deposit avoids Lenders Mortgage Insurance (LMI). On a $600K home = $120K. Use FHSS scheme to boost savings via super.</div>
+                  <span style={{ color: theme.textMuted, fontSize: '20px' }}>{homeGuideExpanded === 'phase1' ? '▼' : '▶'}</span>
+                </button>
+                {homeGuideExpanded === 'phase1' && (
+                  <div style={{ padding: '20px', background: darkMode ? '#1a1a2e' : '#f8fafc' }}>
+                    <div style={{ display: 'grid', gap: '12px' }}>
+                      {[
+                        { title: 'Check your credit score', desc: 'Get free report from Equifax, Experian, or Illion. 700+ is good.', action: 'Help me understand my credit score' },
+                        { title: 'Save your deposit', desc: '20% avoids LMI. On $600K home = $120K deposit needed.', action: 'Create a deposit savings goal' },
+                        { title: 'FHSS Scheme', desc: 'Salary sacrifice up to $15K/yr into super, withdraw for first home.', action: 'Explain how FHSS works' },
+                        { title: 'Reduce existing debts', desc: 'Pay off credit cards, BNPL, personal loans. Close unused cards.', action: 'Help me prioritize my debts' },
+                        { title: 'Build genuine savings', desc: '3+ months of consistent saving shows banks financial discipline.', action: 'Set up automatic savings' },
+                      ].map((item, idx) => (
+                        <div key={idx} style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{item.title}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{item.desc}</div>
+                          </div>
+                          <button onClick={() => { setChatInput(item.action); handleChatMessage(); }} style={{ padding: '6px 12px', background: theme.warning + '20', color: theme.warning, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' as const }}>🤖 Ask Aureus</button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>First Home Super Saver Scheme (FHSS)</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Salary sacrifice up to $15K/year (max $50K total) into super, then withdraw for your first home deposit. Saves tax and grows faster.</div>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Reduce existing debts</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Lenders check your debt-to-income ratio. Pay off credit cards, BNPL, and personal loans. Close unused credit cards — even $0 balance counts against you.</div>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Build genuine savings</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Lenders want to see 3+ months of consistent saving. Regular deposits into a dedicated savings account shows financial discipline.</div>
-                  </div>
-                </div>
+                )}
               </div>
               
               {/* Phase 2: Understand the Costs */}
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                  <span style={{ fontSize: '20px' }}>🧾</span>
-                  <h3 style={{ margin: 0, color: theme.purple, fontSize: '16px' }}>Phase 2: Understand the Costs</h3>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', paddingLeft: '20px', borderLeft: '2px solid #334155' }}>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Stamp duty</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Varies by state. QLD: $0 on first home under $500K (house) or $550K (land). NSW: $0 under $800K for first home. VIC: $0 under $600K. Use your state's calculator.</div>
+              <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + theme.border }}>
+                <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === 'phase2' ? null : 'phase2')} style={{ width: '100%', padding: '16px 20px', background: homeGuideExpanded === 'phase2' ? 'linear-gradient(135deg, #8b5cf620, transparent)' : theme.cardBg, border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '24px' }}>🧾</span>
+                    <div style={{ textAlign: 'left' as const }}>
+                      <div style={{ color: theme.purple, fontWeight: 700 }}>Phase 2: Understand the Costs</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>Stamp duty, LMI, legal fees, inspections</div>
+                    </div>
                   </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Lenders Mortgage Insurance (LMI)</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Charged when deposit is under 20%. Can add $10K-$30K+ to your loan. Avoid with 20% deposit, or use government guarantee schemes.</div>
+                  <span style={{ color: theme.textMuted, fontSize: '20px' }}>{homeGuideExpanded === 'phase2' ? '▼' : '▶'}</span>
+                </button>
+                {homeGuideExpanded === 'phase2' && (
+                  <div style={{ padding: '20px', background: darkMode ? '#1a1a2e' : '#f8fafc' }}>
+                    {/* COMPREHENSIVE COST CALCULATOR */}
+                    <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', marginBottom: '16px' }}>
+                      <div style={{ color: theme.text, fontWeight: 700, marginBottom: '12px' }}>🧮 Complete Cost Calculator</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                        <div>
+                          <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Property Price</label>
+                          <input type="number" placeholder="600000" value={homeBuyingPrice} onChange={e => setHomeBuyingPrice(e.target.value)} style={{ ...inputStyle, width: '100%', padding: '10px' }} />
+                        </div>
+                        <div>
+                          <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>State</label>
+                          <select value={homeCalcState} onChange={e => setHomeCalcState(e.target.value)} style={{ ...inputStyle, width: '100%', padding: '10px' }}>
+                            <option value="QLD">Queensland</option>
+                            <option value="NSW">New South Wales</option>
+                            <option value="VIC">Victoria</option>
+                            <option value="WA">Western Australia</option>
+                            <option value="SA">South Australia</option>
+                            <option value="TAS">Tasmania</option>
+                            <option value="NT">Northern Territory</option>
+                            <option value="ACT">ACT</option>
+                          </select>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <input type="checkbox" checked={homeCalcFirstHome} onChange={e => setHomeCalcFirstHome(e.target.checked)} />
+                          <label style={{ color: theme.text, fontSize: '12px' }}>First home buyer</label>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <input type="checkbox" checked={homeCalcNewBuild} onChange={e => setHomeCalcNewBuild(e.target.checked)} />
+                          <label style={{ color: theme.text, fontSize: '12px' }}>New build</label>
+                        </div>
+                      </div>
+                      
+                      {homeBuyingPrice && parseFloat(homeBuyingPrice) > 0 && (() => {
+                        const price = parseFloat(homeBuyingPrice)
+                        
+                        // Stamp duty calculation by state (simplified)
+                        let stampDuty = 0
+                        if (homeCalcFirstHome) {
+                          // First home buyer exemptions
+                          if (homeCalcState === 'QLD' && price <= 500000) stampDuty = 0
+                          else if (homeCalcState === 'QLD' && price <= 550000) stampDuty = (price - 500000) * 0.035
+                          else if (homeCalcState === 'NSW' && price <= 800000) stampDuty = 0
+                          else if (homeCalcState === 'VIC' && price <= 600000) stampDuty = 0
+                          else stampDuty = price * 0.04 // Default rate
+                        } else {
+                          stampDuty = price * 0.045 // Non-first-home rate
+                        }
+                        
+                        // FHOG (only for new builds)
+                        let fhog = 0
+                        if (homeCalcFirstHome && homeCalcNewBuild) {
+                          if (homeCalcState === 'QLD' && price <= 750000) fhog = 30000
+                          else if (homeCalcState === 'NSW' && price <= 600000) fhog = 10000
+                          else if (homeCalcState === 'VIC' && price <= 750000) fhog = 10000
+                          else fhog = 10000 // Other states
+                        }
+                        
+                        // All costs breakdown
+                        const deposit5 = price * 0.05
+                        const deposit10 = price * 0.10
+                        const deposit20 = price * 0.20
+                        const lmi5 = price * 0.028
+                        const lmi10 = price * 0.015
+                        const conveyancing = 2500
+                        const buildingInspection = 500
+                        const pestInspection = 350
+                        const loanApplication = 600
+                        const titleSearch = 200
+                        const settlementFee = 400
+                        const councilRatesAdjust = 500
+                        const insurance = 1500
+                        const movingCosts = 1500
+                        const connectionFees = 500 // Power, gas, internet
+                        
+                        const fixedCosts = conveyancing + buildingInspection + pestInspection + loanApplication + titleSearch + settlementFee + councilRatesAdjust + insurance + movingCosts + connectionFees
+                        
+                        const total5 = deposit5 + lmi5 + stampDuty + fixedCosts - fhog
+                        const total10 = deposit10 + lmi10 + stampDuty + fixedCosts - fhog
+                        const total20 = deposit20 + stampDuty + fixedCosts - fhog
+                        
+                        return (
+                          <>
+                            {/* Deposit Options */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                              <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                                <div style={{ color: theme.danger, fontSize: '11px', fontWeight: 600 }}>5% DEPOSIT</div>
+                                <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>${deposit5.toLocaleString()}</div>
+                                <div style={{ color: theme.danger, fontSize: '12px', marginTop: '4px' }}>+ ${lmi5.toLocaleString()} LMI</div>
+                                <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px', borderTop: '1px solid #475569', paddingTop: '8px' }}>Total needed: <strong>${Math.max(0, total5).toLocaleString()}</strong></div>
+                              </div>
+                              <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
+                                <div style={{ color: theme.warning, fontSize: '11px', fontWeight: 600 }}>10% DEPOSIT</div>
+                                <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>${deposit10.toLocaleString()}</div>
+                                <div style={{ color: theme.warning, fontSize: '12px', marginTop: '4px' }}>+ ${lmi10.toLocaleString()} LMI</div>
+                                <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px', borderTop: '1px solid #475569', paddingTop: '8px' }}>Total needed: <strong>${Math.max(0, total10).toLocaleString()}</strong></div>
+                              </div>
+                              <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const, border: '2px solid ' + theme.success }}>
+                                <div style={{ color: theme.success, fontSize: '11px', fontWeight: 600 }}>20% DEPOSIT ✓</div>
+                                <div style={{ color: theme.text, fontSize: '24px', fontWeight: 700 }}>${deposit20.toLocaleString()}</div>
+                                <div style={{ color: theme.success, fontSize: '12px', marginTop: '4px' }}>No LMI!</div>
+                                <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px', borderTop: '1px solid #475569', paddingTop: '8px' }}>Total needed: <strong>${Math.max(0, total20).toLocaleString()}</strong></div>
+                              </div>
+                            </div>
+                            
+                            {/* Full Cost Breakdown */}
+                            <div style={{ padding: '16px', background: '#1e293b', borderRadius: '8px' }}>
+                              <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, marginBottom: '12px' }}>FULL COST BREAKDOWN</div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.textMuted }}>Stamp Duty:</span><span style={{ color: stampDuty === 0 ? theme.success : theme.text }}>{stampDuty === 0 ? 'EXEMPT ✓' : '$' + stampDuty.toLocaleString()}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.textMuted }}>Conveyancing:</span><span style={{ color: theme.text }}>${conveyancing.toLocaleString()}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.textMuted }}>Building Inspection:</span><span style={{ color: theme.text }}>${buildingInspection.toLocaleString()}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.textMuted }}>Pest Inspection:</span><span style={{ color: theme.text }}>${pestInspection.toLocaleString()}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.textMuted }}>Loan Application:</span><span style={{ color: theme.text }}>${loanApplication.toLocaleString()}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.textMuted }}>Title Search:</span><span style={{ color: theme.text }}>${titleSearch.toLocaleString()}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.textMuted }}>Settlement Fee:</span><span style={{ color: theme.text }}>${settlementFee.toLocaleString()}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.textMuted }}>Council Rates Adj:</span><span style={{ color: theme.text }}>${councilRatesAdjust.toLocaleString()}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.textMuted }}>Home Insurance:</span><span style={{ color: theme.text }}>${insurance.toLocaleString()}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.textMuted }}>Moving Costs:</span><span style={{ color: theme.text }}>${movingCosts.toLocaleString()}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.textMuted }}>Utilities Connection:</span><span style={{ color: theme.text }}>${connectionFees.toLocaleString()}</span></div>
+                                {fhog > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.success }}>FHOG Grant:</span><span style={{ color: theme.success }}>-${fhog.toLocaleString()} ✓</span></div>}
+                              </div>
+                              <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #334155', display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: theme.text, fontWeight: 600 }}>Additional costs (excl. deposit):</span>
+                                <span style={{ color: theme.warning, fontWeight: 700 }}>${(stampDuty + fixedCosts - fhog).toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </>
+                        )
+                      })()}
+                    </div>
                   </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Legal/conveyancing fees</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Solicitor or conveyancer: $1,500-$3,000. They handle contracts, title searches, settlement. Essential — never skip this.</div>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Building & pest inspections</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>$400-$800. Non-negotiable for houses. Finds structural issues, termites, and defects before you buy. Can save tens of thousands.</div>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Ongoing costs</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Council rates ($1,500-$3,000/yr), insurance ($1,500-$3,000/yr), body corp/strata if unit ($2,000-$8,000/yr), maintenance (budget 1% of home value/yr).</div>
-                  </div>
-                </div>
+                )}
               </div>
               
               {/* Phase 3: Government Schemes */}
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                  <span style={{ fontSize: '20px' }}>🏛️</span>
-                  <h3 style={{ margin: 0, color: theme.accent, fontSize: '16px' }}>Phase 3: Government Schemes</h3>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', paddingLeft: '20px', borderLeft: '2px solid #334155' }}>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>First Home Owner Grant (FHOG)</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>QLD: $30,000 for new homes under $750K. NSW: $10,000 new homes under $600K. VIC: $10,000 new homes under $750K. Must be new build or substantially renovated.</div>
+              <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + theme.border }}>
+                <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === 'phase3' ? null : 'phase3')} style={{ width: '100%', padding: '16px 20px', background: homeGuideExpanded === 'phase3' ? 'linear-gradient(135deg, #3b82f620, transparent)' : theme.cardBg, border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '24px' }}>🏛️</span>
+                    <div style={{ textAlign: 'left' as const }}>
+                      <div style={{ color: theme.accent, fontWeight: 700 }}>Phase 3: Government Schemes</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>FHOG, First Home Guarantee, Help to Buy</div>
+                    </div>
                   </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>First Home Guarantee (FHG)</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Buy with 5% deposit, government guarantees the rest — NO LMI. 35,000 places/year. Income cap: $125K single, $200K couple. Price caps vary by region.</div>
+                  <span style={{ color: theme.textMuted, fontSize: '20px' }}>{homeGuideExpanded === 'phase3' ? '▼' : '▶'}</span>
+                </button>
+                {homeGuideExpanded === 'phase3' && (
+                  <div style={{ padding: '20px', background: darkMode ? '#1a1a2e' : '#f8fafc' }}>
+                    <div style={{ display: 'grid', gap: '12px' }}>
+                      {[
+                        { title: 'First Home Owner Grant (FHOG)', desc: 'QLD: $30K new homes <$750K. NSW: $10K <$600K. VIC: $10K <$750K. New builds only.', action: 'Am I eligible for FHOG?' },
+                        { title: 'First Home Guarantee (FHG)', desc: 'Buy with 5% deposit, no LMI. Income cap: $125K single, $200K couple. 35,000 places/yr.', action: 'Explain First Home Guarantee' },
+                        { title: 'Regional First Home Buyer Guarantee', desc: '10,000 places/yr for regional areas. Same 5% deposit, no LMI benefits.', action: 'What counts as regional?' },
+                        { title: 'Family Home Guarantee', desc: 'Single parents can buy with just 2% deposit, no LMI. 5,000 places/yr.', action: 'Tell me about Family Home Guarantee' },
+                        { title: 'Help to Buy (coming)', desc: 'Gov co-owns up to 40% new/30% existing. Only need 2% deposit. 10,000 places/yr.', action: 'When does Help to Buy start?' },
+                      ].map((item, idx) => (
+                        <div key={idx} style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{item.title}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{item.desc}</div>
+                          </div>
+                          <button onClick={() => { setChatInput(item.action); handleChatMessage(); }} style={{ padding: '6px 12px', background: theme.accent + '20', color: theme.accent, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' as const }}>🤖 Ask Aureus</button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Regional First Home Buyer Guarantee</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>10,000 places/year for regional areas. Same benefits as FHG but for regional property purchases.</div>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Family Home Guarantee</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>For single parents. Buy with just 2% deposit, no LMI. 5,000 places/year.</div>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Help to Buy (coming)</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Government co-owns up to 40% (new) or 30% (existing). You need just 2% deposit. 10,000 places/year when it launches.</div>
-                  </div>
-                </div>
+                )}
               </div>
               
               {/* Phase 4: Get Pre-Approved */}
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                  <span style={{ fontSize: '20px' }}>🏦</span>
-                  <h3 style={{ margin: 0, color: theme.success, fontSize: '16px' }}>Phase 4: Get Pre-Approved</h3>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', paddingLeft: '20px', borderLeft: '2px solid #334155' }}>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Gather your documents</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Last 2 payslips, 3 months bank statements, tax returns (if self-employed), ID, and details of all debts and expenses.</div>
+              <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + theme.border }}>
+                <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === 'phase4' ? null : 'phase4')} style={{ width: '100%', padding: '16px 20px', background: homeGuideExpanded === 'phase4' ? 'linear-gradient(135deg, #10b98120, transparent)' : theme.cardBg, border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '24px' }}>🏦</span>
+                    <div style={{ textAlign: 'left' as const }}>
+                      <div style={{ color: theme.success, fontWeight: 700 }}>Phase 4: Get Pre-Approved</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>Documents, broker, borrowing power</div>
+                    </div>
                   </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Use a mortgage broker</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Free for you (paid by lender). They compare 30+ lenders, know which ones suit your situation, and handle paperwork. Worth it.</div>
+                  <span style={{ color: theme.textMuted, fontSize: '20px' }}>{homeGuideExpanded === 'phase4' ? '▼' : '▶'}</span>
+                </button>
+                {homeGuideExpanded === 'phase4' && (
+                  <div style={{ padding: '20px', background: darkMode ? '#1a1a2e' : '#f8fafc' }}>
+                    <div style={{ display: 'grid', gap: '12px' }}>
+                      {[
+                        { title: 'Gather your documents', desc: '2 payslips, 3mo bank statements, tax returns (self-emp), ID, all debts.', action: 'What documents do I need for a home loan?' },
+                        { title: 'Use a mortgage broker', desc: 'Free for you. They compare 30+ lenders and handle paperwork.', action: 'Should I use a broker or go direct?' },
+                        { title: 'Get pre-approval', desc: 'Shows sellers you are serious. Valid 3-6 months. Not locked to that lender.', action: 'How do I get pre-approval?' },
+                        { title: 'Understand borrowing power', desc: 'Rule: 5-6x gross income. $100K = ~$500-600K. But budget for YOUR comfort.', action: 'Calculate my borrowing power' },
+                      ].map((item, idx) => (
+                        <div key={idx} style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{item.title}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{item.desc}</div>
+                          </div>
+                          <button onClick={() => { setChatInput(item.action); handleChatMessage(); }} style={{ padding: '6px 12px', background: theme.success + '20', color: theme.success, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' as const }}>🤖 Ask Aureus</button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Get pre-approval</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Shows sellers you're serious. Usually valid 3-6 months. Gives you a budget to house hunt within. Doesn't commit you to that lender.</div>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Understand borrowing power</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Rule of thumb: 5-6x gross income. $100K income ≈ $500-600K borrowing. But consider if repayments work for YOUR budget, not just what the bank allows.</div>
-                  </div>
-                </div>
+                )}
               </div>
               
               {/* Phase 5: Buy Smart */}
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                  <span style={{ fontSize: '20px' }}>🎯</span>
-                  <h3 style={{ margin: 0, color: theme.danger, fontSize: '16px' }}>Phase 5: Buy Smart</h3>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', paddingLeft: '20px', borderLeft: '2px solid #334155' }}>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Research areas thoroughly</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Check flood maps, future development plans, school zones, transport, crime stats. Use Domain, REA, SQM Research for price data.</div>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Attend inspections</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Go to open homes. Take notes. Check water pressure, power points, storage, natural light, noise levels. Visit at different times of day.</div>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Get building & pest inspection</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>BEFORE making an offer or going to auction. $400-$800 can save you from a $50K+ nightmare.</div>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Negotiate or bid smart</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Private treaty: always offer below asking. Auction: set your max and DO NOT go over. Emotion is expensive at auctions.</div>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: '#334155', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Settlement</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Usually 30-90 days after contract. Your conveyancer handles everything. Final inspection before settlement. Then you get the keys!</div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Home Buying Cost Calculator */}
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '20px' }}>🧮</span>
-                  <h3 style={{ margin: 0, color: theme.warning, fontSize: '16px' }}>Home Buying Cost Calculator</h3>
-                </div>
-                <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 12px 0' }}>Enter a property price to see all the costs involved</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <span style={{ color: theme.warning, fontWeight: 700 }}>$</span>
-                  <input 
-                    type="number" 
-                    placeholder="Property price (e.g. 600000)" 
-                    value={homeBuyingPrice}
-                    onChange={e => setHomeBuyingPrice(e.target.value)}
-                    style={{ flex: 1, padding: '12px 16px', background: darkMode ? '#334155' : '#e2e8f0', border: 'none', borderRadius: '8px', color: theme.text, fontSize: '16px' }}
-                  />
-                </div>
-                {homeBuyingPrice && parseFloat(homeBuyingPrice) > 0 && (() => {
-                  const price = parseFloat(homeBuyingPrice)
-                  const deposit5 = price * 0.05
-                  const deposit10 = price * 0.10
-                  const deposit20 = price * 0.20
-                  const lmi5 = price * 0.025 // ~2.5% LMI estimate for 5%
-                  const lmi10 = price * 0.013 // ~1.3% LMI estimate for 10%
-                  const stampDuty = price > 800000 ? price * 0.045 : 0 // Simplified first home exemption
-                  const conveyancing = 2000
-                  const inspection = 600
-                  const total5 = deposit5 + lmi5 + stampDuty + conveyancing + inspection
-                  const total10 = deposit10 + lmi10 + stampDuty + conveyancing + inspection
-                  const total20 = deposit20 + stampDuty + conveyancing + inspection
-                  
-                  return (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                      <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>5% Deposit</div>
-                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>${deposit5.toLocaleString()}</div>
-                        <div style={{ color: theme.danger, fontSize: '11px', marginTop: '4px' }}>+ ${lmi5.toLocaleString()} LMI</div>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px', borderTop: '1px solid #475569', paddingTop: '8px' }}>Total: ${total5.toLocaleString()}</div>
-                      </div>
-                      <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>10% Deposit</div>
-                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>${deposit10.toLocaleString()}</div>
-                        <div style={{ color: theme.warning, fontSize: '11px', marginTop: '4px' }}>+ ${lmi10.toLocaleString()} LMI</div>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px', borderTop: '1px solid #475569', paddingTop: '8px' }}>Total: ${total10.toLocaleString()}</div>
-                      </div>
-                      <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const, border: '2px solid ' + theme.success }}>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>20% Deposit</div>
-                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>${deposit20.toLocaleString()}</div>
-                        <div style={{ color: theme.success, fontSize: '11px', marginTop: '4px' }}>No LMI! ✓</div>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px', borderTop: '1px solid #475569', paddingTop: '8px' }}>Total: ${total20.toLocaleString()}</div>
-                      </div>
+              <div style={{ marginBottom: '24px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + theme.border }}>
+                <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === 'phase5' ? null : 'phase5')} style={{ width: '100%', padding: '16px 20px', background: homeGuideExpanded === 'phase5' ? 'linear-gradient(135deg, #ef444420, transparent)' : theme.cardBg, border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '24px' }}>🎯</span>
+                    <div style={{ textAlign: 'left' as const }}>
+                      <div style={{ color: theme.danger, fontWeight: 700 }}>Phase 5: Buy Smart</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>Research, inspect, negotiate, settle</div>
                     </div>
-                  )
-                })()}
+                  </div>
+                  <span style={{ color: theme.textMuted, fontSize: '20px' }}>{homeGuideExpanded === 'phase5' ? '▼' : '▶'}</span>
+                </button>
+                {homeGuideExpanded === 'phase5' && (
+                  <div style={{ padding: '20px', background: darkMode ? '#1a1a2e' : '#f8fafc' }}>
+                    <div style={{ display: 'grid', gap: '12px' }}>
+                      {[
+                        { title: 'Research areas', desc: 'Flood maps, development plans, schools, transport, crime stats.', action: 'What should I research about an area?' },
+                        { title: 'Attend inspections', desc: 'Check water pressure, power points, storage, light, noise at different times.', action: 'What to look for at open homes?' },
+                        { title: 'Get building & pest inspection', desc: 'BEFORE offer/auction. $400-800 can save $50K+ in problems.', action: 'Is building inspection worth it?' },
+                        { title: 'Negotiate or bid smart', desc: 'Private: offer below asking. Auction: set max and STICK TO IT.', action: 'Tips for negotiating house price' },
+                        { title: 'Settlement day', desc: '30-90 days after contract. Final inspection. Then you get the keys!', action: 'What happens at settlement?' },
+                      ].map((item, idx) => (
+                        <div key={idx} style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{item.title}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{item.desc}</div>
+                          </div>
+                          <button onClick={() => { setChatInput(item.action); handleChatMessage(); }} style={{ padding: '6px 12px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' as const }}>🤖 Ask Aureus</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Ready to Start CTA */}
