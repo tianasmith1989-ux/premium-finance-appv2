@@ -226,8 +226,13 @@ Respond ONLY in this JSON format:
 }`
 
       const onboardingPrompts: {[key: string]: string} = {
-        greeting: `Welcome the trader! Ask for their name. Be excited but professional. Mention you'll help them with prop firms, psychology, and building their personal account through compounding.`,
-        experience: `User's name: ${userResponse}. Store it. Now ask about their trading experience. Are they: Beginner (0-1 years), Intermediate (1-3 years), or Advanced (3+ years)?`,
+        greeting: `Welcome the trader! Ask for their name only. Be excited but professional. Just ask "What's your name?" - nothing else about experience yet.`,
+        experience: `The user just told you their name is "${userResponse}". 
+IMPORTANT: Do NOT ask for their name again - you already have it!
+Store their name with: {"type": "setMemory", "data": {"name": "${userResponse}"}}
+
+Now greet them BY NAME and ask ONLY about trading experience:
+"Great to meet you, ${userResponse}! How long have you been trading? Are you a Beginner (0-1 years), Intermediate (1-3 years), or Advanced (3+ years)?"`,
         style: `They said: "${userResponse}". Now ask their trading style - are they a Scalper (seconds-minutes), Day Trader (minutes-hours), or Swing Trader (days-weeks)?`,
         instruments: `They said: "${userResponse}". Ask what markets they trade: Forex pairs? Futures (ES, NQ)? Stocks? Crypto? They can trade multiple.`,
         goals: `They said: "${userResponse}". Now the important one - ask about their goals:
