@@ -1922,6 +1922,37 @@ export default function Dashboard() {
     setChatInput(prev => prev || "Analyze this chart for me")
   }
 
+  // Quick message sender for "Ask Aureus" buttons - bypasses state timing issues
+  const sendQuickMessage = async (message: string) => {
+    if (!message.trim() || isLoading) return
+    
+    setChatMessages(prev => [...prev, { role: 'user', content: message }])
+    setChatInput('')
+    setIsLoading(true)
+    
+    try {
+      const endpoint = appMode === 'budget' ? '/api/budget-coach' : '/api/trading-coach'
+      const recentHistory = [...chatMessages.slice(-10), { role: 'user', content: message }]
+        .map(m => `${m.role === 'user' ? 'User' : 'Aureus'}: ${m.content}`)
+        .join('\n')
+      
+      const body = appMode === 'budget'
+        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }, memory: budgetMemory }
+        : { mode: 'question', question: message, conversationHistory: recentHistory, tradingData: { trades }, memory: tradingMemory }
+      
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const data = await response.json()
+      
+      if (data.actions && Array.isArray(data.actions)) {
+        executeAIActions(data.actions)
+      }
+      setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
+    } catch (error) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I had trouble with that. Let's try again!" }])
+    }
+    setIsLoading(false)
+  }
+
   const handleChatMessage = async () => {
     if ((!chatInput.trim() && !pendingChartImage) || isLoading) return
     const message = chatInput.trim()
@@ -3727,10 +3758,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <button 
-                    onClick={() => {
-                      setChatMessages(prev => [...prev, { role: 'user', content: "I'd like to change my financial path" }])
-                      handleChatMessage()
-                    }}
+                    onClick={() => sendQuickMessage("I'd like to change my financial path")}
                     style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}
                   >
                     Change Path
@@ -4100,7 +4128,7 @@ export default function Dashboard() {
                             <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{item.title}</div>
                             <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{item.desc}</div>
                           </div>
-                          <button onClick={() => { setChatInput(item.action); handleChatMessage(); }} style={{ padding: '6px 12px', background: theme.warning + '20', color: theme.warning, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' as const }}>🤖 Ask Aureus</button>
+                          <button onClick={() => { sendQuickMessage(item.action) }} style={{ padding: '6px 12px', background: theme.warning + '20', color: theme.warning, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' as const }}>🤖 Ask Aureus</button>
                         </div>
                       ))}
                     </div>
@@ -4282,7 +4310,7 @@ export default function Dashboard() {
                             <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{item.title}</div>
                             <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{item.desc}</div>
                           </div>
-                          <button onClick={() => { setChatInput(item.action); handleChatMessage(); }} style={{ padding: '6px 12px', background: theme.accent + '20', color: theme.accent, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' as const }}>🤖 Ask Aureus</button>
+                          <button onClick={() => { sendQuickMessage(item.action) }} style={{ padding: '6px 12px', background: theme.accent + '20', color: theme.accent, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' as const }}>🤖 Ask Aureus</button>
                         </div>
                       ))}
                     </div>
@@ -4316,7 +4344,7 @@ export default function Dashboard() {
                             <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{item.title}</div>
                             <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{item.desc}</div>
                           </div>
-                          <button onClick={() => { setChatInput(item.action); handleChatMessage(); }} style={{ padding: '6px 12px', background: theme.success + '20', color: theme.success, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' as const }}>🤖 Ask Aureus</button>
+                          <button onClick={() => { sendQuickMessage(item.action) }} style={{ padding: '6px 12px', background: theme.success + '20', color: theme.success, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' as const }}>🤖 Ask Aureus</button>
                         </div>
                       ))}
                     </div>
@@ -4351,7 +4379,7 @@ export default function Dashboard() {
                             <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{item.title}</div>
                             <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{item.desc}</div>
                           </div>
-                          <button onClick={() => { setChatInput(item.action); handleChatMessage(); }} style={{ padding: '6px 12px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' as const }}>🤖 Ask Aureus</button>
+                          <button onClick={() => { sendQuickMessage(item.action) }} style={{ padding: '6px 12px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' as const }}>🤖 Ask Aureus</button>
                         </div>
                       ))}
                     </div>
