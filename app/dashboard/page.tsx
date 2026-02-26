@@ -3407,7 +3407,7 @@ export default function Dashboard() {
                         </div>
                         
                         {/* Date picker for adding to calendar */}
-                        {goalCalendarPicker?.goalId === goal.id && (
+                        {goalCalendarPicker?.goalId === goal.id && goalCalendarPicker && (
                           <div style={{ marginTop: '12px', padding: '12px', background: theme.cardBg, borderRadius: '8px', border: '1px solid ' + theme.purple }}>
                             <div style={{ color: theme.text, fontSize: '13px', marginBottom: '8px', fontWeight: 600 }}>📅 When do you want to start saving?</div>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
