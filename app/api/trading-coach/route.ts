@@ -226,77 +226,74 @@ Respond ONLY in this JSON format:
 }`
 
       const onboardingPrompts: {[key: string]: string} = {
-        greeting: `This is the GREETING step. The user hasn't given their name yet.
-Ask for their name ONLY. Keep it brief.
-Example: "Hey! I'm Aureus, your trading coach. What's your name?"
-Set nextStep: "experience"
-Do NOT ask about experience yet - just get their name.`,
+        greeting: `This is the GREETING step. 
+The user said: "${userResponse}"
 
-        experience: `This is the EXPERIENCE step. The user just said: "${userResponse}"
-That is their NAME. Store it: {"type": "setMemory", "data": {"name": "${userResponse}"}}
+If "${userResponse}" looks like a name (any word or short phrase), then:
+- This IS their name! Store it: actions: [{"type": "setMemory", "data": {"name": "${userResponse}"}}]
+- Greet them by name: "Nice to meet you, ${userResponse}! How long have you been trading? Beginner (0-1 year), Intermediate (1-3 years), or Advanced (3+ years)?"
+- Set nextStep: "style" (skip to style since we're asking experience in this message)
 
-CRITICAL: Do NOT ask for their name again! You just received it!
+If they said something that's NOT a name (like "hello" or "hi"), then:
+- Just ask: "Hey! What's your name?"
+- Set nextStep: "greeting" (stay on greeting)`,
 
-Greet them by name and ask about experience level:
-"Nice to meet you, ${userResponse}! How long have you been trading?
-- Beginner (less than 1 year)
-- Intermediate (1-3 years)  
-- Advanced (3+ years)"
-
-Set nextStep: "style"`,
-
-        style: `They said: "${userResponse}" about their experience level. 
-Now ask their trading style:
-"What's your trading style?
-- Scalper (trades last seconds to minutes)
-- Day Trader (trades last minutes to hours, close by end of day)
-- Swing Trader (hold positions for days to weeks)"
+        experience: `This is the EXPERIENCE step.
+The user said: "${userResponse}" about their experience level.
+Ask about their trading style:
+"Got it! What's your trading style?
+- Scalper (seconds to minutes)
+- Day Trader (minutes to hours, always flat by close)
+- Swing Trader (hold for days or weeks)"
 Set nextStep: "instruments"`,
 
-        instruments: `They said: "${userResponse}" about their style.
+        style: `This is the STYLE step.
+The user said: "${userResponse}" about their style.
 Ask what markets they trade:
-"What markets do you trade? (can be multiple)
-- Forex (currency pairs)
+"What markets do you trade?
+- Forex
 - Futures (ES, NQ, etc)
 - Stocks
-- Crypto"
+- Crypto
+(Can be multiple)"
 Set nextStep: "goals"`,
 
-        goals: `They said: "${userResponse}" about what they trade.
-Now ask about their goals:
-"What are your trading goals?
-1. Are you going for prop firm funding? Which firm?
+        instruments: `This is the INSTRUMENTS step.
+The user said: "${userResponse}" about what they trade.
+Ask about their goals:
+"What are your goals?
+1. Passing a prop firm challenge? Which firm?
 2. Growing a personal account?
-3. What's your monthly income target from trading?"
+3. What's your target monthly income from trading?"
 Set nextStep: "psychology"`,
 
-        psychology: `They said: "${userResponse}" about their goals.
-Ask about their biggest weakness:
-"Let's talk real - what's your biggest trading weakness? Common ones:
-- Revenge trading after losses
-- Overtrading / taking too many trades
-- Moving stop losses
-- FOMO - chasing trades
-- Cutting winners too early
-Everyone has one. What's yours?"
+        goals: `This is the GOALS step.
+The user said: "${userResponse}" about their goals.
+Ask about their weakness:
+"Real talk - what's your biggest trading weakness?
+- Revenge trading
+- Overtrading
+- Moving stops
+- FOMO
+- Cutting winners short
+Be honest, we all have one."
 Set nextStep: "rules"`,
 
-        rules: `They said: "${userResponse}" about their weakness.
-Acknowledge it supportively, then suggest 2-3 specific rules that would help.
-Example if they said overtrading: "Max 3 trades per day", "Stop trading after 2 losses"
-Ask if they want to adopt these rules.
+        psychology: `This is the PSYCHOLOGY step.
+The user said: "${userResponse}" about their weakness.
+Acknowledge it, then suggest 2-3 rules to help. Ask if they want to use these rules.
 Set nextStep: "complete"`,
 
-        complete: `They said: "${userResponse}".
-Wrap up! Summarize:
-- Their experience level
-- Their trading style  
-- What they trade
-- Their goals
-- The rules you'll help them follow
+        rules: `This is the RULES step.
+The user said: "${userResponse}".
+Wrap up the onboarding:
+- Summarize what you learned
+- Mention you'll help with prop firm rules, psychology, and tracking
+- End with encouragement
+Set isComplete: true, nextStep: null`,
 
-End with: "Let's crush it! You can log trades, track your psychology, and I'll help you stay disciplined."
-Set isComplete: true, nextStep: null`
+        complete: `Onboarding is complete. Just say something encouraging to get them started.
+Set isComplete: true`
       }
 
       userPrompt = onboardingPrompts[onboardingStep] || onboardingPrompts.greeting
