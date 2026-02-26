@@ -226,28 +226,77 @@ Respond ONLY in this JSON format:
 }`
 
       const onboardingPrompts: {[key: string]: string} = {
-        greeting: `Welcome the trader! Ask for their name only. Be excited but professional. Just ask "What's your name?" - nothing else about experience yet.`,
-        experience: `The user just told you their name is "${userResponse}". 
-IMPORTANT: Do NOT ask for their name again - you already have it!
-Store their name with: {"type": "setMemory", "data": {"name": "${userResponse}"}}
+        greeting: `This is the GREETING step. The user hasn't given their name yet.
+Ask for their name ONLY. Keep it brief.
+Example: "Hey! I'm Aureus, your trading coach. What's your name?"
+Set nextStep: "experience"
+Do NOT ask about experience yet - just get their name.`,
 
-Now greet them BY NAME and ask ONLY about trading experience:
-"Great to meet you, ${userResponse}! How long have you been trading? Are you a Beginner (0-1 years), Intermediate (1-3 years), or Advanced (3+ years)?"`,
-        style: `They said: "${userResponse}". Now ask their trading style - are they a Scalper (seconds-minutes), Day Trader (minutes-hours), or Swing Trader (days-weeks)?`,
-        instruments: `They said: "${userResponse}". Ask what markets they trade: Forex pairs? Futures (ES, NQ)? Stocks? Crypto? They can trade multiple.`,
-        goals: `They said: "${userResponse}". Now the important one - ask about their goals:
-1. Are they going for prop firm funding? Which firm interests them?
-2. Do they have a personal account they're building?
-3. What's their monthly income target from trading?`,
-        psychology: `They said: "${userResponse}". Now the real talk - ask about their biggest trading weakness. Common ones: revenge trading, overtrading, moving stops, FOMO, cutting winners short. Be supportive, everyone has weaknesses.`,
-        rules: `They said: "${userResponse}". Acknowledge their weakness and suggest 3-4 specific trading rules that would help them. Ask if they want to add these as their personal trading rules. Example: if they struggle with overtrading, suggest "Max 3 trades per day".`,
-        complete: `They said: "${userResponse}". Wrap up the onboarding! Summarize what you learned about them. Mention you'll help them:
-- Stay within prop firm rules
-- Build their personal account through compounding
-- Catch tilt before it costs them
-- Review their trades and psychology
+        experience: `This is the EXPERIENCE step. The user just said: "${userResponse}"
+That is their NAME. Store it: {"type": "setMemory", "data": {"name": "${userResponse}"}}
 
-Set isComplete: true`
+CRITICAL: Do NOT ask for their name again! You just received it!
+
+Greet them by name and ask about experience level:
+"Nice to meet you, ${userResponse}! How long have you been trading?
+- Beginner (less than 1 year)
+- Intermediate (1-3 years)  
+- Advanced (3+ years)"
+
+Set nextStep: "style"`,
+
+        style: `They said: "${userResponse}" about their experience level. 
+Now ask their trading style:
+"What's your trading style?
+- Scalper (trades last seconds to minutes)
+- Day Trader (trades last minutes to hours, close by end of day)
+- Swing Trader (hold positions for days to weeks)"
+Set nextStep: "instruments"`,
+
+        instruments: `They said: "${userResponse}" about their style.
+Ask what markets they trade:
+"What markets do you trade? (can be multiple)
+- Forex (currency pairs)
+- Futures (ES, NQ, etc)
+- Stocks
+- Crypto"
+Set nextStep: "goals"`,
+
+        goals: `They said: "${userResponse}" about what they trade.
+Now ask about their goals:
+"What are your trading goals?
+1. Are you going for prop firm funding? Which firm?
+2. Growing a personal account?
+3. What's your monthly income target from trading?"
+Set nextStep: "psychology"`,
+
+        psychology: `They said: "${userResponse}" about their goals.
+Ask about their biggest weakness:
+"Let's talk real - what's your biggest trading weakness? Common ones:
+- Revenge trading after losses
+- Overtrading / taking too many trades
+- Moving stop losses
+- FOMO - chasing trades
+- Cutting winners too early
+Everyone has one. What's yours?"
+Set nextStep: "rules"`,
+
+        rules: `They said: "${userResponse}" about their weakness.
+Acknowledge it supportively, then suggest 2-3 specific rules that would help.
+Example if they said overtrading: "Max 3 trades per day", "Stop trading after 2 losses"
+Ask if they want to adopt these rules.
+Set nextStep: "complete"`,
+
+        complete: `They said: "${userResponse}".
+Wrap up! Summarize:
+- Their experience level
+- Their trading style  
+- What they trade
+- Their goals
+- The rules you'll help them follow
+
+End with: "Let's crush it! You can log trades, track your psychology, and I'll help you stay disciplined."
+Set isComplete: true, nextStep: null`
       }
 
       userPrompt = onboardingPrompts[onboardingStep] || onboardingPrompts.greeting
