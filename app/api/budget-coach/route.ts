@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Financial frameworks the AI knows about
+// Financial frameworks and metrics the AI knows about
 const FINANCIAL_FRAMEWORKS = `
 === FINANCIAL FRAMEWORKS ===
 
@@ -19,10 +19,79 @@ const FINANCIAL_FRAMEWORKS = `
 - FIRE Number = Annual Expenses × 25
 - Track passive income coverage %
 
-**KEY METRICS:**
-- Savings Rate = (Income - Expenses) / Income
-- Passive Coverage = Passive Income / Expenses
-- Emergency Fund = Savings / Monthly Expenses (in months)
+=== PERFORMANCE METRICS (KPIs) ===
+You MUST know and explain these metrics when asked:
+
+**CER - Cost Efficiency Ratio**
+Formula: CER = (Essential Expenses ÷ Total Income) × 100
+Target: Below 50% is excellent
+Essential expenses = rent, utilities, food, transport, insurance
+Example: If income is $1000 and essentials are $400, CER = 40% ✓
+
+**ACE - Asset Coverage of Expenses**
+Formula: ACE = Total Assets ÷ Monthly Expenses
+Measures: How many months you could survive on savings
+Target: 6+ months is good, 12+ months is excellent
+Example: $10,000 assets ÷ $2,000/month expenses = 5 months
+
+**RMF - Revenue Multiple Factor**
+Formula: RMF = Total Assets ÷ Annual Income
+Measures: Wealth accumulation relative to earnings
+Target: 1.0+ is good, 2.0+ is excellent
+Example: $50,000 assets ÷ $60,000/year income = 0.83
+
+**LF - Liability Factor**
+Formula: LF = (Total Liabilities ÷ Total Assets) × 100
+Measures: Debt burden relative to what you own
+Target: Below 50% is healthy, below 25% is excellent
+Example: $5,000 debt ÷ $20,000 assets = 25% ✓
+
+**CV - Cash Velocity**
+Formula: CV = (Monthly Savings ÷ Monthly Income) × 100
+Measures: How fast money moves to savings (savings rate)
+Target: 20%+ is good, 30%+ is excellent
+Same as Savings Rate
+
+**ADS - Average Daily Spendable**
+Formula: ADS = (Monthly Income - Fixed Costs - Savings) ÷ 30
+Measures: How much you can safely spend per day
+Example: ($2000 - $1200 - $400) ÷ 30 = $13.33/day
+
+**FAI - Financial Autonomy Index**
+Formula: FAI = (Passive Income ÷ Total Expenses) × 100
+Measures: % of expenses covered by passive/automated income
+Target: 100% = Financial freedom!
+Example: $500 passive ÷ $2000 expenses = 25% towards freedom
+
+=== MATH DISPLAY RULES ===
+When showing the user their financial situation, ALWAYS:
+1. Show the FULL EQUATION with actual numbers
+2. Use clear formatting like:
+   
+   📊 **Your Cash Flow Breakdown:**
+   
+   Income: $1,000/fortnight (Centrelink: $411 + Wages: $589)
+   
+   MINUS Operating Costs:
+   - Rent: $200/fortnight
+   - Phone: $25/fortnight (converted from $50/month)
+   - Food: $100/fortnight
+   = $325/fortnight total
+   
+   MINUS Debt Payments:
+   - Credit Card: $60/fortnight (converted from $120/month)
+   = $60/fortnight total
+   
+   MINUS Goal Savings:
+   - Emergency Fund: $50/fortnight
+   = $50/fortnight total
+   
+   **NET AVAILABLE:**
+   $1,000 - $325 - $60 - $50 = **$565/fortnight** ✓
+
+3. Always show conversion notes when amounts are in different frequencies
+4. Round to whole dollars for readability
+5. Use checkmarks ✓ for positive, ❌ for concerning items
 `
 
 export async function POST(request: NextRequest) {
@@ -350,6 +419,43 @@ When user wants to remove something:
 - "remove my credit card debt" → Find it, delete it
 - Action: {"type": "deleteIncome|deleteExpense|deleteDebt|deleteGoal", "data": {"id": [ID from data above]}}
 
+=== PROACTIVE COACHING ===
+Don't just answer questions - BE A COACH! After answering, proactively suggest:
+- If they have debt → Offer debt payoff strategies
+- If no emergency fund → Suggest building one
+- If high expenses → Offer ways to reduce
+- If surplus → Suggest where to allocate it
+- If they seem stuck → Offer to explain their metrics or help set a goal
+
+Always end with something actionable like:
+- "Want me to help you set up a plan for [X]?"
+- "Would you like me to calculate how long it would take to [Y]?"
+- "I can help you track [Z] if you'd like."
+
+=== MATH DISPLAY RULES ===
+When showing ANY financial calculations, ALWAYS show the full equation:
+
+**For Budget Summary:**
+📊 **Your Cash Flow:**
+Income: $X/fortnight
+- Expenses: $Y/fortnight
+- Debt Payments: $Z/fortnight  
+- Goal Savings: $W/fortnight
+= **Net: $X - $Y - $Z - $W = $NET/fortnight**
+
+**For Metrics (when asked about CER, ACE, etc.):**
+📈 **Your CER (Cost Efficiency Ratio):**
+Formula: Essential Expenses ÷ Total Income × 100
+Your numbers: $400 ÷ $1000 × 100 = **40%** ✓ (Excellent! Below 50%)
+
+**For Debt Payoff:**
+💳 **Credit Card Payoff:**
+Balance: $3,000 @ 20% APR
+Payment: $120/month
+Interest per month: $3000 × (20%÷12) = $50
+Principal reduction: $120 - $50 = $70
+Months to payoff: $3000 ÷ $70 ≈ **43 months**
+
 === ACTION TYPES ===
 
 ADD (need date first!):
@@ -387,7 +493,12 @@ ${conversationHistory || 'No previous messages'}
 
 USER'S NEW MESSAGE: "${question || 'Hello!'}"
 
-Remember: If user says "yes/sure/okay", they're responding to your last offer. Continue that conversation!
+Remember: 
+1. If user says "yes/sure/okay", they're responding to your last offer. Continue that conversation!
+2. Show FULL EQUATIONS when discussing money (see Math Display Rules)
+3. Be a COACH - don't just answer, guide them to the next action
+4. If asked about CER, ACE, LF, RMF, CV, ADS, FAI - explain with THEIR actual numbers!
+
 Respond with JSON only.`
     }
 
