@@ -160,8 +160,35 @@ export async function POST(request: NextRequest) {
         context += '\nDEBTS (payments come out of budget!):\n'
         financialData.debts.forEach((debt: any) => {
           const payment = parseFloat(debt.minPayment || '0')
+          const balance = parseFloat(debt.balance || '0')
+          const apr = parseFloat(debt.interestRate || '0')
+          const monthlyRate = apr / 100 / 12
+          
           totalDebtPaymentsFortnightly += convertToFortnightly(payment, debt.frequency || 'monthly')
-          context += `  - "${debt.name}" owes $${debt.balance} @ ${debt.interestRate}% → PAYMENT: $${debt.minPayment}/${debt.frequency || 'monthly'}\n`
+          
+          // Calculate payoff time using amortization
+          const monthlyPayment = debt.frequency === 'fortnightly' ? payment * 2 : 
+                                 debt.frequency === 'weekly' ? payment * 4 : payment
+          let remaining = balance
+          let months = 0
+          let totalInterest = 0
+          
+          if (monthlyPayment > balance * monthlyRate) {
+            while (remaining > 0 && months < 600) {
+              const interest = remaining * monthlyRate
+              totalInterest += interest
+              remaining = remaining + interest - monthlyPayment
+              months++
+            }
+          }
+          
+          const payoffDate = new Date()
+          payoffDate.setMonth(payoffDate.getMonth() + months)
+          
+          context += `  - "${debt.name}" owes $${balance.toFixed(0)} @ ${apr}% APR\n`
+          context += `    Payment: $${payment}/${debt.frequency || 'monthly'} = $${monthlyPayment.toFixed(0)}/month\n`
+          context += `    Payoff: ${months < 600 ? months + ' months' : 'Never'} (${months < 600 ? payoffDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'N/A'})\n`
+          context += `    Total interest: $${totalInterest.toFixed(0)}\n`
         })
       }
       
@@ -183,7 +210,7 @@ export async function POST(request: NextRequest) {
       context += `Debt Payments: $${totalDebtPaymentsFortnightly.toFixed(0)}/fortnight\n`
       context += `Goal Savings: $${totalGoalSavingsFortnightly.toFixed(0)}/fortnight\n`
       context += `NET AVAILABLE: $${netFortnightly.toFixed(0)}/fortnight\n`
-      context += '\n⚠️ IMPORTANT: When giving budget summaries, ALWAYS include debt payments AND goal savings as outgoings!\n'
+      context += '\n⚠️ IMPORTANT: Use the pre-calculated debt payoff figures above! Do NOT calculate payoff time yourself - use the numbers provided.\n'
       
       return context
     }
