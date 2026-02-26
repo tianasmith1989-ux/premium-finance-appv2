@@ -112,7 +112,8 @@ export async function POST(request: NextRequest) {
       conversationHistory,
       tradingData,
       accounts,
-      memory
+      memory,
+      chartImage // Base64 image for chart analysis
     } = await request.json()
 
     const apiKey = process.env.ANTHROPIC_API_KEY
@@ -342,6 +343,30 @@ Remember: If user says "yes/sure/okay", they're responding to your last offer.
 Respond with JSON only.`
     }
 
+    // Build message content - support text and optional image
+    let messageContent: any = systemPrompt + '\n\n' + userPrompt
+    
+    // If there's a chart image, format for vision API
+    if (chartImage && chartImage.startsWith('data:image')) {
+      const base64Data = chartImage.split(',')[1]
+      const mediaType = chartImage.split(';')[0].split(':')[1]
+      
+      messageContent = [
+        {
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: mediaType,
+            data: base64Data
+          }
+        },
+        {
+          type: 'text',
+          text: systemPrompt + '\n\n' + userPrompt + '\n\n[USER HAS ATTACHED A CHART IMAGE - Analyze it for: price action, key levels, potential setups, entry/exit points, and whether it aligns with their trading style]'
+        }
+      ]
+    }
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -351,9 +376,9 @@ Respond with JSON only.`
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
+        max_tokens: 1500, // Increased for chart analysis
         messages: [
-          { role: 'user', content: systemPrompt + '\n\n' + userPrompt }
+          { role: 'user', content: messageContent }
         ]
       })
     })
