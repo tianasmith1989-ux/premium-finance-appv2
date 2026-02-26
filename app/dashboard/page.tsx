@@ -24,6 +24,11 @@ export default function Dashboard() {
   const [extractedPayslip, setExtractedPayslip] = useState<any>(null)
   const payslipInputRef = useRef<HTMLInputElement>(null)
   
+  // Trading chart upload
+  const [chartProcessing, setChartProcessing] = useState(false)
+  const [pendingChartImage, setPendingChartImage] = useState<string | null>(null)
+  const chartInputRef = useRef<HTMLInputElement>(null)
+  
   // ==================== AUTOMATION STATE ====================
   const [showAutomation, setShowAutomation] = useState(false)
   const [automationSetup, setAutomationSetup] = useState<{
@@ -1244,9 +1249,27 @@ export default function Dashboard() {
   }
 
   const addGoalToCalendar = (goal: any) => {
-    if (!goal.paymentAmount) { alert('Set a payment amount first'); return }
-    setGoals(goals.map(g => g.id === goal.id ? { ...g, startDate: g.startDate || new Date().toISOString().split('T')[0] } : g))
-    alert(`${goal.name} added to calendar!`)
+    const payment = parseFloat(goal.paymentAmount || '0')
+    if (payment <= 0) { 
+      alert('Set a savings amount first (how much you want to save each period)'); 
+      return 
+    }
+    
+    // Use the goal's startDate if set, otherwise use today
+    const startDate = goal.startDate || new Date().toISOString().split('T')[0]
+    
+    // Add as a recurring expense entry (category: goal) so it appears on calendar
+    setExpenses(prev => [...prev, {
+      id: Date.now(),
+      name: `💰 ${goal.name}`,
+      amount: payment.toString(),
+      frequency: goal.savingsFrequency || 'monthly',
+      category: 'goal',
+      dueDate: startDate,
+      goalId: goal.id // Link to the goal
+    }])
+    
+    alert(`✅ ${goal.name} added to calendar!\n\nYou'll see $${payment.toFixed(0)}/${goal.savingsFrequency || 'monthly'} starting ${startDate}`)
   }
 
   // Debt payoff calculator - calculates months to payoff
@@ -1849,16 +1872,37 @@ export default function Dashboard() {
     })
   }
 
+  // Handle chart image upload for trading analysis
+  const handleChartUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    // Convert to base64 for display and sending to API
+    const base64 = await new Promise<string>((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.readAsDataURL(file)
+    })
+    
+    setPendingChartImage(base64)
+    setChatInput(prev => prev || "Analyze this chart for me")
+  }
+
   const handleChatMessage = async () => {
-    if (!chatInput.trim() || isLoading) return
+    if ((!chatInput.trim() && !pendingChartImage) || isLoading) return
     const message = chatInput.trim()
     
     if ((appMode === 'budget' && budgetOnboarding.isActive) || (appMode === 'trading' && tradingOnboarding.isActive)) {
       await handleOnboardingResponse(message, appMode!)
+      setPendingChartImage(null)
       return
     }
     
-    setChatMessages(prev => [...prev, { role: 'user', content: message }])
+    // Show user message (with image indicator if present)
+    const userMessageContent = pendingChartImage 
+      ? `${message}\n[📊 Chart image attached]`
+      : message
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessageContent, image: pendingChartImage || undefined }])
     setChatInput('')
     setIsLoading(true)
     
@@ -1872,7 +1916,17 @@ export default function Dashboard() {
       
       const body = appMode === 'budget'
         ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }, memory: budgetMemory }
-        : { mode: 'question', question: message, conversationHistory: recentHistory, tradingData: { trades }, memory: tradingMemory }
+        : { 
+            mode: 'question', 
+            question: message, 
+            conversationHistory: recentHistory, 
+            tradingData: { trades }, 
+            memory: tradingMemory,
+            chartImage: pendingChartImage || undefined // Send image to trading coach
+          }
+      
+      // Clear pending image
+      setPendingChartImage(null)
       
       const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await response.json()
@@ -1908,7 +1962,7 @@ export default function Dashboard() {
       setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial operations coach. I'll help you optimize your cash flow, eliminate liabilities, and build automated revenue streams.\n\nLet's get to know each other. What should I call you?" }])
     } else {
       setTradingOnboarding({ isActive: true, step: 'greeting' })
-      setChatMessages([{ role: 'assistant', content: "Hey! 📈 I'm Aureus, your trading operations coach. I'll help you optimize your trading capital, maintain discipline, and scale your accounts systematically.\n\nWhat's your name, and how long have you been trading?" }])
+      setChatMessages([{ role: 'assistant', content: "Hey! 📈 I'm Aureus, your trading operations coach.\n\nI'll help you optimize capital deployment, maintain psychological discipline, and systematically scale your accounts.\n\nWhat's your name?" }])
     }
   }
 
@@ -4377,8 +4431,25 @@ export default function Dashboard() {
                 <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{winRate.toFixed(0)}% win rate • {trades.length} trades</div></div>
               </div>
               {proactiveInsight && chatMessages.length === 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>{proactiveInsight.suggestion && <p style={{ color: theme.purple, fontSize: '13px', margin: '8px 0 0 0' }}>💡 {proactiveInsight.suggestion}</p>}</div>}
+              
+              {/* Pending chart preview */}
+              {pendingChartImage && (
+                <div style={{ marginBottom: '12px', padding: '8px', background: theme.cardBg, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <img src={pendingChartImage} alt="Chart" style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
+                  <span style={{ color: theme.text, fontSize: '12px', flex: 1 }}>📊 Chart attached</span>
+                  <button onClick={() => setPendingChartImage(null)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button>
+                </div>
+              )}
+              
               {chatMessages.length > 0 && <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>{chatMessages.map((msg, idx) => <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.warning : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>)}{isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}</div>}
-              <div style={{ display: 'flex', gap: '8px' }}><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus about your trading..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.warning, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button></div>
+              
+              {/* Chat input with chart upload */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input type="file" ref={chartInputRef} accept="image/*" onChange={handleChartUpload} style={{ display: 'none' }} />
+                <button onClick={() => chartInputRef.current?.click()} style={{ padding: '10px 12px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '16px' }} title="Upload chart screenshot">📷</button>
+                <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder={pendingChartImage ? "What would you like me to analyze?" : "Ask Aureus about your trading..."} style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} />
+                <button onClick={handleChatMessage} disabled={isLoading || (!chatInput.trim() && !pendingChartImage)} style={{ padding: '10px 16px', background: theme.warning, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || (!chatInput.trim() && !pendingChartImage) ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button>
+              </div>
             </div>
             
             {/* TILT DETECTOR & DAILY STATUS */}
