@@ -123,6 +123,35 @@ Account Sizes: $25K, $50K, $75K, $100K, $150K, $250K, $300K
   ✅ Can scale up to 20 accounts
 - Best for: Futures traders, especially NQ and ES scalpers
 
+**Take Profit Trader (Futures Only)**
+Account Sizes: $25K, $50K, $75K, $100K, $150K
+- PRO ACCOUNT (Evaluation):
+  • Profit Target: $1,500 - $6,000 (varies by account)
+  • Max Drawdown: End-of-Day Trailing (locks in profits at day end)
+  • $25K: $1,500 target, $1,500 EOD trailing DD
+  • $50K: $3,000 target, $2,500 EOD trailing DD
+  • $75K: $4,000 target, $2,500 EOD trailing DD
+  • $100K: $5,000 target, $3,000 EOD trailing DD
+  • $150K: $6,000 target, $4,500 EOD trailing DD
+  • Min Trading Days: None!
+  • No time limit
+- FUNDED (PRO+ Account):
+  • Profit Split: 80% (increases with consistency)
+  • Virtual drawdown - trade the full contract size
+  • Payout threshold: $1,000 minimum
+  • Weekly payouts available
+- KEY RULES:
+  ✅ EOD trailing (more forgiving than intraday trailing)
+  ✅ No minimum trading days in evaluation
+  ✅ No consistency rules
+  ❌ Must flatten positions by 4:00 PM ET
+  ❌ Cannot hold through major economic events
+  ⚠️ Scaling rules apply (max contracts based on profits)
+- SCALING (Max Contracts):
+  • Until $1,500 profit: Start with X contracts (varies by account)
+  • Unlock more contracts as you hit profit milestones
+- Best for: Futures traders who want EOD drawdown (not intraday) and no minimum days
+
 **TopStep (Futures Only)**
 Account Sizes: $50K, $100K, $150K
 - TRADING COMBINE (Evaluation):
