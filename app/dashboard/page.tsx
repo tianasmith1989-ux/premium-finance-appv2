@@ -1084,6 +1084,33 @@ export default function Dashboard() {
     setGoals([...goals, { ...newGoal, id: Date.now() }])
     setNewGoal({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: new Date().toISOString().split('T')[0], paymentAmount: '' })
   }
+  
+  // Helper function to add items to roadmap
+  const addToRoadmap = (name: string, category: string, targetAmount: string | number, icon: string, notes?: string, currentAmount?: number) => {
+    // Check if already exists
+    if (roadmapMilestones.some(m => m.name.toLowerCase() === name.toLowerCase())) {
+      alert(`"${name}" is already in your roadmap!`)
+      return
+    }
+    
+    const newMilestoneItem = {
+      id: Date.now(),
+      name,
+      category,
+      icon,
+      targetAmount: typeof targetAmount === 'number' ? targetAmount.toString() : targetAmount,
+      currentAmount: currentAmount || 0,
+      targetDate: '',
+      notes: notes || '',
+      completed: false,
+      createdAt: new Date().toISOString()
+    }
+    
+    setRoadmapMilestones(prev => [...prev, newMilestoneItem])
+    
+    // Show confirmation
+    alert(`✅ Added "${name}" to your roadmap!`)
+  }
   const deleteGoal = (id: number) => setGoals(goals.filter(g => g.id !== id))
 
   const addAsset = () => {
@@ -3820,45 +3847,82 @@ export default function Dashboard() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                   {budgetMemory.bigGoals.home && (
                     <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '20px' }}>🏠</span>
-                        <span style={{ color: theme.accent, fontWeight: 600 }}>Home Ownership</span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '20px' }}>🏠</span>
+                          <span style={{ color: theme.accent, fontWeight: 600 }}>Home Ownership</span>
+                        </div>
+                        {!roadmapMilestones.some(m => m.name.toLowerCase().includes('home')) && (
+                          <button onClick={() => {
+                            const match = budgetMemory.bigGoals.home.match(/\$?([\d,]+)/)
+                            addToRoadmap('Home Deposit', 'savings', match ? match[1].replace(/,/g, '') : '100000', '🏠', budgetMemory.bigGoals.home)
+                          }} style={{ padding: '4px 8px', background: theme.purple + '20', color: theme.purple, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '10px' }}>+ Roadmap</button>
+                        )}
                       </div>
                       <div style={{ color: theme.text, fontSize: '14px' }}>{budgetMemory.bigGoals.home}</div>
                     </div>
                   )}
                   {budgetMemory.bigGoals.fire && (
                     <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '20px' }}>🔥</span>
-                        <span style={{ color: theme.warning, fontWeight: 600 }}>Financial Independence</span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '20px' }}>🔥</span>
+                          <span style={{ color: theme.warning, fontWeight: 600 }}>Financial Independence</span>
+                        </div>
+                        {!roadmapMilestones.some(m => m.name.toLowerCase().includes('fire') || m.name.toLowerCase().includes('retire')) && (
+                          <button onClick={() => {
+                            const fireNumber = monthlyExpenses * 12 * 25
+                            addToRoadmap('FIRE Number', 'savings', fireNumber.toString(), '🔥', budgetMemory.bigGoals.fire)
+                          }} style={{ padding: '4px 8px', background: theme.purple + '20', color: theme.purple, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '10px' }}>+ Roadmap</button>
+                        )}
                       </div>
                       <div style={{ color: theme.text, fontSize: '14px' }}>{budgetMemory.bigGoals.fire}</div>
                     </div>
                   )}
                   {budgetMemory.bigGoals.debtFree && (
                     <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '20px' }}>💳</span>
-                        <span style={{ color: theme.success, fontWeight: 600 }}>Debt Freedom</span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '20px' }}>💳</span>
+                          <span style={{ color: theme.success, fontWeight: 600 }}>Debt Freedom</span>
+                        </div>
+                        {!roadmapMilestones.some(m => m.name.toLowerCase().includes('debt')) && totalDebtBalance > 0 && (
+                          <button onClick={() => addToRoadmap('Become Debt Free', 'debt', totalDebtBalance.toString(), '💳', budgetMemory.bigGoals.debtFree)} style={{ padding: '4px 8px', background: theme.purple + '20', color: theme.purple, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '10px' }}>+ Roadmap</button>
+                        )}
                       </div>
                       <div style={{ color: theme.text, fontSize: '14px' }}>{budgetMemory.bigGoals.debtFree}</div>
                     </div>
                   )}
                   {budgetMemory.bigGoals.wealthTarget && (
                     <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '20px' }}>💰</span>
-                        <span style={{ color: theme.purple, fontWeight: 600 }}>Wealth Target</span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '20px' }}>💰</span>
+                          <span style={{ color: theme.purple, fontWeight: 600 }}>Wealth Target</span>
+                        </div>
+                        {!roadmapMilestones.some(m => m.name.toLowerCase().includes('wealth') || m.name.toLowerCase().includes('net worth')) && (
+                          <button onClick={() => {
+                            const match = budgetMemory.bigGoals.wealthTarget.match(/\$?([\d,]+)/)
+                            addToRoadmap('Wealth Target', 'savings', match ? match[1].replace(/,/g, '') : '1000000', '💰', budgetMemory.bigGoals.wealthTarget)
+                          }} style={{ padding: '4px 8px', background: theme.purple + '20', color: theme.purple, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '10px' }}>+ Roadmap</button>
+                        )}
                       </div>
                       <div style={{ color: theme.text, fontSize: '14px' }}>{budgetMemory.bigGoals.wealthTarget}</div>
                     </div>
                   )}
                   {budgetMemory.bigGoals.passiveTarget && (
                     <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '20px' }}>🌴</span>
-                        <span style={{ color: theme.success, fontWeight: 600 }}>Passive Income</span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '20px' }}>🌴</span>
+                          <span style={{ color: theme.success, fontWeight: 600 }}>Passive Income</span>
+                        </div>
+                        {!roadmapMilestones.some(m => m.name.toLowerCase().includes('passive')) && (
+                          <button onClick={() => {
+                            const match = budgetMemory.bigGoals.passiveTarget.match(/\$?([\d,]+)/)
+                            addToRoadmap('Passive Income Goal', 'income', match ? match[1].replace(/,/g, '') : '3000', '🌴', budgetMemory.bigGoals.passiveTarget, passiveIncome + totalPassiveQuestIncome)
+                          }} style={{ padding: '4px 8px', background: theme.purple + '20', color: theme.purple, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '10px' }}>+ Roadmap</button>
+                        )}
                       </div>
                       <div style={{ color: theme.text, fontSize: '14px' }}>{budgetMemory.bigGoals.passiveTarget}</div>
                     </div>
@@ -3879,12 +3943,34 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowAddMilestone(true)}
-                  style={{ padding: '10px 20px', background: theme.purple, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
-                >
-                  + Add Milestone
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {roadmapMilestones.length > 0 && (
+                    <button
+                      onClick={() => {
+                        // Build roadmap summary for Aureus
+                        const milestoneSummary = roadmapMilestones.map(m => 
+                          `- ${m.name}: Target $${parseFloat(m.targetAmount).toLocaleString()}, Current $${m.currentAmount?.toLocaleString() || 0}${m.targetDate ? `, Deadline: ${m.targetDate}` : ''}`
+                        ).join('\n')
+                        
+                        setActiveTab('dashboard')
+                        setChatMessages([{
+                          role: 'user',
+                          content: `Please analyze my roadmap and create a detailed action plan with timeline:\n\n**My Milestones:**\n${milestoneSummary}\n\n**My Financial Data:**\n- Monthly Income: $${monthlyIncome.toFixed(0)}\n- Monthly Expenses: $${monthlyExpenses.toFixed(0)}\n- Net Cash Flow: $${(monthlyIncome - monthlyExpenses - monthlyDebtPayments).toFixed(0)}\n- Current Savings: $${emergencyFund.toFixed(0)}\n- Total Debt: $${totalDebtBalance.toFixed(0)}\n\nPlease give me:\n1. A prioritized order to tackle these goals\n2. Realistic timeline for each milestone\n3. Specific weekly/monthly actions\n4. Any conflicts or concerns with my goals`
+                        }])
+                        sendMessage(`Please analyze my roadmap and create a detailed action plan with timeline:\n\n**My Milestones:**\n${milestoneSummary}\n\n**My Financial Data:**\n- Monthly Income: $${monthlyIncome.toFixed(0)}\n- Monthly Expenses: $${monthlyExpenses.toFixed(0)}\n- Net Cash Flow: $${(monthlyIncome - monthlyExpenses - monthlyDebtPayments).toFixed(0)}\n- Current Savings: $${emergencyFund.toFixed(0)}\n- Total Debt: $${totalDebtBalance.toFixed(0)}\n\nPlease give me:\n1. A prioritized order to tackle these goals\n2. Realistic timeline for each milestone\n3. Specific weekly/monthly actions\n4. Any conflicts or concerns with my goals`)
+                      }}
+                      style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                      🤖 Aureus: Build My Plan
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowAddMilestone(true)}
+                    style={{ padding: '10px 20px', background: theme.purple, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
+                  >
+                    + Add Milestone
+                  </button>
+                </div>
               </div>
               
               {/* Add Milestone Form */}
@@ -4449,10 +4535,11 @@ export default function Dashboard() {
                 {australianBabySteps.map((item) => {
                   const isCurrent = item.step === currentBabyStep.step
                   const done = item.step < currentBabyStep.step
+                  const alreadyInRoadmap = roadmapMilestones.some(m => m.name.toLowerCase().includes(item.title.toLowerCase().split(' ').slice(0, 2).join(' ')))
                   return (
-                    <div key={item.step} onClick={() => setSelectedBabyStep(item.step)} style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '16px', background: done ? (darkMode ? '#1e3a32' : '#f0fdf4') : isCurrent ? (darkMode ? '#2e2a1e' : '#fefce8') : (darkMode ? '#334155' : '#f8fafc'), borderRadius: '12px', border: done ? '2px solid ' + theme.success : isCurrent ? '2px solid ' + theme.warning : '1px solid ' + theme.border, cursor: 'pointer', transition: 'transform 0.2s' }}>
-                      <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' }}>{done ? '✓' : item.icon}</div>
-                      <div style={{ flex: 1 }}>
+                    <div key={item.step} style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '16px', background: done ? (darkMode ? '#1e3a32' : '#f0fdf4') : isCurrent ? (darkMode ? '#2e2a1e' : '#fefce8') : (darkMode ? '#334155' : '#f8fafc'), borderRadius: '12px', border: done ? '2px solid ' + theme.success : isCurrent ? '2px solid ' + theme.warning : '1px solid ' + theme.border, cursor: 'pointer', transition: 'transform 0.2s' }}>
+                      <div onClick={() => setSelectedBabyStep(item.step)} style={{ width: '44px', height: '44px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' }}>{done ? '✓' : item.icon}</div>
+                      <div onClick={() => setSelectedBabyStep(item.step)} style={{ flex: 1 }}>
                         <div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{item.title}</div>
                         <div style={{ color: theme.textMuted, fontSize: '13px' }}>{item.desc}</div>
                         {isCurrent && currentBabyStep.target && currentBabyStep.target > 0 && (
@@ -4466,7 +4553,37 @@ export default function Dashboard() {
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '4px' }}>
                         <div style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, background: done ? theme.success : isCurrent ? theme.warning : theme.border, color: done || isCurrent ? 'white' : theme.textMuted }}>{done ? '✓ Complete' : isCurrent ? '→ Current' : 'Pending'}</div>
-                        <div style={{ color: theme.accent, fontSize: '12px' }}>Click for details →</div>
+                        {!done && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              addToRoadmap(
+                                `Baby Step ${item.step}: ${item.title}`,
+                                'savings',
+                                item.target?.toString() || '0',
+                                item.icon,
+                                item.desc,
+                                isCurrent ? (currentBabyStep.current || 0) : 0
+                              )
+                            }}
+                            disabled={alreadyInRoadmap}
+                            style={{ 
+                              padding: '4px 10px', 
+                              background: alreadyInRoadmap ? theme.border : theme.purple + '20', 
+                              color: alreadyInRoadmap ? theme.textMuted : theme.purple, 
+                              border: 'none', 
+                              borderRadius: '12px', 
+                              cursor: alreadyInRoadmap ? 'default' : 'pointer', 
+                              fontSize: '11px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            {alreadyInRoadmap ? '✓ In Roadmap' : '+ Add to Roadmap'}
+                          </button>
+                        )}
+                        <div onClick={() => setSelectedBabyStep(item.step)} style={{ color: theme.accent, fontSize: '12px', cursor: 'pointer' }}>Click for details →</div>
                       </div>
                     </div>
                   )
@@ -4948,13 +5065,48 @@ export default function Dashboard() {
                       </div>
                       
                       {/* Tags Row */}
-                      <div style={{ display: 'flex', gap: '8px', margin: '12px 0', marginLeft: '56px' }}>
+                      <div style={{ display: 'flex', gap: '8px', margin: '12px 0', marginLeft: '56px', flexWrap: 'wrap' as const }}>
                         <span style={{ padding: '3px 8px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           💰 {quest.potentialIncome}
                         </span>
                         <span style={{ padding: '3px 8px', background: darkMode ? '#334155' : '#e2e8f0', color: theme.textMuted, borderRadius: '4px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           ⏱ {quest.timeToSetup}
                         </span>
+                        {!isLocked && quest.status !== 'completed' && (
+                          <button
+                            onClick={() => {
+                              // Parse potential income to get a target (use middle estimate)
+                              let targetAmount = '0'
+                              const income = quest.potentialIncome || ''
+                              const match = income.match(/\$?([\d,]+)/)
+                              if (match) targetAmount = match[1].replace(',', '')
+                              
+                              addToRoadmap(
+                                `Quest: ${quest.name}`,
+                                'income',
+                                targetAmount,
+                                quest.icon,
+                                quest.description,
+                                quest.monthlyIncome || 0
+                              )
+                            }}
+                            disabled={roadmapMilestones.some(m => m.name.toLowerCase().includes(quest.name.toLowerCase()))}
+                            style={{ 
+                              padding: '3px 8px', 
+                              background: roadmapMilestones.some(m => m.name.toLowerCase().includes(quest.name.toLowerCase())) ? theme.border : theme.purple + '20', 
+                              color: roadmapMilestones.some(m => m.name.toLowerCase().includes(quest.name.toLowerCase())) ? theme.textMuted : theme.purple, 
+                              borderRadius: '4px', 
+                              fontSize: '11px', 
+                              border: 'none',
+                              cursor: roadmapMilestones.some(m => m.name.toLowerCase().includes(quest.name.toLowerCase())) ? 'default' : 'pointer',
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '4px' 
+                            }}
+                          >
+                            {roadmapMilestones.some(m => m.name.toLowerCase().includes(quest.name.toLowerCase())) ? '✓ In Roadmap' : '+ Roadmap'}
+                          </button>
+                        )}
                       </div>
                       
                       {/* Progress bar for in-progress quests */}
