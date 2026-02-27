@@ -120,11 +120,10 @@ export default function Dashboard() {
       potentialIncome: '$50-200/quarter',
       difficulty: 'Medium',
       timeToSetup: '1 hour',
-      status: 'locked', 
+      status: 'not_started', 
       progress: 0,
       currentStep: 0,
       monthlyIncome: 0, 
-      unlockRequirement: 'Complete $2k emergency fund',
       steps: [
         { title: 'Open brokerage', description: 'Stake ($3/trade), CMC (free under $1k), Pearler (for auto-invest)', action: 'Brokerage opened' },
         { title: 'Research ETFs', description: 'VAS (Aussie shares 4%), VHY (high yield 5%), A200 (low fee)', action: 'Picked my ETF' },
@@ -142,11 +141,10 @@ export default function Dashboard() {
       potentialIncome: '$20-100/year growth',
       difficulty: 'Easy',
       timeToSetup: '15 mins',
-      status: 'locked', 
+      status: 'not_started', 
       progress: 0,
       currentStep: 0,
       monthlyIncome: 0, 
-      unlockRequirement: 'Complete $2k emergency fund',
       steps: [
         { title: 'Choose platform', description: 'Raiz (round-ups + rewards), Spaceship (no fees under $5k)', action: 'Signed up' },
         { title: 'Connect bank', description: 'Link your spending account for automatic round-ups', action: 'Bank connected' },
@@ -185,11 +183,10 @@ export default function Dashboard() {
       potentialIncome: '$0-10,000+/mo',
       difficulty: 'Hard',
       timeToSetup: '6-24 months',
-      status: 'locked', 
+      status: 'not_started', 
       progress: 0,
       currentStep: 0,
       monthlyIncome: 0, 
-      unlockRequirement: '$500/mo passive income',
       steps: [
         { title: 'Choose niche', description: 'Finance, tech reviews, cooking, fitness - pick something you love', action: 'Niche chosen' },
         { title: 'Create consistently', description: '2-3 pieces per week minimum. YouTube, TikTok, blog, podcast', action: 'Creating content' },
@@ -207,11 +204,10 @@ export default function Dashboard() {
       potentialIncome: '$500-2000+/mo',
       difficulty: 'Expert',
       timeToSetup: '6-12 months',
-      status: 'locked', 
+      status: 'not_started', 
       progress: 0,
       currentStep: 0,
       monthlyIncome: 0, 
-      unlockRequirement: '$50k deposit saved',
       steps: [
         { title: 'Save deposit', description: 'Need 10-20% deposit + stamp duty + costs (see Baby Step 5)', action: 'Deposit saved' },
         { title: 'Get pre-approval', description: 'Know your borrowing power before house hunting', action: 'Pre-approved' },
@@ -308,6 +304,19 @@ export default function Dashboard() {
   const [homeCalcNewBuild, setHomeCalcNewBuild] = useState(false)
   const [homeDocuments, setHomeDocuments] = useState<{name: string, type: string, uploadedAt: string}[]>([])
   const homeDocInputRef = useRef<HTMLInputElement>(null)
+  
+  // My Roadmap - Visual Path to Goals
+  const [roadmapMilestones, setRoadmapMilestones] = useState<any[]>([])
+  const [showAddMilestone, setShowAddMilestone] = useState(false)
+  const [newMilestone, setNewMilestone] = useState({ 
+    name: '', 
+    targetAmount: '', 
+    targetDate: '', 
+    category: 'savings', // savings, debt, income, lifestyle
+    icon: '🎯',
+    notes: ''
+  })
+  const [editingMilestone, setEditingMilestone] = useState<number | null>(null)
   
   // Alerts & Reminders
   const [alertsEnabled, setAlertsEnabled] = useState(true)
@@ -705,6 +714,7 @@ export default function Dashboard() {
       if (data.budgetMemory) setBudgetMemory(data.budgetMemory)
       if (data.tradingMemory) setTradingMemory(data.tradingMemory)
       if (data.paidOccurrences) setPaidOccurrences(new Set(data.paidOccurrences))
+      if (data.roadmapMilestones) setRoadmapMilestones(data.roadmapMilestones)
     }
   }, [])
 
@@ -712,10 +722,11 @@ export default function Dashboard() {
     const data = {
       incomeStreams, expenses, debts, goals, assets, liabilities, trades,
       budgetMemory, tradingMemory,
-      paidOccurrences: Array.from(paidOccurrences)
+      paidOccurrences: Array.from(paidOccurrences),
+      roadmapMilestones
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones])
 
   // Scroll chat to bottom - use scrollTop instead of scrollIntoView to avoid page jump
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -882,44 +893,10 @@ export default function Dashboard() {
   )
 
   // ==================== DYNAMIC QUEST UNLOCK LOGIC ====================
-  // Compute quest unlock status based on actual user financial data
+  // All quests are unlocked from the start - let users explore freely
   const getQuestUnlockStatus = (questId: number): { isUnlocked: boolean, reason?: string } => {
-    const totalSavings = assets.filter(a => a.type === 'savings').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
-    const totalInvestments = assets.filter(a => a.type === 'investment').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
-    const totalPassive = passiveIncome + totalPassiveQuestIncome
-    const hasEmergencyFund = totalSavings >= 2000
-    const has50kSaved = totalSavings + totalInvestments >= 50000
-    const has500PassiveIncome = totalPassive >= 500
-    
-    switch (questId) {
-      case 1: // High-Interest Savings - always unlocked
-      case 2: // Cashback & Rewards - always unlocked
-      case 3: // Bank Bonus Hunting - always unlocked
-      case 6: // Side Hustle - always unlocked
-        return { isUnlocked: true }
-      
-      case 4: // Dividend ETFs - requires $2k emergency fund
-      case 5: // Micro-Investing - requires $2k emergency fund
-        return { 
-          isUnlocked: hasEmergencyFund, 
-          reason: hasEmergencyFund ? undefined : 'Complete $2k emergency fund' 
-        }
-      
-      case 7: // Content Creation - requires $500/mo passive income
-        return { 
-          isUnlocked: has500PassiveIncome, 
-          reason: has500PassiveIncome ? undefined : '$500/mo passive income' 
-        }
-      
-      case 8: // Investment Property - requires $50k deposit saved
-        return { 
-          isUnlocked: has50kSaved, 
-          reason: has50kSaved ? undefined : '$50k deposit saved' 
-        }
-      
-      default:
-        return { isUnlocked: true }
-    }
+    // All quests unlocked - no artificial gates
+    return { isUnlocked: true }
   }
 
   // Australian Baby Steps with detailed content
@@ -3889,6 +3866,314 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+            
+            {/* ==================== MY ROADMAP - Visual Path to Goals ==================== */}
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: '16px', border: '2px solid ' + theme.purple }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '28px' }}>🗺️</span>
+                    <div>
+                      <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>My Roadmap</h2>
+                      <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Your personalized journey to financial freedom</p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAddMilestone(true)}
+                  style={{ padding: '10px 20px', background: theme.purple, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  + Add Milestone
+                </button>
+              </div>
+              
+              {/* Add Milestone Form */}
+              {showAddMilestone && (
+                <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', marginBottom: '20px', border: '1px solid ' + theme.border }}>
+                  <h4 style={{ margin: '0 0 16px 0', color: theme.text }}>✨ Add New Milestone</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Milestone Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., Pay off credit card, Save $10K emergency fund"
+                        value={newMilestone.name}
+                        onChange={e => setNewMilestone({...newMilestone, name: e.target.value})}
+                        style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Category</label>
+                      <select
+                        value={newMilestone.category}
+                        onChange={e => setNewMilestone({...newMilestone, category: e.target.value, icon: e.target.value === 'savings' ? '💰' : e.target.value === 'debt' ? '💳' : e.target.value === 'income' ? '📈' : '🌴'})}
+                        style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}
+                      >
+                        <option value="savings">💰 Savings Goal</option>
+                        <option value="debt">💳 Debt Payoff</option>
+                        <option value="income">📈 Income Goal</option>
+                        <option value="lifestyle">🌴 Lifestyle Goal</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Target Amount ($)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g., 10000"
+                        value={newMilestone.targetAmount}
+                        onChange={e => setNewMilestone({...newMilestone, targetAmount: e.target.value})}
+                        style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Target Date</label>
+                      <input
+                        type="date"
+                        value={newMilestone.targetDate}
+                        onChange={e => setNewMilestone({...newMilestone, targetDate: e.target.value})}
+                        style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Notes (optional)</label>
+                    <textarea
+                      placeholder="Why is this milestone important to you? What will you do when you achieve it?"
+                      value={newMilestone.notes}
+                      onChange={e => setNewMilestone({...newMilestone, notes: e.target.value})}
+                      style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text, minHeight: '60px', resize: 'vertical' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                      onClick={() => {
+                        if (newMilestone.name && newMilestone.targetAmount) {
+                          setRoadmapMilestones([...roadmapMilestones, {
+                            ...newMilestone,
+                            id: Date.now(),
+                            currentAmount: 0,
+                            completed: false,
+                            createdAt: new Date().toISOString()
+                          }])
+                          setNewMilestone({ name: '', targetAmount: '', targetDate: '', category: 'savings', icon: '🎯', notes: '' })
+                          setShowAddMilestone(false)
+                        }
+                      }}
+                      style={{ padding: '10px 24px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      Add Milestone
+                    </button>
+                    <button
+                      onClick={() => setShowAddMilestone(false)}
+                      style={{ padding: '10px 24px', background: 'transparent', color: theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Visual Timeline */}
+              {roadmapMilestones.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', background: theme.cardBg, borderRadius: '12px' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
+                  <h3 style={{ color: theme.text, margin: '0 0 8px 0' }}>No milestones yet</h3>
+                  <p style={{ color: theme.textMuted, margin: '0 0 16px 0' }}>Add your first milestone to start mapping your financial journey!</p>
+                  <p style={{ color: theme.textMuted, fontSize: '13px', margin: 0 }}>
+                    Examples: "$2K emergency fund by March", "Pay off credit card by June", "$50K house deposit by 2027"
+                  </p>
+                </div>
+              ) : (
+                <div style={{ position: 'relative' }}>
+                  {/* Timeline line */}
+                  <div style={{ position: 'absolute', left: '24px', top: '24px', bottom: '24px', width: '4px', background: 'linear-gradient(180deg, ' + theme.purple + ', ' + theme.success + ')', borderRadius: '2px' }} />
+                  
+                  {/* Milestones */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {roadmapMilestones
+                      .sort((a, b) => new Date(a.targetDate || '2099-12-31').getTime() - new Date(b.targetDate || '2099-12-31').getTime())
+                      .map((milestone, idx) => {
+                        const progress = milestone.targetAmount > 0 ? (milestone.currentAmount / parseFloat(milestone.targetAmount)) * 100 : 0
+                        const isCompleted = progress >= 100 || milestone.completed
+                        const daysUntil = milestone.targetDate ? Math.ceil((new Date(milestone.targetDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null
+                        
+                        return (
+                          <div key={milestone.id} style={{ display: 'flex', gap: '16px', position: 'relative' }}>
+                            {/* Timeline dot */}
+                            <div style={{ 
+                              width: '48px', height: '48px', borderRadius: '50%', 
+                              background: isCompleted ? theme.success : theme.cardBg, 
+                              border: '4px solid ' + (isCompleted ? theme.success : theme.purple),
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                              fontSize: '24px', flexShrink: 0, zIndex: 1
+                            }}>
+                              {isCompleted ? '✓' : milestone.icon}
+                            </div>
+                            
+                            {/* Milestone card */}
+                            <div style={{ 
+                              flex: 1, padding: '20px', background: theme.cardBg, borderRadius: '12px', 
+                              border: '1px solid ' + (isCompleted ? theme.success : theme.border),
+                              opacity: isCompleted ? 0.8 : 1
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                                <div>
+                                  <h4 style={{ margin: '0 0 4px 0', color: theme.text, fontSize: '16px', textDecoration: isCompleted ? 'line-through' : 'none' }}>
+                                    {milestone.name}
+                                  </h4>
+                                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                    <span style={{ color: theme.purple, fontSize: '13px', fontWeight: 600 }}>
+                                      ${parseFloat(milestone.targetAmount).toLocaleString()}
+                                    </span>
+                                    {milestone.targetDate && (
+                                      <span style={{ 
+                                        color: daysUntil !== null && daysUntil < 30 ? theme.warning : theme.textMuted, 
+                                        fontSize: '12px' 
+                                      }}>
+                                        📅 {new Date(milestone.targetDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        {daysUntil !== null && daysUntil > 0 && ` (${daysUntil} days)`}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  {!isCompleted && (
+                                    <button
+                                      onClick={() => {
+                                        const updated = roadmapMilestones.map(m => 
+                                          m.id === milestone.id ? { ...m, completed: true, currentAmount: m.targetAmount } : m
+                                        )
+                                        setRoadmapMilestones(updated)
+                                      }}
+                                      style={{ padding: '6px 12px', background: theme.success + '20', color: theme.success, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                                    >
+                                      ✓ Complete
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => setRoadmapMilestones(roadmapMilestones.filter(m => m.id !== milestone.id))}
+                                    style={{ padding: '6px 12px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              </div>
+                              
+                              {/* Progress bar */}
+                              {!isCompleted && (
+                                <div style={{ marginBottom: '12px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                    <span style={{ color: theme.textMuted, fontSize: '12px' }}>Progress</span>
+                                    <span style={{ color: theme.text, fontSize: '12px', fontWeight: 600 }}>{Math.min(progress, 100).toFixed(0)}%</span>
+                                  </div>
+                                  <div style={{ height: '8px', background: '#334155', borderRadius: '4px', overflow: 'hidden' }}>
+                                    <div style={{ width: Math.min(progress, 100) + '%', height: '100%', background: 'linear-gradient(90deg, ' + theme.purple + ', ' + theme.success + ')', borderRadius: '4px', transition: 'width 0.5s ease' }} />
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Update progress */}
+                              {!isCompleted && (
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>Current:</span>
+                                  <input
+                                    type="number"
+                                    value={milestone.currentAmount}
+                                    onChange={e => {
+                                      const updated = roadmapMilestones.map(m => 
+                                        m.id === milestone.id ? { ...m, currentAmount: parseFloat(e.target.value) || 0 } : m
+                                      )
+                                      setRoadmapMilestones(updated)
+                                    }}
+                                    style={{ width: '100px', padding: '6px 10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '6px', color: theme.text, fontSize: '13px' }}
+                                  />
+                                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>/ ${parseFloat(milestone.targetAmount).toLocaleString()}</span>
+                                </div>
+                              )}
+                              
+                              {milestone.notes && (
+                                <p style={{ color: theme.textMuted, fontSize: '12px', margin: '12px 0 0 0', fontStyle: 'italic' }}>"{milestone.notes}"</p>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                  </div>
+                </div>
+              )}
+              
+              {/* Quick Add Suggestions */}
+              {roadmapMilestones.length < 3 && (
+                <div style={{ marginTop: '20px', padding: '16px', background: theme.purple + '15', borderRadius: '12px' }}>
+                  <p style={{ color: theme.text, fontSize: '13px', margin: '0 0 12px 0' }}>💡 <strong>Suggested milestones based on your data:</strong></p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {emergencyFund < 2000 && !roadmapMilestones.some(m => m.name.toLowerCase().includes('emergency')) && (
+                      <button
+                        onClick={() => {
+                          setRoadmapMilestones([...roadmapMilestones, {
+                            id: Date.now(),
+                            name: '$2K Emergency Fund',
+                            category: 'savings',
+                            icon: '🛡️',
+                            targetAmount: '2000',
+                            currentAmount: emergencyFund,
+                            targetDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                            notes: 'Baby Step 1 - Financial safety net',
+                            completed: false,
+                            createdAt: new Date().toISOString()
+                          }])
+                        }}
+                        style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '12px' }}
+                      >
+                        + 🛡️ $2K Emergency Fund
+                      </button>
+                    )}
+                    {totalDebt > 0 && !roadmapMilestones.some(m => m.name.toLowerCase().includes('debt')) && (
+                      <button
+                        onClick={() => {
+                          setRoadmapMilestones([...roadmapMilestones, {
+                            id: Date.now(),
+                            name: 'Become Debt Free',
+                            category: 'debt',
+                            icon: '💳',
+                            targetAmount: totalDebt.toString(),
+                            currentAmount: 0,
+                            targetDate: '',
+                            notes: 'Freedom from debt payments',
+                            completed: false,
+                            createdAt: new Date().toISOString()
+                          }])
+                        }}
+                        style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '12px' }}
+                      >
+                        + 💳 Pay Off ${totalDebt.toLocaleString()} Debt
+                      </button>
+                    )}
+                    {!roadmapMilestones.some(m => m.name.toLowerCase().includes('passive') || m.name.toLowerCase().includes('income')) && (
+                      <button
+                        onClick={() => {
+                          setRoadmapMilestones([...roadmapMilestones, {
+                            id: Date.now(),
+                            name: '$500/mo Passive Income',
+                            category: 'income',
+                            icon: '📈',
+                            targetAmount: '500',
+                            currentAmount: passiveIncome + totalPassiveQuestIncome,
+                            targetDate: '',
+                            notes: 'Monthly passive income target',
+                            completed: false,
+                            createdAt: new Date().toISOString()
+                          }])
+                        }}
+                        style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '12px' }}
+                      >
+                        + 📈 $500/mo Passive Income
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             
             {/* Current Progress Summary */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
