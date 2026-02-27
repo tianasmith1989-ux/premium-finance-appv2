@@ -1,42 +1,192 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Prop Firm Rules Database
+// Comprehensive Prop Firm Rules Database
 const PROP_FIRM_RULES = `
-=== PROP FIRM RULES DATABASE ===
+=== COMPREHENSIVE PROP FIRM RULES DATABASE ===
 
-**FTMO:**
-- Challenge: 10% profit target, 10% max drawdown, 5% daily drawdown, min 4 trading days, max 30 days
-- Verification: 5% profit target, 10% max drawdown, 5% daily drawdown, min 4 trading days, max 60 days
-- Funded: 80% profit split, same drawdown rules
-- Rules: No trading 2 mins before/after high-impact news, no holding over weekend (unless swing account), stop loss required
-- Tips: Focus on consistency over speed. Many fail by rushing. 0.5% daily = 10% in 20 days.
+**FTMO (Most Popular)**
+Account Sizes: $10K, $25K, $50K, $100K, $200K
+- CHALLENGE PHASE:
+  • Profit Target: 10%
+  • Max Drawdown: 10% (from initial balance)
+  • Daily Drawdown: 5% (resets daily at midnight CE(S)T)
+  • Min Trading Days: 4 days
+  • Max Time: 30 calendar days
+- VERIFICATION PHASE:
+  • Profit Target: 5%
+  • Same drawdown rules
+  • Min Trading Days: 4 days
+  • Max Time: 60 calendar days
+- FUNDED ACCOUNT:
+  • Profit Split: 80% (up to 90% with scaling)
+  • Same drawdown rules apply forever
+  • First payout after 14 days, then bi-weekly
+- STRICT RULES:
+  ❌ No trading during high-impact news (2 min before/after)
+  ❌ No holding positions over weekend (unless Swing account)
+  ❌ No copy trading between FTMO accounts
+  ❌ No martingale or grid strategies
+  ✅ Stop loss recommended but not required
+  ✅ Can use EAs/bots
+- SCALING PLAN: +25% account size every 4 months if profitable
+- RESET: Can buy a reset to start over if you fail
 
-**MyFundedFX:**
-- Evaluation: 8% profit target, 8% max drawdown, 5% daily drawdown, min 5 trading days, no time limit
-- Funded: 80% profit split, scaling plan available
-- Rules: No news restrictions, can hold over weekend, more relaxed than FTMO
-- Tips: Good for swing traders. Lower targets = easier pass. Use the no-time-limit wisely.
+**MyFundedFX (Beginner Friendly)**
+Account Sizes: $5K, $10K, $25K, $50K, $100K, $200K
+- EVALUATION PHASE (1-Step or 2-Step options):
+  • 1-Step: 10% target, 6% max DD, 4% daily DD
+  • 2-Step Challenge: 8% target, 8% max DD, 5% daily DD
+  • 2-Step Verification: 5% target
+  • Min Trading Days: 5 days
+  • Max Time: No time limit!
+- FUNDED ACCOUNT:
+  • Profit Split: 80%
+  • First payout after 5 trading days
+- RELAXED RULES:
+  ✅ No news trading restrictions
+  ✅ Can hold over weekends
+  ✅ Can hold overnight
+  ✅ EA/Bots allowed
+  ❌ No copy trading
+- Best for: Swing traders, patient traders who need no time pressure
 
-**The5ers:**
-- Evaluation: 6% profit target, 4% max drawdown (trailing), no daily limit, no time limit
-- Funded: 50-100% profit split (scales up), can scale to $4M
-- Rules: Very tight drawdown (4%). Designed for conservative traders.
-- Tips: Only for experienced traders with tight risk management. One bad trade can blow it.
+**The5ers (Instant Funding Option)**
+Account Sizes: $6K, $20K, $60K, $100K (Bootcamp); Up to $4M (Scaling)
+- BOOTCAMP (Evaluation):
+  • Profit Target: 6% (or 8% or 10% depending on program)
+  • Max Drawdown: 4% TRAILING (this is tight!)
+  • No daily drawdown limit
+  • No time limit
+- HYPER GROWTH (Instant Funding):
+  • Start with real money immediately
+  • Lower leverage (1:10)
+  • 6% drawdown trailing
+- FUNDED:
+  • Profit Split: 50% initially, scales to 100%
+  • Can scale up to $4 million!
+- STRICT RULES:
+  ❌ Very tight 4% trailing drawdown - one bad day can fail you
+  ✅ No time limits
+  ✅ Weekend holding allowed
+  ⚠️ Designed for CONSERVATIVE traders only
+- Best for: Experienced traders with excellent risk management
 
-**Funded Next:**
-- Challenge: 10% profit target, 10% max drawdown, 5% daily drawdown, no time limit
-- Verification: 5% profit target, same drawdown rules
-- Funded: 90% profit split (one of the highest!)
-- Rules: 15% consistency rule (no single trade can be >15% of total profit)
-- Tips: Great profit split. Consistency rule prevents lucky big trades from passing.
+**Funded Next (High Profit Split)**
+Account Sizes: $6K, $15K, $25K, $50K, $100K, $200K
+- CHALLENGE PHASE:
+  • Profit Target: 10%
+  • Max Drawdown: 10%
+  • Daily Drawdown: 5%
+  • Min Trading Days: 5 days
+  • No time limit
+- VERIFICATION PHASE:
+  • Profit Target: 5%
+  • Same drawdown rules
+- FUNDED:
+  • Profit Split: 90% (one of the highest!)
+  • Payout on demand after 5 trading days
+- KEY RULE - CONSISTENCY:
+  ⚠️ 15% Consistency Rule: No single trade can be more than 15% of your total profits
+  This prevents "one lucky trade" passes
+- Best for: Consistent traders, not home-run hitters
 
-**General Prop Firm Success Tips:**
-1. Risk 0.5-1% per trade maximum (0.5% is safer for challenges)
-2. Don't trade every day - quality over quantity
-3. Focus on A+ setups only - this isn't your money yet
-4. If down 2% in a day, STOP. Come back tomorrow.
-5. Many traders pass in 2-3 weeks, not 2-3 days. Be patient.
-6. The challenge tests psychology more than skill. Stay calm.
+**E8 Funding**
+Account Sizes: $25K, $50K, $100K, $250K
+- EVALUATION:
+  • Profit Target: 8%
+  • Max Drawdown: 8%
+  • Daily Drawdown: 5%
+  • Min Trading Days: 5 days
+  • No time limit
+- FUNDED:
+  • Profit Split: 80%
+  • First payout after 8 days
+- RULES:
+  ✅ No news restrictions
+  ✅ Weekend holding allowed
+  ❌ No copy trading
+- Best for: Those who want simple, straightforward rules
+
+**Apex Trader Funding (Futures Only)**
+Account Sizes: $25K, $50K, $75K, $100K, $150K, $250K, $300K
+- EVALUATION:
+  • Profit Target: $1,500 - $20,000 (varies by account)
+  • Trailing Drawdown (moves up with profits)
+  • Min Trading Days: 7 days
+  • Must trade during regular market hours at least once
+- FUNDED:
+  • Profit Split: 90% first $25K, then 100%!
+  • Payout twice per month
+- RULES:
+  ❌ Cannot hold through major news
+  ❌ Must flatten by 4:59 PM ET
+  ✅ Can scale up to 20 accounts
+- Best for: Futures traders, especially NQ and ES scalpers
+
+**TopStep (Futures Only)**
+Account Sizes: $50K, $100K, $150K
+- TRADING COMBINE (Evaluation):
+  • Profit Target: $3,000 - $9,000
+  • Max Drawdown: $2,000 - $4,500
+  • Daily Drawdown: $1,000 - $2,200
+  • Min Trading Days: None!
+- FUNDED:
+  • Profit Split: 90% (100% on first $10K)
+  • Weekly payouts
+- RULES:
+  ⚠️ "Consistency Rule" - can't make all profit in one day
+  ❌ Must close by 3:10 PM CT
+- Best for: Day traders who trade futures indices
+
+**True Forex Funds**
+Account Sizes: $10K, $25K, $50K, $100K, $200K
+- ONE-PHASE CHALLENGE:
+  • Profit Target: 10%
+  • Max Drawdown: 8%
+  • Daily Drawdown: 5%
+  • No time limit
+- FUNDED:
+  • Profit Split: 80%
+- RULES:
+  ✅ No news restrictions
+  ✅ Weekend holding OK
+  ✅ Copy trading allowed (with restrictions)
+- Best for: Traders who want simple one-phase evaluation
+
+=== GENERAL PROP FIRM SUCCESS STRATEGIES ===
+
+**Risk Management (CRITICAL):**
+1. Risk 0.5% per trade during challenge (1% max)
+2. This means 10 losing trades in a row only = 5% loss
+3. Never risk more than 1% daily drawdown buffer
+4. Example: $100K account, 5% daily = $5,000 max daily loss
+   With 0.5% risk = 10 trades before daily limit
+
+**Position Sizing Formula:**
+Risk Amount = Account Balance × Risk Percentage
+Position Size = Risk Amount ÷ (Entry - Stop Loss)
+
+**Challenge Passing Strategy:**
+1. Days 1-3: Don't trade. Observe the market.
+2. Week 1: Trade small (0.25-0.5% risk), get feel for conditions
+3. Week 2-3: Normal trading (0.5-1% risk)
+4. If you hit 5-7%: Reduce risk to 0.25% and cruise to target
+5. Never try to hit target in one day
+
+**Psychology for Challenges:**
+- You have UNLIMITED attempts (just costs money to reset)
+- The goal is consistency, not speed
+- A 0.5% daily gain = 10% in 20 trading days
+- Stop trading the day if down 1-2%
+- The market will be there tomorrow
+
+**What Causes Most Failures:**
+1. Over-trading (taking B and C setups)
+2. Revenge trading after losses
+3. Moving stop losses
+4. Trading during news
+5. Trying to pass too fast
+6. Not knowing the specific rules of YOUR firm
 `
 
 const TRADING_PSYCHOLOGY = `
@@ -158,31 +308,83 @@ export async function POST(request: NextRequest) {
       context += `- Win rate: ${winRate.toFixed(1)}%\n`
       context += `- Total P&L: $${totalPnL.toFixed(2)}\n\n`
       
-      // Accounts
-      if (accounts && accounts.length > 0) {
-        context += `TRADING ACCOUNTS:\n`
-        accounts.forEach((acc: any) => {
-          const pnl = parseFloat(acc.currentBalance || '0') - parseFloat(acc.startingBalance || '0')
-          const pnlPct = parseFloat(acc.startingBalance || '0') > 0 
-            ? (pnl / parseFloat(acc.startingBalance || '0') * 100)
-            : 0
-          context += `- ${acc.name} (${acc.propFirm || 'Personal'}): $${parseFloat(acc.currentBalance || '0').toLocaleString()} (${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%)\n`
+      // Accounts with FULL details
+      const accountsList = tradingData.accounts || accounts || []
+      if (accountsList && accountsList.length > 0) {
+        context += `=== USER'S TRADING ACCOUNTS ===\n`
+        accountsList.forEach((acc: any, idx: number) => {
+          const startBal = parseFloat(acc.startingBalance || '0')
+          const currBal = parseFloat(acc.currentBalance || '0')
+          const pnl = currBal - startBal
+          const pnlPct = startBal > 0 ? (pnl / startBal * 100) : 0
+          
+          // Get account-specific trades
+          const accTrades = allTrades.filter((t: any) => t.accountId === acc.id)
+          const accTodayTrades = accTrades.filter((t: any) => t.date === todayStr)
+          const accTodayPnL = accTodayTrades.reduce((sum: number, t: any) => sum + parseFloat(t.profitLoss || '0'), 0)
+          const accTodayPnLPct = startBal > 0 ? (accTodayPnL / startBal * 100) : 0
+          
+          context += `\n📊 ACCOUNT ${idx + 1}: ${acc.name} (ID: ${acc.id})\n`
+          context += `   Type: ${acc.type === 'prop_challenge' ? 'Prop Challenge' : acc.type === 'prop_funded' ? 'Funded' : 'Personal'}\n`
+          context += `   Prop Firm: ${acc.propFirm || 'N/A'}\n`
+          context += `   Balance: $${currBal.toLocaleString()} (Started: $${startBal.toLocaleString()})\n`
+          context += `   Total P&L: ${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}% ($${pnl.toFixed(0)})\n`
+          context += `   Today's P&L: ${accTodayPnLPct >= 0 ? '+' : ''}${accTodayPnLPct.toFixed(2)}% ($${accTodayPnL.toFixed(0)})\n`
+          context += `   Trades: ${accTrades.length} total, ${accTodayTrades.length} today\n`
+          
           if (acc.type !== 'personal') {
-            context += `  Max DD: ${acc.maxDrawdown}%, Daily DD: ${acc.dailyDrawdown}%, Target: ${acc.profitTarget}%\n`
-            const ddRemaining = parseFloat(acc.maxDrawdown || '0') - Math.abs(Math.min(0, pnlPct))
-            context += `  Drawdown remaining: ${ddRemaining.toFixed(2)}%\n`
+            const maxDD = parseFloat(acc.maxDrawdown || '0')
+            const dailyDD = parseFloat(acc.dailyDrawdown || '0')
+            const target = parseFloat(acc.profitTarget || '0')
+            const ddUsed = pnlPct < 0 ? Math.abs(pnlPct) : 0
+            const ddRemaining = maxDD - ddUsed
+            const dailyDDUsed = accTodayPnLPct < 0 ? Math.abs(accTodayPnLPct) : 0
+            const dailyDDRemaining = dailyDD - dailyDDUsed
+            const progressToTarget = target > 0 ? (pnlPct / target * 100) : 0
+            
+            context += `   --- ACCOUNT RULES ---\n`
+            context += `   Max Drawdown: ${maxDD}% (Used: ${ddUsed.toFixed(2)}%, Remaining: ${ddRemaining.toFixed(2)}%)\n`
+            context += `   Daily Drawdown: ${dailyDD}% (Used today: ${dailyDDUsed.toFixed(2)}%, Remaining: ${dailyDDRemaining.toFixed(2)}%)\n`
+            context += `   Profit Target: ${target}% (Progress: ${progressToTarget.toFixed(1)}%)\n`
+            
+            if (acc.minTradingDays) context += `   Min Trading Days: ${acc.minTradingDays}\n`
+            if (acc.maxTradingDays) context += `   Max Days to Pass: ${acc.maxTradingDays}\n`
+            if (acc.consistencyRule) context += `   Consistency Rule: ${acc.consistencyRule}\n`
+            if (acc.newsRestriction) context += `   ⚠️ NEWS TRADING RESTRICTED\n`
+            if (!acc.weekendHolding) context += `   ⚠️ NO WEEKEND HOLDING\n`
+            if (acc.profitSplit) context += `   Profit Split: ${acc.profitSplit}%\n`
+            
+            // Custom rules
+            if (acc.customRules && acc.customRules.length > 0) {
+              context += `   --- CUSTOM RULES (USER DEFINED) ---\n`
+              acc.customRules.forEach((rule: string) => {
+                context += `   • ${rule}\n`
+              })
+            }
+            
+            // Warnings
+            if (ddRemaining < maxDD * 0.3) {
+              context += `   🚨 WARNING: Approaching max drawdown! Only ${ddRemaining.toFixed(2)}% remaining!\n`
+            }
+            if (dailyDDRemaining < dailyDD * 0.3) {
+              context += `   🚨 WARNING: Approaching daily drawdown limit!\n`
+            }
+            if (progressToTarget >= 80) {
+              context += `   ✅ ALMOST THERE: ${progressToTarget.toFixed(1)}% to profit target!\n`
+            }
           }
         })
         context += '\n'
       }
       
       // Trading rules
-      if (tradingData.rules && tradingData.rules.length > 0) {
-        const enabledRules = tradingData.rules.filter((r: any) => r.enabled)
-        context += `ACTIVE TRADING RULES:\n`
+      if (tradingRules && tradingRules.length > 0) {
+        const enabledRules = tradingRules.filter((r: any) => r.enabled)
+        context += `USER'S TRADING RULES:\n`
         enabledRules.forEach((rule: any) => {
           context += `- ${rule.rule}\n`
         })
+      }
       }
       
       return context
@@ -469,7 +671,18 @@ When user wants to add a trading milestone:
 
 **LOG TRADE:**
 When user tells you about a completed trade:
-- Action: {"type": "addTrade", "data": {"instrument": "EURUSD", "direction": "long", "entryPrice": "1.0850", "exitPrice": "1.0890", "profitLoss": "200", "notes": "Clean breakout setup"}}
+- IMPORTANT: Always ask which account to log it to if they have accounts!
+- Include accountId to link trade to the correct account
+- Action: {"type": "addTrade", "data": {"instrument": "EURUSD", "direction": "long", "entryPrice": "1.0850", "exitPrice": "1.0890", "profitLoss": "200", "accountId": 123456789, "notes": "Clean breakout setup"}}
+- The trade P&L will automatically update the account balance
+- After logging, remind them of their account status (drawdown remaining, etc.)
+
+**ACCOUNT STATUS CHECK:**
+When user asks about their account or you log a trade:
+- Review their drawdown status from the context
+- If approaching limits, give a clear warning
+- Remind them of any custom rules they've set
+- Example: "Trade logged! Your FTMO account is now at +3.2%. You have 6.8% max drawdown remaining. Remember your rule: no trading after 3 losses in a day."
 
 **CHART ANALYSIS:**
 When analyzing charts, if user has set minimum R:R of ${tradeIdeaSettings?.minRR || '3'}:1:
