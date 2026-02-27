@@ -476,7 +476,17 @@ export default function Dashboard() {
     dailyDrawdown: '',
     profitTarget: '',
     riskPerTrade: '1',
-    isActive: true
+    isActive: true,
+    // Custom rules for the account
+    customRules: [] as string[],
+    // Additional prop firm settings
+    minTradingDays: '',
+    maxTradingDays: '',
+    consistencyRule: '', // e.g., "No single trade can be >15% of total profit"
+    newsRestriction: false,
+    weekendHolding: true,
+    scalingPlan: false,
+    profitSplit: ''
   })
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
   const [showAddAccount, setShowAddAccount] = useState(false)
@@ -1333,7 +1343,22 @@ export default function Dashboard() {
 
   const addTrade = () => {
     if (!newTrade.instrument) return
-    setTrades([...trades, { ...newTrade, id: Date.now() }].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()))
+    
+    const tradeWithId = { ...newTrade, id: Date.now() }
+    setTrades(prev => [...prev, tradeWithId].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()))
+    
+    // Update account balance if trade is linked to an account
+    if (newTrade.accountId && newTrade.accountId > 0) {
+      const pnl = parseFloat(newTrade.profitLoss) || 0
+      setTradingAccounts(prev => prev.map(acc => {
+        if (acc.id === newTrade.accountId) {
+          const newBalance = parseFloat(acc.currentBalance || '0') + pnl
+          return { ...acc, currentBalance: newBalance.toString() }
+        }
+        return acc
+      }))
+    }
+    
     setNewTrade({ 
       date: new Date().toISOString().split('T')[0], 
       instrument: '', 
@@ -1342,7 +1367,7 @@ export default function Dashboard() {
       exitPrice: '', 
       profitLoss: '', 
       riskAmount: '',
-      accountId: 0,
+      accountId: newTrade.accountId, // Keep same account selected
       setupGrade: 'A',
       emotionBefore: 'neutral',
       emotionAfter: 'neutral',
@@ -1351,7 +1376,24 @@ export default function Dashboard() {
       screenshot: ''
     })
   }
-  const deleteTrade = (id: number) => setTrades(trades.filter(t => t.id !== id))
+  
+  const deleteTrade = (id: number) => {
+    const trade = trades.find(t => t.id === id)
+    
+    // Reverse the P&L from account if linked
+    if (trade && trade.accountId && trade.accountId > 0) {
+      const pnl = parseFloat(trade.profitLoss) || 0
+      setTradingAccounts(prev => prev.map(acc => {
+        if (acc.id === trade.accountId) {
+          const newBalance = parseFloat(acc.currentBalance || '0') - pnl
+          return { ...acc, currentBalance: newBalance.toString() }
+        }
+        return acc
+      }))
+    }
+    
+    setTrades(trades.filter(t => t.id !== id))
+  }
 
   const addPresetBill = (preset: any) => {
     const amount = prompt(`Enter amount for ${preset.name}:`, preset.amount || '')
@@ -5629,40 +5671,67 @@ export default function Dashboard() {
                 <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', marginBottom: '20px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '12px' }}>
                     <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Account Name</label>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Account Name *</label>
                       <input value={newAccount.name} onChange={e => setNewAccount({...newAccount, name: e.target.value})} placeholder="My FTMO 100k" style={{...inputStyle, width: '100%'}} />
                     </div>
                     <div>
                       <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Type</label>
                       <select value={newAccount.type} onChange={e => setNewAccount({...newAccount, type: e.target.value})} style={{...inputStyle, width: '100%'}}>
-                        <option value="personal">Personal</option>
-                        <option value="prop_challenge">Prop Challenge</option>
-                        <option value="prop_funded">Prop Funded</option>
+                        <option value="personal">💼 Personal Account</option>
+                        <option value="prop_challenge">🎯 Prop Challenge</option>
+                        <option value="prop_funded">🏆 Prop Funded</option>
                       </select>
                     </div>
                     <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Prop Firm</label>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Prop Firm (or Custom)</label>
                       <select value={newAccount.propFirm} onChange={e => {
-                        const firm = propFirmProfiles[e.target.value]
-                        setNewAccount({
-                          ...newAccount, 
-                          propFirm: e.target.value,
-                          maxDrawdown: firm?.phases?.challenge?.maxDrawdown?.toString() || '',
-                          dailyDrawdown: firm?.phases?.challenge?.dailyDrawdown?.toString() || '',
-                          profitTarget: firm?.phases?.challenge?.profitTarget?.toString() || ''
-                        })
+                        const firmName = e.target.value
+                        if (firmName === 'Custom') {
+                          setNewAccount({
+                            ...newAccount, 
+                            propFirm: 'Custom',
+                            maxDrawdown: '',
+                            dailyDrawdown: '',
+                            profitTarget: ''
+                          })
+                        } else {
+                          const firm = propFirmProfiles[firmName]
+                          const phase = newAccount.type === 'prop_funded' ? 'funded' : 'challenge'
+                          setNewAccount({
+                            ...newAccount, 
+                            propFirm: firmName,
+                            maxDrawdown: firm?.phases?.[phase]?.maxDrawdown?.toString() || firm?.phases?.challenge?.maxDrawdown?.toString() || '',
+                            dailyDrawdown: firm?.phases?.[phase]?.dailyDrawdown?.toString() || firm?.phases?.challenge?.dailyDrawdown?.toString() || '',
+                            profitTarget: firm?.phases?.[phase]?.profitTarget?.toString() || firm?.phases?.challenge?.profitTarget?.toString() || ''
+                          })
+                        }
                       }} style={{...inputStyle, width: '100%'}}>
-                        <option value="">Select...</option>
+                        <option value="">Select or Custom...</option>
                         {Object.keys(propFirmProfiles).map(firm => (
                           <option key={firm} value={firm}>{firm}</option>
                         ))}
+                        <option value="Custom">✏️ Custom (enter rules below)</option>
                       </select>
                     </div>
                     <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Starting Balance</label>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Starting Balance *</label>
                       <input type="number" value={newAccount.startingBalance} onChange={e => setNewAccount({...newAccount, startingBalance: e.target.value, currentBalance: e.target.value})} placeholder="100000" style={{...inputStyle, width: '100%'}} />
                     </div>
                   </div>
+                  
+                  {/* Custom firm name input */}
+                  {newAccount.propFirm === 'Custom' && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Custom Prop Firm Name</label>
+                      <input 
+                        value={newAccount.phase || ''} 
+                        onChange={e => setNewAccount({...newAccount, phase: e.target.value})} 
+                        placeholder="Enter prop firm name (e.g., Topstep, Apex, etc.)" 
+                        style={{...inputStyle, width: '100%'}} 
+                      />
+                    </div>
+                  )}
+                  
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '12px' }}>
                     <div>
                       <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Max Drawdown %</label>
@@ -5681,14 +5750,72 @@ export default function Dashboard() {
                       <input type="number" value={newAccount.riskPerTrade} onChange={e => setNewAccount({...newAccount, riskPerTrade: e.target.value})} placeholder="1" style={{...inputStyle, width: '100%'}} />
                     </div>
                   </div>
+                  
+                  {/* Additional Prop Firm Settings */}
+                  {newAccount.type !== 'personal' && (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '12px' }}>
+                        <div>
+                          <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Min Trading Days</label>
+                          <input type="number" value={newAccount.minTradingDays} onChange={e => setNewAccount({...newAccount, minTradingDays: e.target.value})} placeholder="4" style={{...inputStyle, width: '100%'}} />
+                        </div>
+                        <div>
+                          <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Max Days (0=none)</label>
+                          <input type="number" value={newAccount.maxTradingDays} onChange={e => setNewAccount({...newAccount, maxTradingDays: e.target.value})} placeholder="30" style={{...inputStyle, width: '100%'}} />
+                        </div>
+                        <div>
+                          <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Profit Split %</label>
+                          <input type="number" value={newAccount.profitSplit} onChange={e => setNewAccount({...newAccount, profitSplit: e.target.value})} placeholder="80" style={{...inputStyle, width: '100%'}} />
+                        </div>
+                        <div>
+                          <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Consistency Rule</label>
+                          <input value={newAccount.consistencyRule} onChange={e => setNewAccount({...newAccount, consistencyRule: e.target.value})} placeholder="e.g., 15%" style={{...inputStyle, width: '100%'}} />
+                        </div>
+                      </div>
+                      
+                      {/* Toggle Rules */}
+                      <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexWrap: 'wrap' as const }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: theme.text, fontSize: '13px', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={newAccount.newsRestriction} onChange={e => setNewAccount({...newAccount, newsRestriction: e.target.checked})} />
+                          📰 News trading restricted
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: theme.text, fontSize: '13px', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={newAccount.weekendHolding} onChange={e => setNewAccount({...newAccount, weekendHolding: e.target.checked})} />
+                          📅 Weekend holding allowed
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: theme.text, fontSize: '13px', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={newAccount.scalingPlan} onChange={e => setNewAccount({...newAccount, scalingPlan: e.target.checked})} />
+                          📈 Scaling plan available
+                        </label>
+                      </div>
+                      
+                      {/* Custom Rules */}
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '8px' }}>Custom Rules (one per line - Aureus will enforce these!)</label>
+                        <textarea
+                          value={newAccount.customRules.join('\n')}
+                          onChange={e => setNewAccount({...newAccount, customRules: e.target.value.split('\n').filter(r => r.trim())})}
+                          placeholder="Stop loss required on every trade&#10;No martingale strategies&#10;Must close all positions by Friday close&#10;etc."
+                          style={{...inputStyle, width: '100%', minHeight: '80px', resize: 'vertical' as const}}
+                        />
+                      </div>
+                    </>
+                  )}
+                  
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => {
                       if (newAccount.name && newAccount.startingBalance) {
-                        setTradingAccounts([...tradingAccounts, { ...newAccount, id: Date.now(), currentBalance: newAccount.startingBalance }])
-                        setNewAccount({ name: '', type: 'personal', propFirm: '', phase: '', startingBalance: '', currentBalance: '', maxDrawdown: '', dailyDrawdown: '', profitTarget: '', riskPerTrade: '1', isActive: true })
+                        const accountToAdd = {
+                          ...newAccount,
+                          id: Date.now(),
+                          currentBalance: newAccount.startingBalance,
+                          propFirm: newAccount.propFirm === 'Custom' ? (newAccount.phase || 'Custom') : newAccount.propFirm
+                        }
+                        setTradingAccounts([...tradingAccounts, accountToAdd])
+                        setNewAccount({ name: '', type: 'personal', propFirm: '', phase: '', startingBalance: '', currentBalance: '', maxDrawdown: '', dailyDrawdown: '', profitTarget: '', riskPerTrade: '1', isActive: true, customRules: [], minTradingDays: '', maxTradingDays: '', consistencyRule: '', newsRestriction: false, weekendHolding: true, scalingPlan: false, profitSplit: '' })
                         setShowAddAccount(false)
                       }
-                    }} style={btnSuccess}>Add Account</button>
+                    }} style={{...btnSuccess, opacity: (!newAccount.name || !newAccount.startingBalance) ? 0.5 : 1}} disabled={!newAccount.name || !newAccount.startingBalance}>Add Account</button>
                     <button onClick={() => setShowAddAccount(false)} style={{ ...btnPrimary, background: theme.textMuted }}>Cancel</button>
                   </div>
                 </div>
@@ -5701,7 +5828,7 @@ export default function Dashboard() {
                   <p>No accounts yet. Add your first trading account to get started!</p>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '16px' }}>
                   {tradingAccounts.map(account => {
                     const startBal = parseFloat(account.startingBalance || '0')
                     const currBal = parseFloat(account.currentBalance || '0')
@@ -5714,43 +5841,80 @@ export default function Dashboard() {
                     const drawdownUsed = pnl < 0 ? Math.abs(pnlPercent) : 0
                     const drawdownRemaining = maxDD - drawdownUsed
                     
+                    // Get account-specific trades
+                    const accountTrades = trades.filter(t => t.accountId === account.id)
+                    const accountWins = accountTrades.filter(t => parseFloat(t.profitLoss || '0') > 0).length
+                    const accountWinRate = accountTrades.length > 0 ? (accountWins / accountTrades.length) * 100 : 0
+                    
+                    // Today's P&L for daily drawdown check
+                    const today = new Date().toISOString().split('T')[0]
+                    const todaysTrades = accountTrades.filter(t => t.date === today)
+                    const todaysPnl = todaysTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+                    const todaysPnlPercent = startBal > 0 ? (todaysPnl / startBal) * 100 : 0
+                    const dailyDDRemaining = dailyDD > 0 ? dailyDD - Math.abs(Math.min(0, todaysPnlPercent)) : null
+                    
+                    // Warning states
+                    const isNearMaxDD = drawdownRemaining < maxDD * 0.3 && maxDD > 0
+                    const isNearDailyDD = dailyDDRemaining !== null && dailyDDRemaining < dailyDD * 0.3
+                    const isNearTarget = progressToTarget >= 80 && progressToTarget < 100
+                    const hitTarget = progressToTarget >= 100
+                    
                     return (
                       <div key={account.id} style={{ 
                         padding: '20px', 
                         background: darkMode ? '#1e293b' : '#f8fafc', 
                         borderRadius: '12px',
-                        border: '2px solid ' + (account.type === 'personal' ? theme.purple : account.type === 'prop_funded' ? theme.success : theme.warning)
+                        border: '2px solid ' + (
+                          hitTarget ? theme.success :
+                          isNearMaxDD || isNearDailyDD ? theme.danger :
+                          account.type === 'personal' ? theme.purple : 
+                          account.type === 'prop_funded' ? theme.success : theme.warning
+                        )
                       }}>
+                        {/* Header */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                              <span style={{ fontSize: '20px' }}>{account.type === 'personal' ? '👤' : account.type === 'prop_funded' ? '🏆' : '🎯'}</span>
-                              <span style={{ fontWeight: 600, color: theme.text }}>{account.name}</span>
+                              <span style={{ fontSize: '20px' }}>{hitTarget ? '🏆' : account.type === 'personal' ? '👤' : account.type === 'prop_funded' ? '💰' : '🎯'}</span>
+                              <span style={{ fontWeight: 700, color: theme.text, fontSize: '16px' }}>{account.name}</span>
                             </div>
                             <div style={{ fontSize: '12px', color: theme.textMuted }}>
                               {account.propFirm || 'Personal Account'} {account.type === 'prop_challenge' ? '• Challenge' : account.type === 'prop_funded' ? '• Funded' : ''}
                             </div>
                           </div>
-                          <div style={{ 
-                            padding: '4px 10px', 
-                            background: pnl >= 0 ? theme.success + '20' : theme.danger + '20', 
-                            color: pnl >= 0 ? theme.success : theme.danger,
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            fontWeight: 600
-                          }}>
-                            {pnl >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%
+                          <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '4px' }}>
+                            <div style={{ 
+                              padding: '4px 10px', 
+                              background: pnl >= 0 ? theme.success + '20' : theme.danger + '20', 
+                              color: pnl >= 0 ? theme.success : theme.danger,
+                              borderRadius: '4px',
+                              fontSize: '14px',
+                              fontWeight: 700
+                            }}>
+                              {pnl >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%
+                            </div>
+                            <button onClick={() => {
+                              if (confirm('Delete this account? This cannot be undone.')) {
+                                setTradingAccounts(prev => prev.filter(a => a.id !== account.id))
+                              }
+                            }} style={{ padding: '2px 6px', background: 'transparent', color: theme.textMuted, border: 'none', cursor: 'pointer', fontSize: '11px' }}>🗑️ Delete</button>
                           </div>
                         </div>
                         
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                          <div>
-                            <div style={{ color: theme.textMuted, fontSize: '11px' }}>Balance</div>
-                            <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>${currBal.toLocaleString()}</div>
+                        {/* Balance & P&L */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                          <div style={{ background: theme.cardBg, padding: '12px', borderRadius: '8px', textAlign: 'center' as const }}>
+                            <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>Balance</div>
+                            <div style={{ color: theme.text, fontSize: '18px', fontWeight: 700 }}>${currBal.toLocaleString()}</div>
                           </div>
-                          <div>
-                            <div style={{ color: theme.textMuted, fontSize: '11px' }}>P&L</div>
-                            <div style={{ color: pnl >= 0 ? theme.success : theme.danger, fontSize: '20px', fontWeight: 700 }}>${pnl.toFixed(0)}</div>
+                          <div style={{ background: theme.cardBg, padding: '12px', borderRadius: '8px', textAlign: 'center' as const }}>
+                            <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>Total P&L</div>
+                            <div style={{ color: pnl >= 0 ? theme.success : theme.danger, fontSize: '18px', fontWeight: 700 }}>${pnl.toFixed(0)}</div>
+                          </div>
+                          <div style={{ background: theme.cardBg, padding: '12px', borderRadius: '8px', textAlign: 'center' as const }}>
+                            <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>Win Rate</div>
+                            <div style={{ color: accountWinRate >= 50 ? theme.success : theme.warning, fontSize: '18px', fontWeight: 700 }}>{accountWinRate.toFixed(0)}%</div>
+                            <div style={{ color: theme.textMuted, fontSize: '10px' }}>{accountTrades.length} trades</div>
                           </div>
                         </div>
                         
@@ -5760,41 +5924,105 @@ export default function Dashboard() {
                             {profitTarget > 0 && (
                               <div style={{ marginBottom: '12px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
-                                  <span style={{ color: theme.textMuted }}>Target: {profitTarget}%</span>
-                                  <span style={{ color: theme.success }}>{progressToTarget.toFixed(1)}%</span>
+                                  <span style={{ color: theme.textMuted }}>🎯 Target: {profitTarget}%</span>
+                                  <span style={{ color: hitTarget ? theme.success : theme.warning, fontWeight: 600 }}>
+                                    {hitTarget ? '✅ TARGET HIT!' : `${pnlPercent.toFixed(2)}% / ${profitTarget}%`}
+                                  </span>
                                 </div>
-                                <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
-                                  <div style={{ width: progressToTarget + '%', height: '100%', background: theme.success }} />
+                                <div style={{ height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
+                                  <div style={{ width: Math.min(progressToTarget, 100) + '%', height: '100%', background: hitTarget ? theme.success : 'linear-gradient(90deg, ' + theme.warning + ', ' + theme.success + ')' }} />
                                 </div>
                               </div>
                             )}
                             
-                            {/* Drawdown Warning */}
-                            <div style={{ 
-                              padding: '8px 12px', 
-                              background: drawdownRemaining < maxDD * 0.3 ? theme.danger + '20' : theme.warning + '20', 
-                              borderRadius: '6px',
-                              display: 'flex',
-                              justifyContent: 'space-between'
-                            }}>
-                              <span style={{ color: theme.textMuted, fontSize: '12px' }}>Drawdown Remaining</span>
-                              <span style={{ color: drawdownRemaining < maxDD * 0.3 ? theme.danger : theme.warning, fontWeight: 600, fontSize: '12px' }}>
-                                {drawdownRemaining.toFixed(2)}% (${(startBal * drawdownRemaining / 100).toFixed(0)})
-                              </span>
+                            {/* Drawdown Status */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                              {/* Max Drawdown */}
+                              <div style={{ 
+                                padding: '10px', 
+                                background: isNearMaxDD ? theme.danger + '20' : theme.cardBg, 
+                                borderRadius: '8px',
+                                border: isNearMaxDD ? '1px solid ' + theme.danger : 'none'
+                              }}>
+                                <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>Max DD Remaining</div>
+                                <div style={{ color: isNearMaxDD ? theme.danger : theme.text, fontWeight: 700, fontSize: '14px' }}>
+                                  {drawdownRemaining.toFixed(2)}%
+                                </div>
+                                <div style={{ color: theme.textMuted, fontSize: '10px' }}>${(startBal * drawdownRemaining / 100).toFixed(0)} buffer</div>
+                              </div>
+                              
+                              {/* Daily Drawdown */}
+                              {dailyDD > 0 && (
+                                <div style={{ 
+                                  padding: '10px', 
+                                  background: isNearDailyDD ? theme.danger + '20' : theme.cardBg, 
+                                  borderRadius: '8px',
+                                  border: isNearDailyDD ? '1px solid ' + theme.danger : 'none'
+                                }}>
+                                  <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>Daily DD Remaining</div>
+                                  <div style={{ color: isNearDailyDD ? theme.danger : theme.text, fontWeight: 700, fontSize: '14px' }}>
+                                    {dailyDDRemaining?.toFixed(2)}%
+                                  </div>
+                                  <div style={{ color: todaysPnl >= 0 ? theme.success : theme.danger, fontSize: '10px' }}>Today: {todaysPnl >= 0 ? '+' : ''}${todaysPnl.toFixed(0)}</div>
+                                </div>
+                              )}
                             </div>
+                            
+                            {/* Warnings */}
+                            {(isNearMaxDD || isNearDailyDD) && (
+                              <div style={{ marginTop: '12px', padding: '10px', background: theme.danger + '20', borderRadius: '8px', borderLeft: '4px solid ' + theme.danger }}>
+                                <span style={{ color: theme.danger, fontSize: '12px', fontWeight: 600 }}>
+                                  ⚠️ {isNearDailyDD ? 'Approaching daily drawdown limit! Consider stopping for today.' : 'Low drawdown buffer! Trade very carefully.'}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {isNearTarget && !hitTarget && (
+                              <div style={{ marginTop: '12px', padding: '10px', background: theme.success + '20', borderRadius: '8px', borderLeft: '4px solid ' + theme.success }}>
+                                <span style={{ color: theme.success, fontSize: '12px', fontWeight: 600 }}>
+                                  🎯 Almost there! {(profitTarget - pnlPercent).toFixed(2)}% to target. Stay disciplined!
+                                </span>
+                              </div>
+                            )}
                           </>
                         )}
                         
                         {account.type === 'personal' && (
                           <div style={{ 
-                            padding: '8px 12px', 
+                            padding: '10px', 
                             background: theme.purple + '20', 
-                            borderRadius: '6px',
+                            borderRadius: '8px',
                             textAlign: 'center' as const
                           }}>
-                            <span style={{ color: theme.purple, fontSize: '12px' }}>💡 Compound your profits for faster growth!</span>
+                            <span style={{ color: theme.purple, fontSize: '12px' }}>💡 Focus on consistent growth. Use the compound calculator above!</span>
                           </div>
                         )}
+                        
+                        {/* Quick Update Balance */}
+                        <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ color: theme.textMuted, fontSize: '11px' }}>Update balance:</span>
+                          <input 
+                            type="number" 
+                            placeholder={currBal.toString()}
+                            onBlur={(e) => {
+                              if (e.target.value) {
+                                setTradingAccounts(prev => prev.map(a => 
+                                  a.id === account.id ? { ...a, currentBalance: e.target.value } : a
+                                ))
+                                e.target.value = ''
+                              }
+                            }}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && (e.target as HTMLInputElement).value) {
+                                setTradingAccounts(prev => prev.map(a => 
+                                  a.id === account.id ? { ...a, currentBalance: (e.target as HTMLInputElement).value } : a
+                                ));
+                                (e.target as HTMLInputElement).value = ''
+                              }
+                            }}
+                            style={{...inputStyle, width: '100px', padding: '4px 8px', fontSize: '12px'}} 
+                          />
+                        </div>
                       </div>
                     )
                   })}
@@ -6093,32 +6321,152 @@ export default function Dashboard() {
 
             {/* TRADE JOURNAL */}
             <div style={cardStyle}>
-              <h2 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '20px' }}>📓 Trade Journal</h2>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' as const }}>
-                <input type="date" value={newTrade.date} onChange={e => setNewTrade({...newTrade, date: e.target.value})} style={inputStyle} />
-                <input placeholder="Instrument" value={newTrade.instrument} onChange={e => setNewTrade({...newTrade, instrument: e.target.value})} style={{...inputStyle, width: '120px'}} />
-                <select value={newTrade.direction} onChange={e => setNewTrade({...newTrade, direction: e.target.value})} style={inputStyle}><option value="long">Long</option><option value="short">Short</option></select>
-                <input placeholder="Entry" type="number" value={newTrade.entryPrice} onChange={e => setNewTrade({...newTrade, entryPrice: e.target.value})} style={{...inputStyle, width: '90px'}} />
-                <input placeholder="Exit" type="number" value={newTrade.exitPrice} onChange={e => setNewTrade({...newTrade, exitPrice: e.target.value})} style={{...inputStyle, width: '90px'}} />
-                <input placeholder="P&L" type="number" value={newTrade.profitLoss} onChange={e => setNewTrade({...newTrade, profitLoss: e.target.value})} style={{...inputStyle, width: '90px'}} />
-                <input placeholder="Notes" value={newTrade.notes} onChange={e => setNewTrade({...newTrade, notes: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '150px'}} />
-                <button onClick={addTrade} style={btnPrimary}>+ Add</button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h2 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📓 Trade Journal</h2>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ color: theme.textMuted, fontSize: '13px' }}>{trades.length} trades logged</span>
+                </div>
               </div>
-              <div style={{ maxHeight: '400px', overflowY: 'auto' as const }}>
-                {trades.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const, padding: '40px' }}>No trades yet. Start journaling!</p> : trades.map(trade => (
-                  <div key={trade.id} style={{ padding: '12px', marginBottom: '8px', background: parseFloat(trade.profitLoss || '0') >= 0 ? (darkMode ? '#1e3a32' : '#f0fdf4') : (darkMode ? '#3a1e1e' : '#fef2f2'), borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                      <span style={{ color: theme.textMuted, fontSize: '13px' }}>{trade.date}</span>
-                      <span style={{ color: theme.text, fontWeight: 600 }}>{trade.instrument}</span>
-                      <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, background: trade.direction === 'long' ? theme.success + '20' : theme.danger + '20', color: trade.direction === 'long' ? theme.success : theme.danger }}>{trade.direction.toUpperCase()}</span>
-                      {trade.notes && <span style={{ color: theme.textMuted, fontSize: '12px' }}>"{trade.notes}"</span>}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ color: parseFloat(trade.profitLoss || '0') >= 0 ? theme.success : theme.danger, fontSize: '18px', fontWeight: 700 }}>{parseFloat(trade.profitLoss || '0') >= 0 ? '+' : ''}${parseFloat(trade.profitLoss || '0').toFixed(2)}</span>
-                      <button onClick={() => deleteTrade(trade.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>×</button>
-                    </div>
+              
+              {/* Trade Input Form */}
+              <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f1f5f9', borderRadius: '12px', marginBottom: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                  {/* Account Selection - Important! */}
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Account *</label>
+                    <select value={newTrade.accountId} onChange={e => setNewTrade({...newTrade, accountId: parseInt(e.target.value)})} style={{...inputStyle, width: '100%', borderColor: !newTrade.accountId ? theme.warning : theme.border}}>
+                      <option value={0}>Select Account</option>
+                      {tradingAccounts.map(acc => (
+                        <option key={acc.id} value={acc.id}>{acc.name}</option>
+                      ))}
+                    </select>
                   </div>
-                ))}
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Date</label>
+                    <input type="date" value={newTrade.date} onChange={e => setNewTrade({...newTrade, date: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Instrument *</label>
+                    <input placeholder="EURUSD, NQ, etc" value={newTrade.instrument} onChange={e => setNewTrade({...newTrade, instrument: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Direction</label>
+                    <select value={newTrade.direction} onChange={e => setNewTrade({...newTrade, direction: e.target.value})} style={{...inputStyle, width: '100%'}}>
+                      <option value="long">🟢 Long</option>
+                      <option value="short">🔴 Short</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Entry Price</label>
+                    <input placeholder="Entry" type="number" step="0.00001" value={newTrade.entryPrice} onChange={e => setNewTrade({...newTrade, entryPrice: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Exit Price</label>
+                    <input placeholder="Exit" type="number" step="0.00001" value={newTrade.exitPrice} onChange={e => setNewTrade({...newTrade, exitPrice: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>P&L ($) *</label>
+                    <input placeholder="+100 or -50" type="number" value={newTrade.profitLoss} onChange={e => setNewTrade({...newTrade, profitLoss: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Setup Grade</label>
+                    <select value={newTrade.setupGrade} onChange={e => setNewTrade({...newTrade, setupGrade: e.target.value})} style={{...inputStyle, width: '100%'}}>
+                      <option value="A">A - Perfect Setup</option>
+                      <option value="B">B - Good Setup</option>
+                      <option value="C">C - Weak Setup</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Notes</label>
+                    <input placeholder="What did you learn? What was the setup?" value={newTrade.notes} onChange={e => setNewTrade({...newTrade, notes: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  <button onClick={addTrade} disabled={!newTrade.instrument || !newTrade.profitLoss} style={{ ...btnPrimary, opacity: (!newTrade.instrument || !newTrade.profitLoss) ? 0.5 : 1, padding: '10px 24px' }}>+ Log Trade</button>
+                </div>
+                {!newTrade.accountId && tradingAccounts.length > 0 && (
+                  <p style={{ color: theme.warning, fontSize: '11px', margin: '8px 0 0 0' }}>
+                    ⚠️ Select an account to track this trade's P&L against your account balance
+                  </p>
+                )}
+                {tradingAccounts.length === 0 && (
+                  <p style={{ color: theme.warning, fontSize: '11px', margin: '8px 0 0 0' }}>
+                    ⚠️ <span onClick={() => setShowAddAccount(true)} style={{ color: theme.accent, cursor: 'pointer', textDecoration: 'underline' }}>Create an account first</span> to track trades properly
+                  </p>
+                )}
+              </div>
+              
+              {/* Trade List */}
+              <div style={{ maxHeight: '500px', overflowY: 'auto' as const }}>
+                {trades.length === 0 ? (
+                  <div style={{ textAlign: 'center' as const, padding: '40px', color: theme.textMuted }}>
+                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>📓</div>
+                    <p>No trades logged yet. Start journaling to track your performance!</p>
+                  </div>
+                ) : trades.map(trade => {
+                  const linkedAccount = tradingAccounts.find(a => a.id === trade.accountId)
+                  const pnl = parseFloat(trade.profitLoss || '0')
+                  return (
+                    <div key={trade.id} style={{ 
+                      padding: '16px', 
+                      marginBottom: '8px', 
+                      background: pnl >= 0 ? (darkMode ? '#1e3a32' : '#f0fdf4') : (darkMode ? '#3a1e1e' : '#fef2f2'), 
+                      borderRadius: '12px', 
+                      border: '1px solid ' + (pnl >= 0 ? theme.success + '30' : theme.danger + '30')
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' as const }}>
+                          <span style={{ color: theme.textMuted, fontSize: '13px' }}>{trade.date}</span>
+                          <span style={{ color: theme.text, fontWeight: 700, fontSize: '16px' }}>{trade.instrument}</span>
+                          <span style={{ 
+                            padding: '3px 10px', 
+                            borderRadius: '4px', 
+                            fontSize: '11px', 
+                            fontWeight: 600, 
+                            background: trade.direction === 'long' ? theme.success + '20' : theme.danger + '20', 
+                            color: trade.direction === 'long' ? theme.success : theme.danger 
+                          }}>
+                            {trade.direction === 'long' ? '🟢 LONG' : '🔴 SHORT'}
+                          </span>
+                          {trade.setupGrade && (
+                            <span style={{ 
+                              padding: '3px 8px', 
+                              borderRadius: '4px', 
+                              fontSize: '11px', 
+                              fontWeight: 600, 
+                              background: trade.setupGrade === 'A' ? theme.success + '20' : trade.setupGrade === 'B' ? theme.warning + '20' : theme.danger + '20',
+                              color: trade.setupGrade === 'A' ? theme.success : trade.setupGrade === 'B' ? theme.warning : theme.danger
+                            }}>
+                              {trade.setupGrade} Setup
+                            </span>
+                          )}
+                          {linkedAccount && (
+                            <span style={{ padding: '3px 8px', background: theme.purple + '20', color: theme.purple, borderRadius: '4px', fontSize: '11px' }}>
+                              {linkedAccount.name}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ 
+                            color: pnl >= 0 ? theme.success : theme.danger, 
+                            fontSize: '22px', 
+                            fontWeight: 700 
+                          }}>
+                            {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                          </span>
+                          <button onClick={() => deleteTrade(trade.id)} style={{ padding: '6px 10px', background: theme.danger, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>🗑️</button>
+                        </div>
+                      </div>
+                      {(trade.entryPrice || trade.exitPrice || trade.notes) && (
+                        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' as const, color: theme.textMuted, fontSize: '12px' }}>
+                          {trade.entryPrice && <span>Entry: {trade.entryPrice}</span>}
+                          {trade.exitPrice && <span>Exit: {trade.exitPrice}</span>}
+                          {trade.notes && <span style={{ fontStyle: 'italic' }}>"{trade.notes}"</span>}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
