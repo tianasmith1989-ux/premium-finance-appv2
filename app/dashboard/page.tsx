@@ -5865,43 +5865,228 @@ export default function Dashboard() {
               <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '20px' }}>📈 Personal Account Compounding</h2>
               <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 20px 0' }}>See the power of consistent, compounded returns</p>
               
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '20px' }}>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Starting Capital</label><input type="number" value={tradingCalculator.startingCapital} onChange={e => setTradingCalculator({...tradingCalculator, startingCapital: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Monthly Add</label><input type="number" value={tradingCalculator.monthlyContribution} onChange={e => setTradingCalculator({...tradingCalculator, monthlyContribution: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Daily Return %</label><input type="number" step="0.1" value={tradingCalculator.returnRate} onChange={e => setTradingCalculator({...tradingCalculator, returnRate: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Months</label><input type="number" value={tradingCalculator.months} onChange={e => setTradingCalculator({...tradingCalculator, months: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Trading Days/Mo</label><input type="number" value="20" style={{...inputStyle, width: '100%'}} disabled /></div>
+              {/* Currency Selection */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Currency:</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {['$', '€', '£', '₹', '¥'].map(curr => (
+                    <button key={curr} onClick={() => setTradingCalculator({...tradingCalculator, currency: curr})} style={{ padding: '8px 16px', background: tradingCalculator.currency === curr ? theme.warning : theme.cardBg, color: tradingCalculator.currency === curr ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>{curr}</button>
+                  ))}
+                </div>
               </div>
               
-              {(() => {
-                const result = calculateCompounding(
-                  parseFloat(tradingCalculator.startingCapital) || 0,
-                  parseFloat(tradingCalculator.monthlyContribution) || 0,
-                  parseFloat(tradingCalculator.returnRate) || 0,
-                  20, // trading days per month
-                  parseInt(tradingCalculator.months) || 0
-                )
-                return (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                    <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
-                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Future Balance</div>
-                      <div style={{ color: theme.success, fontSize: '32px', fontWeight: 700 }}>${result.finalBalance.toLocaleString()}</div>
+              {/* Main Inputs */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Principal amount:</label>
+                  <div style={{ display: 'flex', alignItems: 'center', background: theme.cardBg, borderRadius: '8px', border: '1px solid ' + theme.border }}>
+                    <span style={{ padding: '10px 12px', color: theme.textMuted, borderRight: '1px solid ' + theme.border }}>{tradingCalculator.currency}</span>
+                    <input type="number" value={tradingCalculator.startingCapital} onChange={e => setTradingCalculator({...tradingCalculator, startingCapital: e.target.value})} style={{ flex: 1, padding: '10px', background: 'transparent', border: 'none', color: theme.text, fontSize: '16px' }} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Interest rate:</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', background: theme.cardBg, borderRadius: '8px', border: '1px solid ' + theme.border, flex: 1 }}>
+                      <input type="number" value={tradingCalculator.returnRate} onChange={e => setTradingCalculator({...tradingCalculator, returnRate: e.target.value})} style={{ flex: 1, padding: '10px', background: 'transparent', border: 'none', color: theme.text, fontSize: '16px' }} />
+                      <span style={{ padding: '10px 12px', color: theme.textMuted }}>%</span>
                     </div>
-                    <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
-                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Total Deposited</div>
-                      <div style={{ color: theme.purple, fontSize: '32px', fontWeight: 700 }}>${((parseFloat(tradingCalculator.startingCapital) || 0) + ((parseFloat(tradingCalculator.monthlyContribution) || 0) * (parseInt(tradingCalculator.months) || 0))).toLocaleString()}</div>
-                    </div>
-                    <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
-                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Pure Profit</div>
-                      <div style={{ color: theme.warning, fontSize: '32px', fontWeight: 700 }}>${result.totalGain.toLocaleString()}</div>
+                    <select value={tradingCalculator.returnPeriod} onChange={e => setTradingCalculator({...tradingCalculator, returnPeriod: e.target.value})} style={{ padding: '10px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}>
+                      <option value="daily">daily</option>
+                      <option value="weekly">weekly</option>
+                      <option value="monthly">monthly</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Time Period */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Years:</label>
+                  <input type="number" value={tradingCalculator.years} onChange={e => setTradingCalculator({...tradingCalculator, years: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                </div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Months:</label>
+                  <input type="number" value={tradingCalculator.months} onChange={e => setTradingCalculator({...tradingCalculator, months: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                </div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Days:</label>
+                  <input type="number" value={tradingCalculator.days} onChange={e => setTradingCalculator({...tradingCalculator, days: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                </div>
+              </div>
+              
+              {/* Include Days */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ color: theme.textMuted, fontSize: '12px' }}>Include all days of week?</label>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button onClick={() => setTradingCalculator({...tradingCalculator, includeWeekends: true, includeDays: ['M', 'T', 'W', 'T2', 'F', 'S', 'S2']})} style={{ padding: '6px 16px', background: tradingCalculator.includeWeekends ? theme.cardBg : theme.warning, color: tradingCalculator.includeWeekends ? theme.text : 'white', border: '1px solid ' + theme.border, borderRadius: '4px 0 0 4px', cursor: 'pointer' }}>Yes</button>
+                    <button onClick={() => setTradingCalculator({...tradingCalculator, includeWeekends: false, includeDays: ['M', 'T', 'W', 'T2', 'F']})} style={{ padding: '6px 16px', background: !tradingCalculator.includeWeekends ? theme.warning : theme.cardBg, color: !tradingCalculator.includeWeekends ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '0 4px 4px 0', cursor: 'pointer' }}>No</button>
+                  </div>
+                </div>
+                
+                {!tradingCalculator.includeWeekends && (
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Days to include:</label>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {[{d: 'M', l: 'M'}, {d: 'T', l: 'T'}, {d: 'W', l: 'W'}, {d: 'T2', l: 'T'}, {d: 'F', l: 'F'}, {d: 'S', l: 'S'}, {d: 'S2', l: 'S'}].map(({d, l}) => (
+                        <button key={d} onClick={() => {
+                          const newDays = tradingCalculator.includeDays.includes(d) 
+                            ? tradingCalculator.includeDays.filter(x => x !== d)
+                            : [...tradingCalculator.includeDays, d]
+                          setTradingCalculator({...tradingCalculator, includeDays: newDays})
+                        }} style={{ width: '36px', height: '36px', background: tradingCalculator.includeDays.includes(d) ? theme.warning : theme.cardBg, color: tradingCalculator.includeDays.includes(d) ? 'white' : theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>{l}</button>
+                      ))}
                     </div>
                   </div>
+                )}
+              </div>
+              
+              {/* Reinvest Rate */}
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Daily reinvest rate:</label>
+                  <select value={tradingCalculator.reinvestRate} onChange={e => setTradingCalculator({...tradingCalculator, reinvestRate: e.target.value})} style={{...inputStyle, width: '100%'}}>
+                    <option value="100">100%</option>
+                    <option value="75">75%</option>
+                    <option value="50">50%</option>
+                    <option value="25">25%</option>
+                    <option value="0">0% (withdraw all)</option>
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Start date? <span style={{ color: theme.accent, cursor: 'pointer' }} onClick={() => setTradingCalculator({...tradingCalculator, startDate: new Date().toISOString().split('T')[0]})}>today</span></label>
+                  <input type="date" value={tradingCalculator.startDate} onChange={e => setTradingCalculator({...tradingCalculator, startDate: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                </div>
+              </div>
+              
+              {/* Additional Contributions */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Additional contributions: <span style={{ color: theme.textMuted }}>(optional)</span></label>
+                <div style={{ display: 'flex', gap: '4px', marginBottom: tradingCalculator.additionalContributions !== 'none' ? '12px' : 0 }}>
+                  {['none', 'deposits', 'withdrawals'].map(opt => (
+                    <button key={opt} onClick={() => setTradingCalculator({...tradingCalculator, additionalContributions: opt})} style={{ padding: '8px 20px', background: tradingCalculator.additionalContributions === opt ? theme.warning : theme.cardBg, color: tradingCalculator.additionalContributions === opt ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '4px', cursor: 'pointer', textTransform: 'capitalize' }}>{opt === 'none' ? 'None' : opt.charAt(0).toUpperCase() + opt.slice(1)}</button>
+                  ))}
+                </div>
+                {tradingCalculator.additionalContributions === 'deposits' && (
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <input type="number" placeholder="Amount" value={tradingCalculator.depositAmount} onChange={e => setTradingCalculator({...tradingCalculator, depositAmount: e.target.value})} style={{...inputStyle, flex: 1}} />
+                    <select value={tradingCalculator.depositFrequency} onChange={e => setTradingCalculator({...tradingCalculator, depositFrequency: e.target.value})} style={inputStyle}>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                )}
+                {tradingCalculator.additionalContributions === 'withdrawals' && (
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <input type="number" placeholder="Amount" value={tradingCalculator.withdrawAmount} onChange={e => setTradingCalculator({...tradingCalculator, withdrawAmount: e.target.value})} style={{...inputStyle, flex: 1}} />
+                    <select value={tradingCalculator.withdrawFrequency} onChange={e => setTradingCalculator({...tradingCalculator, withdrawFrequency: e.target.value})} style={inputStyle}>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+              
+              {/* Calculate Button */}
+              <button onClick={() => {}} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '16px', marginBottom: '24px' }}>
+                📊 Calculate
+              </button>
+              
+              {/* Results */}
+              {(() => {
+                const result = tradingResults
+                return (
+                  <>
+                    {/* Summary Stats */}
+                    <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', marginBottom: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Total days / Business days</div>
+                          <div style={{ color: theme.text, fontSize: '28px', fontWeight: 700 }}>{result.totalCalendarDays} / {result.totalTradingDays}</div>
+                        </div>
+                        <div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Days excluded</div>
+                          <div style={{ color: theme.warning, fontSize: '20px', fontWeight: 600 }}>{tradingCalculator.includeWeekends ? 'None' : 'Sat. Sun.'}</div>
+                        </div>
+                        <div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Daily interest rate</div>
+                          <div style={{ color: theme.warning, fontSize: '20px', fontWeight: 600 }}>{tradingCalculator.returnRate}%</div>
+                        </div>
+                        <div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>End date</div>
+                          <div style={{ color: theme.success, fontSize: '20px', fontWeight: 600 }}>{result.endDate?.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid ' + theme.border }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>Initial balance on {new Date(tradingCalculator.startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+                        <div style={{ color: theme.success, fontSize: '32px', fontWeight: 700 }}>{tradingCalculator.currency}{parseFloat(tradingCalculator.startingCapital).toLocaleString()}</div>
+                      </div>
+                    </div>
+                    
+                    {/* Final Results */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
+                      <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Future Balance</div>
+                        <div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>{tradingCalculator.currency}{result.futureValue.toLocaleString(undefined, {maximumFractionDigits: 2})}</div>
+                      </div>
+                      <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Total Contributed</div>
+                        <div style={{ color: theme.purple, fontSize: '28px', fontWeight: 700 }}>{tradingCalculator.currency}{result.totalContributed.toLocaleString(undefined, {maximumFractionDigits: 2})}</div>
+                      </div>
+                      <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Pure Profit</div>
+                        <div style={{ color: theme.warning, fontSize: '28px', fontWeight: 700 }}>{tradingCalculator.currency}{result.profit.toLocaleString(undefined, {maximumFractionDigits: 2})}</div>
+                      </div>
+                    </div>
+                    
+                    {/* Earnings Breakdown */}
+                    {result.breakdown && result.breakdown.length > 0 && (
+                      <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                          <h3 style={{ margin: 0, color: theme.text, fontSize: '16px' }}>Earnings breakdown</h3>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            {['daily', 'weekly', 'monthly', 'yearly'].map(view => (
+                              <button key={view} onClick={() => setCompoundView(view as any)} style={{ padding: '6px 12px', background: compoundView === view ? theme.warning : theme.border, color: compoundView === view ? 'white' : theme.text, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', textTransform: 'capitalize' }}>{view}</button>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ background: theme.border }}>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', color: theme.text, fontSize: '12px' }}>Date / Day</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'right', color: theme.text, fontSize: '12px' }}>Earnings</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'right', color: theme.warning, fontSize: '12px' }}>Total Earnings</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'right', color: theme.success, fontSize: '12px' }}>Balance</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {result.breakdown.slice(0, compoundView === 'daily' ? 50 : compoundView === 'weekly' ? 20 : 12).map((row: any, idx: number) => (
+                                <tr key={idx} style={{ borderBottom: '1px solid ' + theme.border, opacity: row.excluded ? 0.5 : 1 }}>
+                                  <td style={{ padding: '8px 12px', color: row.excluded ? theme.textMuted : theme.text, fontSize: '13px' }}>
+                                    {row.excluded ? 'Day excluded' : `${row.date?.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}`}
+                                  </td>
+                                  <td style={{ padding: '8px 12px', textAlign: 'right', color: row.excluded ? theme.textMuted : theme.text, fontSize: '13px' }}>{row.excluded ? '-' : `${tradingCalculator.currency}${row.earnings.toLocaleString(undefined, {maximumFractionDigits: 2})}`}</td>
+                                  <td style={{ padding: '8px 12px', textAlign: 'right', color: theme.warning, fontSize: '13px' }}>{tradingCalculator.currency}{row.totalEarnings.toLocaleString(undefined, {maximumFractionDigits: 2})}</td>
+                                  <td style={{ padding: '8px 12px', textAlign: 'right', color: theme.success, fontSize: '13px' }}>{tradingCalculator.currency}{row.balance.toLocaleString(undefined, {maximumFractionDigits: 2})}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )
               })()}
               
-              <div style={{ marginTop: '16px', padding: '12px', background: theme.success + '20', borderRadius: '8px' }}>
-                <p style={{ color: theme.success, margin: 0, fontSize: '13px' }}>
-                  💡 <strong>Aureus says:</strong> Even 0.5% daily compounded over 12 months turns $10,000 into over $30,000. Consistency beats big wins!
+              <div style={{ marginTop: '16px', padding: '12px', background: theme.warning + '20', borderRadius: '8px', border: '1px solid ' + theme.warning + '40' }}>
+                <p style={{ color: theme.text, margin: 0, fontSize: '12px' }}>
+                  ⚠️ <strong>Note:</strong> This calculator is for illustrative purposes only and does not constitute financial advice. We do not offer investment opportunities, promise returns, or endorse any financial products.
                 </p>
               </div>
             </div>
