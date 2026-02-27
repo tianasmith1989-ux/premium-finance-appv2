@@ -446,6 +446,18 @@ export default function Dashboard() {
         'Withdraw or compound profits monthly'
       ],
       accountSizes: []
+    },
+    'Custom': {
+      name: 'Custom Prop Firm',
+      phases: {
+        challenge: { profitTarget: 10, maxDrawdown: 10, dailyDrawdown: 5, minDays: 0, maxDays: null },
+        verification: { profitTarget: 5, maxDrawdown: 10, dailyDrawdown: 5, minDays: 0, maxDays: null },
+        funded: { maxDrawdown: 10, dailyDrawdown: 5, profitSplit: 80 }
+      },
+      rules: [
+        'Add your custom rules below'
+      ],
+      accountSizes: [5000, 10000, 25000, 50000, 100000, 200000]
     }
   }
   
@@ -481,6 +493,36 @@ export default function Dashboard() {
     { id: 8, rule: 'Journal every trade', enabled: true, category: 'discipline' }
   ])
   const [showRuleEditor, setShowRuleEditor] = useState(false)
+  const [newCustomRule, setNewCustomRule] = useState({ rule: '', category: 'risk' })
+  
+  // ==================== TRADING ROADMAP ====================
+  const [tradingRoadmap, setTradingRoadmap] = useState<any[]>([])
+  const [showAddTradingMilestone, setShowAddTradingMilestone] = useState(false)
+  const [newTradingMilestone, setNewTradingMilestone] = useState({
+    name: '',
+    targetAmount: '',
+    targetDate: '',
+    category: 'prop', // prop, personal, skill, income
+    icon: '🎯',
+    notes: '',
+    currentAmount: 0
+  })
+  
+  // ==================== CHART ANALYSIS STATE ====================
+  const [chartAnalysisMode, setChartAnalysisMode] = useState<'single' | 'multi'>('single')
+  const [multiTimeframeCharts, setMultiTimeframeCharts] = useState<{
+    small?: string, // e.g., 1m, 5m, 15m
+    mid?: string,   // e.g., 1h, 4h
+    high?: string   // e.g., daily, weekly
+  }>({})
+  
+  // ==================== TRADE IDEA SETTINGS ====================
+  const [tradeIdeaSettings, setTradeIdeaSettings] = useState({
+    minRR: '3', // Minimum risk:reward ratio
+    maxRiskPercent: '1',
+    preferredInstruments: [] as string[],
+    tradingStyle: 'day' // scalp, day, swing
+  })
   
   // ==================== PSYCHOLOGY TRACKING ====================
   const [dailyMood, setDailyMood] = useState<{[date: string]: { mood: string, notes: string, tiltRisk: number }}>({})
@@ -591,16 +633,25 @@ export default function Dashboard() {
   
   // Trading Calculator
   const [tradingCalculator, setTradingCalculator] = useState({
-    startingCapital: '10000',
-    monthlyContribution: '500',
-    returnRate: '1',
-    returnPeriod: 'daily',
+    currency: '$',
+    startingCapital: '100',
+    returnRate: '100',
+    returnPeriod: 'daily', // daily, weekly, monthly
     years: '0',
-    months: '3',
+    months: '6',
     days: '0',
-    includeDays: ['M', 'T', 'W', 'T2', 'F'],
-    reinvestRate: '100'
+    includeWeekends: false,
+    includeDays: ['M', 'T', 'W', 'T', 'F'], // Days to include
+    reinvestRate: '100', // % of profits to reinvest
+    additionalContributions: 'none', // none, deposits, withdrawals
+    depositAmount: '0',
+    depositFrequency: 'monthly',
+    withdrawAmount: '0',
+    withdrawFrequency: 'monthly',
+    startDate: new Date().toISOString().split('T')[0]
   })
+  const [compoundBreakdown, setCompoundBreakdown] = useState<any[]>([])
+  const [compoundView, setCompoundView] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily')
   
   // ==================== AI AGENT STATE ====================
   const [budgetMemory, setBudgetMemory] = useState<any>({
@@ -715,6 +766,10 @@ export default function Dashboard() {
       if (data.tradingMemory) setTradingMemory(data.tradingMemory)
       if (data.paidOccurrences) setPaidOccurrences(new Set(data.paidOccurrences))
       if (data.roadmapMilestones) setRoadmapMilestones(data.roadmapMilestones)
+      if (data.tradingRoadmap) setTradingRoadmap(data.tradingRoadmap)
+      if (data.tradingRules) setTradingRules(data.tradingRules)
+      if (data.tradingAccounts) setTradingAccounts(data.tradingAccounts)
+      if (data.tradeIdeaSettings) setTradeIdeaSettings(data.tradeIdeaSettings)
     }
   }, [])
 
@@ -723,10 +778,10 @@ export default function Dashboard() {
       incomeStreams, expenses, debts, goals, assets, liabilities, trades,
       budgetMemory, tradingMemory,
       paidOccurrences: Array.from(paidOccurrences),
-      roadmapMilestones
+      roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings])
 
   // Scroll chat to bottom - use scrollTop instead of scrollIntoView to avoid page jump
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -1628,17 +1683,31 @@ export default function Dashboard() {
         .map(m => `${m.role === 'user' ? 'User' : 'Aureus'}: ${m.content}`)
         .join('\n')
       
+      // Build appropriate body based on mode
+      const bodyData = mode === 'budget' 
+        ? { 
+            mode: 'onboarding', 
+            onboardingStep: currentStep, 
+            userResponse: response,
+            conversationHistory: recentHistory,
+            memory,
+            financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }
+          }
+        : {
+            mode: 'onboarding',
+            onboardingStep: currentStep,
+            userResponse: response,
+            conversationHistory: recentHistory,
+            memory,
+            tradingData: { trades, accounts: tradingAccounts },
+            tradeIdeaSettings,
+            tradingRules
+          }
+      
       const apiResponse = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          mode: 'onboarding', 
-          onboardingStep: currentStep, 
-          userResponse: response,
-          conversationHistory: recentHistory,
-          memory,
-          financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }
-        })
+        body: JSON.stringify(bodyData)
       })
       
       const data = await apiResponse.json()
@@ -1648,11 +1717,17 @@ export default function Dashboard() {
       if (data.actions && Array.isArray(data.actions) && data.actions.length > 0) {
         executeAIActions(data.actions)
         
-        // Build summary of what was added
+        // Build summary of what was added (budget mode)
         const incomeAdded = data.actions.filter((a: any) => a.type === 'addIncome')
         const expenseAdded = data.actions.filter((a: any) => a.type === 'addExpense')
         const debtAdded = data.actions.filter((a: any) => a.type === 'addDebt')
         const goalAdded = data.actions.filter((a: any) => a.type === 'addGoal')
+        
+        // Trading mode actions
+        const accountAdded = data.actions.filter((a: any) => a.type === 'addAccount')
+        const ruleAdded = data.actions.filter((a: any) => a.type === 'addTradingRule')
+        const tradeAdded = data.actions.filter((a: any) => a.type === 'addTrade')
+        const milestoneAdded = data.actions.filter((a: any) => a.type === 'addTradingMilestone')
         
         const parts = []
         if (incomeAdded.length > 0) {
@@ -1670,6 +1745,23 @@ export default function Dashboard() {
         if (goalAdded.length > 0) {
           const names = goalAdded.map((a: any) => a.data?.name || 'Goal').join(', ')
           parts.push(`🎯 Goal: ${names}`)
+        }
+        // Trading actions
+        if (accountAdded.length > 0) {
+          const names = accountAdded.map((a: any) => a.data?.name || 'Account').join(', ')
+          parts.push(`📊 Account: ${names}`)
+        }
+        if (ruleAdded.length > 0) {
+          const names = ruleAdded.map((a: any) => a.data?.rule || 'Rule').join(', ')
+          parts.push(`📋 Rule: ${names}`)
+        }
+        if (tradeAdded.length > 0) {
+          const names = tradeAdded.map((a: any) => a.data?.instrument || 'Trade').join(', ')
+          parts.push(`📈 Trade: ${names}`)
+        }
+        if (milestoneAdded.length > 0) {
+          const names = milestoneAdded.map((a: any) => a.data?.name || 'Milestone').join(', ')
+          parts.push(`🎯 Milestone: ${names}`)
         }
         
         if (parts.length > 0) {
@@ -1948,20 +2040,107 @@ export default function Dashboard() {
 
         // ===== MEMORY ACTIONS =====
         case 'setMemory':
-          setBudgetMemory((prev: any) => {
-            const updated = { ...prev }
-            if (data.name) updated.name = data.name
-            if (data.payDay) updated.payDay = data.payDay
-            if (data.lifeEvents) updated.lifeEvents = data.lifeEvents
-            if (data.currentStep) updated.currentStep = data.currentStep
-            if (data.financialPath) updated.financialPath = data.financialPath
-            if (data.targetGoal) updated.targetGoal = data.targetGoal
-            if (data.bigGoals) updated.bigGoals = { ...(prev.bigGoals || {}), ...data.bigGoals }
-            if (data.preferences) updated.preferences = { ...prev.preferences, ...data.preferences }
-            if (data.patterns) updated.patterns = [...(prev.patterns || []), ...data.patterns]
-            if (data.notes) updated.notes = [...(prev.notes || []), ...data.notes]
-            return updated
-          })
+          // Check if this is for trading or budget
+          if (appMode === 'trading') {
+            setTradingMemory((prev: any) => {
+              const updated = { ...prev }
+              if (data.name) updated.name = data.name
+              if (data.experience) updated.experience = data.experience
+              if (data.tradingStyle) updated.tradingStyle = data.tradingStyle
+              if (data.instruments) updated.instruments = data.instruments
+              if (data.propFirmGoals) updated.propFirmGoals = { ...(prev.propFirmGoals || {}), ...data.propFirmGoals }
+              if (data.personalAccountGoals) updated.personalAccountGoals = { ...(prev.personalAccountGoals || {}), ...data.personalAccountGoals }
+              if (data.psychology) updated.psychology = { ...(prev.psychology || {}), ...data.psychology }
+              if (data.preferences) updated.preferences = { ...(prev.preferences || {}), ...data.preferences }
+              return updated
+            })
+          } else {
+            setBudgetMemory((prev: any) => {
+              const updated = { ...prev }
+              if (data.name) updated.name = data.name
+              if (data.payDay) updated.payDay = data.payDay
+              if (data.lifeEvents) updated.lifeEvents = data.lifeEvents
+              if (data.currentStep) updated.currentStep = data.currentStep
+              if (data.financialPath) updated.financialPath = data.financialPath
+              if (data.targetGoal) updated.targetGoal = data.targetGoal
+              if (data.bigGoals) updated.bigGoals = { ...(prev.bigGoals || {}), ...data.bigGoals }
+              if (data.preferences) updated.preferences = { ...prev.preferences, ...data.preferences }
+              if (data.patterns) updated.patterns = [...(prev.patterns || []), ...data.patterns]
+              if (data.notes) updated.notes = [...(prev.notes || []), ...data.notes]
+              return updated
+            })
+          }
+          break
+        
+        // ===== TRADING ACTIONS =====
+        case 'addAccount':
+          if (data.name && data.startingBalance) {
+            setTradingAccounts(prev => [...prev, {
+              id: Date.now(),
+              name: data.name,
+              type: data.type || 'personal',
+              propFirm: data.propFirm || '',
+              phase: data.phase || '',
+              startingBalance: data.startingBalance?.toString().replace(/[$,]/g, ''),
+              currentBalance: data.currentBalance || data.startingBalance?.toString().replace(/[$,]/g, ''),
+              maxDrawdown: data.maxDrawdown || '',
+              dailyDrawdown: data.dailyDrawdown || '',
+              profitTarget: data.profitTarget || '',
+              riskPerTrade: data.riskPerTrade || '1',
+              isActive: true
+            }])
+          }
+          break
+          
+        case 'addTradingRule':
+          if (data.rule) {
+            setTradingRules(prev => [...prev, {
+              id: Date.now(),
+              rule: data.rule,
+              category: data.category || 'risk',
+              enabled: data.enabled !== false
+            }])
+          }
+          break
+          
+        case 'toggleRule':
+          if (data.id) {
+            setTradingRules(prev => prev.map(r => r.id === data.id ? { ...r, enabled: !r.enabled } : r))
+          }
+          break
+          
+        case 'addTrade':
+          if (data.instrument) {
+            setTrades(prev => [...prev, {
+              id: Date.now(),
+              date: data.date || new Date().toISOString().split('T')[0],
+              instrument: data.instrument,
+              direction: data.direction || 'long',
+              entryPrice: data.entryPrice || '',
+              exitPrice: data.exitPrice || '',
+              profitLoss: data.profitLoss?.toString().replace(/[$,]/g, '') || '0',
+              notes: data.notes || '',
+              setup: data.setup || '',
+              emotion: data.emotion || 'neutral'
+            }])
+          }
+          break
+          
+        case 'addTradingMilestone':
+          if (data.name) {
+            setTradingRoadmap(prev => [...prev, {
+              id: Date.now(),
+              name: data.name,
+              targetAmount: data.targetAmount || '0',
+              currentAmount: data.currentAmount || 0,
+              targetDate: data.targetDate || '',
+              category: data.category || 'prop',
+              icon: data.icon || '🎯',
+              notes: data.notes || '',
+              completed: false,
+              createdAt: new Date().toISOString()
+            }])
+          }
           break
       }
     })
@@ -2046,9 +2225,11 @@ export default function Dashboard() {
             mode: 'question', 
             question: message, 
             conversationHistory: recentHistory, 
-            tradingData: { trades }, 
+            tradingData: { trades, accounts: tradingAccounts }, 
             memory: tradingMemory,
-            chartImage: pendingChartImage || undefined // Send image to trading coach
+            chartImage: pendingChartImage || undefined, // Send image to trading coach
+            tradeIdeaSettings, // User's R:R and risk preferences
+            tradingRules // User's custom rules
           }
       
       // Clear pending image
@@ -2158,30 +2339,114 @@ export default function Dashboard() {
 
   const calculateTradingCompound = () => {
     const capital = parseFloat(tradingCalculator.startingCapital) || 0
-    const monthly = parseFloat(tradingCalculator.monthlyContribution) || 0
     const rate = parseFloat(tradingCalculator.returnRate) / 100 || 0
     const reinvest = parseFloat(tradingCalculator.reinvestRate) / 100 || 1
     const years = parseInt(tradingCalculator.years) || 0
     const months = parseInt(tradingCalculator.months) || 0
     const days = parseInt(tradingCalculator.days) || 0
     
+    // Calculate total calendar days
     const totalCalendarDays = years * 365 + months * 30 + days
+    
+    // Calculate trading days based on selected days
     const tradingDaysPerWeek = tradingCalculator.includeDays.length
     const totalTradingDays = Math.floor(totalCalendarDays * (tradingDaysPerWeek / 7))
     
+    // Generate breakdown
+    const breakdown: any[] = []
     let balance = capital
+    let totalEarnings = 0
     let totalContributed = capital
     
-    for (let d = 0; d < totalTradingDays; d++) {
-      const profit = balance * rate
-      balance += profit * reinvest
-      if (d > 0 && d % 20 === 0) {
-        balance += monthly
-        totalContributed += monthly
+    // Get start date
+    const startDate = new Date(tradingCalculator.startDate || Date.now())
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const dayMap: {[key: string]: number} = { 'S': 0, 'M': 1, 'T': 2, 'W': 3, 'T2': 4, 'F': 5, 'S2': 6 }
+    const activeDays = tradingCalculator.includeDays.map(d => {
+      if (d === 'T') return 2
+      if (d === 'T2') return 4
+      if (d === 'S') return 6
+      return dayMap[d] || 1
+    })
+    
+    let currentDate = new Date(startDate)
+    let tradingDayCount = 0
+    
+    for (let d = 0; d < totalCalendarDays && tradingDayCount < totalTradingDays; d++) {
+      const dayOfWeek = currentDate.getDay()
+      const isActiveTradingDay = activeDays.includes(dayOfWeek === 0 ? 7 : dayOfWeek) || 
+        (tradingCalculator.includeDays.includes('M') && dayOfWeek === 1) ||
+        (tradingCalculator.includeDays.includes('T') && dayOfWeek === 2) ||
+        (tradingCalculator.includeDays.includes('W') && dayOfWeek === 3) ||
+        (tradingCalculator.includeDays.includes('T2') && dayOfWeek === 4) ||
+        (tradingCalculator.includeDays.includes('F') && dayOfWeek === 5) ||
+        (tradingCalculator.includeDays.includes('S') && dayOfWeek === 6) ||
+        (tradingCalculator.includeDays.includes('S2') && dayOfWeek === 0)
+      
+      if (!isActiveTradingDay) {
+        // Add excluded day to breakdown
+        breakdown.push({
+          date: new Date(currentDate),
+          dayName: dayNames[dayOfWeek],
+          excluded: true,
+          earnings: 0,
+          totalEarnings: totalEarnings,
+          balance: balance
+        })
+      } else {
+        // Calculate daily return
+        const dailyEarnings = balance * rate * reinvest
+        balance += dailyEarnings
+        totalEarnings += dailyEarnings
+        tradingDayCount++
+        
+        breakdown.push({
+          date: new Date(currentDate),
+          dayName: dayNames[dayOfWeek],
+          excluded: false,
+          earnings: dailyEarnings,
+          totalEarnings: totalEarnings,
+          balance: balance
+        })
       }
+      
+      // Add deposits/withdrawals
+      if (tradingCalculator.additionalContributions === 'deposits') {
+        const depositAmt = parseFloat(tradingCalculator.depositAmount) || 0
+        if (tradingCalculator.depositFrequency === 'daily' && !breakdown[breakdown.length-1]?.excluded) {
+          balance += depositAmt
+          totalContributed += depositAmt
+        } else if (tradingCalculator.depositFrequency === 'weekly' && d % 7 === 0 && d > 0) {
+          balance += depositAmt
+          totalContributed += depositAmt
+        } else if (tradingCalculator.depositFrequency === 'monthly' && d % 30 === 0 && d > 0) {
+          balance += depositAmt
+          totalContributed += depositAmt
+        }
+      } else if (tradingCalculator.additionalContributions === 'withdrawals') {
+        const withdrawAmt = parseFloat(tradingCalculator.withdrawAmount) || 0
+        if (tradingCalculator.withdrawFrequency === 'monthly' && d % 30 === 0 && d > 0) {
+          balance = Math.max(0, balance - withdrawAmt)
+        }
+      }
+      
+      currentDate.setDate(currentDate.getDate() + 1)
     }
     
-    return { futureValue: balance, totalContributed, profit: balance - totalContributed, totalCalendarDays, totalTradingDays }
+    // Calculate end date
+    const endDate = new Date(startDate)
+    endDate.setDate(endDate.getDate() + totalCalendarDays)
+    
+    return { 
+      futureValue: balance, 
+      totalContributed, 
+      profit: balance - totalContributed, 
+      totalCalendarDays, 
+      totalTradingDays: tradingDayCount,
+      breakdown,
+      endDate,
+      excludedDays: tradingCalculator.includeWeekends ? [] : ['Sat', 'Sun']
+    }
   }
 
   const forexPropResults = calculateForexProp()
