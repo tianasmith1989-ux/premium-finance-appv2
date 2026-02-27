@@ -385,7 +385,6 @@ export async function POST(request: NextRequest) {
           context += `- ${rule.rule}\n`
         })
       }
-      }
       
       return context
     }
