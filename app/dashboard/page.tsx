@@ -447,6 +447,51 @@ export default function Dashboard() {
       ],
       accountSizes: []
     },
+    'Take Profit Trader': {
+      name: 'Take Profit Trader',
+      phases: {
+        evaluation: { profitTarget: 6, maxDrawdown: 6, dailyDrawdown: null, minDays: 0, maxDays: null },
+        funded: { maxDrawdown: 6, dailyDrawdown: null, profitSplit: 80 }
+      },
+      rules: [
+        'EOD Trailing Drawdown (locks at end of day)',
+        'No minimum trading days',
+        'Must flatten by 4:00 PM ET',
+        'No holding through major economic events',
+        'Scaling rules for max contracts',
+        '80% profit split'
+      ],
+      accountSizes: [25000, 50000, 75000, 100000, 150000]
+    },
+    'Apex Trader': {
+      name: 'Apex Trader Funding',
+      phases: {
+        evaluation: { profitTarget: 6, maxDrawdown: 5, dailyDrawdown: null, minDays: 7, maxDays: null },
+        funded: { maxDrawdown: 5, dailyDrawdown: null, profitSplit: 90 }
+      },
+      rules: [
+        'Trailing drawdown',
+        'Min 7 trading days',
+        'Must flatten by 4:59 PM ET',
+        'No holding through major news',
+        '90% profit split (100% after $25K)'
+      ],
+      accountSizes: [25000, 50000, 75000, 100000, 150000, 250000, 300000]
+    },
+    'TopStep': {
+      name: 'TopStep',
+      phases: {
+        combine: { profitTarget: 6, maxDrawdown: 4, dailyDrawdown: 2, minDays: 0, maxDays: null },
+        funded: { maxDrawdown: 4, dailyDrawdown: 2, profitSplit: 90 }
+      },
+      rules: [
+        'Trading Combine evaluation',
+        'Consistency rule applies',
+        'Must close by 3:10 PM CT',
+        '90% profit split (100% on first $10K)'
+      ],
+      accountSizes: [50000, 100000, 150000]
+    },
     'Custom': {
       name: 'Custom Prop Firm',
       phases: {
@@ -2322,22 +2367,42 @@ export default function Dashboard() {
   const handleModeSelect = (mode: 'budget' | 'trading') => {
     setAppMode(mode)
     setShowModeSelector(false)
-    setChatMessages([])
     setProactiveInsight(null)
     setTourStep(0) // Reset tour step
     
     const memory = mode === 'budget' ? budgetMemory : tradingMemory
     const tourDone = mode === 'budget' ? budgetTourCompleted : tradingTourCompleted
+    const currentOnboarding = mode === 'budget' ? budgetOnboarding : tradingOnboarding
+    
+    // If onboarding is currently active (in progress), keep the chat and continue
+    if (currentOnboarding.isActive && currentOnboarding.step !== 'complete') {
+      // Don't clear chat - let them continue where they left off
+      setActiveTab('dashboard')
+      return
+    }
     
     if (!memory.onboardingComplete && !tourDone) {
       // Show tour for new users of THIS mode
+      setChatMessages([])
       setShowTour(true)
     } else if (!memory.onboardingComplete) {
-      // Tour completed but onboarding not done - go to chat
-      setActiveTab('chat')
-      startOnboarding(mode)
+      // Tour completed but onboarding not done - check if we were mid-onboarding
+      if (currentOnboarding.step && currentOnboarding.step !== 'greeting' && currentOnboarding.step !== 'complete') {
+        // Resume onboarding where they left off
+        setActiveTab('dashboard')
+        if (mode === 'budget') {
+          setBudgetOnboarding({ ...currentOnboarding, isActive: true })
+        } else {
+          setTradingOnboarding({ ...currentOnboarding, isActive: true })
+        }
+      } else {
+        // Start fresh onboarding
+        setActiveTab('dashboard')
+        setChatMessages([])
+        startOnboarding(mode)
+      }
     } else {
-      // Returning user - go to quickview
+      // Returning user - go to quickview, keep existing chat
       setActiveTab('quickview')
       fetchProactiveInsight(mode)
     }
