@@ -780,6 +780,9 @@ export default function Dashboard() {
       if (data.tradingRules) setTradingRules(data.tradingRules)
       if (data.tradingAccounts) setTradingAccounts(data.tradingAccounts)
       if (data.tradeIdeaSettings) setTradeIdeaSettings(data.tradeIdeaSettings)
+      if (data.budgetOnboarding) setBudgetOnboarding(data.budgetOnboarding)
+      if (data.tradingOnboarding) setTradingOnboarding(data.tradingOnboarding)
+      if (data.chatMessages) setChatMessages(data.chatMessages)
     }
   }, [])
 
@@ -788,10 +791,11 @@ export default function Dashboard() {
       incomeStreams, expenses, debts, goals, assets, liabilities, trades,
       budgetMemory, tradingMemory,
       paidOccurrences: Array.from(paidOccurrences),
-      roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings
+      roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings,
+      budgetOnboarding, tradingOnboarding, chatMessages
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings, budgetOnboarding, tradingOnboarding, chatMessages])
 
   // Scroll chat to bottom - use scrollTop instead of scrollIntoView to avoid page jump
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -6317,6 +6321,332 @@ export default function Dashboard() {
                   ⚠️ <strong>Note:</strong> This calculator is for illustrative purposes only and does not constitute financial advice. We do not offer investment opportunities, promise returns, or endorse any financial products.
                 </p>
               </div>
+            </div>
+
+            {/* ==================== TRADING ROADMAP ==================== */}
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: '16px', border: '2px solid ' + theme.warning }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '28px' }}>🗺️</span>
+                    <div>
+                      <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>Trading Roadmap</h2>
+                      <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Your journey to trading success</p>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {tradingRoadmap.length > 0 && (
+                    <button
+                      onClick={() => {
+                        const milestoneSummary = tradingRoadmap.map(m => 
+                          `- ${m.name}: Target $${parseFloat(m.targetAmount || '0').toLocaleString()}, Current $${m.currentAmount?.toLocaleString() || 0}${m.targetDate ? `, Deadline: ${m.targetDate}` : ''}`
+                        ).join('\n')
+                        
+                        const accountSummary = tradingAccounts.map(acc => {
+                          const pnl = parseFloat(acc.currentBalance || '0') - parseFloat(acc.startingBalance || '0')
+                          const pnlPct = parseFloat(acc.startingBalance || '0') > 0 ? (pnl / parseFloat(acc.startingBalance || '0') * 100) : 0
+                          return `- ${acc.name} (${acc.propFirm || 'Personal'}): $${parseFloat(acc.currentBalance || '0').toLocaleString()} (${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%)`
+                        }).join('\n')
+                        
+                        setChatMessages([{
+                          role: 'user',
+                          content: `Please analyze my trading roadmap and create a plan:\n\n**My Milestones:**\n${milestoneSummary}\n\n**My Accounts:**\n${accountSummary}\n\n**My Stats:**\n- Win Rate: ${winRate.toFixed(0)}%\n- Total Trades: ${trades.length}\n\nGive me:\n1. Priority order for my goals\n2. Specific daily/weekly actions\n3. Risk management reminders\n4. Timeline estimates`
+                        }])
+                        sendQuickMessage(`Please analyze my trading roadmap and create a plan:\n\n**My Milestones:**\n${milestoneSummary}\n\n**My Accounts:**\n${accountSummary}\n\n**My Stats:**\n- Win Rate: ${winRate.toFixed(0)}%\n- Total Trades: ${trades.length}\n\nGive me:\n1. Priority order for my goals\n2. Specific daily/weekly actions\n3. Risk management reminders\n4. Timeline estimates`)
+                      }}
+                      style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                      🤖 Aureus: Build My Plan
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowAddTradingMilestone(true)}
+                    style={{ padding: '10px 20px', background: theme.warning, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
+                  >
+                    + Add Milestone
+                  </button>
+                </div>
+              </div>
+              
+              {/* Add Milestone Form */}
+              {showAddTradingMilestone && (
+                <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', marginBottom: '20px', border: '1px solid ' + theme.border }}>
+                  <h4 style={{ margin: '0 0 16px 0', color: theme.text }}>✨ Add Trading Milestone</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Milestone Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., Pass FTMO Challenge, Hit 100 trades, $10K profit"
+                        value={newTradingMilestone.name}
+                        onChange={e => setNewTradingMilestone({...newTradingMilestone, name: e.target.value})}
+                        style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Target Amount ($)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g., 10000"
+                        value={newTradingMilestone.targetAmount}
+                        onChange={e => setNewTradingMilestone({...newTradingMilestone, targetAmount: e.target.value})}
+                        style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Target Date (optional)</label>
+                      <input
+                        type="date"
+                        value={newTradingMilestone.targetDate}
+                        onChange={e => setNewTradingMilestone({...newTradingMilestone, targetDate: e.target.value})}
+                        style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Category</label>
+                      <select
+                        value={newTradingMilestone.category}
+                        onChange={e => setNewTradingMilestone({...newTradingMilestone, category: e.target.value})}
+                        style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}
+                      >
+                        <option value="prop">🎯 Prop Firm</option>
+                        <option value="personal">💰 Personal Account</option>
+                        <option value="skill">📚 Skill Development</option>
+                        <option value="income">💵 Income Goal</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Notes (optional)</label>
+                    <textarea
+                      placeholder="Any additional notes about this milestone..."
+                      value={newTradingMilestone.notes}
+                      onChange={e => setNewTradingMilestone({...newTradingMilestone, notes: e.target.value})}
+                      style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text, minHeight: '60px', resize: 'vertical' as const }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => {
+                        if (newTradingMilestone.name) {
+                          setTradingRoadmap(prev => [...prev, {
+                            id: Date.now(),
+                            ...newTradingMilestone,
+                            currentAmount: 0,
+                            completed: false,
+                            createdAt: new Date().toISOString()
+                          }])
+                          setNewTradingMilestone({ name: '', targetAmount: '', targetDate: '', category: 'prop', icon: '🎯', notes: '', currentAmount: 0 })
+                          setShowAddTradingMilestone(false)
+                        }
+                      }}
+                      style={{ padding: '10px 20px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      Add Milestone
+                    </button>
+                    <button
+                      onClick={() => setShowAddTradingMilestone(false)}
+                      style={{ padding: '10px 20px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Milestones Display */}
+              {tradingRoadmap.length === 0 ? (
+                <div style={{ textAlign: 'center' as const, padding: '40px', color: theme.textMuted }}>
+                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎯</div>
+                  <p style={{ marginBottom: '8px' }}>No trading milestones yet</p>
+                  <p style={{ fontSize: '13px' }}>Add milestones to track your journey: prop challenges, income goals, skill development, etc.</p>
+                </div>
+              ) : (
+                <div style={{ position: 'relative' }}>
+                  {/* Timeline Line */}
+                  <div style={{ position: 'absolute', left: '20px', top: '20px', bottom: '20px', width: '4px', background: `linear-gradient(180deg, ${theme.warning}, ${theme.success})`, borderRadius: '2px' }} />
+                  
+                  {/* Milestones */}
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
+                    {tradingRoadmap.sort((a, b) => {
+                      if (a.completed && !b.completed) return 1
+                      if (!a.completed && b.completed) return -1
+                      if (a.targetDate && b.targetDate) return new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime()
+                      return 0
+                    }).map((milestone, idx) => {
+                      const progress = milestone.targetAmount && parseFloat(milestone.targetAmount) > 0 
+                        ? Math.min((milestone.currentAmount || 0) / parseFloat(milestone.targetAmount) * 100, 100)
+                        : 0
+                      const daysUntil = milestone.targetDate 
+                        ? Math.ceil((new Date(milestone.targetDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                        : null
+                      const categoryIcons: {[key: string]: string} = { prop: '🎯', personal: '💰', skill: '📚', income: '💵' }
+                      
+                      return (
+                        <div key={milestone.id} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', paddingLeft: '8px' }}>
+                          {/* Timeline Dot */}
+                          <div style={{ 
+                            width: '28px', height: '28px', borderRadius: '50%', 
+                            background: milestone.completed ? theme.success : progress > 0 ? theme.warning : theme.cardBg,
+                            border: '3px solid ' + (milestone.completed ? theme.success : theme.warning),
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '12px', zIndex: 1, flexShrink: 0
+                          }}>
+                            {milestone.completed ? '✓' : categoryIcons[milestone.category] || '🎯'}
+                          </div>
+                          
+                          {/* Milestone Card */}
+                          <div style={{ 
+                            flex: 1, padding: '16px', 
+                            background: milestone.completed ? theme.success + '20' : theme.cardBg, 
+                            borderRadius: '12px', 
+                            border: '1px solid ' + (milestone.completed ? theme.success : theme.border),
+                            opacity: milestone.completed ? 0.8 : 1
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                              <div>
+                                <div style={{ fontWeight: 600, color: theme.text, fontSize: '15px' }}>{milestone.name}</div>
+                                {milestone.notes && <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{milestone.notes}</div>}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {daysUntil !== null && !milestone.completed && (
+                                  <span style={{ 
+                                    padding: '4px 8px', 
+                                    background: daysUntil < 7 ? theme.danger + '20' : daysUntil < 30 ? theme.warning + '20' : theme.success + '20',
+                                    color: daysUntil < 7 ? theme.danger : daysUntil < 30 ? theme.warning : theme.success,
+                                    borderRadius: '4px', fontSize: '11px', fontWeight: 600
+                                  }}>
+                                    {daysUntil > 0 ? `${daysUntil} days` : daysUntil === 0 ? 'Today!' : 'Overdue'}
+                                  </span>
+                                )}
+                                <button 
+                                  onClick={() => setTradingRoadmap(prev => prev.filter(m => m.id !== milestone.id))}
+                                  style={{ padding: '4px 8px', background: 'transparent', color: theme.textMuted, border: 'none', cursor: 'pointer', fontSize: '12px' }}
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {/* Progress */}
+                            {milestone.targetAmount && parseFloat(milestone.targetAmount) > 0 && (
+                              <div style={{ marginBottom: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: theme.textMuted, marginBottom: '4px' }}>
+                                  <span>${(milestone.currentAmount || 0).toLocaleString()}</span>
+                                  <span>${parseFloat(milestone.targetAmount).toLocaleString()}</span>
+                                </div>
+                                <div style={{ height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
+                                  <div style={{ width: progress + '%', height: '100%', background: milestone.completed ? theme.success : `linear-gradient(90deg, ${theme.warning}, ${theme.success})`, borderRadius: '4px', transition: 'width 0.3s' }} />
+                                </div>
+                                <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '4px' }}>{progress.toFixed(1)}% complete</div>
+                              </div>
+                            )}
+                            
+                            {/* Actions */}
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                              {!milestone.completed && (
+                                <>
+                                  <input
+                                    type="number"
+                                    placeholder="Update amount"
+                                    style={{ padding: '6px 10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '6px', color: theme.text, fontSize: '12px', width: '120px' }}
+                                    onKeyPress={e => {
+                                      if (e.key === 'Enter') {
+                                        const input = e.target as HTMLInputElement
+                                        const newAmount = parseFloat(input.value)
+                                        if (!isNaN(newAmount)) {
+                                          setTradingRoadmap(prev => prev.map(m => m.id === milestone.id ? { ...m, currentAmount: newAmount } : m))
+                                          input.value = ''
+                                        }
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => setTradingRoadmap(prev => prev.map(m => m.id === milestone.id ? { ...m, completed: true } : m))}
+                                    style={{ padding: '6px 12px', background: theme.success + '20', color: theme.success, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                                  >
+                                    ✓ Complete
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {/* Smart Suggestions */}
+              {tradingRoadmap.length === 0 && tradingAccounts.length > 0 && (
+                <div style={{ marginTop: '20px', padding: '16px', background: theme.warning + '15', borderRadius: '12px', border: '1px solid ' + theme.warning + '30' }}>
+                  <div style={{ color: theme.text, fontWeight: 600, marginBottom: '12px' }}>💡 Suggested Milestones</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
+                    {tradingAccounts.filter(a => a.type !== 'personal').map(acc => (
+                      <button
+                        key={acc.id}
+                        onClick={() => {
+                          setTradingRoadmap(prev => [...prev, {
+                            id: Date.now(),
+                            name: `Pass ${acc.propFirm || acc.name} Challenge`,
+                            targetAmount: (parseFloat(acc.startingBalance || '0') * parseFloat(acc.profitTarget || '10') / 100).toString(),
+                            category: 'prop',
+                            icon: '🎯',
+                            notes: `Profit target: ${acc.profitTarget}%`,
+                            currentAmount: Math.max(0, parseFloat(acc.currentBalance || '0') - parseFloat(acc.startingBalance || '0')),
+                            targetDate: '',
+                            completed: false,
+                            createdAt: new Date().toISOString()
+                          }])
+                        }}
+                        style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '13px' }}
+                      >
+                        + Pass {acc.propFirm || acc.name}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => {
+                        setTradingRoadmap(prev => [...prev, {
+                          id: Date.now(),
+                          name: 'Complete 100 Trades',
+                          targetAmount: '100',
+                          category: 'skill',
+                          icon: '📚',
+                          notes: 'Build consistency through volume',
+                          currentAmount: trades.length,
+                          targetDate: '',
+                          completed: false,
+                          createdAt: new Date().toISOString()
+                        }])
+                      }}
+                      style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '13px' }}
+                    >
+                      + 100 Trades Milestone
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTradingRoadmap(prev => [...prev, {
+                          id: Date.now(),
+                          name: '$10,000 Total Profit',
+                          targetAmount: '10000',
+                          category: 'income',
+                          icon: '💵',
+                          notes: 'Cumulative trading profits',
+                          currentAmount: trades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0),
+                          targetDate: '',
+                          completed: false,
+                          createdAt: new Date().toISOString()
+                        }])
+                      }}
+                      style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '13px' }}
+                    >
+                      + $10K Profit Goal
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* TRADE JOURNAL */}
