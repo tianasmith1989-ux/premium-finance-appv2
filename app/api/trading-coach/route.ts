@@ -113,7 +113,9 @@ export async function POST(request: NextRequest) {
       tradingData,
       accounts,
       memory,
-      chartImage // Base64 image for chart analysis
+      chartImage, // Base64 image for chart analysis
+      tradeIdeaSettings, // User's preferred R:R, risk settings
+      tradingRules // User's custom trading rules
     } = await request.json()
 
     const apiKey = process.env.ANTHROPIC_API_KEY
@@ -205,98 +207,156 @@ ${PROP_FIRM_RULES}
 ${TRADING_PSYCHOLOGY}
 
 Current onboarding step: ${onboardingStep}
-User's name: ${memory?.name || 'trader'}
+User's name: ${memory?.name || 'not set yet'}
+User's experience: ${memory?.experience || 'not set yet'}
+User's style: ${memory?.tradingStyle || 'not set yet'}
+User's instruments: ${memory?.instruments?.join(', ') || 'not set yet'}
+User's goals: ${JSON.stringify(memory?.propFirmGoals) || 'not set yet'}
 
-ONBOARDING FLOW:
-1. greeting - Welcome them, ask their name
-2. experience - Ask their trading experience level
-3. style - Ask their trading style (scalper, day trader, swing trader)
-4. instruments - Ask what they trade (forex, futures, stocks, crypto)
-5. goals - Ask about prop firm goals vs personal account goals
-6. psychology - Ask about their biggest trading weakness
-7. rules - Help them set up trading rules
-8. complete - Summary and let's start!
+=== ONBOARDING STEP INSTRUCTIONS ===
 
-Respond ONLY in this JSON format:
-{
-  "message": "Your conversational response",
-  "extractedData": { any relevant data from their response },
-  "nextStep": "next_step_name or null if done",
-  "isComplete": true/false
-}`
+${onboardingStep === 'greeting' ? `
+GREETING STEP - Get their name.
 
-      const onboardingPrompts: {[key: string]: string} = {
-        greeting: `This is the GREETING step. 
-The user said: "${userResponse}"
+If this looks like a name (1-3 words, no question marks):
+- Store it with: {"type": "setMemory", "data": {"name": "THE_NAME"}}
+- Say: "Nice to meet you, [Name]! How long have you been trading? Beginner (0-1 year), Intermediate (1-3 years), or Advanced (3+ years)?"
+- Set nextStep: "experience"
 
-If "${userResponse}" looks like a name (any word or short phrase), then:
-- This IS their name! Store it: actions: [{"type": "setMemory", "data": {"name": "${userResponse}"}}]
-- Greet them by name: "Nice to meet you, ${userResponse}! How long have you been trading? Beginner (0-1 year), Intermediate (1-3 years), or Advanced (3+ years)?"
-- Set nextStep: "style" (skip to style since we're asking experience in this message)
+If they said "hi", "hello", "hey" etc:
+- Ask: "Hey! 📈 I'm Aureus, your trading operations coach. I'll help you optimize capital deployment, maintain psychological discipline, and systematically scale your accounts. What's your name?"
+- Keep nextStep: "greeting"
+` : ''}
 
-If they said something that's NOT a name (like "hello" or "hi"), then:
-- Just ask: "Hey! What's your name?"
-- Set nextStep: "greeting" (stay on greeting)`,
+${onboardingStep === 'experience' ? `
+EXPERIENCE STEP - They told you their experience level.
 
-        experience: `This is the EXPERIENCE step.
-The user said: "${userResponse}" about their experience level.
-Ask about their trading style:
+Extract their experience (beginner/intermediate/advanced or years).
+Store: {"type": "setMemory", "data": {"experience": "their_level"}}
+
+Then ask about trading style:
 "Got it! What's your trading style?
 - Scalper (seconds to minutes)
 - Day Trader (minutes to hours, always flat by close)
 - Swing Trader (hold for days or weeks)"
-Set nextStep: "instruments"`,
 
-        style: `This is the STYLE step.
-The user said: "${userResponse}" about their style.
-Ask what markets they trade:
+Set nextStep: "style"
+` : ''}
+
+${onboardingStep === 'style' ? `
+STYLE STEP - They told you their trading style.
+
+Extract style and store: {"type": "setMemory", "data": {"tradingStyle": "scalper|day_trader|swing_trader"}}
+
+Then ask about instruments:
 "What markets do you trade?
 - Forex
 - Futures (ES, NQ, etc)
 - Stocks
 - Crypto
 (Can be multiple)"
-Set nextStep: "goals"`,
 
-        instruments: `This is the INSTRUMENTS step.
-The user said: "${userResponse}" about what they trade.
-Ask about their goals:
-"What are your goals?
-1. Passing a prop firm challenge? Which firm?
-2. Growing a personal account?
-3. What's your target monthly income from trading?"
-Set nextStep: "psychology"`,
+Set nextStep: "instruments"
+` : ''}
 
-        goals: `This is the GOALS step.
-The user said: "${userResponse}" about their goals.
-Ask about their weakness:
-"Real talk - what's your biggest trading weakness?
-- Revenge trading
-- Overtrading
-- Moving stops
-- FOMO
+${onboardingStep === 'instruments' ? `
+INSTRUMENTS STEP - They told you what they trade.
+
+Extract instruments and store: {"type": "setMemory", "data": {"instruments": ["forex", "futures", etc]}}
+
+Then ask about goals:
+"Now let's talk goals. I need to know what you're actually trying to achieve:
+
+1. Are you trying to pass a prop firm challenge? If so, which firm?
+2. Are you growing a personal account?
+3. What's your realistic target for monthly returns (be honest - 1-5% is very good)?
+
+Tell me your situation!"
+
+Set nextStep: "goals"
+` : ''}
+
+${onboardingStep === 'goals' ? `
+GOALS STEP - They told you their goals.
+
+Extract their goals:
+- If prop firm mentioned: {"type": "setMemory", "data": {"propFirmGoals": {"targetFirm": "FTMO", "pursuing": true}}}
+- If personal account: {"type": "setMemory", "data": {"personalAccountGoals": {"pursuing": true, "monthlyTarget": X}}}
+
+Then ask about psychology:
+"Real talk - what's your biggest trading weakness? The thing that gets you in trouble?
+- Revenge trading after losses
+- FOMO - jumping in late
+- Overtrading when bored
+- Moving stop losses
 - Cutting winners short
-Be honest, we all have one."
-Set nextStep: "rules"`,
+- Over-leveraging
 
-        psychology: `This is the PSYCHOLOGY step.
-The user said: "${userResponse}" about their weakness.
-Acknowledge it, then suggest 2-3 rules to help. Ask if they want to use these rules.
-Set nextStep: "complete"`,
+Be honest, we all have one. Knowing yours is the first step to fixing it."
 
-        rules: `This is the RULES step.
-The user said: "${userResponse}".
-Wrap up the onboarding:
-- Summarize what you learned
-- Mention you'll help with prop firm rules, psychology, and tracking
-- End with encouragement
-Set isComplete: true, nextStep: null`,
+Set nextStep: "psychology"
+` : ''}
 
-        complete: `Onboarding is complete. Just say something encouraging to get them started.
-Set isComplete: true`
-      }
+${onboardingStep === 'psychology' ? `
+PSYCHOLOGY STEP - They told you their weakness.
 
-      userPrompt = onboardingPrompts[onboardingStep] || onboardingPrompts.greeting
+Acknowledge their weakness genuinely. Store it: {"type": "setMemory", "data": {"psychology": {"weakness": "their_weakness"}}}
+
+Then suggest 2-3 specific rules to help with THAT weakness. Example for revenge trading:
+"Revenge trading - that's a common one. Here are some rules that help:
+1. After any losing trade, wait 15 minutes before the next trade
+2. Max 3 trades per day - period
+3. If down 1% in a day, stop trading
+
+Want me to add these to your trading rules? You can customize them anytime."
+
+Set nextStep: "rules"
+` : ''}
+
+${onboardingStep === 'rules' ? `
+RULES STEP - Confirm their rules.
+
+If they agreed to rules, add them:
+{"type": "addTradingRule", "data": {"rule": "Wait 15 mins after a loss", "category": "psychology", "enabled": true}}
+
+Then wrap up:
+"Perfect! Here's what I've learned about you:
+- Experience: [X]
+- Style: [X]  
+- Markets: [X]
+- Goals: [X]
+- Weakness to watch: [X]
+
+I'll help you:
+✅ Track your trades and psychology
+✅ Stay within prop firm rules (if applicable)
+✅ Compound your personal account
+✅ Catch yourself before you tilt
+
+Check the 🗺️ Roadmap section to set trading milestones. Let's make some money, [Name]! 💪"
+
+Set isComplete: true
+` : ''}
+
+=== RESPONSE FORMAT ===
+Respond with RAW JSON only:
+{
+  "message": "Your conversational response",
+  "nextStep": "next_step_name",
+  "actions": [{"type": "setMemory", "data": {...}}, ...],
+  "isComplete": false
+}
+
+Remember:
+- Use actions to store data
+- Don't skip steps
+- Be conversational but professional
+- Show you understand trading`
+
+      userPrompt = `Current step: ${onboardingStep}
+User said: "${userResponse}"
+
+Respond with JSON only. Extract relevant data and move to the correct next step.`
     }
     // ==================== PRE-SESSION MODE ====================
     else if (mode === 'pre_session') {
@@ -380,9 +440,56 @@ Today is ${today}.
 User's memory/profile:
 ${JSON.stringify(memory || {}, null, 2)}
 
+User's trade idea settings:
+- Minimum R:R ratio: ${tradeIdeaSettings?.minRR || '3'}:1
+- Max risk per trade: ${tradeIdeaSettings?.maxRiskPercent || '1'}%
+- Trading style: ${tradeIdeaSettings?.tradingStyle || 'day trading'}
+
 CONVERSATION HISTORY:
 ${conversationHistory || 'No previous messages'}
 
+=== WHAT YOU CAN DO ===
+
+**ADD TRADING ACCOUNT:**
+When user wants to add a prop firm account or personal account:
+- Ask for: name, type (prop_challenge/prop_funded/personal), prop firm, starting balance, drawdown limits
+- Action: {"type": "addAccount", "data": {"name": "FTMO 100K", "type": "prop_challenge", "propFirm": "FTMO", "startingBalance": "100000", "maxDrawdown": "10", "dailyDrawdown": "5", "profitTarget": "10"}}
+
+**ADD TRADING RULE:**
+When user wants to add a custom rule:
+- Action: {"type": "addTradingRule", "data": {"rule": "No trading on Fridays", "category": "timing", "enabled": true}}
+
+**TOGGLE TRADING RULE:**
+When user wants to enable/disable a rule:
+- Action: {"type": "toggleRule", "data": {"id": 123}}
+
+**ADD TO ROADMAP:**
+When user wants to add a trading milestone:
+- Action: {"type": "addTradingMilestone", "data": {"name": "Pass FTMO Challenge", "targetAmount": "10000", "category": "prop", "icon": "🎯"}}
+
+**LOG TRADE:**
+When user tells you about a completed trade:
+- Action: {"type": "addTrade", "data": {"instrument": "EURUSD", "direction": "long", "entryPrice": "1.0850", "exitPrice": "1.0890", "profitLoss": "200", "notes": "Clean breakout setup"}}
+
+**CHART ANALYSIS:**
+When analyzing charts, if user has set minimum R:R of ${tradeIdeaSettings?.minRR || '3'}:1:
+- Only suggest trade ideas that meet or exceed this R:R
+- Always include specific entry, stop loss, and take profit levels
+- Calculate the R:R and show it
+
+**MULTI-TIMEFRAME ANALYSIS:**
+For better analysis, suggest uploading:
+1. Higher timeframe (Daily/4H) - Overall trend and key levels
+2. Mid timeframe (1H) - Structure and zones
+3. Lower timeframe (15m/5m) - Entry precision
+
+=== IMPORTANT DISCLAIMER ===
+When giving trade ideas or analysis:
+- Remind users this is educational, not financial advice
+- They should do their own analysis
+- Past setups don't guarantee future results
+
+=== RESPONSE FORMAT ===
 RESPOND ONLY WITH RAW JSON:
 {"message": "your helpful response", "actions": []}
 
@@ -390,7 +497,10 @@ Be direct, practical, and specific. If they're asking about prop firms, give spe
 
       userPrompt = `USER'S MESSAGE: "${question || 'Hello!'}"
 
-Remember: If user says "yes/sure/okay", they're responding to your last offer.
+Remember: 
+- If user says "yes/sure/okay", they're responding to your last offer
+- Match trade ideas to their R:R requirements (min ${tradeIdeaSettings?.minRR || '3'}:1)
+- Use actions to add accounts, rules, trades, or milestones when asked
 Respond with JSON only.`
     }
 
