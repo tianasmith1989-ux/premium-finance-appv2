@@ -1,4 +1,4 @@
-'use client'
+use client'
 
 import { useUser } from '@clerk/nextjs'
 import { useState, useEffect, useRef } from 'react'
@@ -4128,7 +4128,7 @@ export default function Dashboard() {
                         + 🛡️ $2K Emergency Fund
                       </button>
                     )}
-                    {totalDebt > 0 && !roadmapMilestones.some(m => m.name.toLowerCase().includes('debt')) && (
+                    {totalDebtBalance > 0 && !roadmapMilestones.some(m => m.name.toLowerCase().includes('debt')) && (
                       <button
                         onClick={() => {
                           setRoadmapMilestones([...roadmapMilestones, {
@@ -4136,7 +4136,7 @@ export default function Dashboard() {
                             name: 'Become Debt Free',
                             category: 'debt',
                             icon: '💳',
-                            targetAmount: totalDebt.toString(),
+                            targetAmount: totalDebtBalance.toString(),
                             currentAmount: 0,
                             targetDate: '',
                             notes: 'Freedom from debt payments',
@@ -4146,7 +4146,7 @@ export default function Dashboard() {
                         }}
                         style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '12px' }}
                       >
-                        + 💳 Pay Off ${totalDebt.toLocaleString()} Debt
+                        + 💳 Pay Off ${totalDebtBalance.toLocaleString()} Debt
                       </button>
                     )}
                     {!roadmapMilestones.some(m => m.name.toLowerCase().includes('passive') || m.name.toLowerCase().includes('income')) && (
