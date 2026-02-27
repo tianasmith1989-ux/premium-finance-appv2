@@ -2690,6 +2690,13 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
+              
+              {/* AI Disclaimer */}
+              <div style={{ padding: '8px 12px', background: theme.warning + '15', borderRadius: '8px', marginBottom: '12px', border: '1px solid ' + theme.warning + '30' }}>
+                <p style={{ margin: 0, color: theme.textMuted, fontSize: '11px', lineHeight: 1.4 }}>
+                  ⚠️ <strong>Important:</strong> Aureus is an AI assistant, not a licensed financial advisor. Always verify information and consult qualified professionals for major financial decisions. AI can make mistakes.
+                </p>
+              </div>
 
               {/* Chat Messages */}
               <div ref={chatContainerRef} style={{ flex: 1, overflowY: 'auto' as const, marginBottom: '16px', padding: '8px' }}>
@@ -3770,6 +3777,22 @@ export default function Dashboard() {
         {appMode === 'budget' && activeTab === 'path' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             
+            {/* Financial Disclaimer Banner */}
+            <div style={{ padding: '12px 16px', background: 'linear-gradient(135deg, #f59e0b15, #ef444415)', borderRadius: '12px', border: '1px solid #f59e0b40' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <span style={{ fontSize: '20px' }}>⚠️</span>
+                <div>
+                  <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}>Important Disclaimer</div>
+                  <p style={{ margin: 0, color: theme.textMuted, fontSize: '12px', lineHeight: 1.5 }}>
+                    This app provides general financial information and AI-powered suggestions for educational purposes only. It is <strong>not financial advice</strong>. 
+                    Aureus is an AI assistant that can make mistakes — always verify calculations and recommendations. 
+                    Consult a licensed financial advisor, accountant, or relevant professional before making significant financial decisions. 
+                    Past performance and projections do not guarantee future results.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
             {/* Aureus Chat - At TOP */}
             <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
@@ -3957,7 +3980,7 @@ export default function Dashboard() {
                           role: 'user',
                           content: `Please analyze my roadmap and create a detailed action plan with timeline:\n\n**My Milestones:**\n${milestoneSummary}\n\n**My Financial Data:**\n- Monthly Income: $${monthlyIncome.toFixed(0)}\n- Monthly Expenses: $${monthlyExpenses.toFixed(0)}\n- Net Cash Flow: $${(monthlyIncome - monthlyExpenses - monthlyDebtPayments).toFixed(0)}\n- Current Savings: $${emergencyFund.toFixed(0)}\n- Total Debt: $${totalDebtBalance.toFixed(0)}\n\nPlease give me:\n1. A prioritized order to tackle these goals\n2. Realistic timeline for each milestone\n3. Specific weekly/monthly actions\n4. Any conflicts or concerns with my goals`
                         }])
-                        sendMessage(`Please analyze my roadmap and create a detailed action plan with timeline:\n\n**My Milestones:**\n${milestoneSummary}\n\n**My Financial Data:**\n- Monthly Income: $${monthlyIncome.toFixed(0)}\n- Monthly Expenses: $${monthlyExpenses.toFixed(0)}\n- Net Cash Flow: $${(monthlyIncome - monthlyExpenses - monthlyDebtPayments).toFixed(0)}\n- Current Savings: $${emergencyFund.toFixed(0)}\n- Total Debt: $${totalDebtBalance.toFixed(0)}\n\nPlease give me:\n1. A prioritized order to tackle these goals\n2. Realistic timeline for each milestone\n3. Specific weekly/monthly actions\n4. Any conflicts or concerns with my goals`)
+                        sendQuickMessage(`Please analyze my roadmap and create a detailed action plan with timeline:\n\n**My Milestones:**\n${milestoneSummary}\n\n**My Financial Data:**\n- Monthly Income: $${monthlyIncome.toFixed(0)}\n- Monthly Expenses: $${monthlyExpenses.toFixed(0)}\n- Net Cash Flow: $${(monthlyIncome - monthlyExpenses - monthlyDebtPayments).toFixed(0)}\n- Current Savings: $${emergencyFund.toFixed(0)}\n- Total Debt: $${totalDebtBalance.toFixed(0)}\n\nPlease give me:\n1. A prioritized order to tackle these goals\n2. Realistic timeline for each milestone\n3. Specific weekly/monthly actions\n4. Any conflicts or concerns with my goals`)
                       }}
                       style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
@@ -5651,6 +5674,18 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+      
+      {/* Footer Disclaimer */}
+      <footer style={{ padding: '16px 24px', background: theme.cardBg, borderTop: '1px solid ' + theme.border, textAlign: 'center' as const }}>
+        <p style={{ margin: '0 0 8px 0', color: theme.textMuted, fontSize: '11px', lineHeight: 1.5 }}>
+          ⚠️ <strong>Disclaimer:</strong> Aureus is an AI-powered financial assistant for educational and informational purposes only. 
+          This is not financial, tax, or legal advice. AI can make mistakes — always verify information. 
+          Consult qualified professionals before making financial decisions.
+        </p>
+        <p style={{ margin: 0, color: theme.textMuted, fontSize: '10px' }}>
+          © {new Date().getFullYear()} Aureus • Not affiliated with any financial institution • Past performance ≠ future results
+        </p>
+      </footer>
 
       <style jsx global>{`
         @keyframes pulse {
