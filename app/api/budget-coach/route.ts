@@ -103,7 +103,8 @@ export async function POST(request: NextRequest) {
       userResponse,
       conversationHistory,
       financialData,
-      memory
+      memory,
+      countryConfig
     } = await request.json()
 
     const apiKey = process.env.ANTHROPIC_API_KEY
@@ -115,6 +116,36 @@ export async function POST(request: NextRequest) {
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
     const currentYear = new Date().getFullYear()
     const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0')
+    
+    // Build country-specific context
+    const buildCountryContext = () => {
+      if (!countryConfig) {
+        // Default to Australia if no config
+        return `
+=== COUNTRY: AUSTRALIA 🇦🇺 ===
+- Currency: AUD ($)
+- Retirement System: Superannuation (Super) - employer contributes 11.5%
+- Government Benefits: Centrelink (JobSeeker, Youth Allowance, Family Tax Benefit, etc.)
+- Pay Frequency: Most common is fortnightly
+- Home Buying: First Home Guarantee, Help to Buy, First Home Super Saver (FHSS)
+- Tax: ATO, Medicare Levy 2%, tax brackets
+- Terminology: Use "Super" for retirement, "Centrelink" for benefits, "fortnight" for pay periods
+`
+      }
+      
+      return `
+=== COUNTRY: ${countryConfig.name.toUpperCase()} ${countryConfig.flag} ===
+- Currency: ${countryConfig.currency} (${countryConfig.currencySymbol})
+- Retirement System: ${countryConfig.retirement}
+- Government Benefits: ${countryConfig.benefits}
+- Common Pay Frequency: ${countryConfig.payFrequency}
+- Home Buying Schemes: ${countryConfig.homeSchemes?.join(', ') || 'Various programs'}
+- Tax System: ${countryConfig.taxSystem}
+- IMPORTANT: Use "${countryConfig.terminology?.retirement || 'retirement'}" instead of "Super"
+- IMPORTANT: Use "${countryConfig.terminology?.benefits || 'benefits'}" for government assistance
+- IMPORTANT: Use "${countryConfig.terminology?.payPeriod || 'pay period'}" for payment frequency discussions
+`
+    }
 
     // Helper to build context from financial data
     const buildFinancialContext = () => {
@@ -245,7 +276,7 @@ export async function POST(request: NextRequest) {
       const totalDebtBalance = financialData.debts?.reduce((sum: number, d: any) => sum + parseFloat(d.balance || '0'), 0) || 0
       const netWorth = totalAssets - totalLiabilities - totalDebtBalance
       
-      context += `\nNET WORTH: $${netWorth.toLocaleString()}\n`
+      context += `\nWEALTH POSITION: $${netWorth.toLocaleString()}\n`
       
       // ROADMAP MILESTONES - This is what the user is working towards!
       if (financialData.roadmapMilestones?.length > 0) {
@@ -305,10 +336,12 @@ export async function POST(request: NextRequest) {
     let userPrompt = ''
 
     if (mode === 'onboarding') {
-      systemPrompt = `You are Aureus, a friendly Australian financial coach helping "${memory?.name || 'a new user'}" set up their budget.
+      systemPrompt = `You are Aureus, a friendly financial coach helping "${memory?.name || 'a new user'}" set up their budget.
 
 TODAY: ${today}
 CURRENT STEP: ${onboardingStep}
+
+${buildCountryContext()}
 
 === ALREADY IN SYSTEM ===
 ${buildFinancialContext()}
@@ -546,7 +579,7 @@ Present it like this:
 
 Based on what you've told me:
 📊 **Your Numbers:**
-- Net Worth: $[calculate from assets - debts]
+- Wealth Position: $[calculate from assets - debts]
 - Super Balance: $[from assets]
 - Monthly Surplus: $[NET AVAILABLE] 
 - FIRE Number: $[monthly expenses × 12 × 25] (the magic number for financial freedom!)
@@ -592,7 +625,7 @@ Use the financial data above to calculate:
 - Total assets (sum all assets)
 - Super balance (from super assets)
 - Total debt (sum all debt balances)
-- Net Worth = Assets - Debts
+- Wealth Position = Assets - Debts
 - FIRE Number = Monthly Expenses × 12 × 25
 
 **FORMAT YOUR RESPONSE LIKE THIS:**
@@ -612,7 +645,7 @@ Use the financial data above to calculate:
   - Super: $X
   - Other: $X
 • Total Liabilities: $X (debt)
-• **Net Worth: $X**
+• **Wealth Position: $X**
 
 **🔥 Financial Freedom Analysis:**
 Your monthly expenses: $X/month
@@ -705,6 +738,8 @@ Respond with JSON only.`
     } else if (mode === 'proactive') {
       systemPrompt = `You are Aureus, giving a quick daily insight. Today is ${today}.
 
+${buildCountryContext()}
+
 ${buildFinancialContext()}
 
 User's name: ${memory?.name || 'there'}
@@ -723,6 +758,7 @@ Give a brief, encouraging insight. Mention:
 - Progress toward goals or debt freedom
 
 Keep it to 2-3 sentences. Be encouraging but accurate.
+Use country-appropriate terminology (see Country section above).
 
 Response format:
 {
@@ -737,6 +773,8 @@ Response format:
     } else {
       // Question/Chat mode - handles questions AND edits
       systemPrompt = `You are Aureus, a helpful financial coach. Today is ${today}.
+
+${buildCountryContext()}
 
 ${FINANCIAL_FRAMEWORKS}
 
@@ -755,16 +793,20 @@ ${conversationHistory || 'No previous messages'}
 
 3. OUTPUT FORMAT: Respond with RAW JSON only. No markdown code blocks. No text before or after the JSON.
 
+4. COUNTRY-SPECIFIC: Use the terminology from the Country section above. Don't mention "Super" if user is in USA, etc.
+
 === WHAT YOU CAN DO ===
 
 **ANSWER QUESTIONS:**
 - Use their actual numbers from the data above
 - Use the NET AVAILABLE for "how much is left" questions
 - Be specific and helpful
+- Use country-appropriate terms and schemes
 
 **ADD NEW ITEMS:**
 Same rules as onboarding - ask for DATE before adding!
 1. User mentions amount → Ask for date
+2. User gives date → Add it
 2. User gives date → Add it
 
 **EDIT EXISTING ITEMS:**
@@ -924,6 +966,12 @@ When giving specific financial advice or recommendations:
 - For major decisions (investments, debt strategies, home buying), remind them to consult qualified professionals
 - If asked about tax implications, remind them to consult a tax professional
 - Keep disclaimers brief and natural - don't be overly repetitive
+
+⚠️ NEVER PROMISE NOTIFICATIONS:
+- Do NOT say you will text, email, or send notifications to the user
+- Do NOT promise reminders via SMS, email, or push notifications
+- You CAN only add items to the in-app calendar - that's the only "reminder" system
+- If user asks about notifications, explain that calendar alerts show in the app but external notifications are not currently available
 
 Example natural disclaimers:
 - "Based on your numbers, here's what I see (always good to double-check my math!)..."
