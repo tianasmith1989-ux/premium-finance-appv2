@@ -2129,6 +2129,62 @@ export default function Dashboard() {
           }
           break
 
+        // ===== BUDGET ROADMAP ACTIONS =====
+        case 'addRoadmapMilestone':
+          if (data.name) {
+            // Check if already exists
+            const exists = roadmapMilestones.some(m => m.name.toLowerCase() === data.name.toLowerCase())
+            if (!exists) {
+              setRoadmapMilestones(prev => [...prev, {
+                id: Date.now(),
+                name: data.name,
+                targetAmount: data.targetAmount?.toString().replace(/[$,]/g, '') || '0',
+                currentAmount: data.currentAmount || 0,
+                targetDate: data.targetDate || '',
+                category: data.category || 'savings',
+                icon: data.icon || '🎯',
+                notes: data.notes || '',
+                completed: false,
+                createdAt: new Date().toISOString()
+              }])
+            }
+          }
+          break
+          
+        // ===== ASSET ACTIONS =====
+        case 'addAsset':
+          if (data.name && data.value) {
+            setAssets(prev => [...prev, {
+              id: Date.now(),
+              name: data.name,
+              value: data.value?.toString().replace(/[$,]/g, ''),
+              type: data.type || 'savings'
+            }])
+          }
+          break
+          
+        case 'updateAsset':
+          if (data.id) {
+            setAssets(prev => prev.map(item => {
+              if (item.id === data.id || Math.floor(item.id) === Math.floor(data.id)) {
+                return {
+                  ...item,
+                  ...(data.name && { name: data.name }),
+                  ...(data.value && { value: data.value.toString().replace(/[$,]/g, '') }),
+                  ...(data.type && { type: data.type })
+                }
+              }
+              return item
+            }))
+          }
+          break
+          
+        case 'deleteAsset':
+          if (data.id) {
+            setAssets(prev => prev.filter(item => item.id !== data.id && Math.floor(item.id) !== Math.floor(data.id)))
+          }
+          break
+
         // ===== MEMORY ACTIONS =====
         case 'setMemory':
           // Check if this is for trading or budget
@@ -3458,13 +3514,13 @@ export default function Dashboard() {
               </div>
             )}
             
-            {/* This Month Summary */}
+            {/* Monthly Summary - uses standard monthly calculations */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Income This Month</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>${currentMonthTotals.incomeTotal.toFixed(0)}</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Expenses</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 700 }}>${currentMonthTotals.expenseTotal.toFixed(0)}</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Debt Payments</div><div style={{ color: theme.warning, fontSize: '28px', fontWeight: 700 }}>${currentMonthTotals.debtTotal.toFixed(0)}</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Goal Savings</div><div style={{ color: theme.purple, fontSize: '28px', fontWeight: 700 }}>${currentMonthTotals.goalTotal.toFixed(0)}</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Net This Month</div><div style={{ color: currentMonthTotals.total >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>${currentMonthTotals.total.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Income /month</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>${monthlyIncome.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Expenses /month</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 700 }}>${monthlyExpenses.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Debt Payments</div><div style={{ color: theme.warning, fontSize: '28px', fontWeight: 700 }}>${monthlyDebtPayments.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Goal Savings</div><div style={{ color: theme.purple, fontSize: '28px', fontWeight: 700 }}>${monthlyGoalSavings.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Net /month</div><div style={{ color: monthlySurplus >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>${monthlySurplus.toFixed(0)}</div></div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
@@ -4115,19 +4171,108 @@ export default function Dashboard() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               <div style={cardStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}><h3 style={{ margin: 0, color: theme.success }}>📈 Assets</h3><span style={{ color: theme.success, fontWeight: 700 }}>${totalAssets.toFixed(0)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}><h3 style={{ margin: 0, color: theme.success }}>📈 Assets</h3><span style={{ color: theme.success, fontWeight: 700 }}>${totalAssets.toLocaleString()}</span></div>
+                
+                {/* Quick add buttons for common accounts */}
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
+                  {['Savings Account', 'Super/401K', 'ETF Portfolio', 'Emergency Fund', 'Term Deposit'].map(preset => (
+                    <button key={preset} onClick={() => setNewAsset({...newAsset, name: preset, type: preset.includes('Super') ? 'super' : preset.includes('ETF') || preset.includes('Portfolio') ? 'investment' : 'savings'})} style={{ padding: '4px 10px', background: theme.cardBg, color: theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', fontSize: '11px' }}>+ {preset}</button>
+                  ))}
+                </div>
+                
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                   <input placeholder="Asset name" value={newAsset.name} onChange={e => setNewAsset({...newAsset, name: e.target.value})} style={{...inputStyle, flex: 1}} />
                   <input placeholder="Value" type="number" value={newAsset.value} onChange={e => setNewAsset({...newAsset, value: e.target.value})} style={{...inputStyle, width: '100px'}} />
-                  <select value={newAsset.type} onChange={e => setNewAsset({...newAsset, type: e.target.value})} style={inputStyle}><option value="savings">Savings</option><option value="investment">Investment</option><option value="property">Property</option><option value="vehicle">Vehicle</option><option value="other">Other</option></select>
+                  <select value={newAsset.type} onChange={e => setNewAsset({...newAsset, type: e.target.value})} style={inputStyle}>
+                    <option value="savings">💰 Savings</option>
+                    <option value="super">🏦 Super/401K</option>
+                    <option value="investment">📊 Investment</option>
+                    <option value="property">🏠 Property</option>
+                    <option value="vehicle">🚗 Vehicle</option>
+                    <option value="crypto">₿ Crypto</option>
+                    <option value="other">📦 Other</option>
+                  </select>
                   <button onClick={addAsset} style={btnSuccess}>+</button>
                 </div>
-                {assets.map(a => (
-                  <div key={a.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div><div style={{ color: theme.text, fontWeight: 600 }}>{a.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{a.type}</div></div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: theme.success, fontWeight: 700 }}>${parseFloat(a.value).toFixed(0)}</span><button onClick={() => deleteAsset(a.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>×</button></div>
+                
+                {/* Group assets by type */}
+                {assets.length === 0 ? (
+                  <div style={{ textAlign: 'center' as const, padding: '20px', color: theme.textMuted }}>
+                    <p style={{ margin: 0, fontSize: '13px' }}>No assets added yet. Add your savings, super, and investments!</p>
                   </div>
-                ))}
+                ) : (
+                  <>
+                    {/* Liquid Assets (Savings + Emergency) */}
+                    {assets.filter(a => a.type === 'savings').length > 0 && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px', textTransform: 'uppercase' as const }}>💰 Savings ({assets.filter(a => a.type === 'savings').length})</div>
+                        {assets.filter(a => a.type === 'savings').map(a => (
+                          <div key={a.id} style={{ padding: '10px 12px', marginBottom: '4px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: theme.text, fontSize: '14px' }}>{a.name}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: theme.success, fontWeight: 700 }}>${parseFloat(a.value).toLocaleString()}</span><button onClick={() => deleteAsset(a.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button></div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Super/Retirement */}
+                    {assets.filter(a => a.type === 'super').length > 0 && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px', textTransform: 'uppercase' as const }}>🏦 Super/Retirement</div>
+                        {assets.filter(a => a.type === 'super').map(a => (
+                          <div key={a.id} style={{ padding: '10px 12px', marginBottom: '4px', background: darkMode ? '#1e2a3b' : '#f0f4ff', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: theme.text, fontSize: '14px' }}>{a.name}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: theme.accent, fontWeight: 700 }}>${parseFloat(a.value).toLocaleString()}</span><button onClick={() => deleteAsset(a.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button></div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Investments */}
+                    {assets.filter(a => a.type === 'investment' || a.type === 'crypto').length > 0 && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px', textTransform: 'uppercase' as const }}>📊 Investments</div>
+                        {assets.filter(a => a.type === 'investment' || a.type === 'crypto').map(a => (
+                          <div key={a.id} style={{ padding: '10px 12px', marginBottom: '4px', background: darkMode ? '#2a1e3b' : '#f5f0ff', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div><span style={{ color: theme.text, fontSize: '14px' }}>{a.name}</span><span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '8px' }}>{a.type}</span></div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: theme.purple, fontWeight: 700 }}>${parseFloat(a.value).toLocaleString()}</span><button onClick={() => deleteAsset(a.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button></div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Property & Other */}
+                    {assets.filter(a => a.type === 'property' || a.type === 'vehicle' || a.type === 'other').length > 0 && (
+                      <div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px', textTransform: 'uppercase' as const }}>🏠 Property & Other</div>
+                        {assets.filter(a => a.type === 'property' || a.type === 'vehicle' || a.type === 'other').map(a => (
+                          <div key={a.id} style={{ padding: '10px 12px', marginBottom: '4px', background: darkMode ? '#3a3a1e' : '#fffef0', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div><span style={{ color: theme.text, fontSize: '14px' }}>{a.name}</span><span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '8px' }}>{a.type}</span></div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: theme.warning, fontWeight: 700 }}>${parseFloat(a.value).toLocaleString()}</span><button onClick={() => deleteAsset(a.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button></div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+                
+                {/* Summary by category */}
+                {assets.length > 0 && (
+                  <div style={{ marginTop: '12px', padding: '12px', background: theme.success + '15', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: theme.text }}>
+                      <span>💰 Liquid:</span>
+                      <span style={{ fontWeight: 600 }}>${assets.filter(a => a.type === 'savings' || a.type === 'investment').reduce((s, a) => s + parseFloat(a.value || '0'), 0).toLocaleString()}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: theme.text, marginTop: '4px' }}>
+                      <span>🏦 Super:</span>
+                      <span style={{ fontWeight: 600 }}>${assets.filter(a => a.type === 'super').reduce((s, a) => s + parseFloat(a.value || '0'), 0).toLocaleString()}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: theme.text, marginTop: '4px' }}>
+                      <span>🏠 Illiquid:</span>
+                      <span style={{ fontWeight: 600 }}>${assets.filter(a => a.type === 'property' || a.type === 'vehicle' || a.type === 'other').reduce((s, a) => s + parseFloat(a.value || '0'), 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div style={cardStyle}>
