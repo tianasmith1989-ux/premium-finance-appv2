@@ -260,6 +260,65 @@ export default function Dashboard() {
     }
   }
   
+  // ==================== SUBSCRIPTION STATE ====================
+  const [userSubscription, setUserSubscription] = useState<{
+    plan: 'free' | 'pro' | 'annual',
+    status: 'active' | 'cancelled' | 'past_due' | 'none',
+    aiChatsUsed: number,
+    aiChatsLimit: number,
+    expiresAt: string | null,
+    customerId: string | null
+  }>({
+    plan: 'free',
+    status: 'none',
+    aiChatsUsed: 0,
+    aiChatsLimit: 5, // Free tier limit
+    expiresAt: null,
+    customerId: null
+  })
+  
+  const [showPricingModal, setShowPricingModal] = useState(false)
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
+  
+  // Lemon Squeezy checkout URLs - REPLACE WITH YOUR ACTUAL URLS
+  const LEMONSQUEEZY_URLS = {
+    pro_monthly: 'https://aureus.lemonsqueezy.com/checkout/buy/YOUR_PRO_MONTHLY_PRODUCT_ID',
+    pro_annual: 'https://aureus.lemonsqueezy.com/checkout/buy/YOUR_PRO_ANNUAL_PRODUCT_ID',
+    // Customer portal for managing subscription
+    customer_portal: 'https://aureus.lemonsqueezy.com/billing'
+  }
+  
+  // Check if user can use AI (within limits or subscribed)
+  const canUseAI = () => {
+    if (userSubscription.plan === 'pro' || userSubscription.plan === 'annual') {
+      return { allowed: true, remaining: Infinity }
+    }
+    const remaining = userSubscription.aiChatsLimit - userSubscription.aiChatsUsed
+    return { allowed: remaining > 0, remaining }
+  }
+  
+  // Track AI usage
+  const trackAIUsage = () => {
+    if (userSubscription.plan === 'free') {
+      setUserSubscription(prev => ({
+        ...prev,
+        aiChatsUsed: prev.aiChatsUsed + 1
+      }))
+    }
+  }
+  
+  // Reset monthly usage on new month
+  useEffect(() => {
+    const lastReset = localStorage.getItem('aureus_usage_reset')
+    const now = new Date()
+    const currentMonth = `${now.getFullYear()}-${now.getMonth()}`
+    
+    if (lastReset !== currentMonth) {
+      setUserSubscription(prev => ({ ...prev, aiChatsUsed: 0 }))
+      localStorage.setItem('aureus_usage_reset', currentMonth)
+    }
+  }, [])
+  
   // Selected quest for detail view
   const [showQuestDetail, setShowQuestDetail] = useState(false)
   const [selectedBabyStep, setSelectedBabyStep] = useState<number | null>(null)
@@ -908,6 +967,7 @@ export default function Dashboard() {
       if (data.tradingOnboarding) setTradingOnboarding(data.tradingOnboarding)
       if (data.chatMessages) setChatMessages(data.chatMessages)
       if (data.userCountry) setUserCountry(data.userCountry)
+      if (data.userSubscription) setUserSubscription(data.userSubscription)
     }
   }, [])
 
@@ -917,10 +977,10 @@ export default function Dashboard() {
       budgetMemory, tradingMemory,
       paidOccurrences: Array.from(paidOccurrences),
       roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings,
-      budgetOnboarding, tradingOnboarding, chatMessages, userCountry
+      budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings, budgetOnboarding, tradingOnboarding, chatMessages, userCountry])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings, budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription])
 
   // Scroll chat to bottom - use scrollTop instead of scrollIntoView to avoid page jump
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -2557,11 +2617,21 @@ export default function Dashboard() {
     if ((!chatInput.trim() && !pendingChartImage) || isLoading) return
     const message = chatInput.trim()
     
+    // Check AI usage limits (skip for onboarding)
+    const aiStatus = canUseAI()
+    if (!aiStatus.allowed && !budgetOnboarding.isActive && !tradingOnboarding.isActive) {
+      setShowUpgradePrompt(true)
+      return
+    }
+    
     if ((appMode === 'budget' && budgetOnboarding.isActive) || (appMode === 'trading' && tradingOnboarding.isActive)) {
       await handleOnboardingResponse(message, appMode!)
       setPendingChartImage(null)
       return
     }
+    
+    // Track AI usage for free tier
+    trackAIUsage()
     
     // Show user message (with image indicator if present)
     const userMessageContent = pendingChartImage 
@@ -3105,6 +3175,156 @@ export default function Dashboard() {
   // ==================== RENDER: MAIN APP ====================
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
+      {/* PRICING MODAL */}
+      {showPricingModal && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowPricingModal(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '32px', maxWidth: '900px', width: '100%', maxHeight: '90vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+            <div style={{ textAlign: 'center' as const, marginBottom: '32px' }}>
+              <h2 style={{ color: theme.text, fontSize: '28px', fontWeight: 800, margin: '0 0 8px 0' }}>Upgrade to Aureus Pro</h2>
+              <p style={{ color: theme.textMuted, margin: 0 }}>Unlock unlimited AI coaching and take control of your finances</p>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '32px' }}>
+              {/* FREE TIER */}
+              <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', border: '2px solid ' + theme.border }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ color: theme.textMuted, fontSize: '14px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Free</div>
+                  <div style={{ color: theme.text, fontSize: '36px', fontWeight: 800 }}>$0<span style={{ fontSize: '16px', fontWeight: 400 }}>/month</span></div>
+                </div>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0' }}>
+                  {['5 AI chats per month', 'Basic budgeting tools', 'Income & expense tracking', 'Debt tracking', 'Goal setting'].map(feature => (
+                    <li key={feature} style={{ color: theme.text, fontSize: '14px', padding: '8px 0', borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ color: theme.success }}>✓</span> {feature}
+                    </li>
+                  ))}
+                  {['Unlimited AI coaching', 'Financial roadmap', 'Trading mode', 'Calendar alerts'].map(feature => (
+                    <li key={feature} style={{ color: theme.textMuted, fontSize: '14px', padding: '8px 0', borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ color: theme.textMuted }}>✗</span> {feature}
+                    </li>
+                  ))}
+                </ul>
+                <button 
+                  disabled={userSubscription.plan === 'free'}
+                  style={{ width: '100%', padding: '14px', background: userSubscription.plan === 'free' ? theme.textMuted : theme.cardBg, color: userSubscription.plan === 'free' ? 'white' : theme.text, border: userSubscription.plan === 'free' ? 'none' : '2px solid ' + theme.border, borderRadius: '12px', cursor: userSubscription.plan === 'free' ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '14px' }}
+                >
+                  {userSubscription.plan === 'free' ? '✓ Current Plan' : 'Downgrade'}
+                </button>
+              </div>
+              
+              {/* PRO MONTHLY - RECOMMENDED */}
+              <div style={{ padding: '24px', background: 'linear-gradient(135deg, ' + theme.success + '20, ' + theme.accent + '20)', borderRadius: '16px', border: '3px solid ' + theme.success, position: 'relative' as const }}>
+                <div style={{ position: 'absolute' as const, top: '-12px', left: '50%', transform: 'translateX(-50%)', background: theme.success, color: 'white', padding: '4px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>MOST POPULAR</div>
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ color: theme.success, fontSize: '14px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Pro Monthly</div>
+                  <div style={{ color: theme.text, fontSize: '36px', fontWeight: 800 }}>$20<span style={{ fontSize: '16px', fontWeight: 400 }}>/month</span></div>
+                </div>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0' }}>
+                  {['Unlimited AI coaching', 'All budgeting features', 'Financial roadmap builder', 'Baby Steps & FIRE path', 'Trading mode', 'Calendar alerts', 'Goal automation', 'Priority support'].map(feature => (
+                    <li key={feature} style={{ color: theme.text, fontSize: '14px', padding: '8px 0', borderBottom: '1px solid ' + theme.border + '50', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ color: theme.success }}>✓</span> {feature}
+                    </li>
+                  ))}
+                </ul>
+                <button 
+                  onClick={() => window.open(LEMONSQUEEZY_URLS.pro_monthly, '_blank')}
+                  disabled={userSubscription.plan === 'pro'}
+                  style={{ width: '100%', padding: '14px', background: userSubscription.plan === 'pro' ? theme.textMuted : theme.success, color: 'white', border: 'none', borderRadius: '12px', cursor: userSubscription.plan === 'pro' ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '15px' }}
+                >
+                  {userSubscription.plan === 'pro' ? '✓ Current Plan' : 'Get Pro Monthly'}
+                </button>
+              </div>
+              
+              {/* PRO ANNUAL - BEST VALUE */}
+              <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', border: '2px solid ' + theme.purple, position: 'relative' as const }}>
+                <div style={{ position: 'absolute' as const, top: '-12px', left: '50%', transform: 'translateX(-50%)', background: theme.purple, color: 'white', padding: '4px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>SAVE 30%</div>
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ color: theme.purple, fontSize: '14px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Pro Annual</div>
+                  <div style={{ color: theme.text, fontSize: '36px', fontWeight: 800 }}>$14<span style={{ fontSize: '16px', fontWeight: 400 }}>/month</span></div>
+                  <div style={{ color: theme.success, fontSize: '13px', fontWeight: 600 }}>$168/year (save $72)</div>
+                </div>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px 0' }}>
+                  {['Everything in Pro Monthly', '2 months FREE', 'Locked-in pricing', 'Annual savings'].map(feature => (
+                    <li key={feature} style={{ color: theme.text, fontSize: '14px', padding: '8px 0', borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ color: theme.purple }}>✓</span> {feature}
+                    </li>
+                  ))}
+                </ul>
+                <button 
+                  onClick={() => window.open(LEMONSQUEEZY_URLS.pro_annual, '_blank')}
+                  disabled={userSubscription.plan === 'annual'}
+                  style={{ width: '100%', padding: '14px', background: userSubscription.plan === 'annual' ? theme.textMuted : theme.purple, color: 'white', border: 'none', borderRadius: '12px', cursor: userSubscription.plan === 'annual' ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '15px' }}
+                >
+                  {userSubscription.plan === 'annual' ? '✓ Current Plan' : 'Get Pro Annual'}
+                </button>
+              </div>
+            </div>
+            
+            {/* Comparison Table */}
+            <div style={{ background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+              <h4 style={{ color: theme.text, margin: '0 0 16px 0', fontSize: '16px' }}>Why Aureus Pro?</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                <div style={{ textAlign: 'center' as const }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>🤖</div>
+                  <div style={{ color: theme.text, fontWeight: 600, marginBottom: '4px' }}>Unlimited AI Coaching</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Get personalized advice anytime, no limits</div>
+                </div>
+                <div style={{ textAlign: 'center' as const }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>🗺️</div>
+                  <div style={{ color: theme.text, fontWeight: 600, marginBottom: '4px' }}>Financial Roadmap</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Step-by-step path to financial freedom</div>
+                </div>
+                <div style={{ textAlign: 'center' as const }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>💰</div>
+                  <div style={{ color: theme.text, fontWeight: 600, marginBottom: '4px' }}>Save $500+/month</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Users report major savings with AI guidance</div>
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={{ color: theme.textMuted, fontSize: '13px', margin: 0 }}>
+                Cancel anytime • Secure payment via Lemon Squeezy • 30-day money-back guarantee
+              </p>
+              <button onClick={() => setShowPricingModal(false)} style={{ padding: '10px 20px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer' }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* UPGRADE PROMPT (shown when free tier limit reached) */}
+      {showUpgradePrompt && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowUpgradePrompt(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '32px', maxWidth: '500px', width: '100%', textAlign: 'center' as const }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto' }}>
+              <span style={{ fontSize: '40px' }}>🔒</span>
+            </div>
+            <h2 style={{ color: theme.text, fontSize: '24px', fontWeight: 700, margin: '0 0 8px 0' }}>You've reached your free limit!</h2>
+            <p style={{ color: theme.textMuted, margin: '0 0 24px 0' }}>
+              You've used all 5 AI chats for this month. Upgrade to Pro for unlimited coaching.
+            </p>
+            
+            <div style={{ background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginBottom: '12px' }}>
+                <div><div style={{ color: theme.textMuted, fontSize: '12px' }}>Monthly</div><div style={{ color: theme.text, fontWeight: 700, fontSize: '24px' }}>$20</div></div>
+                <div style={{ borderLeft: '1px solid ' + theme.border, paddingLeft: '24px' }}><div style={{ color: theme.purple, fontSize: '12px' }}>Annual (save 30%)</div><div style={{ color: theme.text, fontWeight: 700, fontSize: '24px' }}>$14<span style={{ fontSize: '14px' }}>/mo</span></div></div>
+              </div>
+              <div style={{ color: theme.success, fontSize: '14px', fontWeight: 600 }}>✓ Unlimited AI coaching • ✓ All features</div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={() => { setShowUpgradePrompt(false); setShowPricingModal(true); }} style={{ flex: 1, padding: '14px', background: theme.success, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '15px' }}>
+                See Pricing
+              </button>
+              <button onClick={() => setShowUpgradePrompt(false)} style={{ padding: '14px 24px', background: 'transparent', border: '2px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontWeight: 600 }}>
+                Maybe Later
+              </button>
+            </div>
+            
+            <p style={{ color: theme.textMuted, fontSize: '12px', marginTop: '16px' }}>Your chats reset on the 1st of each month</p>
+          </div>
+        </div>
+      )}
+
       {/* Modals */}
       {expandedDay && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setExpandedDay(null)}>
@@ -3264,6 +3484,52 @@ export default function Dashboard() {
             <option value="NZ">🇳🇿 NZ</option>
             <option value="CA">🇨🇦 CA</option>
           </select>
+          
+          {/* Subscription Status / Upgrade Button */}
+          {userSubscription.plan === 'free' ? (
+            <button 
+              onClick={() => setShowPricingModal(true)}
+              style={{ 
+                padding: '6px 14px', 
+                background: 'linear-gradient(135deg, #10b981, #059669)', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '8px', 
+                cursor: 'pointer', 
+                fontSize: '13px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              ⚡ Upgrade
+              <span style={{ 
+                background: 'rgba(255,255,255,0.2)', 
+                padding: '2px 6px', 
+                borderRadius: '4px', 
+                fontSize: '11px' 
+              }}>
+                {userSubscription.aiChatsUsed}/{userSubscription.aiChatsLimit}
+              </span>
+            </button>
+          ) : (
+            <button 
+              onClick={() => window.open(LEMONSQUEEZY_URLS.customer_portal, '_blank')}
+              style={{ 
+                padding: '6px 14px', 
+                background: theme.success + '20', 
+                color: theme.success, 
+                border: '1px solid ' + theme.success, 
+                borderRadius: '8px', 
+                cursor: 'pointer', 
+                fontSize: '13px',
+                fontWeight: 600
+              }}
+            >
+              ✓ Pro {userSubscription.plan === 'annual' ? '(Annual)' : ''}
+            </button>
+          )}
         </div>
       </header>
 
