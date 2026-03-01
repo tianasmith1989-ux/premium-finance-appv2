@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
         financialData.income.forEach((inc: any) => {
           const amount = parseFloat(inc.amount || '0')
           totalIncomeFortnightly += convertToFortnightly(amount, inc.frequency)
-          context += `  - "${inc.name}" $${inc.amount}/${inc.frequency} on ${inc.startDate}\n`
+          context += `  - [ID: ${inc.id}] "${inc.name}" $${inc.amount}/${inc.frequency} on ${inc.startDate}\n`
         })
       }
       
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
         financialData.expenses.forEach((exp: any) => {
           const amount = parseFloat(exp.amount || '0')
           totalExpensesFortnightly += convertToFortnightly(amount, exp.frequency)
-          context += `  - "${exp.name}" $${exp.amount}/${exp.frequency} due ${exp.dueDate}\n`
+          context += `  - [ID: ${exp.id}] "${exp.name}" $${exp.amount}/${exp.frequency} due ${exp.dueDate}\n`
         })
       }
       
@@ -165,6 +165,8 @@ export async function POST(request: NextRequest) {
           const monthlyRate = apr / 100 / 12
           
           totalDebtPaymentsFortnightly += convertToFortnightly(payment, debt.frequency || 'monthly')
+          
+          context += `  - [ID: ${debt.id}] "${debt.name}"\n`
           
           // Calculate payoff time using amortization
           const monthlyPayment = debt.frequency === 'fortnightly' ? payment * 2 : 
@@ -197,7 +199,7 @@ export async function POST(request: NextRequest) {
         financialData.goals.forEach((goal: any) => {
           const payment = parseFloat(goal.paymentAmount || '0')
           totalGoalSavingsFortnightly += convertToFortnightly(payment, goal.savingsFrequency || 'monthly')
-          context += `  - "${goal.name}" $${goal.saved}/$${goal.target} → SAVING: $${goal.paymentAmount}/${goal.savingsFrequency}\n`
+          context += `  - [ID: ${goal.id}] "${goal.name}" $${goal.saved}/$${goal.target} → SAVING: $${goal.paymentAmount}/${goal.savingsFrequency}\n`
         })
       }
       
@@ -766,16 +768,25 @@ Same rules as onboarding - ask for DATE before adding!
 2. User gives date → Add it
 
 **EDIT EXISTING ITEMS:**
+⚠️ CRITICAL: When you say you're updating something, you MUST include the action in your response!
+If you say "I've updated your emergency fund to $71" but actions: [] is empty, IT WON'T UPDATE!
+
 When user wants to change something:
-- "change my rent to $500" → Find rent in expenses, update it
-- "my pay is now $450" → Find their income, update it
-- Action: {"type": "updateIncome|updateExpense|updateDebt|updateGoal", "data": {"id": [ID from data above], "field": "newValue", ...}}
+- Find the item's ID from the data above (e.g., [ID: 1234567890])
+- Include the updateX action with that exact ID
+
+Examples:
+- "change my rent to $500" → Find rent ID, use: {"type": "updateExpense", "data": {"id": 1234567890, "amount": "500"}}
+- "my pay is now $450" → Find income ID, use: {"type": "updateIncome", "data": {"id": 1234567890, "amount": "450"}}
+- "change emergency fund savings to $71/fortnight" → {"type": "updateGoal", "data": {"id": 1234567890, "paymentAmount": "71"}}
+
+WRONG: "I've updated your goal!" with actions: []
+RIGHT: "Updated!" with actions: [{"type": "updateGoal", "data": {"id": 1234567890, "paymentAmount": "71"}}]
 
 **DELETE ITEMS:**
 When user wants to remove something:
-- "delete Netflix" → Find Netflix in expenses, delete it
-- "remove my credit card debt" → Find it, delete it
-- Action: {"type": "deleteIncome|deleteExpense|deleteDebt|deleteGoal", "data": {"id": [ID from data above]}}
+- "delete Netflix" → Find Netflix ID, use: {"type": "deleteExpense", "data": {"id": 1234567890}}
+- "remove my credit card debt" → Find ID, use: {"type": "deleteDebt", "data": {"id": 1234567890}}
 
 === PROACTIVE COACHING ===
 Don't just answer questions - BE A COACH! After answering, proactively suggest:
