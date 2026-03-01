@@ -1200,7 +1200,7 @@ export default function Dashboard() {
   }
   
   // Helper function to add items to roadmap
-  const addToRoadmap = (name: string, category: string, targetAmount: string | number, icon: string, notes?: string, currentAmount?: number) => {
+  const addToRoadmap = (name: string, category: string, targetAmount: string | number, icon: string, notes?: string, currentAmount?: number, linkedGoalId?: number) => {
     // Check if already exists
     if (roadmapMilestones.some(m => m.name.toLowerCase() === name.toLowerCase())) {
       alert(`"${name}" is already in your roadmap!`)
@@ -1217,13 +1217,58 @@ export default function Dashboard() {
       targetDate: '',
       notes: notes || '',
       completed: false,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      linkedGoalId: linkedGoalId || null, // Link to goal if exists
+      calendarAlerts: true // Enable calendar alerts by default
     }
     
     setRoadmapMilestones(prev => [...prev, newMilestoneItem])
     
     // Show confirmation
     alert(`✅ Added "${name}" to your roadmap!`)
+  }
+  
+  // Sync Goals ↔ Roadmap - when a goal updates, update linked roadmap milestone
+  useEffect(() => {
+    // Update roadmap milestones that are linked to goals
+    setRoadmapMilestones(prev => prev.map(milestone => {
+      if (milestone.linkedGoalId) {
+        const linkedGoal = goals.find(g => g.id === milestone.linkedGoalId)
+        if (linkedGoal) {
+          return {
+            ...milestone,
+            currentAmount: parseFloat(linkedGoal.saved || '0'),
+            targetAmount: linkedGoal.target,
+            completed: parseFloat(linkedGoal.saved || '0') >= parseFloat(linkedGoal.target || '0')
+          }
+        }
+      }
+      return milestone
+    }))
+  }, [goals])
+  
+  // Helper to add goal AND roadmap milestone together (linked)
+  const addLinkedGoalAndMilestone = (goalData: any, milestoneCategory: string, icon: string) => {
+    const goalId = Date.now()
+    const goal = { ...goalData, id: goalId }
+    setGoals(prev => [...prev, goal])
+    
+    // Add linked roadmap milestone
+    const milestone = {
+      id: goalId + 1,
+      name: goalData.name,
+      category: milestoneCategory,
+      icon,
+      targetAmount: goalData.target,
+      currentAmount: parseFloat(goalData.saved || '0'),
+      targetDate: goalData.deadline || '',
+      notes: `Linked to goal: ${goalData.name}`,
+      completed: false,
+      createdAt: new Date().toISOString(),
+      linkedGoalId: goalId,
+      calendarAlerts: true
+    }
+    setRoadmapMilestones(prev => [...prev, milestone])
   }
   const deleteGoal = (id: number) => setGoals(goals.filter(g => g.id !== id))
 
@@ -1726,6 +1771,45 @@ export default function Dashboard() {
       if (shouldShowItem(goal.startDate, goal.savingsFrequency)) {
         const id = `goal-${goal.id}-${year}-${month}-${day}`
         items.push({ ...goal, amount: goal.paymentAmount, itemId: id, itemType: 'goal', isPaid: paidOccurrences.has(id) })
+      }
+    })
+    
+    // Roadmap milestone deadlines and check-ins
+    roadmapMilestones.filter(m => !m.completed && m.calendarAlerts !== false).forEach(milestone => {
+      // Show on target date if set
+      if (milestone.targetDate) {
+        const target = parseDateParts(milestone.targetDate)
+        if (target && target.day === day && target.month === month && target.year === year) {
+          const id = `milestone-deadline-${milestone.id}`
+          items.push({ 
+            ...milestone, 
+            name: `🎯 ${milestone.name} DEADLINE`,
+            amount: milestone.targetAmount,
+            itemId: id, 
+            itemType: 'milestone-deadline',
+            isPaid: milestone.completed
+          })
+        }
+      }
+      
+      // Show weekly check-in reminder (every Monday)
+      const checkDate = new Date(year, month, day)
+      if (checkDate.getDay() === 1) { // Monday
+        const progress = parseFloat(milestone.targetAmount || '0') > 0 
+          ? (milestone.currentAmount / parseFloat(milestone.targetAmount || '1') * 100).toFixed(0)
+          : 0
+        // Only show if not complete and has a target
+        if (parseFloat(milestone.targetAmount || '0') > 0 && milestone.currentAmount < parseFloat(milestone.targetAmount || '0')) {
+          const id = `milestone-checkin-${milestone.id}-${year}-${month}-${day}`
+          items.push({
+            ...milestone,
+            name: `📍 ${milestone.name} (${progress}%)`,
+            amount: parseFloat(milestone.targetAmount || '0') - milestone.currentAmount,
+            itemId: id,
+            itemType: 'milestone-checkin',
+            isPaid: paidOccurrences.has(id)
+          })
+        }
       }
     })
 
@@ -2924,7 +3008,7 @@ export default function Dashboard() {
           <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '24px', maxWidth: '500px', width: '90%', maxHeight: '80vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 16px 0', color: theme.text }}>{calendarMonth.toLocaleDateString('en-US', { month: 'long' })} {expandedDay.day}</h3>
             {expandedDay.items.length === 0 ? <p style={{ color: theme.textMuted }}>No items scheduled</p> : expandedDay.items.map(item => (
-              <div key={item.itemId} style={{ padding: '12px', marginBottom: '8px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'expense' ? '#dbeafe' : item.itemType === 'debt' ? '#fee2e2' : '#ede9fe', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: item.isPaid ? 0.6 : 1 }}>
+              <div key={item.itemId} style={{ padding: '12px', marginBottom: '8px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'expense' ? '#dbeafe' : item.itemType === 'debt' ? '#fee2e2' : item.itemType === 'milestone-deadline' ? '#fef3c7' : item.itemType === 'milestone-checkin' ? '#e0e7ff' : '#ede9fe', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: item.isPaid ? 0.6 : 1 }}>
                 <div><div style={{ fontWeight: 600, color: '#1e293b', textDecoration: item.isPaid ? 'line-through' : 'none' }}>{item.name}</div><div style={{ fontSize: '12px', color: '#64748b' }}>${item.amount} • {item.itemType}</div></div>
                 <button onClick={() => togglePaid(item.itemId)} style={{ padding: '8px 16px', background: item.isPaid ? '#6b7280' : theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>{item.isPaid ? '✓ Paid' : 'Pay'}</button>
               </div>
@@ -3670,7 +3754,7 @@ export default function Dashboard() {
                     <div key={day} onClick={() => items.length > 0 && setExpandedDay({ day, items })} style={{ minHeight: '80px', padding: '4px', background: isToday ? theme.accent + '20' : (darkMode ? '#1e293b' : '#f8fafc'), borderRadius: '8px', border: isToday ? '2px solid ' + theme.accent : '1px solid ' + theme.border, cursor: items.length > 0 ? 'pointer' : 'default' }}>
                       <div style={{ fontWeight: 600, color: theme.text, marginBottom: '4px', fontSize: '13px' }}>{day}</div>
                       {items.slice(0, 2).map(item => (
-                        <div key={item.itemId} style={{ fontSize: '10px', padding: '2px 4px', marginBottom: '2px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'expense' ? '#dbeafe' : item.itemType === 'debt' ? '#fee2e2' : '#ede9fe', color: '#1e293b', borderRadius: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, opacity: item.isPaid ? 0.5 : 1 }}>{item.name}</div>
+                        <div key={item.itemId} style={{ fontSize: '10px', padding: '2px 4px', marginBottom: '2px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'expense' ? '#dbeafe' : item.itemType === 'debt' ? '#fee2e2' : item.itemType === 'milestone-deadline' ? '#fef3c7' : item.itemType === 'milestone-checkin' ? '#e0e7ff' : '#ede9fe', color: '#1e293b', borderRadius: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, opacity: item.isPaid ? 0.5 : 1 }}>{item.name}</div>
                       ))}
                       {items.length > 2 && <div style={{ fontSize: '10px', color: theme.accent, fontWeight: 600 }}>+{items.length - 2}</div>}
                     </div>
@@ -3926,9 +4010,20 @@ export default function Dashboard() {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ color: theme.purple, fontWeight: 700 }}>{progress.toFixed(0)}%</span>
-                            <button onClick={() => startEdit('goal', goal)} style={{ padding: '4px 8px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
-                            <button onClick={() => addGoalToCalendar(goal)} style={{ padding: '4px 8px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>📅</button>
-                            <button onClick={() => deleteGoal(goal.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>×</button>
+                            <button onClick={() => startEdit('goal', goal)} style={{ padding: '4px 8px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} title="Edit">✏️</button>
+                            <button onClick={() => addGoalToCalendar(goal)} style={{ padding: '4px 8px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} title="Add to Calendar">📅</button>
+                            {/* Link to Roadmap button - only show if not already linked */}
+                            {!roadmapMilestones.some(m => m.linkedGoalId === goal.id) && (
+                              <button 
+                                onClick={() => addToRoadmap(goal.name, 'savings', goal.target, '🎯', `Saving ${goal.paymentAmount}/${goal.savingsFrequency}`, parseFloat(goal.saved || '0'), goal.id)} 
+                                style={{ padding: '4px 8px', background: theme.success + '20', color: theme.success, border: '1px solid ' + theme.success, borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }} 
+                                title="Link to Roadmap"
+                              >🗺️</button>
+                            )}
+                            {roadmapMilestones.some(m => m.linkedGoalId === goal.id) && (
+                              <span style={{ padding: '2px 6px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '9px' }} title="Linked to Roadmap">🔗</span>
+                            )}
+                            <button onClick={() => deleteGoal(goal.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} title="Delete">×</button>
                           </div>
                         </div>
                         
@@ -4676,8 +4771,9 @@ export default function Dashboard() {
                                 <div>
                                   <h4 style={{ margin: '0 0 4px 0', color: theme.text, fontSize: '16px', textDecoration: isCompleted ? 'line-through' : 'none' }}>
                                     {milestone.name}
+                                    {milestone.linkedGoalId && <span style={{ marginLeft: '8px', padding: '2px 6px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '9px' }} title="Linked to Goal">🔗 Goal</span>}
                                   </h4>
-                                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' as const }}>
                                     <span style={{ color: theme.purple, fontSize: '13px', fontWeight: 600 }}>
                                       ${parseFloat(milestone.targetAmount).toLocaleString()}
                                     </span>
@@ -4690,6 +4786,30 @@ export default function Dashboard() {
                                         {daysUntil !== null && daysUntil > 0 && ` (${daysUntil} days)`}
                                       </span>
                                     )}
+                                    {/* Calendar alerts toggle */}
+                                    <button
+                                      onClick={() => {
+                                        const updated = roadmapMilestones.map(m => 
+                                          m.id === milestone.id ? { ...m, calendarAlerts: !m.calendarAlerts } : m
+                                        )
+                                        setRoadmapMilestones(updated)
+                                      }}
+                                      style={{ 
+                                        padding: '2px 8px', 
+                                        background: milestone.calendarAlerts !== false ? theme.accent + '20' : theme.cardBg, 
+                                        color: milestone.calendarAlerts !== false ? theme.accent : theme.textMuted, 
+                                        border: '1px solid ' + (milestone.calendarAlerts !== false ? theme.accent : theme.border), 
+                                        borderRadius: '12px', 
+                                        cursor: 'pointer', 
+                                        fontSize: '10px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}
+                                      title={milestone.calendarAlerts !== false ? 'Calendar alerts ON - click to disable' : 'Calendar alerts OFF - click to enable'}
+                                    >
+                                      {milestone.calendarAlerts !== false ? '🔔' : '🔕'} Calendar
+                                    </button>
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -4697,7 +4817,7 @@ export default function Dashboard() {
                                     <button
                                       onClick={() => {
                                         const updated = roadmapMilestones.map(m => 
-                                          m.id === milestone.id ? { ...m, completed: true, currentAmount: m.targetAmount } : m
+                                          m.id === milestone.id ? { ...m, completed: true, currentAmount: parseFloat(m.targetAmount) } : m
                                         )
                                         setRoadmapMilestones(updated)
                                       }}
