@@ -322,6 +322,85 @@ export default function Dashboard() {
   const [alertsEnabled, setAlertsEnabled] = useState(true)
   const [alertDaysBefore, setAlertDaysBefore] = useState(2)
   
+  // Country/Region Settings - affects terminology, retirement systems, government schemes
+  const [userCountry, setUserCountry] = useState<'AU' | 'US' | 'UK' | 'NZ' | 'CA'>('AU')
+  
+  const countryConfig: {[key: string]: {
+    name: string,
+    flag: string,
+    currency: string,
+    currencySymbol: string,
+    retirement: string,
+    benefits: string,
+    payFrequency: string,
+    homeSchemes: string[],
+    taxSystem: string,
+    terminology: {[key: string]: string}
+  }} = {
+    AU: {
+      name: 'Australia',
+      flag: '🇦🇺',
+      currency: 'AUD',
+      currencySymbol: '$',
+      retirement: 'Superannuation (Super)',
+      benefits: 'Centrelink',
+      payFrequency: 'fortnightly',
+      homeSchemes: ['First Home Guarantee', 'Help to Buy', 'First Home Super Saver', 'Family Home Guarantee'],
+      taxSystem: 'ATO - Tax brackets, Medicare levy',
+      terminology: { retirement: 'Super', benefits: 'Centrelink', payPeriod: 'fortnight', realEstate: 'property' }
+    },
+    US: {
+      name: 'United States',
+      flag: '🇺🇸',
+      currency: 'USD',
+      currencySymbol: '$',
+      retirement: '401(k), IRA, Roth IRA',
+      benefits: 'Social Security, Medicare, Medicaid',
+      payFrequency: 'biweekly',
+      homeSchemes: ['FHA Loans', 'VA Loans', 'USDA Loans', 'First-Time Homebuyer Programs'],
+      taxSystem: 'IRS - Federal + State taxes, FICA',
+      terminology: { retirement: '401k/IRA', benefits: 'Social Security', payPeriod: 'paycheck', realEstate: 'real estate' }
+    },
+    UK: {
+      name: 'United Kingdom',
+      flag: '🇬🇧',
+      currency: 'GBP',
+      currencySymbol: '£',
+      retirement: 'Workplace Pension, SIPP, ISA',
+      benefits: 'Universal Credit, State Pension',
+      payFrequency: 'monthly',
+      homeSchemes: ['Help to Buy ISA', 'Lifetime ISA', 'Shared Ownership', 'First Homes Scheme'],
+      taxSystem: 'HMRC - Income tax, National Insurance',
+      terminology: { retirement: 'Pension', benefits: 'Universal Credit', payPeriod: 'month', realEstate: 'property' }
+    },
+    NZ: {
+      name: 'New Zealand',
+      flag: '🇳🇿',
+      currency: 'NZD',
+      currencySymbol: '$',
+      retirement: 'KiwiSaver',
+      benefits: 'Work and Income NZ',
+      payFrequency: 'fortnightly',
+      homeSchemes: ['First Home Grant', 'KiwiSaver First Home Withdrawal', 'Kāinga Ora'],
+      taxSystem: 'IRD - PAYE, ACC levy',
+      terminology: { retirement: 'KiwiSaver', benefits: 'WINZ', payPeriod: 'fortnight', realEstate: 'property' }
+    },
+    CA: {
+      name: 'Canada',
+      flag: '🇨🇦',
+      currency: 'CAD',
+      currencySymbol: '$',
+      retirement: 'RRSP, TFSA, CPP',
+      benefits: 'EI, CPP, OAS',
+      payFrequency: 'biweekly',
+      homeSchemes: ['First-Time Home Buyer Incentive', 'Home Buyers Plan (RRSP)', 'First Home Savings Account'],
+      taxSystem: 'CRA - Federal + Provincial taxes',
+      terminology: { retirement: 'RRSP/TFSA', benefits: 'EI', payPeriod: 'paycheque', realEstate: 'real estate' }
+    }
+  }
+  
+  const currentCountryConfig = countryConfig[userCountry]
+  
   // Motivational Quotes from Money Masters
   const moneyQuotes = [
     { quote: "The goal isn't more money. The goal is living life on your terms.", author: "Chris Brogan" },
@@ -828,6 +907,7 @@ export default function Dashboard() {
       if (data.budgetOnboarding) setBudgetOnboarding(data.budgetOnboarding)
       if (data.tradingOnboarding) setTradingOnboarding(data.tradingOnboarding)
       if (data.chatMessages) setChatMessages(data.chatMessages)
+      if (data.userCountry) setUserCountry(data.userCountry)
     }
   }, [])
 
@@ -837,10 +917,10 @@ export default function Dashboard() {
       budgetMemory, tradingMemory,
       paidOccurrences: Array.from(paidOccurrences),
       roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings,
-      budgetOnboarding, tradingOnboarding, chatMessages
+      budgetOnboarding, tradingOnboarding, chatMessages, userCountry
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings, budgetOnboarding, tradingOnboarding, chatMessages])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings, budgetOnboarding, tradingOnboarding, chatMessages, userCountry])
 
   // Scroll chat to bottom - use scrollTop instead of scrollIntoView to avoid page jump
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -1851,7 +1931,7 @@ export default function Dashboard() {
     try {
       const endpoint = mode === 'budget' ? '/api/budget-coach' : '/api/trading-coach'
       const body = mode === 'budget'
-        ? { mode: 'proactive', financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }, memory: budgetMemory }
+        ? { mode: 'proactive', financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }, memory: budgetMemory, countryConfig: currentCountryConfig }
         : { mode: 'proactive', tradingData: { trades }, memory: tradingMemory }
       
       const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -1888,7 +1968,8 @@ export default function Dashboard() {
             userResponse: response,
             conversationHistory: recentHistory,
             memory,
-            financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }
+            financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities },
+            countryConfig: currentCountryConfig
           }
         : {
             mode: 'onboarding',
@@ -2456,7 +2537,7 @@ export default function Dashboard() {
         .join('\n')
       
       const body = appMode === 'budget'
-        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones }, memory: budgetMemory }
+        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones }, memory: budgetMemory, countryConfig: currentCountryConfig }
         : { mode: 'question', question: message, conversationHistory: recentHistory, tradingData: { trades, accounts: tradingAccounts, roadmap: tradingRoadmap }, memory: tradingMemory, tradeIdeaSettings, tradingRules }
       
       const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -2499,7 +2580,7 @@ export default function Dashboard() {
         .join('\n')
       
       const body = appMode === 'budget'
-        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones }, memory: budgetMemory }
+        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones }, memory: budgetMemory, countryConfig: currentCountryConfig }
         : { 
             mode: 'question', 
             question: message, 
@@ -3161,6 +3242,28 @@ export default function Dashboard() {
             </>
           )}
           <button onClick={() => setDarkMode(!darkMode)} style={{ padding: '8px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>{darkMode ? '☀️' : '🌙'}</button>
+          
+          {/* Country/Region Selector */}
+          <select 
+            value={userCountry} 
+            onChange={e => setUserCountry(e.target.value as any)}
+            style={{ 
+              padding: '6px 10px', 
+              background: theme.cardBg, 
+              border: '1px solid ' + theme.border, 
+              borderRadius: '8px', 
+              cursor: 'pointer', 
+              color: theme.text,
+              fontSize: '14px'
+            }}
+            title="Select your country for localized advice"
+          >
+            <option value="AU">🇦🇺 AU</option>
+            <option value="US">🇺🇸 US</option>
+            <option value="UK">🇬🇧 UK</option>
+            <option value="NZ">🇳🇿 NZ</option>
+            <option value="CA">🇨🇦 CA</option>
+          </select>
         </div>
       </header>
 
@@ -3446,7 +3549,7 @@ export default function Dashboard() {
                     <div style={{ color: theme.textMuted, fontSize: '11px' }}>{savingsRate.toFixed(0)}% margin</div>
                   </div>
                   <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
-                    <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Net Worth</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Wealth Position</div>
                     <div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>${netWorth.toLocaleString()}</div>
                   </div>
                 </div>
@@ -3586,7 +3689,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 
-                <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '16px' }}>
+                <div ref={chatContainerRef} style={{ maxHeight: '400px', overflowY: 'auto' as const, marginBottom: '16px' }}>
                   {chatMessages.map((msg, idx) => (
                     <div key={idx} style={{ marginBottom: '12px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                       <div style={{ 
@@ -3641,7 +3744,7 @@ export default function Dashboard() {
                   <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{currentBabyStep.title}</div></div>
                 </div>
                 {proactiveInsight && chatMessages.length === 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>{proactiveInsight.suggestion && <p style={{ color: theme.purple, fontSize: '13px', margin: '8px 0 0 0' }}>💡 {proactiveInsight.suggestion}</p>}</div>}
-                {chatMessages.length > 0 && <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>{chatMessages.map((msg, idx) => <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>)}{isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}</div>}
+                {chatMessages.length > 0 && <div ref={chatContainerRef} style={{ maxHeight: '400px', overflowY: 'auto' as const, marginBottom: '12px', padding: '12px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>{chatMessages.map((msg, idx) => <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>)}{isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}</div>}
                 <div style={{ display: 'flex', gap: '8px' }}><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button></div>
               </div>
             )}
@@ -4076,6 +4179,74 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+            
+            {/* ASSETS & NET WORTH - Added to Command Centre */}
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, color: theme.success, fontSize: '18px' }}>💰 Assets</h3>
+                <div style={{ textAlign: 'right' as const }}>
+                  <div style={{ color: theme.success, fontWeight: 700, fontSize: '18px' }}>${totalAssets.toLocaleString()}</div>
+                  <div style={{ color: theme.textMuted, fontSize: '11px' }}>Wealth Position: <span style={{ color: netWorth >= 0 ? theme.success : theme.danger }}>${netWorth.toLocaleString()}</span></div>
+                </div>
+              </div>
+              
+              {/* Quick add presets - country-aware */}
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
+                {[
+                  { name: 'Savings Account', type: 'savings' },
+                  { name: currentCountryConfig?.terminology?.retirement || 'Super/401K', type: 'super' },
+                  { name: 'Emergency Fund', type: 'savings' },
+                  { name: 'ETF Portfolio', type: 'investment' }
+                ].map(preset => (
+                  <button key={preset.name} onClick={() => setNewAsset({...newAsset, name: preset.name, type: preset.type})} style={{ padding: '4px 10px', background: theme.cardBg, color: theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', fontSize: '11px' }}>+ {preset.name}</button>
+                ))}
+              </div>
+              
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                <input placeholder="Asset name" value={newAsset.name} onChange={e => setNewAsset({...newAsset, name: e.target.value})} style={{...inputStyle, flex: 1}} />
+                <input placeholder="Value" type="number" value={newAsset.value} onChange={e => setNewAsset({...newAsset, value: e.target.value})} style={{...inputStyle, width: '100px'}} />
+                <select value={newAsset.type} onChange={e => setNewAsset({...newAsset, type: e.target.value})} style={inputStyle}>
+                  <option value="savings">💰 Savings</option>
+                  <option value="super">🏦 {currentCountryConfig?.terminology?.retirement || 'Super'}</option>
+                  <option value="investment">📊 Investment</option>
+                  <option value="property">🏠 Property</option>
+                  <option value="vehicle">🚗 Vehicle</option>
+                  <option value="crypto">₿ Crypto</option>
+                </select>
+                <button onClick={addAsset} style={btnSuccess}>+</button>
+              </div>
+              
+              {/* Compact asset list */}
+              {assets.length === 0 ? (
+                <div style={{ textAlign: 'center' as const, padding: '16px', color: theme.textMuted, fontSize: '13px' }}>
+                  No assets yet. Add your savings, {currentCountryConfig?.terminology?.retirement || 'super'}, and investments!
+                </div>
+              ) : (
+                <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>
+                  {assets.map(a => (
+                    <div key={a.id} style={{ padding: '10px 12px', marginBottom: '6px', background: darkMode ? '#1e2a3b' : '#f8fafc', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ color: theme.text, fontSize: '14px' }}>{a.name}</span>
+                        <span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '8px' }}>{a.type}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ color: a.type === 'savings' ? theme.success : a.type === 'super' ? theme.accent : a.type === 'investment' ? theme.purple : theme.warning, fontWeight: 700 }}>${parseFloat(a.value).toLocaleString()}</span>
+                        <button onClick={() => deleteAsset(a.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Summary row */}
+              {assets.length > 0 && (
+                <div style={{ marginTop: '12px', padding: '10px', background: theme.success + '10', borderRadius: '8px', display: 'flex', justifyContent: 'space-around', fontSize: '12px' }}>
+                  <div><span style={{ color: theme.textMuted }}>Liquid:</span> <span style={{ color: theme.success, fontWeight: 600 }}>${assets.filter(a => a.type === 'savings' || a.type === 'investment').reduce((s, a) => s + parseFloat(a.value || '0'), 0).toLocaleString()}</span></div>
+                  <div><span style={{ color: theme.textMuted }}>{currentCountryConfig?.terminology?.retirement || 'Super'}:</span> <span style={{ color: theme.accent, fontWeight: 600 }}>${assets.filter(a => a.type === 'super').reduce((s, a) => s + parseFloat(a.value || '0'), 0).toLocaleString()}</span></div>
+                  <div><span style={{ color: theme.textMuted }}>Other:</span> <span style={{ color: theme.warning, fontWeight: 600 }}>${assets.filter(a => a.type === 'property' || a.type === 'vehicle' || a.type === 'crypto').reduce((s, a) => s + parseFloat(a.value || '0'), 0).toLocaleString()}</span></div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -4090,7 +4261,7 @@ export default function Dashboard() {
                 <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>Operations Score: {financialHealthScore}</div></div>
               </div>
               {proactiveInsight && chatMessages.length === 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>{proactiveInsight.suggestion && <p style={{ color: theme.purple, fontSize: '13px', margin: '8px 0 0 0' }}>💡 {proactiveInsight.suggestion}</p>}</div>}
-              {chatMessages.length > 0 && <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>{chatMessages.map((msg, idx) => <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>)}{isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}</div>}
+              {chatMessages.length > 0 && <div ref={chatContainerRef} style={{ maxHeight: '400px', overflowY: 'auto' as const, marginBottom: '12px', padding: '12px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>{chatMessages.map((msg, idx) => <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>)}{isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}</div>}
               <div style={{ display: 'flex', gap: '8px' }}><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button></div>
             </div>
             
@@ -4309,7 +4480,7 @@ export default function Dashboard() {
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Monthly Revenue</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 700 }}>${monthlyIncome.toFixed(0)}</div></div>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Operating Costs</div><div style={{ color: theme.danger, fontSize: '24px', fontWeight: 700 }}>${totalOutgoing.toFixed(0)}</div></div>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Net Profit</div><div style={{ color: monthlySurplus >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${monthlySurplus.toFixed(0)}</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{savingsRate.toFixed(0)}% profit margin</div></div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Net Worth</div><div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${netWorth.toFixed(0)}</div></div>
+              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Wealth Position</div><div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${netWorth.toFixed(0)}</div></div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
