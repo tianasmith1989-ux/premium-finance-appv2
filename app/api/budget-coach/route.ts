@@ -201,6 +201,50 @@ export async function POST(request: NextRequest) {
         })
       }
       
+      // Assets section
+      if (financialData.assets?.length > 0) {
+        context += '\nASSETS:\n'
+        let totalSavings = 0
+        let totalSuper = 0
+        let totalInvestments = 0
+        let totalProperty = 0
+        
+        financialData.assets.forEach((asset: any) => {
+          const value = parseFloat(asset.value || '0')
+          context += `  - "${asset.name}" (${asset.type}): $${value.toLocaleString()}\n`
+          
+          if (asset.type === 'savings') totalSavings += value
+          else if (asset.type === 'super') totalSuper += value
+          else if (asset.type === 'investment' || asset.type === 'crypto') totalInvestments += value
+          else if (asset.type === 'property' || asset.type === 'vehicle') totalProperty += value
+        })
+        
+        const totalAssets = financialData.assets.reduce((sum: number, a: any) => sum + parseFloat(a.value || '0'), 0)
+        context += `  TOTAL ASSETS: $${totalAssets.toLocaleString()}\n`
+        context += `    - Liquid (Savings): $${totalSavings.toLocaleString()}\n`
+        context += `    - Super/Retirement: $${totalSuper.toLocaleString()}\n`
+        context += `    - Investments: $${totalInvestments.toLocaleString()}\n`
+        context += `    - Property/Vehicles: $${totalProperty.toLocaleString()}\n`
+      }
+      
+      // Liabilities section
+      if (financialData.liabilities?.length > 0) {
+        context += '\nLIABILITIES (non-debt obligations):\n'
+        financialData.liabilities.forEach((liability: any) => {
+          context += `  - "${liability.name}": $${parseFloat(liability.value || '0').toLocaleString()}\n`
+        })
+        const totalLiabilities = financialData.liabilities.reduce((sum: number, l: any) => sum + parseFloat(l.value || '0'), 0)
+        context += `  TOTAL LIABILITIES: $${totalLiabilities.toLocaleString()}\n`
+      }
+      
+      // Calculate net worth
+      const totalAssets = financialData.assets?.reduce((sum: number, a: any) => sum + parseFloat(a.value || '0'), 0) || 0
+      const totalLiabilities = financialData.liabilities?.reduce((sum: number, l: any) => sum + parseFloat(l.value || '0'), 0) || 0
+      const totalDebtBalance = financialData.debts?.reduce((sum: number, d: any) => sum + parseFloat(d.balance || '0'), 0) || 0
+      const netWorth = totalAssets - totalLiabilities - totalDebtBalance
+      
+      context += `\nNET WORTH: $${netWorth.toLocaleString()}\n`
+      
       // Add calculated summary
       const netFortnightly = totalIncomeFortnightly - totalExpensesFortnightly - totalDebtPaymentsFortnightly - totalGoalSavingsFortnightly
       
@@ -649,6 +693,8 @@ ADD (need date first!):
 {"type": "addExpense", "data": {"name": "...", "amount": "...", "frequency": "...", "category": "...", "dueDate": "YYYY-MM-DD"}}
 {"type": "addDebt", "data": {"name": "...", "balance": "...", "interestRate": "...", "minPayment": "...", "paymentDate": "YYYY-MM-DD"}}
 {"type": "addGoal", "data": {"name": "...", "target": "...", "saved": "0", "deadline": "YYYY-MM-DD", "savingsFrequency": "...", "paymentAmount": "..."}}
+{"type": "addRoadmapMilestone", "data": {"name": "...", "targetAmount": "...", "category": "emergency|debt|savings|investment|income", "icon": "🎯", "notes": "..."}}
+{"type": "addAsset", "data": {"name": "...", "value": "...", "type": "savings|super|investment|property|vehicle|crypto|other"}}
 
 UPDATE (include ID!):
 {"type": "updateIncome", "data": {"id": 123, "amount": "500"}}
@@ -661,6 +707,16 @@ DELETE (just need ID):
 {"type": "deleteExpense", "data": {"id": 456}}
 {"type": "deleteDebt", "data": {"id": 789}}
 {"type": "deleteGoal", "data": {"id": 012}}
+
+=== ADD TO ROADMAP ===
+When user talks about big goals or milestones, add them to the roadmap:
+- "I want to save $10,000 for an emergency fund" → addRoadmapMilestone
+- "My goal is to pay off all debt" → addRoadmapMilestone with totalDebtBalance as target
+- "I want to buy a house in 5 years" → addRoadmapMilestone
+- "I want $1000/month passive income" → addRoadmapMilestone
+
+Categories for roadmap: emergency, debt, savings, investment, income
+Icons: 🛡️ (emergency), 💳 (debt), 🎯 (savings), 📈 (investment), 💰 (income), 🏠 (home)
 
 === RESPONSE FORMAT ===
 
