@@ -1219,13 +1219,15 @@ export default function Dashboard() {
       completed: false,
       createdAt: new Date().toISOString(),
       linkedGoalId: linkedGoalId || null, // Link to goal if exists
-      calendarAlerts: true // Enable calendar alerts by default
+      calendarAlerts: false, // OFF by default - user can enable and configure
+      alertFrequency: 'weekly', // weekly, fortnightly, monthly
+      alertDay: 1 // 0=Sunday, 1=Monday, etc. OR day of month for monthly
     }
     
     setRoadmapMilestones(prev => [...prev, newMilestoneItem])
     
     // Show confirmation
-    alert(`✅ Added "${name}" to your roadmap!`)
+    alert(`✅ Added "${name}" to your roadmap! You can configure calendar reminders in the Roadmap section.`)
   }
   
   // Sync Goals ↔ Roadmap - when a goal updates, update linked roadmap milestone
@@ -1266,7 +1268,9 @@ export default function Dashboard() {
       completed: false,
       createdAt: new Date().toISOString(),
       linkedGoalId: goalId,
-      calendarAlerts: true
+      calendarAlerts: false, // OFF by default
+      alertFrequency: goalData.savingsFrequency || 'weekly',
+      alertDay: 1
     }
     setRoadmapMilestones(prev => [...prev, milestone])
   }
@@ -1775,8 +1779,8 @@ export default function Dashboard() {
     })
     
     // Roadmap milestone deadlines and check-ins
-    roadmapMilestones.filter(m => !m.completed && m.calendarAlerts !== false).forEach(milestone => {
-      // Show on target date if set
+    roadmapMilestones.filter(m => !m.completed && m.calendarAlerts === true).forEach(milestone => {
+      // Show on target date if set (deadline)
       if (milestone.targetDate) {
         const target = parseDateParts(milestone.targetDate)
         if (target && target.day === day && target.month === month && target.year === year) {
@@ -1792,9 +1796,27 @@ export default function Dashboard() {
         }
       }
       
-      // Show weekly check-in reminder (every Monday)
+      // Show recurring check-in based on frequency and day settings
       const checkDate = new Date(year, month, day)
-      if (checkDate.getDay() === 1) { // Monday
+      const alertDay = milestone.alertDay ?? 1 // Default to Monday (1) or 1st of month
+      const alertFrequency = milestone.alertFrequency || 'weekly'
+      
+      let shouldShow = false
+      
+      if (alertFrequency === 'weekly') {
+        // alertDay is day of week (0=Sun, 1=Mon, 2=Tue, etc.)
+        shouldShow = checkDate.getDay() === alertDay
+      } else if (alertFrequency === 'fortnightly') {
+        // Every 2 weeks on the specified day
+        const dayOfWeek = checkDate.getDay()
+        const weekOfYear = Math.floor((checkDate.getTime() - new Date(year, 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))
+        shouldShow = dayOfWeek === alertDay && weekOfYear % 2 === 0
+      } else if (alertFrequency === 'monthly') {
+        // alertDay is day of month (1-31)
+        shouldShow = day === alertDay
+      }
+      
+      if (shouldShow) {
         const progress = parseFloat(milestone.targetAmount || '0') > 0 
           ? (milestone.currentAmount / parseFloat(milestone.targetAmount || '1') * 100).toFixed(0)
           : 0
@@ -4796,9 +4818,9 @@ export default function Dashboard() {
                                       }}
                                       style={{ 
                                         padding: '2px 8px', 
-                                        background: milestone.calendarAlerts !== false ? theme.accent + '20' : theme.cardBg, 
-                                        color: milestone.calendarAlerts !== false ? theme.accent : theme.textMuted, 
-                                        border: '1px solid ' + (milestone.calendarAlerts !== false ? theme.accent : theme.border), 
+                                        background: milestone.calendarAlerts === true ? theme.accent + '20' : theme.cardBg, 
+                                        color: milestone.calendarAlerts === true ? theme.accent : theme.textMuted, 
+                                        border: '1px solid ' + (milestone.calendarAlerts === true ? theme.accent : theme.border), 
                                         borderRadius: '12px', 
                                         cursor: 'pointer', 
                                         fontSize: '10px',
@@ -4806,9 +4828,9 @@ export default function Dashboard() {
                                         alignItems: 'center',
                                         gap: '4px'
                                       }}
-                                      title={milestone.calendarAlerts !== false ? 'Calendar alerts ON - click to disable' : 'Calendar alerts OFF - click to enable'}
+                                      title={milestone.calendarAlerts === true ? 'Calendar alerts ON - click to disable' : 'Calendar alerts OFF - click to enable'}
                                     >
-                                      {milestone.calendarAlerts !== false ? '🔔' : '🔕'} Calendar
+                                      {milestone.calendarAlerts === true ? '🔔' : '🔕'} Calendar
                                     </button>
                                   </div>
                                 </div>
@@ -4834,6 +4856,67 @@ export default function Dashboard() {
                                   </button>
                                 </div>
                               </div>
+                              
+                              {/* Calendar Alert Settings - only show when enabled */}
+                              {milestone.calendarAlerts === true && !isCompleted && (
+                                <div style={{ padding: '12px', marginBottom: '12px', background: theme.accent + '10', borderRadius: '8px', border: '1px solid ' + theme.accent + '30' }}>
+                                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' as const }}>
+                                    <span style={{ color: theme.text, fontSize: '12px', fontWeight: 600 }}>🔔 Remind me:</span>
+                                    <select
+                                      value={milestone.alertFrequency || 'weekly'}
+                                      onChange={e => {
+                                        const updated = roadmapMilestones.map(m => 
+                                          m.id === milestone.id ? { ...m, alertFrequency: e.target.value, alertDay: e.target.value === 'monthly' ? 1 : (m.alertDay || 1) } : m
+                                        )
+                                        setRoadmapMilestones(updated)
+                                      }}
+                                      style={{ padding: '6px 10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '6px', color: theme.text, fontSize: '12px' }}
+                                    >
+                                      <option value="weekly">Weekly</option>
+                                      <option value="fortnightly">Fortnightly</option>
+                                      <option value="monthly">Monthly</option>
+                                    </select>
+                                    
+                                    <span style={{ color: theme.textMuted, fontSize: '12px' }}>on</span>
+                                    
+                                    {(milestone.alertFrequency || 'weekly') !== 'monthly' ? (
+                                      <select
+                                        value={milestone.alertDay ?? 1}
+                                        onChange={e => {
+                                          const updated = roadmapMilestones.map(m => 
+                                            m.id === milestone.id ? { ...m, alertDay: parseInt(e.target.value) } : m
+                                          )
+                                          setRoadmapMilestones(updated)
+                                        }}
+                                        style={{ padding: '6px 10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '6px', color: theme.text, fontSize: '12px' }}
+                                      >
+                                        <option value={0}>Sunday</option>
+                                        <option value={1}>Monday</option>
+                                        <option value={2}>Tuesday</option>
+                                        <option value={3}>Wednesday</option>
+                                        <option value={4}>Thursday</option>
+                                        <option value={5}>Friday</option>
+                                        <option value={6}>Saturday</option>
+                                      </select>
+                                    ) : (
+                                      <select
+                                        value={milestone.alertDay ?? 1}
+                                        onChange={e => {
+                                          const updated = roadmapMilestones.map(m => 
+                                            m.id === milestone.id ? { ...m, alertDay: parseInt(e.target.value) } : m
+                                          )
+                                          setRoadmapMilestones(updated)
+                                        }}
+                                        style={{ padding: '6px 10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '6px', color: theme.text, fontSize: '12px' }}
+                                      >
+                                        {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
+                                          <option key={d} value={d}>{d}{d === 1 ? 'st' : d === 2 ? 'nd' : d === 3 ? 'rd' : 'th'}</option>
+                                        ))}
+                                      </select>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                               
                               {/* Progress bar */}
                               {!isCompleted && (
