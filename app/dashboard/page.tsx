@@ -2151,6 +2151,32 @@ export default function Dashboard() {
           }
           break
           
+        case 'updateRoadmapMilestone':
+          if (data.id) {
+            setRoadmapMilestones(prev => prev.map(item => {
+              if (item.id === data.id || Math.floor(item.id) === Math.floor(data.id)) {
+                return {
+                  ...item,
+                  ...(data.name && { name: data.name }),
+                  ...(data.targetAmount !== undefined && { targetAmount: data.targetAmount.toString().replace(/[$,]/g, '') }),
+                  ...(data.currentAmount !== undefined && { currentAmount: parseFloat(data.currentAmount.toString().replace(/[$,]/g, '')) }),
+                  ...(data.targetDate && { targetDate: data.targetDate }),
+                  ...(data.category && { category: data.category }),
+                  ...(data.notes !== undefined && { notes: data.notes }),
+                  ...(data.completed !== undefined && { completed: data.completed })
+                }
+              }
+              return item
+            }))
+          }
+          break
+          
+        case 'deleteRoadmapMilestone':
+          if (data.id) {
+            setRoadmapMilestones(prev => prev.filter(item => item.id !== data.id && Math.floor(item.id) !== Math.floor(data.id)))
+          }
+          break
+          
         // ===== ASSET ACTIONS =====
         case 'addAsset':
           if (data.name && data.value) {
@@ -2324,8 +2350,8 @@ export default function Dashboard() {
         .join('\n')
       
       const body = appMode === 'budget'
-        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }, memory: budgetMemory }
-        : { mode: 'question', question: message, conversationHistory: recentHistory, tradingData: { trades }, memory: tradingMemory }
+        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones }, memory: budgetMemory }
+        : { mode: 'question', question: message, conversationHistory: recentHistory, tradingData: { trades, accounts: tradingAccounts, roadmap: tradingRoadmap }, memory: tradingMemory, tradeIdeaSettings, tradingRules }
       
       const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await response.json()
@@ -2367,12 +2393,12 @@ export default function Dashboard() {
         .join('\n')
       
       const body = appMode === 'budget'
-        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities }, memory: budgetMemory }
+        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones }, memory: budgetMemory }
         : { 
             mode: 'question', 
             question: message, 
             conversationHistory: recentHistory, 
-            tradingData: { trades, accounts: tradingAccounts }, 
+            tradingData: { trades, accounts: tradingAccounts, roadmap: tradingRoadmap }, 
             memory: tradingMemory,
             chartImage: pendingChartImage || undefined, // Send image to trading coach
             tradeIdeaSettings, // User's R:R and risk preferences
