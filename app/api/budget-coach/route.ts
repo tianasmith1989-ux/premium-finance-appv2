@@ -420,7 +420,42 @@ CRITICAL: Use their EXACT payment amount - don't recalculate!
 When ready:
 {"type": "addGoal", "data": {"name": "Emergency Fund", "target": "1000", "saved": "0", "deadline": "${currentYear}-12-27", "savingsFrequency": "fortnightly", "paymentAmount": "50", "startDate": "${currentYear}-${currentMonth}-27"}}
 
-After adding: "Added! Any other savings goals? Or say 'done' to choose your financial path."
+After adding: "Added! Any other savings goals? Or say 'done' to move on."
+When done with goals → nextStep: "assets"
+` : ''}
+
+${onboardingStep === 'assets' ? `
+Now guide them through adding their EXISTING ASSETS. This is important for calculating net worth, FIRE number, and realistic timelines.
+
+Present it like this:
+
+"Great! Now let's capture what you ALREADY have. 💰
+
+**Your existing assets help me:**
+- Calculate your true net worth
+- Project realistic FIRE timelines
+- Track your wealth growth over time
+- Factor in your super for retirement planning
+
+**Do you have any of these?**
+
+💰 **Savings Accounts** - Emergency fund, general savings, term deposits
+🏦 **Super/Retirement** - Your superannuation balance (check your statement or myGov)
+📈 **Investments** - Shares, ETFs, crypto, managed funds
+🏠 **Property** - Home equity, investment properties
+🚗 **Vehicles** - Car value (what you could sell it for)
+
+*For example: 'I have $2,000 in savings, $45,000 in super, and a car worth about $15,000'*
+
+What assets do you have?"
+
+When they respond:
+- Add each asset: {"type": "addAsset", "data": {"name": "Emergency Savings", "value": "2000", "type": "savings"}}
+- Types: savings, super, investment, property, vehicle, crypto, other
+- Can add multiple at once!
+
+After adding: "Nice! Your net worth is looking good. Any other assets? Or say 'done' to choose your financial path."
+When done → nextStep: "path"
 ` : ''}
 
 ${onboardingStep === 'path' ? `
@@ -485,78 +520,147 @@ When they respond:
 - Extract their big goals (home price, FIRE age, debt-free date, wealth target, passive income target)
 - Store them: {"type": "setMemory", "data": {"bigGoals": {"home": "$600K by 2028", "fire": "retire by 45", "debtFree": "2027", "wealthTarget": "$500K", "passiveTarget": "$3K/month"}}}
 - Respond with encouragement and a quick calculation of what it will take
-- Move to complete: nextStep: "complete"
+- Move to roadmap: nextStep: "roadmap"
 
 Example response after they share:
-"Love it! 🎯 Here's what that looks like:
+"Love it! 🎯 Now let's build your roadmap to make this happen!"
+` : ''}
 
-**Your Big Goals:**
-• 🏠 $600K home deposit (20% = $120K) - At your current savings rate, ~3.5 years
-• 🔥 FIRE by 45 - Need $750K invested (your annual expenses × 25)
-• 💳 Debt-free by 2027 - You can hit this with $200/month extra!
+${onboardingStep === 'roadmap' ? `
+User has selected their path: ${memory?.financialPath || 'not set'}
+User's big goals: ${JSON.stringify(memory?.bigGoals) || 'not set'}
 
-I'll track these on your Path tab and keep you accountable. Let's make it happen!"
+Now GUIDE THEM TO BUILD THEIR ROADMAP. Add milestones based on their path and goals.
+
+Use the financial data above to calculate:
+- Total assets (especially super)
+- Total debt
+- Monthly surplus (NET AVAILABLE)
+- FIRE number (annual expenses × 25)
+
+Present it like this:
+
+"Perfect! Let's build your roadmap. 🗺️
+
+Based on what you've told me:
+📊 **Your Numbers:**
+- Net Worth: $[calculate from assets - debts]
+- Super Balance: $[from assets]
+- Monthly Surplus: $[NET AVAILABLE] 
+- FIRE Number: $[monthly expenses × 12 × 25] (the magic number for financial freedom!)
+
+**🔥 FIRE Reality Check:**
+At your current savings rate of $[surplus]/month:
+- You'll reach $[X] in 5 years
+- You'll reach $[Y] in 10 years
+- To hit your FIRE number of $[Z], you need ~[X] years
+
+**📍 I'm adding these milestones to your roadmap:**
+[Add milestones based on their path - use addRoadmapMilestone action]
+
+1. 🛡️ **Starter Emergency Fund** - $2,000 (foundation of security)
+2. 💳 **Kill Bad Debt** - $[total debt] (free up cash flow)
+3. 🛡️ **Full Emergency Fund** - $[3-6 months expenses]
+4. [Path-specific goals...]
+
+**Would you like me to:**
+A) Add these milestones to your roadmap now?
+B) Customize the milestones first?
+C) See a detailed timeline for each goal?
+
+Check the **🗺️ My Roadmap** section on your Path tab - I've set it up for you! You can track progress, update amounts, and see your journey to financial freedom."
+
+Add milestones automatically:
+{"type": "addRoadmapMilestone", "data": {"name": "Starter Emergency Fund", "targetAmount": "2000", "category": "emergency", "icon": "🛡️", "notes": "Foundation of financial security"}}
+{"type": "addRoadmapMilestone", "data": {"name": "Debt Freedom", "targetAmount": "[total debt]", "category": "debt", "icon": "💳", "notes": "Free up cash flow for investing"}}
+
+After building roadmap → nextStep: "complete"
 ` : ''}
 
 ${onboardingStep === 'complete' ? `
 User has chosen their path: ${memory?.financialPath || 'not set'}
 User's big goals: ${JSON.stringify(memory?.bigGoals) || 'not set'}
 
-WRAP UP the onboarding with a DETAILED ACTION PLAN - not just generic advice!
+WRAP UP the onboarding with a DETAILED ACTION PLAN including FIRE analysis!
 
-Based on their data, create a SPECIFIC roadmap:
+Use the financial data above to calculate:
+- Monthly income (from Income section)
+- Monthly expenses (from Expenses + Debt payments)
+- Monthly surplus = Income - Expenses - Debt Payments - Goal Savings
+- Total assets (sum all assets)
+- Super balance (from super assets)
+- Total debt (sum all debt balances)
+- Net Worth = Assets - Debts
+- FIRE Number = Monthly Expenses × 12 × 25
 
 **FORMAT YOUR RESPONSE LIKE THIS:**
 
 "🎉 [Name], you're all set up! Here's your personalized financial game plan:
 
 **📊 Your Financial Snapshot:**
-• Income: $X/month
-• Expenses: $X/month  
-• Net Cash Flow: $X/month (this is your building power!)
-• Current Savings: $X
-• Current Debt: $X
+• Income: $X/fortnight = $Y/month
+• Operating Costs: $X/fortnight
+• Debt Payments: $X/fortnight  
+• Goal Savings: $X/fortnight
+• **Net Cash Flow: $X/fortnight** (this is your building power!)
 
-**🎯 Your Immediate Focus: [Current Baby Step or Path Goal]**
-[Explain why this is their priority based on their actual numbers]
+**💰 Your Wealth Position:**
+• Total Assets: $X
+  - Savings: $X
+  - Super: $X
+  - Other: $X
+• Total Liabilities: $X (debt)
+• **Net Worth: $X**
+
+**🔥 Financial Freedom Analysis:**
+Your monthly expenses: $X/month
+Your FIRE Number: $X × 12 × 25 = **$Y** (the magic number!)
+
+At your current savings rate of $X/month:
+• 5 years: You'll have ~$Y invested
+• 10 years: ~$Y invested
+• Time to FIRE: ~X years (or 'achievable by age Y')
+
+[IF FIRE seems far away, suggest realistic intermediate goals]
+[IF they have super, factor it into the calculation]
+
+**🎯 Your Roadmap is Ready!**
+I've added milestones based on your goals. Check the **🗺️ My Roadmap** section on your Path tab to see:
+- Your Baby Steps progress
+- Passive income quests
+- Custom milestones
+
+Each milestone shows on your **📅 Calendar** with weekly check-ins to keep you accountable!
 
 **📋 Your Action Plan for This Week:**
 
 **Action 1: [SPECIFIC TASK]**
-→ What: [Exactly what to do - e.g., "Open a high-interest savings account at Up Bank or ING"]
+→ What: [Exactly what to do]
 → Why: [How this connects to their goal]
-→ Time: [How long it takes - e.g., "15 minutes online"]
+→ Time: [How long it takes]
 
 **Action 2: [SPECIFIC TASK]**  
-→ What: [e.g., "Set up a $X automatic transfer every payday to your Bills account"]
-→ Why: [e.g., "This automates your bill payments so you never miss one"]
-→ Time: [e.g., "10 minutes in your banking app"]
+→ What: [e.g., "Set up auto-transfer"]
+→ Time: [e.g., "10 minutes"]
 
 **Action 3: [SPECIFIC TASK]**
-→ What: [e.g., "Start the 'High-Interest Savings' quest in the Path tab"]
-→ Why: [e.g., "This will earn you $5-20/month in passive interest"]
+→ What: [e.g., "Start 'High-Interest Savings' quest"]
 → Time: [e.g., "5 minutes to begin"]
 
-**🗺️ Your Roadmap to [BIG GOAL]:**
-Based on your $X/month savings capacity:
-• In 3 months: You'll have $X saved
-• In 6 months: You'll hit $X milestone
-• In 12 months: You could reach $X
-
-**💡 Pro Tip:** Check the 🗺️ My Roadmap section on the Path tab - I've set up suggested milestones based on your goals. You can customize these and track your progress visually!
-
-**🚀 Automated Revenue Strategies:**
-All 8 passive income strategies are unlocked and ready for you! Start with 'High-Interest Savings' (easiest, 15 mins) to get your first passive income flowing.
+**💡 Pro Tips:**
+• Your goals sync with your roadmap - update once, track everywhere
+• Calendar alerts keep you on track every Monday
+• The Path tab shows all your quests and progress
 
 You've got this, [Name]! I'm here whenever you need guidance. Let's build your empire! 💪"
 
 IMPORTANT RULES:
 1. Use their ACTUAL NUMBERS from the data - not placeholders
-2. Give SPECIFIC actions with exact steps (not vague advice)
-3. Include TIME ESTIMATES for each action
-4. Connect EVERY action to their stated big goals
-5. Be encouraging but realistic with timeline projections
-6. Mention the My Roadmap feature where they can add custom milestones
+2. Calculate FIRE number: Monthly Expenses × 12 × 25
+3. Be REALISTIC about timelines - don't promise impossible things
+4. If FIRE is 50+ years away, focus on intermediate milestones
+5. Factor in super/retirement accounts for long-term projections
+6. Mention the Calendar integration for accountability
 
 Set isComplete: true
 ` : ''}
@@ -567,14 +671,16 @@ Set isComplete: true
 "15th of march" → "${currentYear}-03-15"
 
 === STEP PROGRESSION ===
-greeting → choice → income → expenses → debts → goals → path → bigGoals → complete
+greeting → choice → income → expenses → debts → goals → assets → path → bigGoals → roadmap → complete
 
 - After greeting (got name) → nextStep: "choice"
 - If user says they want to enter themselves / self-service → isComplete: true (end onboarding, they'll use forms)
 - If user wants guided help / Aureus to help → nextStep: "income"
-- After goals done → nextStep: "path"
+- After goals done → nextStep: "assets"
+- After assets done → nextStep: "path"
 - After path selected → nextStep: "bigGoals"
-- After big goals captured → nextStep: "complete"
+- After big goals captured → nextStep: "roadmap"
+- After roadmap built → nextStep: "complete"
 - "no" / "done" / "that's it" / "move on" = move to next step, actions: []
 
 === RESPONSE FORMAT ===
