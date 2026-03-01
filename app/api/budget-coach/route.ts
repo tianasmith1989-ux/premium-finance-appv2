@@ -245,6 +245,46 @@ export async function POST(request: NextRequest) {
       
       context += `\nNET WORTH: $${netWorth.toLocaleString()}\n`
       
+      // ROADMAP MILESTONES - This is what the user is working towards!
+      if (financialData.roadmapMilestones?.length > 0) {
+        context += '\n=== USER\'S ROADMAP MILESTONES ===\n'
+        context += '(These are the user\'s stated goals - help them achieve these!)\n\n'
+        
+        const completed = financialData.roadmapMilestones.filter((m: any) => m.completed)
+        const inProgress = financialData.roadmapMilestones.filter((m: any) => !m.completed)
+        
+        if (inProgress.length > 0) {
+          context += '📍 IN PROGRESS:\n'
+          inProgress.forEach((m: any) => {
+            const target = parseFloat(m.targetAmount || '0')
+            const current = parseFloat(m.currentAmount || '0')
+            const progress = target > 0 ? ((current / target) * 100).toFixed(1) : '0'
+            const remaining = target - current
+            
+            context += `  🎯 "${m.name}"\n`
+            context += `     Category: ${m.category || 'general'}\n`
+            context += `     Target: $${target.toLocaleString()}\n`
+            context += `     Current: $${current.toLocaleString()} (${progress}% complete)\n`
+            context += `     Remaining: $${remaining.toLocaleString()}\n`
+            if (m.targetDate) {
+              const daysUntil = Math.ceil((new Date(m.targetDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+              context += `     Deadline: ${m.targetDate} (${daysUntil > 0 ? daysUntil + ' days' : 'OVERDUE'})\n`
+            }
+            if (m.notes) context += `     Notes: "${m.notes}"\n`
+            context += '\n'
+          })
+        }
+        
+        if (completed.length > 0) {
+          context += '✅ COMPLETED:\n'
+          completed.forEach((m: any) => {
+            context += `  ✓ "${m.name}" - $${parseFloat(m.targetAmount || '0').toLocaleString()}\n`
+          })
+        }
+        
+        context += '\n'
+      }
+      
       // Add calculated summary
       const netFortnightly = totalIncomeFortnightly - totalExpensesFortnightly - totalDebtPaymentsFortnightly - totalGoalSavingsFortnightly
       
@@ -729,30 +769,35 @@ WRONG: \`\`\`json {"message": "..."} \`\`\`
 RIGHT: {"message": "Your response here", "actions": []}
 
 === ROADMAP ANALYSIS ===
-When asked to analyze a roadmap or create a plan:
+When asked to analyze a roadmap, create a plan, or when the user has milestones in their roadmap:
 
-1. **Prioritize Goals** - Order them logically:
-   - Emergency fund first (if not complete)
-   - High-interest debt payoff
-   - Then savings/investment goals by timeline
+LOOK AT THEIR MILESTONES in the "USER'S ROADMAP MILESTONES" section above!
+These are the goals they're actively tracking. Reference them BY NAME when coaching.
 
-2. **Calculate Timelines** - Use their NET cash flow:
-   - Monthly surplus = Income - Expenses - Debt Payments
-   - Time to goal = (Target - Current) / Monthly contribution
+1. **Prioritize Their Milestones** - Based on what they've added:
+   - Emergency fund milestones first (Baby Step 1, Baby Step 3)
+   - Debt milestones (Baby Step 2, Kill Bad Debt)
+   - Investment/passive income milestones (Baby Step 4-7, Quests)
 
-3. **Create Action Plan** - Be SPECIFIC:
-   - Week 1: Open high-interest savings account
-   - Week 2: Set up auto-transfer of $X on payday
-   - Month 1: Hit $X milestone
-   - etc.
+2. **Calculate Realistic Timelines** - Use their NET cash flow:
+   - Net Available: Use the FORTNIGHTLY BUDGET SUMMARY figure
+   - Time to each milestone = (Target - Current) / (Net Available per period)
+   - Show the math!
 
-4. **Flag Conflicts** - Point out issues:
-   - "Your 3 goals total $200K but at $500/month savings = 33 years"
-   - "Consider focusing on debt first - you're paying 18% interest"
+3. **Create Specific Action Plan** for THEIR milestones:
+   - Reference each milestone by name
+   - "For your '$2,000 Emergency Fund' milestone, at $100/fortnight you'll reach it in X months"
+   - "Your 'High-Interest Savings' quest is the perfect first step"
 
-5. **Give Encouragement** - Show progress:
-   - "At your pace, you'll hit milestone 1 in just 4 months!"
-   - "You're 35% of the way to your emergency fund already"
+4. **Sequential Ordering** - Help them focus:
+   - "Focus on [Milestone 1] first, then move to [Milestone 2]"
+   - Explain WHY that order makes sense
+
+5. **Update Milestones** - If they've made progress:
+   - Use updateRoadmapMilestone action to update currentAmount
+   - {"type": "updateRoadmapMilestone", "data": {"id": 123, "currentAmount": 500}}
+
+ALWAYS reference the specific milestones they've added. Don't give generic advice - make it personal to their roadmap.
 
 === IMPORTANT DISCLAIMER ===
 You are an AI assistant providing general financial education and suggestions.
