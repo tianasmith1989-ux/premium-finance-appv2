@@ -9,7 +9,7 @@ export default function Dashboard() {
   // ==================== APP MODE & NAVIGATION ====================
   const [appMode, setAppMode] = useState<'budget' | 'trading' | null>(null)
   const [showModeSelector, setShowModeSelector] = useState(true)
-  const [activeTab, setActiveTab] = useState<'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'trading'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'trading' | 'today' | 'journal' | 'analytics' | 'accounts'>('chat')
   const [darkMode, setDarkMode] = useState(true)
   
   // ==================== TOUR STATE ====================
@@ -552,6 +552,56 @@ Sent from Aureus App
   })
   const [tradingCalendarMonth, setTradingCalendarMonth] = useState(new Date())
   
+  // ==================== TRADING SUB-TABS ====================
+  const [tradingSubTab, setTradingSubTab] = useState<'today' | 'journal' | 'analytics' | 'accounts'>('today')
+  const [showQuickTradeModal, setShowQuickTradeModal] = useState(false)
+  const [quickTradeType, setQuickTradeType] = useState<'win' | 'loss' | null>(null)
+  
+  // ==================== PRE-SESSION ROUTINE ====================
+  const [preSessionChecklist, setPreSessionChecklist] = useState([
+    { id: 1, task: 'Review yesterday\'s trades', completed: false },
+    { id: 2, task: 'Mark key support/resistance levels', completed: false },
+    { id: 3, task: 'Check economic calendar', completed: false },
+    { id: 4, task: 'Set daily profit/loss limits', completed: false },
+    { id: 5, task: 'Mental state check - am I ready?', completed: false }
+  ])
+  const [customChecklistItems, setCustomChecklistItems] = useState<string[]>([])
+  const [dailyMentalState, setDailyMentalState] = useState<'great' | 'good' | 'okay' | 'tired' | 'stressed' | null>(null)
+  const [dailyGoal, setDailyGoal] = useState('')
+  const [sessionStarted, setSessionStarted] = useState(false)
+  
+  // Reset checklist each day
+  const todayStr = new Date().toISOString().split('T')[0]
+  const [lastChecklistReset, setLastChecklistReset] = useState(todayStr)
+  
+  // ==================== POST-SESSION REVIEW ====================
+  const [showPostSessionModal, setShowPostSessionModal] = useState(false)
+  const [postSessionReview, setPostSessionReview] = useState({
+    date: todayStr,
+    overallRating: 0, // 1-5 stars
+    followedPlan: true,
+    emotionalControl: 'good', // great, good, struggled
+    lessonsLearned: '',
+    tomorrowFocus: ''
+  })
+  const [dailyReviews, setDailyReviews] = useState<any[]>([])
+  
+  // ==================== TRADING ROADMAP ====================
+  const [tradingRoadmapGoal, setTradingRoadmapGoal] = useState({
+    title: '',
+    targetDate: '',
+    type: 'prop_funded' // prop_funded, consistent_profit, skill_mastery, income_target
+  })
+  const [tradingRoadmapPhases, setTradingRoadmapPhases] = useState<any[]>([])
+  const [showCreateRoadmapModal, setShowCreateRoadmapModal] = useState(false)
+  const [roadmapProgress, setRoadmapProgress] = useState<{[milestoneId: string]: number}>({})
+  
+  // ==================== TRADE TEMPLATES ====================
+  const [tradeTemplates, setTradeTemplates] = useState<any[]>([
+    { id: 1, name: 'My Trend Pullback', instrument: 'EURUSD', setupType: 'Trend Pullback', direction: 'long', riskAmount: '100' },
+  ])
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  
   // ==================== TRADE SETUPS/TAGS ====================
   const [tradeSetups, setTradeSetups] = useState<string[]>([
     'Trend Pullback',
@@ -601,6 +651,56 @@ Sent from Aureus App
   const [importedTrades, setImportedTrades] = useState<any[]>([])
   const [importMapping, setImportMapping] = useState<{[key: string]: string}>({})
   const tradeFileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Generate AI daily insight based on trading data
+  const generateDailyInsight = () => {
+    const analytics = calculateTradingAnalytics('all', '30d')
+    const todaysTrades = trades.filter(t => t.date === todayStr)
+    const weekTrades = trades.filter(t => {
+      const tradeDate = new Date(t.date)
+      const weekAgo = new Date()
+      weekAgo.setDate(weekAgo.getDate() - 7)
+      return tradeDate >= weekAgo
+    })
+    
+    const insights: string[] = []
+    
+    // Best setup insight
+    const setupStats = Object.entries(analytics.bySetup).sort((a, b) => (b[1].wins / b[1].trades) - (a[1].wins / a[1].trades))
+    if (setupStats.length > 0 && setupStats[0][1].trades >= 3) {
+      const bestSetup = setupStats[0]
+      insights.push(`Your best setup is **${bestSetup[0]}** with ${((bestSetup[1].wins / bestSetup[1].trades) * 100).toFixed(0)}% win rate.`)
+    }
+    
+    // Best day insight
+    const dayStats = Object.entries(analytics.byDay).filter(([_, d]) => d.trades > 0).sort((a, b) => b[1].pnl - a[1].pnl)
+    if (dayStats.length > 0 && dayStats[0][1].trades >= 2) {
+      insights.push(`You perform best on **${dayStats[0][0]}s** (+$${dayStats[0][1].pnl.toFixed(0)}).`)
+    }
+    
+    // Worst emotion insight
+    const emotionStats = Object.entries(analytics.byEmotion).filter(([_, d]) => d.trades > 0 && d.pnl < 0).sort((a, b) => a[1].pnl - b[1].pnl)
+    if (emotionStats.length > 0 && emotionStats[0][1].trades >= 2) {
+      const worstEmotion = emotionStats[0][0]
+      insights.push(`**${worstEmotion.charAt(0).toUpperCase() + worstEmotion.slice(1)}** trades cost you $${Math.abs(emotionStats[0][1].pnl).toFixed(0)}. Stay patient.`)
+    }
+    
+    // Streak insight
+    if (analytics.streaks.currentStreak > 0) {
+      insights.push(`You're on a **${analytics.streaks.currentStreak} win streak** 🔥 Keep it going!`)
+    } else if (analytics.streaks.currentStreak < -2) {
+      insights.push(`You've had ${Math.abs(analytics.streaks.currentStreak)} losses in a row. Consider taking a break.`)
+    }
+    
+    // Week performance
+    const weekPnL = weekTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+    const weekWins = weekTrades.filter(t => parseFloat(t.profitLoss || '0') > 0).length
+    if (weekTrades.length > 0) {
+      insights.push(`This week: ${weekPnL >= 0 ? '+' : ''}$${weekPnL.toFixed(0)} | ${weekWins}W/${weekTrades.length - weekWins}L`)
+    }
+    
+    return insights.length > 0 ? insights : ['Log some trades to get personalized insights!']
+  }
   
   // Calculate comprehensive trading analytics
   const calculateTradingAnalytics = (accountFilter: number | 'all' = 'all', dateRange: string = '30d') => {
@@ -992,6 +1092,47 @@ Sent from Aureus App
   
   const deletePayout = (id: number) => {
     setPayouts(prev => prev.filter(p => p.id !== id))
+  }
+  
+  // ==================== WEEKLY REPORT ====================
+  const [weeklyReports, setWeeklyReports] = useState<any[]>([])
+  const [showWeeklyReport, setShowWeeklyReport] = useState(false)
+  
+  // Generate weekly stats
+  const getWeeklyStats = () => {
+    const now = new Date()
+    const weekStart = new Date(now)
+    weekStart.setDate(now.getDate() - now.getDay()) // Start of week (Sunday)
+    weekStart.setHours(0, 0, 0, 0)
+    
+    const weekTrades = trades.filter(t => new Date(t.date) >= weekStart)
+    const weekWins = weekTrades.filter(t => parseFloat(t.profitLoss || '0') > 0)
+    const weekLosses = weekTrades.filter(t => parseFloat(t.profitLoss || '0') < 0)
+    const weekPnL = weekTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+    const weekWinRate = weekTrades.length > 0 ? (weekWins.length / weekTrades.length) * 100 : 0
+    
+    // Find best and worst setup this week
+    const setupStats: {[key: string]: { pnl: number, trades: number }} = {}
+    weekTrades.forEach(t => {
+      const setup = t.setupType || 'Untagged'
+      if (!setupStats[setup]) setupStats[setup] = { pnl: 0, trades: 0 }
+      setupStats[setup].pnl += parseFloat(t.profitLoss || '0')
+      setupStats[setup].trades++
+    })
+    
+    const sortedSetups = Object.entries(setupStats).sort((a, b) => b[1].pnl - a[1].pnl)
+    const bestSetup = sortedSetups[0]
+    const worstSetup = sortedSetups[sortedSetups.length - 1]
+    
+    return {
+      trades: weekTrades.length,
+      wins: weekWins.length,
+      losses: weekLosses.length,
+      pnl: weekPnL,
+      winRate: weekWinRate,
+      bestSetup: bestSetup ? { name: bestSetup[0], ...bestSetup[1] } : null,
+      worstSetup: worstSetup && sortedSetups.length > 1 ? { name: worstSetup[0], ...worstSetup[1] } : null
+    }
   }
   
   // ==================== PROP FIRM PROFILES ====================
@@ -1454,6 +1595,13 @@ Sent from Aureus App
       if (data.tradeTags) setTradeTags(data.tradeTags)
       if (data.tradeMistakes) setTradeMistakes(data.tradeMistakes)
       if (data.payouts) setPayouts(data.payouts)
+      if (data.preSessionChecklist) setPreSessionChecklist(data.preSessionChecklist)
+      if (data.customChecklistItems) setCustomChecklistItems(data.customChecklistItems)
+      if (data.dailyReviews) setDailyReviews(data.dailyReviews)
+      if (data.tradingRoadmapGoal) setTradingRoadmapGoal(data.tradingRoadmapGoal)
+      if (data.tradingRoadmapPhases) setTradingRoadmapPhases(data.tradingRoadmapPhases)
+      if (data.roadmapProgress) setRoadmapProgress(data.roadmapProgress)
+      if (data.tradeTemplates) setTradeTemplates(data.tradeTemplates)
     }
   }, [])
 
@@ -1464,10 +1612,12 @@ Sent from Aureus App
       paidOccurrences: Array.from(paidOccurrences),
       roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings,
       budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription,
-      tradeSetups, tradeTags, tradeMistakes, payouts
+      tradeSetups, tradeTags, tradeMistakes, payouts,
+      preSessionChecklist, customChecklistItems, dailyReviews,
+      tradingRoadmapGoal, tradingRoadmapPhases, roadmapProgress, tradeTemplates
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings, budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription, tradeSetups, tradeTags, tradeMistakes, payouts])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings, budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription, tradeSetups, tradeTags, tradeMistakes, payouts, preSessionChecklist, customChecklistItems, dailyReviews, tradingRoadmapGoal, tradingRoadmapPhases, roadmapProgress, tradeTemplates])
 
   // Scroll chat to bottom - use scrollTop instead of scrollIntoView to avoid page jump
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -3095,9 +3245,124 @@ Sent from Aureus App
             }])
           }
           break
+          
+        case 'addPayout':
+          if (data.amount) {
+            const payoutData = {
+              id: Date.now(),
+              date: data.date || new Date().toISOString().split('T')[0],
+              amount: parseFloat(data.amount.toString().replace(/[$,]/g, '')),
+              accountId: data.accountId || 0,
+              accountName: data.accountName || '',
+              propFirm: data.propFirm || '',
+              notes: data.notes || '',
+              addToIncome: data.addToIncome !== false
+            }
+            setPayouts(prev => [...prev, payoutData])
+            
+            // Also add to income if requested
+            if (payoutData.addToIncome) {
+              const incomeName = payoutData.propFirm 
+                ? `${payoutData.propFirm} Payout` 
+                : payoutData.accountName 
+                  ? `${payoutData.accountName} Payout`
+                  : 'Trading Payout'
+              
+              setIncomeStreams(prev => [...prev, {
+                id: Date.now() + 1,
+                name: incomeName,
+                amount: payoutData.amount.toString(),
+                frequency: 'once',
+                type: 'trading',
+                startDate: payoutData.date,
+                notes: payoutData.notes
+              }])
+            }
+          }
+          break
+          
+        case 'showAnalytics':
+          // Switch to trading tab and analytics subtab
+          setActiveTab('trading')
+          setTradingSubTab('analytics')
+          if (data.tab) {
+            setAnalyticsTab(data.tab)
+          }
+          if (data.dateRange) {
+            setAnalyticsDateRange(data.dateRange)
+          }
+          break
+          
+        case 'showCompoundCalculator':
+          // Switch to trading tab and open compound calculator
+          setActiveTab('trading')
+          setTradingSubTab('accounts')
+          // Set calculator values if provided
+          if (data.startingBalance || data.monthlyAdd || data.dailyReturn) {
+            // Store compound calc settings - these will be picked up by the calculator UI
+            setCompoundCalcSettings({
+              startingBalance: data.startingBalance || '10000',
+              monthlyAdd: data.monthlyAdd || '0',
+              dailyReturn: data.dailyReturn || '0.5',
+              tradingDays: data.tradingDays || '20',
+              months: data.months || '12'
+            })
+          }
+          break
+          
+        case 'createTradingRoadmap':
+          if (data.goal && data.phases) {
+            setTradingRoadmapGoal({
+              title: data.goal.title || 'My Trading Goal',
+              targetDate: data.goal.targetDate || '',
+              type: data.goal.type || 'prop_funded'
+            })
+            setTradingRoadmapPhases(data.phases.map((phase: any, idx: number) => ({
+              id: Date.now() + idx,
+              name: phase.name,
+              duration: phase.duration,
+              milestones: phase.milestones.map((m: any, mIdx: number) => ({
+                id: Date.now() + idx * 100 + mIdx,
+                task: m.task,
+                completed: m.completed || false
+              }))
+            })))
+            // Switch to roadmap view
+            setActiveTab('trading')
+            setTradingSubTab('accounts')
+          }
+          break
+          
+        case 'updateRoadmapMilestone':
+          if (data.phaseIndex !== undefined && data.milestoneIndex !== undefined) {
+            setTradingRoadmapPhases(prev => prev.map((phase, pIdx) => {
+              if (pIdx === data.phaseIndex) {
+                return {
+                  ...phase,
+                  milestones: phase.milestones.map((m: any, mIdx: number) => {
+                    if (mIdx === data.milestoneIndex) {
+                      return { ...m, completed: data.completed !== false }
+                    }
+                    return m
+                  })
+                }
+              }
+              return phase
+            }))
+          }
+          break
       }
     })
   }
+  
+  // Compound calculator settings (can be set by Aureus)
+  const [compoundCalcSettings, setCompoundCalcSettings] = useState({
+    startingBalance: '10000',
+    monthlyAdd: '0',
+    dailyReturn: '0.5',
+    tradingDays: '20',
+    months: '12'
+  })
 
   // Handle chart image upload for trading analysis
   const handleChartUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -4490,6 +4755,584 @@ Sent from Aureus App
           </div>
         </div>
       )}
+      
+      {/* QUICK TRADE MODAL */}
+      {showQuickTradeModal && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowQuickTradeModal(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '32px', maxWidth: '600px', width: '100%', maxHeight: '90vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ color: theme.text, fontSize: '22px', fontWeight: 700, margin: 0 }}>
+                {quickTradeType === 'win' ? '🟢 Log Win' : quickTradeType === 'loss' ? '🔴 Log Loss' : '📓 Log Trade'}
+              </h2>
+              <button onClick={() => setShowQuickTradeModal(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
+            </div>
+            
+            {/* Quick Win/Loss Buttons */}
+            {!quickTradeType && (
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+                <button 
+                  onClick={() => setQuickTradeType('win')}
+                  style={{ flex: 1, padding: '20px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '12px', cursor: 'pointer' }}
+                >
+                  <span style={{ fontSize: '32px', display: 'block', marginBottom: '8px' }}>🟢</span>
+                  <span style={{ color: 'white', fontWeight: 700, fontSize: '16px' }}>WIN</span>
+                </button>
+                <button 
+                  onClick={() => setQuickTradeType('loss')}
+                  style={{ flex: 1, padding: '20px', background: 'linear-gradient(135deg, #ef4444, #dc2626)', border: 'none', borderRadius: '12px', cursor: 'pointer' }}
+                >
+                  <span style={{ fontSize: '32px', display: 'block', marginBottom: '8px' }}>🔴</span>
+                  <span style={{ color: 'white', fontWeight: 700, fontSize: '16px' }}>LOSS</span>
+                </button>
+              </div>
+            )}
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              {/* P&L Amount */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>P&L Amount *</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: quickTradeType === 'loss' ? theme.danger : theme.success, fontSize: '20px', fontWeight: 700 }}>
+                    {quickTradeType === 'loss' ? '-$' : '+$'}
+                  </span>
+                  <input
+                    type="number"
+                    value={newTrade.profitLoss.replace('-', '')}
+                    onChange={e => setNewTrade({ ...newTrade, profitLoss: quickTradeType === 'loss' ? `-${e.target.value}` : e.target.value })}
+                    placeholder="0.00"
+                    style={{ ...inputStyle, flex: 1, fontSize: '20px', fontWeight: 700, padding: '12px' }}
+                  />
+                </div>
+              </div>
+              
+              {/* Risk Amount (for R calculation) */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Risk Amount (1R)</label>
+                <input
+                  type="number"
+                  value={newTrade.riskAmount}
+                  onChange={e => {
+                    const risk = parseFloat(e.target.value) || 0
+                    const pnl = Math.abs(parseFloat(newTrade.profitLoss) || 0)
+                    const rMultiple = risk > 0 ? (pnl / risk).toFixed(2) : ''
+                    setNewTrade({ ...newTrade, riskAmount: e.target.value, rMultiple: quickTradeType === 'loss' ? `-${rMultiple}` : rMultiple })
+                  }}
+                  placeholder="75"
+                  style={{ ...inputStyle, width: '100%', padding: '12px' }}
+                />
+                {newTrade.riskAmount && newTrade.profitLoss && (
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>
+                    = {newTrade.rMultiple}R
+                  </div>
+                )}
+              </div>
+              
+              {/* Instrument */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Instrument</label>
+                <input
+                  type="text"
+                  value={newTrade.instrument}
+                  onChange={e => setNewTrade({ ...newTrade, instrument: e.target.value.toUpperCase() })}
+                  placeholder="EURUSD, NQ, BTC"
+                  style={{ ...inputStyle, width: '100%' }}
+                />
+              </div>
+              
+              {/* Direction */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Direction</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => setNewTrade({ ...newTrade, direction: 'long' })}
+                    style={{
+                      flex: 1, padding: '10px',
+                      background: newTrade.direction === 'long' ? theme.success + '30' : theme.cardBg,
+                      border: `2px solid ${newTrade.direction === 'long' ? theme.success : theme.border}`,
+                      borderRadius: '8px', cursor: 'pointer',
+                      color: newTrade.direction === 'long' ? theme.success : theme.text,
+                      fontWeight: 600
+                    }}
+                  >
+                    📈 Long
+                  </button>
+                  <button
+                    onClick={() => setNewTrade({ ...newTrade, direction: 'short' })}
+                    style={{
+                      flex: 1, padding: '10px',
+                      background: newTrade.direction === 'short' ? theme.danger + '30' : theme.cardBg,
+                      border: `2px solid ${newTrade.direction === 'short' ? theme.danger : theme.border}`,
+                      borderRadius: '8px', cursor: 'pointer',
+                      color: newTrade.direction === 'short' ? theme.danger : theme.text,
+                      fontWeight: 600
+                    }}
+                  >
+                    📉 Short
+                  </button>
+                </div>
+              </div>
+              
+              {/* Setup Type */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Setup</label>
+                <select
+                  value={newTrade.setupType}
+                  onChange={e => setNewTrade({ ...newTrade, setupType: e.target.value })}
+                  style={{ ...inputStyle, width: '100%' }}
+                >
+                  <option value="">Select setup...</option>
+                  {tradeSetups.map(setup => (
+                    <option key={setup} value={setup}>{setup}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Grade */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Grade</label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {['A+', 'A', 'B', 'C'].map(grade => (
+                    <button
+                      key={grade}
+                      onClick={() => setNewTrade({ ...newTrade, setupGrade: grade })}
+                      style={{
+                        flex: 1, padding: '10px',
+                        background: newTrade.setupGrade === grade ? theme.warning + '30' : theme.cardBg,
+                        border: `2px solid ${newTrade.setupGrade === grade ? theme.warning : theme.border}`,
+                        borderRadius: '8px', cursor: 'pointer',
+                        color: newTrade.setupGrade === grade ? theme.warning : theme.text,
+                        fontWeight: 600, fontSize: '14px'
+                      }}
+                    >
+                      {grade}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {/* Pre-trade Emotion */}
+            <div style={{ marginTop: '20px' }}>
+              <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px' }}>How did you feel BEFORE the trade?</label>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                {[
+                  { key: 'confident', emoji: '😎', label: 'Confident' },
+                  { key: 'neutral', emoji: '😐', label: 'Neutral' },
+                  { key: 'anxious', emoji: '😰', label: 'Anxious' },
+                  { key: 'fomo', emoji: '😱', label: 'FOMO' },
+                  { key: 'revenge', emoji: '😤', label: 'Revenge' }
+                ].map(emotion => (
+                  <button
+                    key={emotion.key}
+                    onClick={() => setNewTrade({ ...newTrade, emotionBefore: emotion.key })}
+                    style={{
+                      padding: '8px 14px',
+                      background: newTrade.emotionBefore === emotion.key ? theme.purple + '30' : theme.cardBg,
+                      border: `2px solid ${newTrade.emotionBefore === emotion.key ? theme.purple : theme.border}`,
+                      borderRadius: '8px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '6px'
+                    }}
+                  >
+                    <span style={{ fontSize: '18px' }}>{emotion.emoji}</span>
+                    <span style={{ color: theme.text, fontSize: '13px' }}>{emotion.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Mistakes (for losses) */}
+            {quickTradeType === 'loss' && (
+              <div style={{ marginTop: '20px' }}>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px' }}>What went wrong? (optional)</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                  {tradeMistakes.slice(0, 6).map(mistake => (
+                    <button
+                      key={mistake}
+                      onClick={() => {
+                        const mistakes = newTrade.mistakes || []
+                        if (mistakes.includes(mistake)) {
+                          setNewTrade({ ...newTrade, mistakes: mistakes.filter(m => m !== mistake) })
+                        } else {
+                          setNewTrade({ ...newTrade, mistakes: [...mistakes, mistake] })
+                        }
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        background: (newTrade.mistakes || []).includes(mistake) ? theme.danger + '30' : theme.cardBg,
+                        border: `2px solid ${(newTrade.mistakes || []).includes(mistake) ? theme.danger : theme.border}`,
+                        borderRadius: '6px', cursor: 'pointer',
+                        color: (newTrade.mistakes || []).includes(mistake) ? theme.danger : theme.text,
+                        fontSize: '12px'
+                      }}
+                    >
+                      {mistake}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Notes */}
+            <div style={{ marginTop: '20px' }}>
+              <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Notes (optional)</label>
+              <input
+                type="text"
+                value={newTrade.notes}
+                onChange={e => setNewTrade({ ...newTrade, notes: e.target.value })}
+                placeholder="What did you learn? What was the setup?"
+                style={{ ...inputStyle, width: '100%' }}
+              />
+            </div>
+            
+            {/* Account Selection */}
+            {tradingAccounts.length > 0 && (
+              <div style={{ marginTop: '20px' }}>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Account</label>
+                <select
+                  value={newTrade.accountId}
+                  onChange={e => setNewTrade({ ...newTrade, accountId: parseInt(e.target.value) })}
+                  style={{ ...inputStyle, width: '100%' }}
+                >
+                  <option value={0}>No account</option>
+                  {tradingAccounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>{acc.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            
+            {/* Save Button */}
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+              <button
+                onClick={() => {
+                  addTrade()
+                  setShowQuickTradeModal(false)
+                  setQuickTradeType(null)
+                }}
+                disabled={!newTrade.profitLoss}
+                style={{
+                  flex: 1,
+                  padding: '16px',
+                  background: newTrade.profitLoss ? (quickTradeType === 'loss' ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)') : theme.textMuted,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  cursor: newTrade.profitLoss ? 'pointer' : 'not-allowed',
+                  fontWeight: 700,
+                  fontSize: '16px'
+                }}
+              >
+                💾 Save Trade
+              </button>
+              <button
+                onClick={() => { setShowQuickTradeModal(false); setQuickTradeType(null) }}
+                style={{
+                  padding: '16px 24px',
+                  background: 'transparent',
+                  border: '2px solid ' + theme.border,
+                  borderRadius: '12px',
+                  color: theme.textMuted,
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* QUICK TRADE MODAL */}
+      {showQuickTradeModal && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => { setShowQuickTradeModal(false); setQuickTradeType(null) }}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '32px', maxWidth: '500px', width: '100%', maxHeight: '90vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ color: theme.text, fontSize: '22px', fontWeight: 700, margin: 0 }}>📝 Log Trade</h2>
+              <button onClick={() => { setShowQuickTradeModal(false); setQuickTradeType(null) }} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
+            </div>
+            
+            {/* Quick Win/Loss Buttons */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+              <button
+                onClick={() => setQuickTradeType('win')}
+                style={{
+                  flex: 1,
+                  padding: '16px',
+                  background: quickTradeType === 'win' ? theme.success : theme.success + '20',
+                  color: quickTradeType === 'win' ? 'white' : theme.success,
+                  border: `2px solid ${theme.success}`,
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  fontSize: '16px'
+                }}
+              >
+                ✅ WIN
+              </button>
+              <button
+                onClick={() => setQuickTradeType('loss')}
+                style={{
+                  flex: 1,
+                  padding: '16px',
+                  background: quickTradeType === 'loss' ? theme.danger : theme.danger + '20',
+                  color: quickTradeType === 'loss' ? 'white' : theme.danger,
+                  border: `2px solid ${theme.danger}`,
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  fontSize: '16px'
+                }}
+              >
+                ❌ LOSS
+              </button>
+            </div>
+            
+            {/* Trade Form */}
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
+              {/* P&L Amount */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>
+                  {quickTradeType === 'loss' ? 'Loss Amount' : 'Profit Amount'} *
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: quickTradeType === 'loss' ? theme.danger : theme.success, fontSize: '20px', fontWeight: 700 }}>
+                    {quickTradeType === 'loss' ? '-$' : '+$'}
+                  </span>
+                  <input
+                    type="number"
+                    value={newTrade.profitLoss.replace('-', '')}
+                    onChange={e => setNewTrade({ 
+                      ...newTrade, 
+                      profitLoss: quickTradeType === 'loss' ? `-${e.target.value}` : e.target.value 
+                    })}
+                    placeholder="0.00"
+                    style={{ ...inputStyle, flex: 1, fontSize: '24px', fontWeight: 700, padding: '12px' }}
+                  />
+                </div>
+              </div>
+              
+              {/* Risk Amount (for R calculation) */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>
+                  Risk (1R) - for R-multiple calc
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: theme.text, fontSize: '16px' }}>$</span>
+                  <input
+                    type="number"
+                    value={newTrade.riskAmount}
+                    onChange={e => {
+                      const risk = parseFloat(e.target.value) || 0
+                      const pnl = Math.abs(parseFloat(newTrade.profitLoss) || 0)
+                      const rMultiple = risk > 0 ? (pnl / risk).toFixed(2) : ''
+                      setNewTrade({ 
+                        ...newTrade, 
+                        riskAmount: e.target.value,
+                        rMultiple: quickTradeType === 'loss' ? `-${rMultiple}` : rMultiple
+                      })
+                    }}
+                    placeholder="75"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  {newTrade.riskAmount && newTrade.profitLoss && (
+                    <span style={{ 
+                      padding: '8px 12px', 
+                      background: quickTradeType === 'loss' ? theme.danger + '20' : theme.success + '20',
+                      color: quickTradeType === 'loss' ? theme.danger : theme.success,
+                      borderRadius: '8px',
+                      fontWeight: 700
+                    }}>
+                      {newTrade.rMultiple}R
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {/* Instrument & Direction */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Instrument</label>
+                  <input
+                    value={newTrade.instrument}
+                    onChange={e => setNewTrade({ ...newTrade, instrument: e.target.value })}
+                    placeholder="EURUSD"
+                    style={{ ...inputStyle, width: '100%' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Direction</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => setNewTrade({ ...newTrade, direction: 'long' })}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        background: newTrade.direction === 'long' ? theme.success + '30' : theme.cardBg,
+                        border: `2px solid ${newTrade.direction === 'long' ? theme.success : theme.border}`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        color: theme.text,
+                        fontWeight: 600
+                      }}
+                    >
+                      📈 Long
+                    </button>
+                    <button
+                      onClick={() => setNewTrade({ ...newTrade, direction: 'short' })}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        background: newTrade.direction === 'short' ? theme.danger + '30' : theme.cardBg,
+                        border: `2px solid ${newTrade.direction === 'short' ? theme.danger : theme.border}`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        color: theme.text,
+                        fontWeight: 600
+                      }}
+                    >
+                      📉 Short
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Setup Type */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Setup/Strategy</label>
+                <select
+                  value={newTrade.setupType}
+                  onChange={e => setNewTrade({ ...newTrade, setupType: e.target.value })}
+                  style={{ ...inputStyle, width: '100%' }}
+                >
+                  <option value="">Select setup...</option>
+                  {tradeSetups.map(setup => (
+                    <option key={setup} value={setup}>{setup}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Pre-Trade Emotion */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px' }}>How did you feel BEFORE this trade?</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                  {[
+                    { key: 'confident', emoji: '😎', label: 'Confident' },
+                    { key: 'neutral', emoji: '😐', label: 'Neutral' },
+                    { key: 'anxious', emoji: '😰', label: 'Anxious' },
+                    { key: 'fomo', emoji: '🤑', label: 'FOMO' },
+                    { key: 'revenge', emoji: '😤', label: 'Revenge' }
+                  ].map(emotion => (
+                    <button
+                      key={emotion.key}
+                      onClick={() => setNewTrade({ ...newTrade, emotionBefore: emotion.key })}
+                      style={{
+                        padding: '8px 12px',
+                        background: newTrade.emotionBefore === emotion.key ? theme.warning + '30' : theme.cardBg,
+                        border: `2px solid ${newTrade.emotionBefore === emotion.key ? theme.warning : theme.border}`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <span style={{ fontSize: '16px' }}>{emotion.emoji}</span>
+                      <span style={{ color: theme.text, fontSize: '12px' }}>{emotion.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Mistakes (for losses) */}
+              {quickTradeType === 'loss' && (
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px' }}>What went wrong?</label>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                    {tradeMistakes.slice(0, 6).map(mistake => (
+                      <button
+                        key={mistake}
+                        onClick={() => {
+                          const mistakes = newTrade.mistakes || []
+                          if (mistakes.includes(mistake)) {
+                            setNewTrade({ ...newTrade, mistakes: mistakes.filter(m => m !== mistake) })
+                          } else {
+                            setNewTrade({ ...newTrade, mistakes: [...mistakes, mistake] })
+                          }
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          background: (newTrade.mistakes || []).includes(mistake) ? theme.danger + '30' : theme.cardBg,
+                          border: `2px solid ${(newTrade.mistakes || []).includes(mistake) ? theme.danger : theme.border}`,
+                          borderRadius: '20px',
+                          cursor: 'pointer',
+                          color: theme.text,
+                          fontSize: '12px'
+                        }}
+                      >
+                        {mistake}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Account Selection */}
+              {tradingAccounts.length > 0 && (
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Account</label>
+                  <select
+                    value={newTrade.accountId}
+                    onChange={e => setNewTrade({ ...newTrade, accountId: parseInt(e.target.value) })}
+                    style={{ ...inputStyle, width: '100%' }}
+                  >
+                    <option value={0}>No account linked</option>
+                    {tradingAccounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>{acc.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
+              {/* Notes */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Notes (optional)</label>
+                <input
+                  value={newTrade.notes}
+                  onChange={e => setNewTrade({ ...newTrade, notes: e.target.value })}
+                  placeholder="What did you learn?"
+                  style={{ ...inputStyle, width: '100%' }}
+                />
+              </div>
+            </div>
+            
+            {/* Save Button */}
+            <button
+              onClick={() => {
+                if (!newTrade.profitLoss) return
+                addTrade()
+                setShowQuickTradeModal(false)
+                setQuickTradeType(null)
+              }}
+              disabled={!newTrade.profitLoss}
+              style={{
+                width: '100%',
+                marginTop: '24px',
+                padding: '16px',
+                background: newTrade.profitLoss ? (quickTradeType === 'loss' ? theme.danger : theme.success) : theme.textMuted,
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: newTrade.profitLoss ? 'pointer' : 'not-allowed',
+                fontWeight: 700,
+                fontSize: '16px'
+              }}
+            >
+              💾 Save Trade
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       {expandedDay && (
@@ -4622,9 +5465,10 @@ Sent from Aureus App
           )}
           {appMode === 'trading' && (
             <>
-              <button onClick={() => setActiveTab('chat')} style={{ padding: '8px 14px', background: activeTab === 'chat' ? theme.warning : 'transparent', color: activeTab === 'chat' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>💬 Aureus</button>
-              <button onClick={() => setActiveTab('quickview')} style={{ padding: '8px 14px', background: activeTab === 'quickview' ? theme.warning : 'transparent', color: activeTab === 'quickview' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>⚡ Quick</button>
-              <button onClick={() => setActiveTab('trading')} style={{ padding: '8px 14px', background: activeTab === 'trading' ? theme.warning : 'transparent', color: activeTab === 'trading' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>📈 Trading</button>
+              <button onClick={() => { setActiveTab('trading'); setTradingSubTab('today'); }} style={{ padding: '8px 14px', background: activeTab === 'trading' && tradingSubTab === 'today' ? theme.warning : 'transparent', color: activeTab === 'trading' && tradingSubTab === 'today' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>🏠 Today</button>
+              <button onClick={() => { setActiveTab('trading'); setTradingSubTab('journal'); }} style={{ padding: '8px 14px', background: activeTab === 'trading' && tradingSubTab === 'journal' ? theme.warning : 'transparent', color: activeTab === 'trading' && tradingSubTab === 'journal' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>📓 Journal</button>
+              <button onClick={() => { setActiveTab('trading'); setTradingSubTab('analytics'); }} style={{ padding: '8px 14px', background: activeTab === 'trading' && tradingSubTab === 'analytics' ? theme.warning : 'transparent', color: activeTab === 'trading' && tradingSubTab === 'analytics' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>📊 Analytics</button>
+              <button onClick={() => { setActiveTab('trading'); setTradingSubTab('accounts'); }} style={{ padding: '8px 14px', background: activeTab === 'trading' && tradingSubTab === 'accounts' ? theme.warning : 'transparent', color: activeTab === 'trading' && tradingSubTab === 'accounts' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>💼 Accounts</button>
             </>
           )}
           <button onClick={() => setDarkMode(!darkMode)} style={{ padding: '8px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>{darkMode ? '☀️' : '🌙'}</button>
@@ -7649,96 +8493,500 @@ Sent from Aureus App
 
         {/* TRADING TAB */}
         {appMode === 'trading' && activeTab === 'trading' && (
-          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
             
-            {/* Aureus Chat - At TOP */}
-            <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.warning}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.warning }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
-                <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{winRate.toFixed(0)}% win rate • {trades.length} trades</div></div>
-              </div>
-              {proactiveInsight && chatMessages.length === 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>{proactiveInsight.suggestion && <p style={{ color: theme.purple, fontSize: '13px', margin: '8px 0 0 0' }}>💡 {proactiveInsight.suggestion}</p>}</div>}
-              
-              {/* Pending chart preview */}
-              {pendingChartImage && (
-                <div style={{ marginBottom: '12px', padding: '8px', background: theme.cardBg, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <img src={pendingChartImage} alt="Chart" style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
-                  <span style={{ color: theme.text, fontSize: '12px', flex: 1 }}>📊 Chart attached</span>
-                  <button onClick={() => setPendingChartImage(null)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button>
-                </div>
-              )}
-              
-              {chatMessages.length > 0 && <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>{chatMessages.map((msg, idx) => <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.warning : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>)}{isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}</div>}
-              
-              {/* Chat input with chart upload */}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input type="file" ref={chartInputRef} accept="image/*" onChange={handleChartUpload} style={{ display: 'none' }} />
-                <button onClick={() => chartInputRef.current?.click()} style={{ padding: '10px 12px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '16px' }} title="Upload chart screenshot">📷</button>
-                <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder={pendingChartImage ? "What would you like me to analyze?" : "Ask Aureus about your trading..."} style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} />
-                <button onClick={handleChatMessage} disabled={isLoading || (!chatInput.trim() && !pendingChartImage)} style={{ padding: '10px 16px', background: theme.warning, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || (!chatInput.trim() && !pendingChartImage) ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button>
-              </div>
+            {/* TRADING SUB-TABS */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+              {[
+                { key: 'today', label: '🏠 Today', desc: 'Daily hub' },
+                { key: 'journal', label: '📓 Journal', desc: 'Log trades' },
+                { key: 'analytics', label: '📊 Analytics', desc: 'Performance' },
+                { key: 'accounts', label: '💼 Accounts', desc: 'Multi-account' }
+              ].map(tab => (
+                <button 
+                  key={tab.key}
+                  onClick={() => setTradingSubTab(tab.key as any)}
+                  style={{ 
+                    padding: '12px 20px', 
+                    background: tradingSubTab === tab.key ? theme.warning : theme.cardBg, 
+                    color: tradingSubTab === tab.key ? 'white' : theme.text, 
+                    border: '2px solid ' + (tradingSubTab === tab.key ? theme.warning : theme.border), 
+                    borderRadius: '12px', 
+                    cursor: 'pointer', 
+                    fontSize: '14px', 
+                    fontWeight: 600,
+                    flex: '1 1 auto',
+                    minWidth: '120px'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
             
-            {/* TILT DETECTOR & DAILY STATUS */}
-            {(() => {
-              const tilt = detectTilt()
-              return (
-                <div style={{ 
-                  padding: '20px', 
-                  background: tilt.tiltScore > 50 ? 'linear-gradient(135deg, #ef444430, #f59e0b30)' : 'linear-gradient(135deg, #10b98130, #3b82f630)', 
-                  borderRadius: '16px', 
-                  border: '2px solid ' + (tilt.tiltScore > 50 ? theme.danger : theme.success) 
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ fontSize: '32px' }}>{tilt.tiltScore > 70 ? '🚨' : tilt.tiltScore > 40 ? '⚠️' : '✅'}</div>
-                      <div>
-                        <div style={{ color: theme.text, fontWeight: 700, fontSize: '18px' }}>
-                          {tilt.tiltScore > 70 ? 'HIGH TILT RISK - STEP AWAY!' : tilt.tiltScore > 40 ? 'Caution - Monitor Yourself' : 'Clear to Trade'}
-                        </div>
-                        <div style={{ color: theme.textMuted, fontSize: '13px' }}>
-                          {tilt.todaysTrades} trades today • {tilt.todaysLosses} losses
-                        </div>
+            {/* ==================== TODAY TAB ==================== */}
+            {tradingSubTab === 'today' && (
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
+                
+                {/* Good Morning Header */}
+                <div style={{ padding: '24px', background: `linear-gradient(135deg, ${theme.warning}20, ${theme.purple}20)`, borderRadius: '16px', border: '2px solid ' + theme.warning }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                    <div>
+                      <h2 style={{ margin: '0 0 4px 0', color: theme.text, fontSize: '24px' }}>
+                        {new Date().getHours() < 12 ? '☀️ Good morning!' : new Date().getHours() < 17 ? '🌤️ Good afternoon!' : '🌙 Good evening!'}
+                      </h2>
+                      <div style={{ color: theme.textMuted, fontSize: '14px' }}>
+                        {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' as const }}>
-                      <div style={{ color: theme.textMuted, fontSize: '11px' }}>TILT SCORE</div>
-                      <div style={{ 
-                        color: tilt.tiltScore > 70 ? theme.danger : tilt.tiltScore > 40 ? theme.warning : theme.success, 
-                        fontSize: '28px', 
-                        fontWeight: 700 
-                      }}>{tilt.tiltScore}%</div>
+                    <button 
+                      onClick={() => setShowQuickTradeModal(true)}
+                      style={{ 
+                        padding: '14px 24px', 
+                        background: 'linear-gradient(135deg, #10b981, #059669)', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '12px', 
+                        cursor: 'pointer', 
+                        fontWeight: 700,
+                        fontSize: '15px',
+                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                      }}
+                    >
+                      + Log Trade
+                    </button>
+                  </div>
+                  
+                  {/* AI Daily Insight */}
+                  <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', borderLeft: '4px solid ' + theme.warning }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 800, color: '#78350f' }}>A</div>
+                      <span style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>Aureus Daily Insight</span>
+                    </div>
+                    <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6 }}>
+                      {generateDailyInsight().map((insight, i) => (
+                        <p key={i} style={{ margin: i === 0 ? 0 : '8px 0 0 0' }} dangerouslySetInnerHTML={{ __html: insight.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Quick Stats Row */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                  {(() => {
+                    const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
+                    const weekTrades = trades.filter(t => new Date(t.date) >= weekAgo)
+                    const weekPnL = weekTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+                    const weekWins = weekTrades.filter(t => parseFloat(t.profitLoss || '0') > 0).length
+                    const todayTrades = trades.filter(t => t.date === todayStr)
+                    const todayPnL = todayTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+                    const analytics = calculateTradingAnalytics('all', '30d')
+                    
+                    return (
+                      <>
+                        <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                          <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>TODAY</div>
+                          <div style={{ color: todayPnL >= 0 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 700 }}>
+                            {todayPnL >= 0 ? '+' : ''}${todayPnL.toFixed(0)}
+                          </div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>{todayTrades.length} trades</div>
+                        </div>
+                        <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                          <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>THIS WEEK</div>
+                          <div style={{ color: weekPnL >= 0 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 700 }}>
+                            {weekPnL >= 0 ? '+' : ''}${weekPnL.toFixed(0)}
+                          </div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>{weekWins}W / {weekTrades.length - weekWins}L</div>
+                        </div>
+                        <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                          <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>WIN RATE</div>
+                          <div style={{ color: winRate >= 50 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 700 }}>
+                            {winRate.toFixed(0)}%
+                          </div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>30 day</div>
+                        </div>
+                        <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                          <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>STREAK</div>
+                          <div style={{ color: analytics.streaks.currentStreak >= 0 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 700 }}>
+                            {analytics.streaks.currentStreak > 0 ? '+' : ''}{analytics.streaks.currentStreak}
+                          </div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>{analytics.streaks.currentStreak > 0 ? '🔥 wins' : analytics.streaks.currentStreak < 0 ? 'losses' : 'neutral'}</div>
+                        </div>
+                      </>
+                    )
+                  })()}
+                </div>
+                
+                {/* Tilt Detector */}
+                {(() => {
+                  const tilt = detectTilt()
+                  return (
+                    <div style={{ 
+                      padding: '16px 20px', 
+                      background: tilt.tiltScore > 50 ? theme.danger + '20' : theme.success + '20', 
+                      borderRadius: '12px', 
+                      border: '2px solid ' + (tilt.tiltScore > 50 ? theme.danger : theme.success),
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ fontSize: '28px' }}>{tilt.tiltScore > 70 ? '🚨' : tilt.tiltScore > 40 ? '⚠️' : '✅'}</div>
+                        <div>
+                          <div style={{ color: theme.text, fontWeight: 600 }}>
+                            {tilt.tiltScore > 70 ? 'HIGH TILT - Step Away!' : tilt.tiltScore > 40 ? 'Caution' : 'Clear to Trade'}
+                          </div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>{tilt.todaysTrades} trades today • {tilt.todaysLosses} losses</div>
+                        </div>
+                      </div>
+                      <div style={{ color: tilt.tiltScore > 50 ? theme.danger : theme.success, fontSize: '24px', fontWeight: 700 }}>{tilt.tiltScore}%</div>
+                    </div>
+                  )
+                })()}
+                
+                {/* Pre-Session Checklist */}
+                <div style={cardStyle}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ margin: 0, color: theme.text, fontSize: '16px' }}>📋 Pre-Session Checklist</h3>
+                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>
+                      {preSessionChecklist.filter(i => i.completed).length}/{preSessionChecklist.length} complete
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                    {preSessionChecklist.map(item => (
+                      <div 
+                        key={item.id}
+                        onClick={() => setPreSessionChecklist(preSessionChecklist.map(i => i.id === item.id ? { ...i, completed: !i.completed } : i))}
+                        style={{ 
+                          padding: '12px 16px', 
+                          background: item.completed ? theme.success + '20' : (darkMode ? '#1e293b' : '#f8fafc'),
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          border: item.completed ? `2px solid ${theme.success}40` : '2px solid transparent'
+                        }}
+                      >
+                        <div style={{ 
+                          width: '24px', height: '24px', borderRadius: '6px', 
+                          background: item.completed ? theme.success : theme.border,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: 'white', fontWeight: 700, fontSize: '14px'
+                        }}>
+                          {item.completed ? '✓' : ''}
+                        </div>
+                        <span style={{ color: theme.text, fontSize: '14px', textDecoration: item.completed ? 'line-through' : 'none', opacity: item.completed ? 0.7 : 1 }}>
+                          {item.task}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Mental State Check */}
+                  <div style={{ marginTop: '16px', padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px' }}>
+                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px', marginBottom: '12px' }}>How are you feeling?</div>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                      {[
+                        { key: 'great', emoji: '😎', label: 'Great' },
+                        { key: 'good', emoji: '🙂', label: 'Good' },
+                        { key: 'okay', emoji: '😐', label: 'Okay' },
+                        { key: 'tired', emoji: '😴', label: 'Tired' },
+                        { key: 'stressed', emoji: '😰', label: 'Stressed' }
+                      ].map(mood => (
+                        <button
+                          key={mood.key}
+                          onClick={() => setDailyMentalState(mood.key as any)}
+                          style={{
+                            padding: '8px 16px',
+                            background: dailyMentalState === mood.key ? theme.warning + '30' : theme.cardBg,
+                            border: `2px solid ${dailyMentalState === mood.key ? theme.warning : theme.border}`,
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <span style={{ fontSize: '18px' }}>{mood.emoji}</span>
+                          <span style={{ color: theme.text, fontSize: '13px' }}>{mood.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {(dailyMentalState === 'tired' || dailyMentalState === 'stressed') && (
+                      <div style={{ marginTop: '12px', padding: '10px', background: theme.warning + '20', borderRadius: '6px', color: theme.warning, fontSize: '13px' }}>
+                        ⚠️ Consider reducing position size or skipping today. Tired/stressed traders make mistakes.
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Aureus Chat */}
+                <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 800, color: '#78350f' }}>A</div>
+                    <div style={{ color: theme.text, fontWeight: 600 }}>Ask Aureus</div>
+                  </div>
+                  
+                  {pendingChartImage && (
+                    <div style={{ marginBottom: '12px', padding: '8px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <img src={pendingChartImage} alt="Chart" style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
+                      <span style={{ color: theme.text, fontSize: '12px', flex: 1 }}>📊 Chart attached</span>
+                      <button onClick={() => setPendingChartImage(null)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button>
+                    </div>
+                  )}
+                  
+                  {chatMessages.length > 0 && (
+                    <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
+                      {chatMessages.map((msg, idx) => (
+                        <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                          <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.warning : (darkMode ? '#1e293b' : '#f8fafc'), color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
+                        </div>
+                      ))}
+                      {isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}
+                    </div>
+                  )}
+                  
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input type="file" ref={chartInputRef} accept="image/*" onChange={handleChartUpload} style={{ display: 'none' }} />
+                    <button onClick={() => chartInputRef.current?.click()} style={{ padding: '10px 12px', background: darkMode ? '#1e293b' : '#f8fafc', color: theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '16px' }} title="Upload chart">📷</button>
+                    <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder={pendingChartImage ? "What should I analyze?" : "Ask about your trading, analyze a chart..."} style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} />
+                    <button onClick={handleChatMessage} disabled={isLoading || (!chatInput.trim() && !pendingChartImage)} style={{ padding: '10px 16px', background: theme.warning, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || (!chatInput.trim() && !pendingChartImage) ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button>
+                  </div>
+                </div>
+                
+                {/* Today's Trades */}
+                {(() => {
+                  const todayTrades = trades.filter(t => t.date === todayStr).sort((a, b) => (b.time || '').localeCompare(a.time || ''))
+                  if (todayTrades.length === 0) return null
+                  return (
+                    <div style={cardStyle}>
+                      <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '16px' }}>📈 Today's Trades</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                        {todayTrades.map(trade => (
+                          <div key={trade.id} style={{ 
+                            padding: '12px 16px', 
+                            background: parseFloat(trade.profitLoss) >= 0 ? theme.success + '15' : theme.danger + '15',
+                            borderRadius: '8px',
+                            borderLeft: `4px solid ${parseFloat(trade.profitLoss) >= 0 ? theme.success : theme.danger}`,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ color: parseFloat(trade.profitLoss) >= 0 ? theme.success : theme.danger, fontWeight: 700 }}>
+                                  {parseFloat(trade.profitLoss) >= 0 ? '🟢' : '🔴'} {trade.instrument}
+                                </span>
+                                <span style={{ color: theme.textMuted, fontSize: '12px' }}>{trade.time}</span>
+                              </div>
+                              <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>
+                                {trade.setupType || 'No setup'} • {trade.direction} • Grade: {trade.setupGrade}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right' as const }}>
+                              <div style={{ color: parseFloat(trade.profitLoss) >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '18px' }}>
+                                {parseFloat(trade.profitLoss) >= 0 ? '+' : ''}${parseFloat(trade.profitLoss).toFixed(0)}
+                              </div>
+                              {trade.rMultiple && <div style={{ color: theme.textMuted, fontSize: '11px' }}>{trade.rMultiple}R</div>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+                
+                {/* Quick Actions */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                  <button onClick={() => setTradingSubTab('journal')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>📓</div>
+                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>Journal</div>
+                  </button>
+                  <button onClick={() => setTradingSubTab('analytics')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>📊</div>
+                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>Analytics</div>
+                  </button>
+                  <button onClick={() => setShowTradeImport(true)} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>📥</div>
+                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>Import</div>
+                  </button>
+                  <button onClick={() => setShowPayoutModal(true)} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>💰</div>
+                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>Payout</div>
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* ==================== JOURNAL TAB ==================== */}
+            {tradingSubTab === 'journal' && (
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
+                
+                {/* Quick Log Button */}
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button 
+                    onClick={() => { setQuickTradeType('win'); setShowQuickTradeModal(true) }}
+                    style={{ 
+                      flex: 1, padding: '20px', 
+                      background: 'linear-gradient(135deg, #10b981, #059669)', 
+                      border: 'none', borderRadius: '12px', 
+                      cursor: 'pointer', 
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
+                    }}
+                  >
+                    <span style={{ fontSize: '28px' }}>🟢</span>
+                    <span style={{ color: 'white', fontWeight: 700, fontSize: '18px' }}>Log Win</span>
+                  </button>
+                  <button 
+                    onClick={() => { setQuickTradeType('loss'); setShowQuickTradeModal(true) }}
+                    style={{ 
+                      flex: 1, padding: '20px', 
+                      background: 'linear-gradient(135deg, #ef4444, #dc2626)', 
+                      border: 'none', borderRadius: '12px', 
+                      cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
+                    }}
+                  >
+                    <span style={{ fontSize: '28px' }}>🔴</span>
+                    <span style={{ color: 'white', fontWeight: 700, fontSize: '18px' }}>Log Loss</span>
+                  </button>
+                </div>
+                
+                {/* Trade List with Filters */}
+                <div style={cardStyle}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ margin: 0, color: theme.text }}>📓 Trade Journal</h3>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <select 
+                        value={analyticsDateRange} 
+                        onChange={e => setAnalyticsDateRange(e.target.value as any)}
+                        style={{ ...inputStyle, padding: '6px 12px', fontSize: '12px' }}
+                      >
+                        <option value="7d">Last 7 days</option>
+                        <option value="30d">Last 30 days</option>
+                        <option value="90d">Last 90 days</option>
+                        <option value="all">All time</option>
+                      </select>
+                      <button onClick={() => setShowTradeImport(true)} style={{ padding: '6px 12px', background: theme.accent, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>📥 Import</button>
                     </div>
                   </div>
                   
-                  {tilt.warnings.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
-                      {tilt.warnings.map((warning, i) => (
-                        <div key={i} style={{ padding: '8px 12px', background: theme.warning + '20', borderRadius: '6px', color: theme.warning, fontSize: '13px' }}>
-                          {warning}
-                        </div>
-                      ))}
+                  {trades.length === 0 ? (
+                    <div style={{ padding: '60px 20px', textAlign: 'center' as const }}>
+                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>📓</div>
+                      <h3 style={{ color: theme.text, margin: '0 0 8px 0' }}>No Trades Yet</h3>
+                      <p style={{ color: theme.textMuted, margin: '0 0 20px 0' }}>Start logging your trades to track your performance.</p>
+                      <button onClick={() => setShowQuickTradeModal(true)} style={{ padding: '12px 24px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>+ Log Your First Trade</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', maxHeight: '500px', overflowY: 'auto' as const }}>
+                      {trades
+                        .filter(t => {
+                          const tradeDate = new Date(t.date)
+                          const now = new Date()
+                          const daysMap: {[key: string]: number} = { '7d': 7, '30d': 30, '90d': 90, 'all': 9999 }
+                          const days = daysMap[analyticsDateRange] || 30
+                          const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+                          return tradeDate >= cutoff
+                        })
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || (b.time || '').localeCompare(a.time || ''))
+                        .map(trade => (
+                          <div key={trade.id} style={{ 
+                            padding: '16px', 
+                            background: darkMode ? '#1e293b' : '#f8fafc',
+                            borderRadius: '12px',
+                            borderLeft: `4px solid ${parseFloat(trade.profitLoss) >= 0 ? theme.success : theme.danger}`
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                  <span style={{ color: parseFloat(trade.profitLoss) >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '16px' }}>
+                                    {parseFloat(trade.profitLoss) >= 0 ? '🟢' : '🔴'} {trade.instrument || 'Unknown'}
+                                  </span>
+                                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>{trade.direction}</span>
+                                  {trade.setupType && <span style={{ padding: '2px 8px', background: theme.accent + '20', color: theme.accent, borderRadius: '4px', fontSize: '11px' }}>{trade.setupType}</span>}
+                                </div>
+                                <div style={{ color: theme.textMuted, fontSize: '12px' }}>
+                                  {trade.date} {trade.time && `• ${trade.time}`} • Grade: {trade.setupGrade}
+                                  {trade.emotionBefore && trade.emotionBefore !== 'neutral' && ` • Felt: ${trade.emotionBefore}`}
+                                </div>
+                                {trade.notes && <div style={{ color: theme.text, fontSize: '13px', marginTop: '8px', fontStyle: 'italic' }}>"{trade.notes}"</div>}
+                              </div>
+                              <div style={{ textAlign: 'right' as const }}>
+                                <div style={{ color: parseFloat(trade.profitLoss) >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '20px' }}>
+                                  {parseFloat(trade.profitLoss) >= 0 ? '+' : ''}${parseFloat(trade.profitLoss).toFixed(2)}
+                                </div>
+                                {trade.rMultiple && <div style={{ color: theme.textMuted, fontSize: '12px' }}>{trade.rMultiple}R</div>}
+                                <button onClick={() => deleteTrade(trade.id)} style={{ marginTop: '8px', padding: '4px 8px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Delete</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                     </div>
                   )}
                 </div>
-              )
-            })()}
+              </div>
+            )}
             
-            {/* ANALYTICS TABS */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' as const, gap: '12px' }}>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                  {[
-                    { key: 'overview', label: '📊 Overview' },
-                    { key: 'calendar', label: '📅 Calendar' },
-                    { key: 'setups', label: '🎯 Setups' },
-                    { key: 'time', label: '⏰ Time' },
-                    { key: 'psychology', label: '🧠 Psychology' }
-                  ].map(tab => (
-                    <button 
-                      key={tab.key}
-                      onClick={() => setAnalyticsTab(tab.key as any)}
-                      style={{ 
+            {/* ==================== ANALYTICS TAB ==================== */}
+            {tradingSubTab === 'analytics' && (
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
+                
+                {/* Analytics Sub-Tabs */}
+                <div style={cardStyle}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' as const, gap: '12px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                      {[
+                        { key: 'overview', label: '📊 Overview' },
+                        { key: 'calendar', label: '📅 Calendar' },
+                        { key: 'setups', label: '🎯 Setups' },
+                        { key: 'time', label: '⏰ Time' },
+                        { key: 'psychology', label: '🧠 Psychology' }
+                      ].map(tab => (
+                        <button 
+                          key={tab.key}
+                          onClick={() => setAnalyticsTab(tab.key as any)}
+                          style={{ 
+                            padding: '8px 16px', 
+                            background: analyticsTab === tab.key ? theme.warning : (darkMode ? '#1e293b' : '#f8fafc'), 
+                            color: analyticsTab === tab.key ? 'white' : theme.text, 
+                            border: '1px solid ' + (analyticsTab === tab.key ? theme.warning : theme.border), 
+                            borderRadius: '8px', 
+                            cursor: 'pointer', 
+                            fontSize: '13px', 
+                            fontWeight: 600 
+                          }}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <select 
+                        value={analyticsDateRange} 
+                        onChange={e => setAnalyticsDateRange(e.target.value as any)}
+                        style={{ ...inputStyle, padding: '6px 12px', fontSize: '12px' }}
+                      >
+                        <option value="7d">Last 7 days</option>
+                        <option value="30d">Last 30 days</option>
+                        <option value="90d">Last 90 days</option>
+                        <option value="all">All time</option>
+                      </select>
+                      {tradingAccounts.length > 0 && (
+                        <select 
+                          value={selectedAnalyticsAccount === 'all' ? 'all' : selectedAnalyticsAccount} 
+                          onChange={e => setSelectedAnalyticsAccount(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                          style={{ ...inputStyle, padding: '6px 12px', fontSize: '12px' }}
+                        >
+                          <option value="all">All Accounts</option>
+                          {tradingAccounts.map(acc => (
+                            <option key={acc.id} value={acc.id}>{acc.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  </div> 
                         padding: '8px 16px', 
                         background: analyticsTab === tab.key ? theme.warning : theme.cardBg, 
                         color: analyticsTab === tab.key ? 'white' : theme.text, 
@@ -8242,6 +9490,43 @@ Sent from Aureus App
                 )
               })()}
             </div>
+            )}
+            
+            {/* ==================== ACCOUNTS TAB ==================== */}
+            {tradingSubTab === 'accounts' && (
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
+                
+                {/* Accounts Summary */}
+                {tradingAccounts.length > 0 && (
+                  <div style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.accent}20, ${theme.purple}20)`, borderRadius: '16px', border: '2px solid ' + theme.accent }}>
+                    <h3 style={{ margin: '0 0 16px 0', color: theme.text }}>💼 Portfolio Overview</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                      <div style={{ textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>Total Balance</div>
+                        <div style={{ color: theme.text, fontSize: '28px', fontWeight: 700 }}>
+                          ${tradingAccounts.reduce((sum, acc) => sum + parseFloat(acc.currentBalance || acc.startingBalance || '0'), 0).toLocaleString()}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>Total P&L</div>
+                        <div style={{ 
+                          color: tradingAccounts.reduce((sum, acc) => sum + (parseFloat(acc.currentBalance || '0') - parseFloat(acc.startingBalance || '0')), 0) >= 0 ? theme.success : theme.danger, 
+                          fontSize: '28px', 
+                          fontWeight: 700 
+                        }}>
+                          {tradingAccounts.reduce((sum, acc) => sum + (parseFloat(acc.currentBalance || '0') - parseFloat(acc.startingBalance || '0')), 0) >= 0 ? '+' : ''}
+                          ${tradingAccounts.reduce((sum, acc) => sum + (parseFloat(acc.currentBalance || '0') - parseFloat(acc.startingBalance || '0')), 0).toLocaleString()}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>Active Accounts</div>
+                        <div style={{ color: theme.text, fontSize: '28px', fontWeight: 700 }}>
+                          {tradingAccounts.filter(a => a.isActive).length}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
             {/* TRADING ACCOUNTS */}
             <div style={cardStyle}>
@@ -9230,44 +10515,12 @@ Sent from Aureus App
                 </div>
               )}
             </div>
-
-            {/* TRADE JOURNAL */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h2 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📓 Trade Journal</h2>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <span style={{ color: theme.textMuted, fontSize: '13px' }}>{trades.length} trades logged</span>
-                </div>
-              </div>
-              
-              {/* Trade Input Form */}
-              <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f1f5f9', borderRadius: '12px', marginBottom: '16px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px', marginBottom: '12px' }}>
-                  {/* Account Selection - Important! */}
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Account *</label>
-                    <select value={newTrade.accountId} onChange={e => setNewTrade({...newTrade, accountId: parseInt(e.target.value)})} style={{...inputStyle, width: '100%', borderColor: !newTrade.accountId ? theme.warning : theme.border}}>
-                      <option value={0}>Select Account</option>
-                      {tradingAccounts.map(acc => (
-                        <option key={acc.id} value={acc.id}>{acc.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Date</label>
-                    <input type="date" value={newTrade.date} onChange={e => setNewTrade({...newTrade, date: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Instrument *</label>
-                    <input placeholder="EURUSD, NQ, etc" value={newTrade.instrument} onChange={e => setNewTrade({...newTrade, instrument: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Direction</label>
-                    <select value={newTrade.direction} onChange={e => setNewTrade({...newTrade, direction: e.target.value})} style={{...inputStyle, width: '100%'}}>
-                      <option value="long">🟢 Long</option>
-                      <option value="short">🔴 Short</option>
-                    </select>
-                  </div>
+            </div>
+            )}
+            
+          </div>
+        )}
+      </main>
                   <div>
                     <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Entry Price</label>
                     <input placeholder="Entry" type="number" step="0.00001" value={newTrade.entryPrice} onChange={e => setNewTrade({...newTrade, entryPrice: e.target.value})} style={{...inputStyle, width: '100%'}} />
