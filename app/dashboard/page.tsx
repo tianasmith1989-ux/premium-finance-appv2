@@ -2066,19 +2066,26 @@ Sent from Aureus App
     
     setNewTrade({ 
       date: new Date().toISOString().split('T')[0], 
+      time: new Date().toTimeString().slice(0,5),
       instrument: '', 
       direction: 'long', 
       entryPrice: '', 
       exitPrice: '', 
       profitLoss: '', 
       riskAmount: '',
+      rMultiple: '',
       accountId: newTrade.accountId, // Keep same account selected
+      setupType: '',
       setupGrade: 'A',
       emotionBefore: 'neutral',
       emotionAfter: 'neutral',
       followedPlan: true,
       notes: '',
-      screenshot: ''
+      screenshot: '',
+      tags: [],
+      session: 'london',
+      holdingTime: '',
+      mistakes: []
     })
   }
   
