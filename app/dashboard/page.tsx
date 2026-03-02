@@ -2741,12 +2741,26 @@ Sent from Aureus App
             setTrades(prev => [...prev, {
               id: Date.now() + Math.random(),
               date: getValidDate(data.date),
+              time: data.time || new Date().toTimeString().slice(0,5),
               instrument: data.instrument,
               direction: data.direction || 'long',
               entryPrice: data.entryPrice || '',
               exitPrice: data.exitPrice || '',
               profitLoss: data.profitLoss.toString().replace(/[$,]/g, ''),
-              notes: data.notes || ''
+              riskAmount: data.riskAmount || '',
+              rMultiple: data.rMultiple || '',
+              accountId: data.accountId || 0,
+              setupType: data.setupType || '',
+              setupGrade: data.setupGrade || 'A',
+              emotionBefore: data.emotionBefore || 'neutral',
+              emotionAfter: data.emotionAfter || 'neutral',
+              followedPlan: data.followedPlan !== false,
+              notes: data.notes || '',
+              screenshot: data.screenshot || '',
+              tags: data.tags || [],
+              session: data.session || 'london',
+              holdingTime: data.holdingTime || '',
+              mistakes: data.mistakes || []
             }])
           }
           break
@@ -3005,18 +3019,43 @@ Sent from Aureus App
           
         case 'addTrade':
           if (data.instrument) {
-            setTrades(prev => [...prev, {
+            const newTradeData = {
               id: Date.now(),
               date: data.date || new Date().toISOString().split('T')[0],
+              time: data.time || new Date().toTimeString().slice(0,5),
               instrument: data.instrument,
               direction: data.direction || 'long',
               entryPrice: data.entryPrice || '',
               exitPrice: data.exitPrice || '',
               profitLoss: data.profitLoss?.toString().replace(/[$,]/g, '') || '0',
+              riskAmount: data.riskAmount || '',
+              rMultiple: data.rMultiple || '',
+              accountId: data.accountId || 0,
+              setupType: data.setupType || data.setup || '',
+              setupGrade: data.setupGrade || 'A',
+              emotionBefore: data.emotionBefore || data.emotion || 'neutral',
+              emotionAfter: data.emotionAfter || 'neutral',
+              followedPlan: data.followedPlan !== false,
               notes: data.notes || '',
-              setup: data.setup || '',
-              emotion: data.emotion || 'neutral'
-            }])
+              screenshot: data.screenshot || '',
+              tags: data.tags || [],
+              session: data.session || 'london',
+              holdingTime: data.holdingTime || '',
+              mistakes: data.mistakes || []
+            }
+            setTrades(prev => [...prev, newTradeData])
+            
+            // Update account balance if linked
+            if (data.accountId && data.accountId > 0) {
+              const pnl = parseFloat(data.profitLoss?.toString().replace(/[$,]/g, '') || '0')
+              setTradingAccounts(prev => prev.map(acc => {
+                if (acc.id === data.accountId) {
+                  const newBalance = parseFloat(acc.currentBalance || '0') + pnl
+                  return { ...acc, currentBalance: newBalance.toString() }
+                }
+                return acc
+              }))
+            }
           }
           break
           
