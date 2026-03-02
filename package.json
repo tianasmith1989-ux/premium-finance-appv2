@@ -8,7 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "next": "14.2.5",
+    "next": "14.2.25",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "@clerk/nextjs": "^6.9.3",
@@ -19,8 +19,5 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "typescript": "^5"
-  },
-  "engines": {
-    "node": "20.x"
   }
 }
