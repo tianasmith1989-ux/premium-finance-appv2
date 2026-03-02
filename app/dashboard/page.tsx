@@ -1,4 +1,4 @@
-'use client'
+use client'
 
 import { useUser } from '@clerk/nextjs'
 import { useState, useEffect, useRef } from 'react'
@@ -279,6 +279,39 @@ export default function Dashboard() {
   
   const [showPricingModal, setShowPricingModal] = useState(false)
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [feedbackText, setFeedbackText] = useState('')
+  const [feedbackType, setFeedbackType] = useState<'bug' | 'feature' | 'general'>('general')
+  const [feedbackSent, setFeedbackSent] = useState(false)
+  
+  // REPLACE WITH YOUR EMAIL
+  const FEEDBACK_EMAIL = 'your-email@example.com'
+  
+  const sendFeedback = () => {
+    if (!feedbackText.trim()) return
+    
+    const subject = encodeURIComponent(`[Aureus ${feedbackType}] Feedback from ${budgetMemory.name || tradingMemory.name || 'User'}`)
+    const body = encodeURIComponent(`
+Feedback Type: ${feedbackType}
+User: ${budgetMemory.name || tradingMemory.name || 'Anonymous'}
+Mode: ${appMode}
+Plan: ${userSubscription.plan}
+
+Message:
+${feedbackText}
+
+---
+Sent from Aureus App
+    `.trim())
+    
+    window.open(`mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`, '_blank')
+    setFeedbackSent(true)
+    setTimeout(() => {
+      setShowFeedbackModal(false)
+      setFeedbackText('')
+      setFeedbackSent(false)
+    }, 2000)
+  }
   
   // Lemon Squeezy checkout URLs - REPLACE WITH YOUR ACTUAL URLS
   const LEMONSQUEEZY_URLS = {
@@ -496,21 +529,450 @@ export default function Dashboard() {
   const [trades, setTrades] = useState<any[]>([])
   const [newTrade, setNewTrade] = useState({ 
     date: new Date().toISOString().split('T')[0], 
+    time: new Date().toTimeString().slice(0,5), // HH:MM
     instrument: '', 
     direction: 'long', 
     entryPrice: '', 
     exitPrice: '', 
     profitLoss: '', 
     riskAmount: '',
+    rMultiple: '', // R-Multiple (profit / risk)
     accountId: 0,
+    setupType: '', // User's tagged setup type
     setupGrade: 'A', // A, B, C setup quality
     emotionBefore: 'neutral', // confident, neutral, anxious, fomo, revenge
     emotionAfter: 'neutral',
     followedPlan: true,
     notes: '',
-    screenshot: ''
+    screenshot: '',
+    tags: [] as string[], // Custom tags
+    session: 'london', // asian, london, newyork
+    holdingTime: '', // Duration of trade
+    mistakes: [] as string[] // What went wrong
   })
   const [tradingCalendarMonth, setTradingCalendarMonth] = useState(new Date())
+  
+  // ==================== TRADE SETUPS/TAGS ====================
+  const [tradeSetups, setTradeSetups] = useState<string[]>([
+    'Trend Pullback',
+    'Breakout',
+    'Support/Resistance',
+    'Fibonacci',
+    'Moving Average',
+    'Range Trade',
+    'News Trade',
+    'Reversal'
+  ])
+  const [tradeTags, setTradeTags] = useState<string[]>([
+    'A+ Setup',
+    'Revenge Trade',
+    'FOMO Entry',
+    'Early Exit',
+    'Moved Stop',
+    'Perfect Execution',
+    'Oversize',
+    'News Impact'
+  ])
+  const [tradeMistakes, setTradeMistakes] = useState<string[]>([
+    'Entered too early',
+    'Entered too late',
+    'Cut winner short',
+    'Let loser run',
+    'Moved stop loss',
+    'No stop loss',
+    'Oversized position',
+    'Revenge trade',
+    'FOMO entry',
+    'Traded during news',
+    'Broke trading rules',
+    'Poor risk/reward'
+  ])
+  const [showSetupManager, setShowSetupManager] = useState(false)
+  const [newSetupName, setNewSetupName] = useState('')
+  
+  // ==================== TRADING ANALYTICS STATE ====================
+  const [analyticsTab, setAnalyticsTab] = useState<'overview' | 'setups' | 'time' | 'psychology' | 'calendar'>('overview')
+  const [analyticsDateRange, setAnalyticsDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d')
+  const [selectedAnalyticsAccount, setSelectedAnalyticsAccount] = useState<number | 'all'>('all')
+  
+  // ==================== CSV IMPORT FOR TRADES ====================
+  const [showTradeImport, setShowTradeImport] = useState(false)
+  const [importPlatform, setImportPlatform] = useState<'metatrader' | 'tradingview' | 'manual' | 'generic'>('generic')
+  const [importedTrades, setImportedTrades] = useState<any[]>([])
+  const [importMapping, setImportMapping] = useState<{[key: string]: string}>({})
+  const tradeFileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Calculate comprehensive trading analytics
+  const calculateTradingAnalytics = (accountFilter: number | 'all' = 'all', dateRange: string = '30d') => {
+    let filteredTrades = [...trades]
+    
+    // Filter by account
+    if (accountFilter !== 'all') {
+      filteredTrades = filteredTrades.filter(t => t.accountId === accountFilter)
+    }
+    
+    // Filter by date range
+    const now = new Date()
+    const daysMap: {[key: string]: number} = { '7d': 7, '30d': 30, '90d': 90, 'all': 9999 }
+    const days = daysMap[dateRange] || 30
+    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+    filteredTrades = filteredTrades.filter(t => new Date(t.date) >= cutoff)
+    
+    if (filteredTrades.length === 0) {
+      return {
+        totalTrades: 0, winners: 0, losers: 0, breakeven: 0,
+        winRate: 0, totalPnL: 0, avgWin: 0, avgLoss: 0,
+        largestWin: 0, largestLoss: 0, profitFactor: 0,
+        avgRMultiple: 0, expectancy: 0, avgHoldingTime: 0,
+        bySetup: {}, byDay: {}, byHour: {}, bySession: {},
+        byInstrument: {}, byEmotion: {}, streaks: { currentStreak: 0, longestWinStreak: 0, longestLoseStreak: 0 },
+        calendarData: {}
+      }
+    }
+    
+    // Basic stats
+    const winners = filteredTrades.filter(t => parseFloat(t.profitLoss || '0') > 0)
+    const losers = filteredTrades.filter(t => parseFloat(t.profitLoss || '0') < 0)
+    const breakeven = filteredTrades.filter(t => parseFloat(t.profitLoss || '0') === 0)
+    
+    const totalPnL = filteredTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+    const totalWins = winners.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+    const totalLosses = Math.abs(losers.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0))
+    
+    const avgWin = winners.length > 0 ? totalWins / winners.length : 0
+    const avgLoss = losers.length > 0 ? totalLosses / losers.length : 0
+    const largestWin = winners.length > 0 ? Math.max(...winners.map(t => parseFloat(t.profitLoss || '0'))) : 0
+    const largestLoss = losers.length > 0 ? Math.min(...losers.map(t => parseFloat(t.profitLoss || '0'))) : 0
+    
+    const profitFactor = totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? Infinity : 0
+    
+    // R-Multiple stats
+    const tradesWithR = filteredTrades.filter(t => t.rMultiple && !isNaN(parseFloat(t.rMultiple)))
+    const avgRMultiple = tradesWithR.length > 0 
+      ? tradesWithR.reduce((sum, t) => sum + parseFloat(t.rMultiple), 0) / tradesWithR.length 
+      : 0
+    
+    // Expectancy = (Win% × AvgWin) - (Loss% × AvgLoss)
+    const winRate = filteredTrades.length > 0 ? (winners.length / filteredTrades.length) * 100 : 0
+    const lossRate = filteredTrades.length > 0 ? (losers.length / filteredTrades.length) * 100 : 0
+    const expectancy = ((winRate / 100) * avgWin) - ((lossRate / 100) * avgLoss)
+    
+    // Performance by Setup
+    const bySetup: {[key: string]: { trades: number, wins: number, pnl: number, avgR: number }} = {}
+    filteredTrades.forEach(t => {
+      const setup = t.setupType || 'Untagged'
+      if (!bySetup[setup]) bySetup[setup] = { trades: 0, wins: 0, pnl: 0, avgR: 0 }
+      bySetup[setup].trades++
+      if (parseFloat(t.profitLoss || '0') > 0) bySetup[setup].wins++
+      bySetup[setup].pnl += parseFloat(t.profitLoss || '0')
+      if (t.rMultiple) bySetup[setup].avgR += parseFloat(t.rMultiple)
+    })
+    Object.keys(bySetup).forEach(k => {
+      if (bySetup[k].trades > 0) bySetup[k].avgR /= bySetup[k].trades
+    })
+    
+    // Performance by Day of Week
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const byDay: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
+    dayNames.forEach(d => byDay[d] = { trades: 0, wins: 0, pnl: 0 })
+    filteredTrades.forEach(t => {
+      const day = dayNames[new Date(t.date).getDay()]
+      byDay[day].trades++
+      if (parseFloat(t.profitLoss || '0') > 0) byDay[day].wins++
+      byDay[day].pnl += parseFloat(t.profitLoss || '0')
+    })
+    
+    // Performance by Hour
+    const byHour: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
+    for (let i = 0; i < 24; i++) byHour[i.toString().padStart(2, '0')] = { trades: 0, wins: 0, pnl: 0 }
+    filteredTrades.forEach(t => {
+      if (t.time) {
+        const hour = t.time.split(':')[0]
+        if (byHour[hour]) {
+          byHour[hour].trades++
+          if (parseFloat(t.profitLoss || '0') > 0) byHour[hour].wins++
+          byHour[hour].pnl += parseFloat(t.profitLoss || '0')
+        }
+      }
+    })
+    
+    // Performance by Session
+    const bySession: {[key: string]: { trades: number, wins: number, pnl: number }} = {
+      asian: { trades: 0, wins: 0, pnl: 0 },
+      london: { trades: 0, wins: 0, pnl: 0 },
+      newyork: { trades: 0, wins: 0, pnl: 0 },
+      overlap: { trades: 0, wins: 0, pnl: 0 }
+    }
+    filteredTrades.forEach(t => {
+      const session = t.session || 'london'
+      if (bySession[session]) {
+        bySession[session].trades++
+        if (parseFloat(t.profitLoss || '0') > 0) bySession[session].wins++
+        bySession[session].pnl += parseFloat(t.profitLoss || '0')
+      }
+    })
+    
+    // Performance by Instrument
+    const byInstrument: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
+    filteredTrades.forEach(t => {
+      const inst = t.instrument || 'Unknown'
+      if (!byInstrument[inst]) byInstrument[inst] = { trades: 0, wins: 0, pnl: 0 }
+      byInstrument[inst].trades++
+      if (parseFloat(t.profitLoss || '0') > 0) byInstrument[inst].wins++
+      byInstrument[inst].pnl += parseFloat(t.profitLoss || '0')
+    })
+    
+    // Performance by Pre-trade Emotion
+    const byEmotion: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
+    filteredTrades.forEach(t => {
+      const emotion = t.emotionBefore || 'neutral'
+      if (!byEmotion[emotion]) byEmotion[emotion] = { trades: 0, wins: 0, pnl: 0 }
+      byEmotion[emotion].trades++
+      if (parseFloat(t.profitLoss || '0') > 0) byEmotion[emotion].wins++
+      byEmotion[emotion].pnl += parseFloat(t.profitLoss || '0')
+    })
+    
+    // Win/Loss streaks
+    let currentStreak = 0
+    let longestWinStreak = 0
+    let longestLoseStreak = 0
+    let tempWinStreak = 0
+    let tempLoseStreak = 0
+    const sortedTrades = [...filteredTrades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    
+    sortedTrades.forEach(t => {
+      const pnl = parseFloat(t.profitLoss || '0')
+      if (pnl > 0) {
+        tempWinStreak++
+        tempLoseStreak = 0
+        longestWinStreak = Math.max(longestWinStreak, tempWinStreak)
+      } else if (pnl < 0) {
+        tempLoseStreak++
+        tempWinStreak = 0
+        longestLoseStreak = Math.max(longestLoseStreak, tempLoseStreak)
+      }
+    })
+    
+    // Current streak
+    if (sortedTrades.length > 0) {
+      const lastTrade = sortedTrades[sortedTrades.length - 1]
+      const lastPnL = parseFloat(lastTrade.profitLoss || '0')
+      if (lastPnL > 0) currentStreak = tempWinStreak
+      else if (lastPnL < 0) currentStreak = -tempLoseStreak
+    }
+    
+    // Calendar data (P&L by day)
+    const calendarData: {[date: string]: { pnl: number, trades: number, wins: number }} = {}
+    filteredTrades.forEach(t => {
+      const date = t.date
+      if (!calendarData[date]) calendarData[date] = { pnl: 0, trades: 0, wins: 0 }
+      calendarData[date].pnl += parseFloat(t.profitLoss || '0')
+      calendarData[date].trades++
+      if (parseFloat(t.profitLoss || '0') > 0) calendarData[date].wins++
+    })
+    
+    return {
+      totalTrades: filteredTrades.length,
+      winners: winners.length,
+      losers: losers.length,
+      breakeven: breakeven.length,
+      winRate,
+      totalPnL,
+      avgWin,
+      avgLoss,
+      largestWin,
+      largestLoss,
+      profitFactor,
+      avgRMultiple,
+      expectancy,
+      avgHoldingTime: 0, // Would need to calculate from holdingTime
+      bySetup,
+      byDay,
+      byHour,
+      bySession,
+      byInstrument,
+      byEmotion,
+      streaks: { currentStreak, longestWinStreak, longestLoseStreak },
+      calendarData
+    }
+  }
+  
+  // Parse CSV for trade import
+  const parseTradeCSV = (csvText: string, platform: string) => {
+    const lines = csvText.trim().split('\n')
+    if (lines.length < 2) return []
+    
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''))
+    const trades: any[] = []
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''))
+      const row: {[key: string]: string} = {}
+      headers.forEach((h, idx) => row[h] = values[idx] || '')
+      
+      // Map based on platform
+      let trade: any = {
+        id: Date.now() + i,
+        date: new Date().toISOString().split('T')[0],
+        time: '',
+        instrument: '',
+        direction: 'long',
+        entryPrice: '',
+        exitPrice: '',
+        profitLoss: '',
+        riskAmount: '',
+        rMultiple: '',
+        accountId: selectedAccountId || 0,
+        setupType: '',
+        notes: 'Imported from ' + platform,
+        selected: true
+      }
+      
+      if (platform === 'metatrader') {
+        // MetaTrader export format
+        trade.date = row['time'] || row['open time'] || row['date'] || ''
+        trade.instrument = row['symbol'] || row['item'] || ''
+        trade.direction = (row['type'] || '').toLowerCase().includes('sell') ? 'short' : 'long'
+        trade.entryPrice = row['price'] || row['open price'] || ''
+        trade.exitPrice = row['close price'] || row['s/l'] || ''
+        trade.profitLoss = row['profit'] || row['pnl'] || ''
+      } else if (platform === 'tradingview') {
+        // TradingView export format
+        trade.date = row['date'] || row['time'] || ''
+        trade.instrument = row['symbol'] || row['ticker'] || ''
+        trade.direction = (row['side'] || row['type'] || '').toLowerCase().includes('sell') ? 'short' : 'long'
+        trade.profitLoss = row['profit'] || row['pnl'] || row['return'] || ''
+      } else {
+        // Generic - try to auto-detect
+        trade.date = row['date'] || row['time'] || row['datetime'] || row['open time'] || ''
+        trade.instrument = row['symbol'] || row['instrument'] || row['ticker'] || row['pair'] || row['asset'] || ''
+        trade.direction = (row['direction'] || row['side'] || row['type'] || '').toLowerCase().includes('sell') || 
+                         (row['direction'] || row['side'] || row['type'] || '').toLowerCase().includes('short') ? 'short' : 'long'
+        trade.entryPrice = row['entry'] || row['entry price'] || row['open'] || row['open price'] || row['price'] || ''
+        trade.exitPrice = row['exit'] || row['exit price'] || row['close'] || row['close price'] || ''
+        trade.profitLoss = row['pnl'] || row['profit'] || row['profit/loss'] || row['return'] || row['result'] || ''
+        trade.riskAmount = row['risk'] || row['risk amount'] || ''
+      }
+      
+      // Parse date if needed
+      if (trade.date && !trade.date.includes('-')) {
+        try {
+          const parsed = new Date(trade.date)
+          if (!isNaN(parsed.getTime())) {
+            trade.date = parsed.toISOString().split('T')[0]
+            trade.time = parsed.toTimeString().slice(0, 5)
+          }
+        } catch (e) {}
+      }
+      
+      if (trade.instrument || trade.profitLoss) {
+        trades.push(trade)
+      }
+    }
+    
+    return trades
+  }
+  
+  const handleTradeFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const text = event.target?.result as string
+      const parsed = parseTradeCSV(text, importPlatform)
+      setImportedTrades(parsed)
+    }
+    reader.readAsText(file)
+  }
+  
+  const confirmTradeImport = () => {
+    const selected = importedTrades.filter(t => t.selected)
+    const newTrades = selected.map(t => ({
+      ...t,
+      id: Date.now() + Math.random(),
+      selected: undefined
+    }))
+    setTrades(prev => [...prev, ...newTrades])
+    setImportedTrades([])
+    setShowTradeImport(false)
+    
+    // Update account balances if applicable
+    if (selectedAccountId) {
+      const totalPnL = newTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+      setTradingAccounts(prev => prev.map(acc => 
+        acc.id === selectedAccountId 
+          ? { ...acc, currentBalance: (parseFloat(acc.currentBalance || acc.startingBalance) + totalPnL).toString() }
+          : acc
+      ))
+    }
+  }
+  
+  // ==================== PAYOUT TRACKING ====================
+  const [payouts, setPayouts] = useState<any[]>([])
+  const [showPayoutModal, setShowPayoutModal] = useState(false)
+  const [newPayout, setNewPayout] = useState({
+    date: new Date().toISOString().split('T')[0],
+    amount: '',
+    accountId: 0,
+    accountName: '',
+    propFirm: '',
+    notes: '',
+    addToIncome: true
+  })
+  
+  // Calculate total payouts
+  const totalPayouts = payouts.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0)
+  const thisMonthPayouts = payouts
+    .filter(p => p.date.startsWith(new Date().toISOString().slice(0, 7)))
+    .reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0)
+  
+  const addPayout = () => {
+    if (!newPayout.amount) return
+    
+    const payout = {
+      ...newPayout,
+      id: Date.now(),
+      amount: parseFloat(newPayout.amount)
+    }
+    
+    setPayouts(prev => [...prev, payout])
+    
+    // Optionally add as income to budget
+    if (newPayout.addToIncome) {
+      const incomeName = newPayout.propFirm 
+        ? `${newPayout.propFirm} Payout` 
+        : newPayout.accountName 
+          ? `${newPayout.accountName} Payout`
+          : 'Trading Payout'
+      
+      setIncomeStreams(prev => [...prev, {
+        id: Date.now(),
+        name: incomeName,
+        amount: newPayout.amount,
+        frequency: 'once', // One-time income
+        type: 'trading',
+        startDate: newPayout.date,
+        notes: newPayout.notes
+      }])
+    }
+    
+    // Reset form
+    setNewPayout({
+      date: new Date().toISOString().split('T')[0],
+      amount: '',
+      accountId: 0,
+      accountName: '',
+      propFirm: '',
+      notes: '',
+      addToIncome: true
+    })
+    setShowPayoutModal(false)
+  }
+  
+  const deletePayout = (id: number) => {
+    setPayouts(prev => prev.filter(p => p.id !== id))
+  }
   
   // ==================== PROP FIRM PROFILES ====================
   const propFirmProfiles: {[key: string]: any} = {
@@ -968,6 +1430,10 @@ export default function Dashboard() {
       if (data.chatMessages) setChatMessages(data.chatMessages)
       if (data.userCountry) setUserCountry(data.userCountry)
       if (data.userSubscription) setUserSubscription(data.userSubscription)
+      if (data.tradeSetups) setTradeSetups(data.tradeSetups)
+      if (data.tradeTags) setTradeTags(data.tradeTags)
+      if (data.tradeMistakes) setTradeMistakes(data.tradeMistakes)
+      if (data.payouts) setPayouts(data.payouts)
     }
   }, [])
 
@@ -977,10 +1443,11 @@ export default function Dashboard() {
       budgetMemory, tradingMemory,
       paidOccurrences: Array.from(paidOccurrences),
       roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings,
-      budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription
+      budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription,
+      tradeSetups, tradeTags, tradeMistakes, payouts
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings, budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings, budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription, tradeSetups, tradeTags, tradeMistakes, payouts])
 
   // Scroll chat to bottom - use scrollTop instead of scrollIntoView to avoid page jump
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -3324,6 +3791,639 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+      
+      {/* FEEDBACK MODAL */}
+      {showFeedbackModal && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowFeedbackModal(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '32px', maxWidth: '500px', width: '100%' }} onClick={e => e.stopPropagation()}>
+            {feedbackSent ? (
+              <div style={{ textAlign: 'center' as const, padding: '40px 0' }}>
+                <div style={{ fontSize: '64px', marginBottom: '16px' }}>✅</div>
+                <h3 style={{ color: theme.text, margin: '0 0 8px 0' }}>Thank you!</h3>
+                <p style={{ color: theme.textMuted, margin: 0 }}>Your feedback has been sent.</p>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                  <h2 style={{ color: theme.text, fontSize: '22px', fontWeight: 700, margin: 0 }}>💬 Send Feedback</h2>
+                  <button onClick={() => setShowFeedbackModal(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
+                </div>
+                
+                <p style={{ color: theme.textMuted, marginBottom: '20px', fontSize: '14px' }}>
+                  Found a bug? Have an idea? I'd love to hear from you!
+                </p>
+                
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px' }}>What's this about?</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {[
+                      { value: 'bug', label: '🐛 Bug', color: theme.danger },
+                      { value: 'feature', label: '💡 Feature', color: theme.purple },
+                      { value: 'general', label: '💬 General', color: theme.accent }
+                    ].map(type => (
+                      <button
+                        key={type.value}
+                        onClick={() => setFeedbackType(type.value as any)}
+                        style={{
+                          flex: 1,
+                          padding: '10px',
+                          background: feedbackType === type.value ? type.color + '20' : theme.cardBg,
+                          color: feedbackType === type.value ? type.color : theme.textMuted,
+                          border: `2px solid ${feedbackType === type.value ? type.color : theme.border}`,
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          fontSize: '13px'
+                        }}
+                      >
+                        {type.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px' }}>Your message</label>
+                  <textarea
+                    value={feedbackText}
+                    onChange={e => setFeedbackText(e.target.value)}
+                    placeholder={
+                      feedbackType === 'bug' ? "What happened? What did you expect to happen?" :
+                      feedbackType === 'feature' ? "What feature would help you?" :
+                      "What's on your mind?"
+                    }
+                    style={{
+                      width: '100%',
+                      minHeight: '120px',
+                      padding: '12px',
+                      background: darkMode ? '#1e293b' : '#f8fafc',
+                      border: '1px solid ' + theme.border,
+                      borderRadius: '8px',
+                      color: theme.text,
+                      fontSize: '14px',
+                      resize: 'vertical' as const,
+                      fontFamily: 'inherit'
+                    }}
+                  />
+                </div>
+                
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button
+                    onClick={sendFeedback}
+                    disabled={!feedbackText.trim()}
+                    style={{
+                      flex: 1,
+                      padding: '14px',
+                      background: feedbackText.trim() ? theme.success : theme.textMuted,
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      cursor: feedbackText.trim() ? 'pointer' : 'not-allowed',
+                      fontWeight: 700,
+                      fontSize: '15px'
+                    }}
+                  >
+                    📧 Send Feedback
+                  </button>
+                  <button
+                    onClick={() => setShowFeedbackModal(false)}
+                    style={{
+                      padding: '14px 24px',
+                      background: 'transparent',
+                      border: '2px solid ' + theme.border,
+                      borderRadius: '12px',
+                      color: theme.textMuted,
+                      cursor: 'pointer',
+                      fontWeight: 600
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                
+                <p style={{ color: theme.textMuted, fontSize: '12px', marginTop: '16px', textAlign: 'center' as const }}>
+                  This will open your email app with the feedback ready to send.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TRADE IMPORT MODAL */}
+      {showTradeImport && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowTradeImport(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '32px', maxWidth: '800px', width: '100%', maxHeight: '90vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ color: theme.text, fontSize: '22px', fontWeight: 700, margin: 0 }}>📥 Import Trades</h2>
+              <button onClick={() => setShowTradeImport(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
+            </div>
+            
+            {importedTrades.length === 0 ? (
+              <>
+                <p style={{ color: theme.textMuted, marginBottom: '20px', fontSize: '14px' }}>
+                  Import trades from your broker or trading platform. Export your trades as CSV and upload below.
+                </p>
+                
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px' }}>Platform</label>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                    {[
+                      { value: 'metatrader', label: '📊 MetaTrader 4/5' },
+                      { value: 'tradingview', label: '📈 TradingView' },
+                      { value: 'generic', label: '📁 Generic CSV' }
+                    ].map(platform => (
+                      <button
+                        key={platform.value}
+                        onClick={() => setImportPlatform(platform.value as any)}
+                        style={{
+                          padding: '10px 16px',
+                          background: importPlatform === platform.value ? theme.accent + '20' : theme.cardBg,
+                          color: importPlatform === platform.value ? theme.accent : theme.text,
+                          border: `2px solid ${importPlatform === platform.value ? theme.accent : theme.border}`,
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          fontSize: '13px'
+                        }}
+                      >
+                        {platform.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {selectedAccountId === null && tradingAccounts.length > 0 && (
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px' }}>Import to Account</label>
+                    <select
+                      value={selectedAccountId || ''}
+                      onChange={e => setSelectedAccountId(parseInt(e.target.value))}
+                      style={{ ...inputStyle, width: '100%' }}
+                    >
+                      <option value="">Select an account...</option>
+                      {tradingAccounts.map(acc => (
+                        <option key={acc.id} value={acc.id}>{acc.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                
+                <div style={{ 
+                  border: `2px dashed ${theme.border}`, 
+                  borderRadius: '12px', 
+                  padding: '40px', 
+                  textAlign: 'center' as const,
+                  marginBottom: '20px'
+                }}>
+                  <input 
+                    type="file" 
+                    ref={tradeFileInputRef} 
+                    accept=".csv" 
+                    onChange={handleTradeFileUpload} 
+                    style={{ display: 'none' }} 
+                  />
+                  <div style={{ fontSize: '40px', marginBottom: '12px' }}>📄</div>
+                  <button
+                    onClick={() => tradeFileInputRef.current?.click()}
+                    style={{
+                      padding: '12px 24px',
+                      background: theme.accent,
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      fontSize: '14px'
+                    }}
+                  >
+                    Choose CSV File
+                  </button>
+                  <p style={{ color: theme.textMuted, fontSize: '12px', marginTop: '12px' }}>
+                    Supported: .csv files from {importPlatform === 'metatrader' ? 'MetaTrader History export' : importPlatform === 'tradingview' ? 'TradingView export' : 'any platform'}
+                  </p>
+                </div>
+                
+                <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px' }}>
+                  <h4 style={{ color: theme.text, margin: '0 0 8px 0', fontSize: '13px' }}>💡 How to export from {importPlatform === 'metatrader' ? 'MetaTrader' : importPlatform === 'tradingview' ? 'TradingView' : 'your platform'}:</h4>
+                  {importPlatform === 'metatrader' && (
+                    <ol style={{ color: theme.textMuted, fontSize: '12px', margin: 0, paddingLeft: '20px' }}>
+                      <li>Open Account History tab</li>
+                      <li>Right-click → Select period (e.g., Last Month)</li>
+                      <li>Right-click → Save as Report</li>
+                      <li>Choose CSV format</li>
+                    </ol>
+                  )}
+                  {importPlatform === 'tradingview' && (
+                    <ol style={{ color: theme.textMuted, fontSize: '12px', margin: 0, paddingLeft: '20px' }}>
+                      <li>Go to your Portfolio or Trading Panel</li>
+                      <li>Click Export button</li>
+                      <li>Select CSV format</li>
+                    </ol>
+                  )}
+                  {importPlatform === 'generic' && (
+                    <p style={{ color: theme.textMuted, fontSize: '12px', margin: 0 }}>
+                      CSV should include columns like: date, symbol/instrument, direction/side, entry price, exit price, profit/pnl
+                    </p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <p style={{ color: theme.textMuted, marginBottom: '16px', fontSize: '14px' }}>
+                  Found {importedTrades.length} trades. Select which ones to import:
+                </p>
+                
+                <div style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
+                  <button onClick={() => setImportedTrades(importedTrades.map(t => ({ ...t, selected: true })))} style={{ padding: '8px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Select All</button>
+                  <button onClick={() => setImportedTrades(importedTrades.map(t => ({ ...t, selected: false })))} style={{ padding: '8px 16px', background: theme.textMuted, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Deselect All</button>
+                </div>
+                
+                <div style={{ maxHeight: '300px', overflowY: 'auto' as const, marginBottom: '20px' }}>
+                  {importedTrades.map((trade, idx) => (
+                    <div 
+                      key={idx}
+                      onClick={() => setImportedTrades(importedTrades.map((t, i) => i === idx ? { ...t, selected: !t.selected } : t))}
+                      style={{ 
+                        padding: '12px', 
+                        marginBottom: '8px', 
+                        background: trade.selected 
+                          ? (parseFloat(trade.profitLoss || '0') >= 0 ? theme.success + '20' : theme.danger + '20')
+                          : (darkMode ? '#1e293b' : '#f8fafc'),
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        border: trade.selected ? `2px solid ${parseFloat(trade.profitLoss || '0') >= 0 ? theme.success : theme.danger}` : '2px solid transparent'
+                      }}
+                    >
+                      <div>
+                        <div style={{ color: theme.text, fontWeight: 600 }}>{trade.instrument || 'Unknown'}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>
+                          {trade.date} • {trade.direction} • Entry: {trade.entryPrice || '-'} → Exit: {trade.exitPrice || '-'}
+                        </div>
+                      </div>
+                      <div style={{ 
+                        color: parseFloat(trade.profitLoss || '0') >= 0 ? theme.success : theme.danger,
+                        fontWeight: 700,
+                        fontSize: '16px'
+                      }}>
+                        {parseFloat(trade.profitLoss || '0') >= 0 ? '+' : ''}${parseFloat(trade.profitLoss || '0').toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button
+                    onClick={confirmTradeImport}
+                    disabled={importedTrades.filter(t => t.selected).length === 0}
+                    style={{
+                      flex: 1,
+                      padding: '14px',
+                      background: importedTrades.filter(t => t.selected).length > 0 ? theme.success : theme.textMuted,
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      cursor: importedTrades.filter(t => t.selected).length > 0 ? 'pointer' : 'not-allowed',
+                      fontWeight: 700,
+                      fontSize: '15px'
+                    }}
+                  >
+                    ✓ Import {importedTrades.filter(t => t.selected).length} Trades
+                  </button>
+                  <button
+                    onClick={() => { setImportedTrades([]); setShowTradeImport(false) }}
+                    style={{
+                      padding: '14px 24px',
+                      background: 'transparent',
+                      border: '2px solid ' + theme.border,
+                      borderRadius: '12px',
+                      color: theme.textMuted,
+                      cursor: 'pointer',
+                      fontWeight: 600
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* SETUP MANAGER MODAL */}
+      {showSetupManager && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowSetupManager(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '32px', maxWidth: '600px', width: '100%', maxHeight: '80vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ color: theme.text, fontSize: '22px', fontWeight: 700, margin: 0 }}>🎯 Manage Setups & Tags</h2>
+              <button onClick={() => setShowSetupManager(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
+            </div>
+            
+            {/* Trade Setups */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ color: theme.text, fontSize: '16px', margin: '0 0 12px 0' }}>📊 Trade Setups (Strategies)</h3>
+              <p style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '12px' }}>
+                Tag your trades with the setup/strategy you used. Track which setups work best for you.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px', marginBottom: '12px' }}>
+                {tradeSetups.map((setup, idx) => (
+                  <div key={idx} style={{ 
+                    padding: '6px 12px', 
+                    background: theme.accent + '20', 
+                    color: theme.accent, 
+                    borderRadius: '16px', 
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    {setup}
+                    <button 
+                      onClick={() => setTradeSetups(tradeSetups.filter((_, i) => i !== idx))}
+                      style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '14px', padding: 0 }}
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input 
+                  value={newSetupName} 
+                  onChange={e => setNewSetupName(e.target.value)}
+                  placeholder="Add new setup..."
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <button 
+                  onClick={() => { 
+                    if (newSetupName.trim() && !tradeSetups.includes(newSetupName.trim())) {
+                      setTradeSetups([...tradeSetups, newSetupName.trim()])
+                      setNewSetupName('')
+                    }
+                  }}
+                  style={{ padding: '8px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  + Add
+                </button>
+              </div>
+            </div>
+            
+            {/* Trade Tags */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ color: theme.text, fontSize: '16px', margin: '0 0 12px 0' }}>🏷️ Trade Tags</h3>
+              <p style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '12px' }}>
+                Add tags to trades for additional context (e.g., "Perfect Entry", "FOMO Trade").
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
+                {tradeTags.map((tag, idx) => (
+                  <div key={idx} style={{ 
+                    padding: '6px 12px', 
+                    background: theme.purple + '20', 
+                    color: theme.purple, 
+                    borderRadius: '16px', 
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    {tag}
+                    <button 
+                      onClick={() => setTradeTags(tradeTags.filter((_, i) => i !== idx))}
+                      style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '14px', padding: 0 }}
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Mistake Tags */}
+            <div>
+              <h3 style={{ color: theme.text, fontSize: '16px', margin: '0 0 12px 0' }}>❌ Mistake Tags</h3>
+              <p style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '12px' }}>
+                Track common mistakes to learn what costs you money.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
+                {tradeMistakes.map((mistake, idx) => (
+                  <div key={idx} style={{ 
+                    padding: '6px 12px', 
+                    background: theme.danger + '20', 
+                    color: theme.danger, 
+                    borderRadius: '16px', 
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    {mistake}
+                    <button 
+                      onClick={() => setTradeMistakes(tradeMistakes.filter((_, i) => i !== idx))}
+                      style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '14px', padding: 0 }}
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <button
+              onClick={() => setShowSetupManager(false)}
+              style={{
+                width: '100%',
+                marginTop: '24px',
+                padding: '14px',
+                background: theme.accent,
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '15px'
+              }}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* PAYOUT MODAL */}
+      {showPayoutModal && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowPayoutModal(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '32px', maxWidth: '500px', width: '100%' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ color: theme.text, fontSize: '22px', fontWeight: 700, margin: 0 }}>💰 Log Payout</h2>
+              <button onClick={() => setShowPayoutModal(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
+            </div>
+            
+            <p style={{ color: theme.textMuted, marginBottom: '20px', fontSize: '14px' }}>
+              Record a withdrawal or payout from your trading accounts. This helps track your trading income.
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
+              {/* Amount */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Amount *</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: theme.success, fontSize: '20px', fontWeight: 700 }}>$</span>
+                  <input
+                    type="number"
+                    value={newPayout.amount}
+                    onChange={e => setNewPayout({ ...newPayout, amount: e.target.value })}
+                    placeholder="0.00"
+                    style={{ ...inputStyle, flex: 1, fontSize: '24px', fontWeight: 700, padding: '12px' }}
+                  />
+                </div>
+              </div>
+              
+              {/* Date */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Date</label>
+                <input
+                  type="date"
+                  value={newPayout.date}
+                  onChange={e => setNewPayout({ ...newPayout, date: e.target.value })}
+                  style={{ ...inputStyle, width: '100%' }}
+                />
+              </div>
+              
+              {/* Account Selection */}
+              {tradingAccounts.length > 0 && (
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>From Account</label>
+                  <select
+                    value={newPayout.accountId}
+                    onChange={e => {
+                      const acc = tradingAccounts.find(a => a.id === parseInt(e.target.value))
+                      setNewPayout({ 
+                        ...newPayout, 
+                        accountId: parseInt(e.target.value),
+                        accountName: acc?.name || '',
+                        propFirm: acc?.propFirm || ''
+                      })
+                    }}
+                    style={{ ...inputStyle, width: '100%' }}
+                  >
+                    <option value={0}>Select account...</option>
+                    {tradingAccounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} {acc.propFirm ? `(${acc.propFirm})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
+              {/* Prop Firm (if no accounts) */}
+              {tradingAccounts.length === 0 && (
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Prop Firm / Source</label>
+                  <input
+                    type="text"
+                    value={newPayout.propFirm}
+                    onChange={e => setNewPayout({ ...newPayout, propFirm: e.target.value })}
+                    placeholder="e.g., FTMO, Personal Account"
+                    style={{ ...inputStyle, width: '100%' }}
+                  />
+                </div>
+              )}
+              
+              {/* Notes */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Notes (optional)</label>
+                <input
+                  type="text"
+                  value={newPayout.notes}
+                  onChange={e => setNewPayout({ ...newPayout, notes: e.target.value })}
+                  placeholder="e.g., First payout, Monthly withdrawal"
+                  style={{ ...inputStyle, width: '100%' }}
+                />
+              </div>
+              
+              {/* Add to Income Toggle */}
+              <div 
+                onClick={() => setNewPayout({ ...newPayout, addToIncome: !newPayout.addToIncome })}
+                style={{ 
+                  padding: '12px 16px', 
+                  background: newPayout.addToIncome ? theme.success + '20' : (darkMode ? '#1e293b' : '#f8fafc'),
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  border: newPayout.addToIncome ? `2px solid ${theme.success}` : '2px solid transparent'
+                }}
+              >
+                <div>
+                  <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Add to Budget Income</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>Include this payout in your budget calculations</div>
+                </div>
+                <div style={{ 
+                  width: '24px', 
+                  height: '24px', 
+                  borderRadius: '6px', 
+                  background: newPayout.addToIncome ? theme.success : theme.border,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 700
+                }}>
+                  {newPayout.addToIncome ? '✓' : ''}
+                </div>
+              </div>
+            </div>
+            
+            {/* Payout History Summary */}
+            {payouts.length > 0 && (
+              <div style={{ marginTop: '20px', padding: '12px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>Total Payouts:</span>
+                  <span style={{ color: theme.success, fontWeight: 700 }}>${totalPayouts.toLocaleString()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>This Month:</span>
+                  <span style={{ color: theme.success, fontWeight: 700 }}>${thisMonthPayouts.toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+            
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+              <button
+                onClick={addPayout}
+                disabled={!newPayout.amount}
+                style={{
+                  flex: 1,
+                  padding: '14px',
+                  background: newPayout.amount ? theme.success : theme.textMuted,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  cursor: newPayout.amount ? 'pointer' : 'not-allowed',
+                  fontWeight: 700,
+                  fontSize: '15px'
+                }}
+              >
+                💰 Log Payout
+              </button>
+              <button
+                onClick={() => setShowPayoutModal(false)}
+                style={{
+                  padding: '14px 24px',
+                  background: 'transparent',
+                  border: '2px solid ' + theme.border,
+                  borderRadius: '12px',
+                  color: theme.textMuted,
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       {expandedDay && (
@@ -3530,6 +4630,23 @@ export default function Dashboard() {
               ✓ Pro {userSubscription.plan === 'annual' ? '(Annual)' : ''}
             </button>
           )}
+          
+          {/* Feedback Button */}
+          <button 
+            onClick={() => setShowFeedbackModal(true)}
+            style={{ 
+              padding: '6px 12px', 
+              background: 'transparent', 
+              border: '1px solid ' + theme.border, 
+              borderRadius: '8px', 
+              cursor: 'pointer', 
+              color: theme.textMuted,
+              fontSize: '13px'
+            }}
+            title="Send feedback"
+          >
+            💬
+          </button>
         </div>
       </header>
 
@@ -3862,7 +4979,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* Quick Actions */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
                   <button onClick={() => setActiveTab('dashboard')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
                     <div style={{ fontSize: '24px', marginBottom: '8px' }}>🎛️</div>
                     <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Command Centre</div>
@@ -3871,7 +4988,37 @@ export default function Dashboard() {
                     <div style={{ fontSize: '24px', marginBottom: '8px' }}>🛤️</div>
                     <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Path & Quests</div>
                   </button>
+                  <button onClick={() => setShowPayoutModal(true)} style={{ padding: '16px', background: 'linear-gradient(135deg, ' + theme.success + '20, ' + theme.warning + '20)', border: '2px solid ' + theme.success, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>💰</div>
+                    <div style={{ color: theme.success, fontWeight: 600, fontSize: '14px' }}>Log Payout</div>
+                  </button>
                 </div>
+                
+                {/* Recent Payouts */}
+                {payouts.length > 0 && (
+                  <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>💸 Trading Payouts</div>
+                      <div style={{ color: theme.success, fontWeight: 700 }}>${totalPayouts.toLocaleString()}</div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', maxHeight: '120px', overflowY: 'auto' as const }}>
+                      {payouts.slice(-3).reverse().map(p => (
+                        <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: darkMode ? '#1e3a2f' : '#ecfdf5', borderRadius: '8px' }}>
+                          <div>
+                            <div style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>${p.amount.toLocaleString()}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '11px' }}>{p.propFirm || p.accountName || 'Trading'} • {new Date(p.date).toLocaleDateString()}</div>
+                          </div>
+                          <button onClick={() => deletePayout(p.id)} style={{ padding: '4px 8px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                    {payouts.length > 3 && (
+                      <div style={{ color: theme.textMuted, fontSize: '11px', textAlign: 'center' as const, marginTop: '8px' }}>
+                        +{payouts.length - 3} more payouts
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
 
@@ -6511,30 +7658,510 @@ export default function Dashboard() {
               )
             })()}
             
-            {/* MAIN STATS */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
-                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Total P&L</div>
-                <div style={{ color: totalPL >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>${totalPL.toFixed(0)}</div>
-              </div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
-                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Win Rate</div>
-                <div style={{ color: winRate >= 50 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 700 }}>{winRate.toFixed(1)}%</div>
-              </div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
-                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Avg Win</div>
-                <div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>${avgWin.toFixed(0)}</div>
-              </div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
-                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Avg Loss</div>
-                <div style={{ color: theme.danger, fontSize: '28px', fontWeight: 700 }}>${avgLoss.toFixed(0)}</div>
-              </div>
-              <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
-                <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Profit Factor</div>
-                <div style={{ color: avgLoss > 0 ? (avgWin / avgLoss >= 1 ? theme.success : theme.danger) : theme.textMuted, fontSize: '28px', fontWeight: 700 }}>
-                  {avgLoss > 0 ? (avgWin / avgLoss).toFixed(2) : '-'}
+            {/* ANALYTICS TABS */}
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' as const, gap: '12px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                  {[
+                    { key: 'overview', label: '📊 Overview' },
+                    { key: 'calendar', label: '📅 Calendar' },
+                    { key: 'setups', label: '🎯 Setups' },
+                    { key: 'time', label: '⏰ Time' },
+                    { key: 'psychology', label: '🧠 Psychology' }
+                  ].map(tab => (
+                    <button 
+                      key={tab.key}
+                      onClick={() => setAnalyticsTab(tab.key as any)}
+                      style={{ 
+                        padding: '8px 16px', 
+                        background: analyticsTab === tab.key ? theme.warning : theme.cardBg, 
+                        color: analyticsTab === tab.key ? 'white' : theme.text, 
+                        border: '1px solid ' + (analyticsTab === tab.key ? theme.warning : theme.border), 
+                        borderRadius: '8px', 
+                        cursor: 'pointer', 
+                        fontSize: '13px', 
+                        fontWeight: 600 
+                      }}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <select 
+                    value={analyticsDateRange} 
+                    onChange={e => setAnalyticsDateRange(e.target.value as any)}
+                    style={{ ...inputStyle, padding: '6px 12px', fontSize: '12px' }}
+                  >
+                    <option value="7d">Last 7 days</option>
+                    <option value="30d">Last 30 days</option>
+                    <option value="90d">Last 90 days</option>
+                    <option value="all">All time</option>
+                  </select>
+                  <select 
+                    value={selectedAnalyticsAccount === 'all' ? 'all' : selectedAnalyticsAccount} 
+                    onChange={e => setSelectedAnalyticsAccount(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                    style={{ ...inputStyle, padding: '6px 12px', fontSize: '12px' }}
+                  >
+                    <option value="all">All Accounts</option>
+                    {tradingAccounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>{acc.name}</option>
+                    ))}
+                  </select>
+                  <button 
+                    onClick={() => setShowTradeImport(true)}
+                    style={{ padding: '6px 12px', background: theme.accent, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+                  >
+                    📥 Import
+                  </button>
                 </div>
               </div>
+              
+              {/* OVERVIEW TAB */}
+              {analyticsTab === 'overview' && (() => {
+                const analytics = calculateTradingAnalytics(selectedAnalyticsAccount, analyticsDateRange)
+                return (
+                  <div>
+                    {/* Main Stats Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px', marginBottom: '24px' }}>
+                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Total P&L</div>
+                        <div style={{ color: analytics.totalPnL >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${analytics.totalPnL.toFixed(0)}</div>
+                      </div>
+                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Win Rate</div>
+                        <div style={{ color: analytics.winRate >= 50 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>{analytics.winRate.toFixed(1)}%</div>
+                      </div>
+                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Profit Factor</div>
+                        <div style={{ color: analytics.profitFactor >= 1 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>{analytics.profitFactor === Infinity ? '∞' : analytics.profitFactor.toFixed(2)}</div>
+                      </div>
+                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Expectancy</div>
+                        <div style={{ color: analytics.expectancy >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${analytics.expectancy.toFixed(0)}</div>
+                      </div>
+                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Avg R-Multiple</div>
+                        <div style={{ color: analytics.avgRMultiple >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>{analytics.avgRMultiple.toFixed(2)}R</div>
+                      </div>
+                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Streak</div>
+                        <div style={{ color: analytics.streaks.currentStreak >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>
+                          {analytics.streaks.currentStreak > 0 ? '+' : ''}{analytics.streaks.currentStreak}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Secondary Stats */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
+                      <div style={{ padding: '12px', background: theme.success + '20', borderRadius: '8px' }}>
+                        <div style={{ color: theme.success, fontSize: '12px' }}>Winners</div>
+                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>{analytics.winners} <span style={{ fontSize: '12px', color: theme.textMuted }}>trades</span></div>
+                        <div style={{ color: theme.success, fontSize: '13px' }}>Avg: ${analytics.avgWin.toFixed(0)} • Best: ${analytics.largestWin.toFixed(0)}</div>
+                      </div>
+                      <div style={{ padding: '12px', background: theme.danger + '20', borderRadius: '8px' }}>
+                        <div style={{ color: theme.danger, fontSize: '12px' }}>Losers</div>
+                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>{analytics.losers} <span style={{ fontSize: '12px', color: theme.textMuted }}>trades</span></div>
+                        <div style={{ color: theme.danger, fontSize: '13px' }}>Avg: ${analytics.avgLoss.toFixed(0)} • Worst: ${analytics.largestLoss.toFixed(0)}</div>
+                      </div>
+                      <div style={{ padding: '12px', background: theme.purple + '20', borderRadius: '8px' }}>
+                        <div style={{ color: theme.purple, fontSize: '12px' }}>Total Trades</div>
+                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>{analytics.totalTrades}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '13px' }}>BE: {analytics.breakeven}</div>
+                      </div>
+                      <div style={{ padding: '12px', background: theme.warning + '20', borderRadius: '8px' }}>
+                        <div style={{ color: theme.warning, fontSize: '12px' }}>Best Streak</div>
+                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>+{analytics.streaks.longestWinStreak}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '13px' }}>Worst: -{analytics.streaks.longestLoseStreak}</div>
+                      </div>
+                    </div>
+                    
+                    {/* Top Instruments */}
+                    <div style={{ marginBottom: '20px' }}>
+                      <h4 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '14px' }}>📈 Performance by Instrument</h4>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                        {Object.entries(analytics.byInstrument)
+                          .sort((a, b) => b[1].pnl - a[1].pnl)
+                          .slice(0, 8)
+                          .map(([inst, data]) => (
+                            <div key={inst} style={{ 
+                              padding: '8px 12px', 
+                              background: darkMode ? '#1e293b' : '#f8fafc', 
+                              borderRadius: '8px',
+                              borderLeft: `3px solid ${data.pnl >= 0 ? theme.success : theme.danger}`
+                            }}>
+                              <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{inst}</div>
+                              <div style={{ color: data.pnl >= 0 ? theme.success : theme.danger, fontSize: '12px' }}>
+                                ${data.pnl.toFixed(0)} • {data.trades} trades • {((data.wins / data.trades) * 100).toFixed(0)}% WR
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+              
+              {/* CALENDAR TAB */}
+              {analyticsTab === 'calendar' && (() => {
+                const analytics = calculateTradingAnalytics(selectedAnalyticsAccount, 'all')
+                const year = tradingCalendarMonth.getFullYear()
+                const month = tradingCalendarMonth.getMonth()
+                const firstDay = new Date(year, month, 1).getDay()
+                const daysInMonth = new Date(year, month + 1, 0).getDate()
+                const days = []
+                
+                // Empty cells before first day
+                for (let i = 0; i < firstDay; i++) {
+                  days.push(<div key={`empty-${i}`} style={{ padding: '8px' }} />)
+                }
+                
+                // Day cells
+                for (let d = 1; d <= daysInMonth; d++) {
+                  const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+                  const dayData = analytics.calendarData[dateStr]
+                  const pnl = dayData?.pnl || 0
+                  const tradeCount = dayData?.trades || 0
+                  const isToday = new Date().toISOString().split('T')[0] === dateStr
+                  
+                  days.push(
+                    <div 
+                      key={d}
+                      style={{ 
+                        padding: '8px', 
+                        background: tradeCount > 0 
+                          ? (pnl >= 0 ? theme.success + '30' : theme.danger + '30')
+                          : (darkMode ? '#1e293b' : '#f8fafc'),
+                        borderRadius: '8px',
+                        textAlign: 'center' as const,
+                        border: isToday ? `2px solid ${theme.warning}` : 'none',
+                        minHeight: '60px'
+                      }}
+                    >
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '2px' }}>{d}</div>
+                      {tradeCount > 0 ? (
+                        <>
+                          <div style={{ color: pnl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '14px' }}>
+                            {pnl >= 0 ? '+' : ''}${pnl.toFixed(0)}
+                          </div>
+                          <div style={{ color: theme.textMuted, fontSize: '10px' }}>{tradeCount} trade{tradeCount > 1 ? 's' : ''}</div>
+                        </>
+                      ) : (
+                        <div style={{ color: theme.textMuted, fontSize: '10px', marginTop: '8px' }}>-</div>
+                      )}
+                    </div>
+                  )
+                }
+                
+                // Monthly totals
+                const monthTrades = Object.entries(analytics.calendarData)
+                  .filter(([date]) => date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`))
+                const monthPnL = monthTrades.reduce((sum, [_, data]) => sum + data.pnl, 0)
+                const monthTradeCount = monthTrades.reduce((sum, [_, data]) => sum + data.trades, 0)
+                const greenDays = monthTrades.filter(([_, d]) => d.pnl > 0).length
+                const redDays = monthTrades.filter(([_, d]) => d.pnl < 0).length
+                
+                return (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                      <button onClick={() => setTradingCalendarMonth(new Date(year, month - 1))} style={{ padding: '8px 16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>←</button>
+                      <div style={{ textAlign: 'center' as const }}>
+                        <div style={{ color: theme.text, fontWeight: 700, fontSize: '18px' }}>
+                          {tradingCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                        </div>
+                        <div style={{ color: monthPnL >= 0 ? theme.success : theme.danger, fontSize: '14px' }}>
+                          {monthPnL >= 0 ? '+' : ''}${monthPnL.toFixed(0)} • {monthTradeCount} trades • {greenDays}🟢 {redDays}🔴
+                        </div>
+                      </div>
+                      <button onClick={() => setTradingCalendarMonth(new Date(year, month + 1))} style={{ padding: '8px 16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>→</button>
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '8px' }}>
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                        <div key={day} style={{ textAlign: 'center' as const, color: theme.textMuted, fontSize: '11px', padding: '4px' }}>{day}</div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+                      {days}
+                    </div>
+                  </div>
+                )
+              })()}
+              
+              {/* SETUPS TAB */}
+              {analyticsTab === 'setups' && (() => {
+                const analytics = calculateTradingAnalytics(selectedAnalyticsAccount, analyticsDateRange)
+                const setupStats = Object.entries(analytics.bySetup)
+                  .sort((a, b) => b[1].pnl - a[1].pnl)
+                
+                return (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <h4 style={{ color: theme.text, margin: 0, fontSize: '14px' }}>🎯 Performance by Setup/Strategy</h4>
+                      <button onClick={() => setShowSetupManager(true)} style={{ padding: '6px 12px', background: theme.accent, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
+                        ⚙️ Manage Setups
+                      </button>
+                    </div>
+                    
+                    {setupStats.length === 0 ? (
+                      <div style={{ padding: '40px', textAlign: 'center' as const, color: theme.textMuted }}>
+                        <div style={{ fontSize: '32px', marginBottom: '12px' }}>🏷️</div>
+                        <div>No setups tagged yet. Tag your trades with setups to see performance breakdowns.</div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                        {setupStats.map(([setup, data]) => (
+                          <div key={setup} style={{ 
+                            padding: '16px', 
+                            background: darkMode ? '#1e293b' : '#f8fafc', 
+                            borderRadius: '12px',
+                            display: 'grid',
+                            gridTemplateColumns: '200px repeat(5, 1fr)',
+                            alignItems: 'center',
+                            gap: '16px'
+                          }}>
+                            <div>
+                              <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{setup}</div>
+                              <div style={{ color: theme.textMuted, fontSize: '12px' }}>{data.trades} trades</div>
+                            </div>
+                            <div style={{ textAlign: 'center' as const }}>
+                              <div style={{ color: theme.textMuted, fontSize: '10px' }}>P&L</div>
+                              <div style={{ color: data.pnl >= 0 ? theme.success : theme.danger, fontWeight: 700 }}>${data.pnl.toFixed(0)}</div>
+                            </div>
+                            <div style={{ textAlign: 'center' as const }}>
+                              <div style={{ color: theme.textMuted, fontSize: '10px' }}>Win Rate</div>
+                              <div style={{ color: (data.wins / data.trades) >= 0.5 ? theme.success : theme.danger, fontWeight: 700 }}>{((data.wins / data.trades) * 100).toFixed(0)}%</div>
+                            </div>
+                            <div style={{ textAlign: 'center' as const }}>
+                              <div style={{ color: theme.textMuted, fontSize: '10px' }}>Avg R</div>
+                              <div style={{ color: data.avgR >= 0 ? theme.success : theme.danger, fontWeight: 700 }}>{data.avgR.toFixed(2)}R</div>
+                            </div>
+                            <div style={{ textAlign: 'center' as const }}>
+                              <div style={{ color: theme.textMuted, fontSize: '10px' }}>Wins</div>
+                              <div style={{ color: theme.success, fontWeight: 700 }}>{data.wins}</div>
+                            </div>
+                            <div>
+                              {/* Visual bar */}
+                              <div style={{ height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
+                                <div style={{ 
+                                  height: '100%', 
+                                  width: `${(data.wins / data.trades) * 100}%`, 
+                                  background: (data.wins / data.trades) >= 0.5 ? theme.success : theme.danger,
+                                  borderRadius: '4px'
+                                }} />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+              
+              {/* TIME TAB */}
+              {analyticsTab === 'time' && (() => {
+                const analytics = calculateTradingAnalytics(selectedAnalyticsAccount, analyticsDateRange)
+                
+                return (
+                  <div>
+                    <div style={{ marginBottom: '24px' }}>
+                      <h4 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '14px' }}>📆 Performance by Day of Week</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
+                        {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => {
+                          const data = analytics.byDay[day]
+                          return (
+                            <div key={day} style={{ 
+                              padding: '12px', 
+                              background: data.trades > 0 
+                                ? (data.pnl >= 0 ? theme.success + '20' : theme.danger + '20')
+                                : (darkMode ? '#1e293b' : '#f8fafc'),
+                              borderRadius: '8px',
+                              textAlign: 'center' as const
+                            }}>
+                              <div style={{ color: theme.textMuted, fontSize: '11px' }}>{day.slice(0, 3)}</div>
+                              <div style={{ color: data.pnl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '16px' }}>
+                                {data.trades > 0 ? `$${data.pnl.toFixed(0)}` : '-'}
+                              </div>
+                              <div style={{ color: theme.textMuted, fontSize: '10px' }}>
+                                {data.trades > 0 ? `${data.trades} trades` : 'No trades'}
+                              </div>
+                              {data.trades > 0 && (
+                                <div style={{ color: (data.wins / data.trades) >= 0.5 ? theme.success : theme.danger, fontSize: '10px' }}>
+                                  {((data.wins / data.trades) * 100).toFixed(0)}% WR
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    
+                    <div style={{ marginBottom: '24px' }}>
+                      <h4 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '14px' }}>⏰ Performance by Hour (24h)</h4>
+                      <div style={{ display: 'flex', gap: '2px', height: '100px', alignItems: 'flex-end' }}>
+                        {Object.entries(analytics.byHour).map(([hour, data]) => {
+                          const maxPnl = Math.max(...Object.values(analytics.byHour).map(d => Math.abs(d.pnl)), 1)
+                          const height = data.trades > 0 ? (Math.abs(data.pnl) / maxPnl) * 80 + 20 : 5
+                          return (
+                            <div 
+                              key={hour}
+                              style={{ 
+                                flex: 1, 
+                                height: `${height}%`,
+                                background: data.trades > 0 
+                                  ? (data.pnl >= 0 ? theme.success : theme.danger)
+                                  : theme.border,
+                                borderRadius: '2px 2px 0 0',
+                                position: 'relative' as const
+                              }}
+                              title={`${hour}:00 - $${data.pnl.toFixed(0)} (${data.trades} trades)`}
+                            />
+                          )
+                        })}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                        <span style={{ color: theme.textMuted, fontSize: '10px' }}>00:00</span>
+                        <span style={{ color: theme.textMuted, fontSize: '10px' }}>06:00</span>
+                        <span style={{ color: theme.textMuted, fontSize: '10px' }}>12:00</span>
+                        <span style={{ color: theme.textMuted, fontSize: '10px' }}>18:00</span>
+                        <span style={{ color: theme.textMuted, fontSize: '10px' }}>23:00</span>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h4 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '14px' }}>🌍 Performance by Session</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                        {[
+                          { key: 'asian', label: 'Asian', time: '00:00-08:00', emoji: '🌏' },
+                          { key: 'london', label: 'London', time: '08:00-16:00', emoji: '🇬🇧' },
+                          { key: 'newyork', label: 'New York', time: '13:00-21:00', emoji: '🇺🇸' },
+                          { key: 'overlap', label: 'Overlap', time: '13:00-16:00', emoji: '🔥' }
+                        ].map(session => {
+                          const data = analytics.bySession[session.key]
+                          return (
+                            <div key={session.key} style={{ 
+                              padding: '16px', 
+                              background: data.trades > 0 
+                                ? (data.pnl >= 0 ? theme.success + '20' : theme.danger + '20')
+                                : (darkMode ? '#1e293b' : '#f8fafc'),
+                              borderRadius: '12px',
+                              textAlign: 'center' as const
+                            }}>
+                              <div style={{ fontSize: '24px', marginBottom: '4px' }}>{session.emoji}</div>
+                              <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{session.label}</div>
+                              <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '8px' }}>{session.time}</div>
+                              <div style={{ color: data.pnl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '18px' }}>
+                                {data.trades > 0 ? `$${data.pnl.toFixed(0)}` : '-'}
+                              </div>
+                              <div style={{ color: theme.textMuted, fontSize: '11px' }}>
+                                {data.trades} trades • {data.trades > 0 ? `${((data.wins / data.trades) * 100).toFixed(0)}% WR` : ''}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+              
+              {/* PSYCHOLOGY TAB */}
+              {analyticsTab === 'psychology' && (() => {
+                const analytics = calculateTradingAnalytics(selectedAnalyticsAccount, analyticsDateRange)
+                
+                return (
+                  <div>
+                    <div style={{ marginBottom: '24px' }}>
+                      <h4 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '14px' }}>🧠 Performance by Pre-Trade Emotion</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
+                        {[
+                          { key: 'confident', label: 'Confident', emoji: '😎' },
+                          { key: 'neutral', label: 'Neutral', emoji: '😐' },
+                          { key: 'anxious', label: 'Anxious', emoji: '😰' },
+                          { key: 'fomo', label: 'FOMO', emoji: '😱' },
+                          { key: 'revenge', label: 'Revenge', emoji: '😤' }
+                        ].map(emotion => {
+                          const data = analytics.byEmotion[emotion.key] || { trades: 0, wins: 0, pnl: 0 }
+                          return (
+                            <div key={emotion.key} style={{ 
+                              padding: '16px', 
+                              background: data.trades > 0 
+                                ? (data.pnl >= 0 ? theme.success + '15' : theme.danger + '15')
+                                : (darkMode ? '#1e293b' : '#f8fafc'),
+                              borderRadius: '12px',
+                              textAlign: 'center' as const,
+                              border: data.trades > 0 && data.pnl < 0 ? `2px solid ${theme.danger}40` : 'none'
+                            }}>
+                              <div style={{ fontSize: '28px', marginBottom: '4px' }}>{emotion.emoji}</div>
+                              <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{emotion.label}</div>
+                              <div style={{ color: data.pnl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '18px', margin: '4px 0' }}>
+                                {data.trades > 0 ? `$${data.pnl.toFixed(0)}` : '-'}
+                              </div>
+                              <div style={{ color: theme.textMuted, fontSize: '11px' }}>
+                                {data.trades} trades
+                              </div>
+                              {data.trades > 0 && (
+                                <div style={{ color: (data.wins / data.trades) >= 0.5 ? theme.success : theme.danger, fontSize: '11px' }}>
+                                  {((data.wins / data.trades) * 100).toFixed(0)}% WR
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    
+                    {/* Insights */}
+                    <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px' }}>
+                      <h4 style={{ color: theme.text, margin: '0 0 16px 0', fontSize: '14px' }}>💡 Psychology Insights</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                        {(() => {
+                          const insights = []
+                          const fomoData = analytics.byEmotion['fomo'] || { trades: 0, pnl: 0 }
+                          const revengeData = analytics.byEmotion['revenge'] || { trades: 0, pnl: 0 }
+                          const confidentData = analytics.byEmotion['confident'] || { trades: 0, pnl: 0, wins: 0 }
+                          
+                          if (fomoData.trades > 0 && fomoData.pnl < 0) {
+                            insights.push({ type: 'warning', text: `FOMO trades cost you $${Math.abs(fomoData.pnl).toFixed(0)}. Consider waiting for your setups.` })
+                          }
+                          if (revengeData.trades > 0 && revengeData.pnl < 0) {
+                            insights.push({ type: 'danger', text: `Revenge trading lost you $${Math.abs(revengeData.pnl).toFixed(0)}. Step away after losses.` })
+                          }
+                          if (confidentData.trades > 3 && (confidentData.wins / confidentData.trades) > 0.6) {
+                            insights.push({ type: 'success', text: `You perform well when confident (${((confidentData.wins / confidentData.trades) * 100).toFixed(0)}% WR). Trust your analysis!` })
+                          }
+                          if (analytics.streaks.longestLoseStreak >= 3) {
+                            insights.push({ type: 'warning', text: `Your longest losing streak was ${analytics.streaks.longestLoseStreak}. Consider a break after 2 consecutive losses.` })
+                          }
+                          
+                          if (insights.length === 0) {
+                            insights.push({ type: 'info', text: 'Track more trades with emotions to get personalized insights.' })
+                          }
+                          
+                          return insights.map((insight, i) => (
+                            <div key={i} style={{ 
+                              padding: '12px 16px', 
+                              background: insight.type === 'danger' ? theme.danger + '20' : 
+                                         insight.type === 'warning' ? theme.warning + '20' : 
+                                         insight.type === 'success' ? theme.success + '20' : theme.accent + '20',
+                              borderRadius: '8px',
+                              color: theme.text,
+                              fontSize: '13px'
+                            }}>
+                              {insight.type === 'danger' && '🚨 '}
+                              {insight.type === 'warning' && '⚠️ '}
+                              {insight.type === 'success' && '✅ '}
+                              {insight.type === 'info' && '💡 '}
+                              {insight.text}
+                            </div>
+                          ))
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
 
             {/* TRADING ACCOUNTS */}
