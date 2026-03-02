@@ -619,13 +619,33 @@ Sent from Aureus App
     filteredTrades = filteredTrades.filter(t => new Date(t.date) >= cutoff)
     
     if (filteredTrades.length === 0) {
+      // Return empty but properly structured data
+      const emptyByDay: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      dayNames.forEach(d => emptyByDay[d] = { trades: 0, wins: 0, pnl: 0 })
+      
+      const emptyByHour: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
+      for (let i = 0; i < 24; i++) emptyByHour[i.toString().padStart(2, '0')] = { trades: 0, wins: 0, pnl: 0 }
+      
+      const emptyBySession: {[key: string]: { trades: number, wins: number, pnl: number }} = {
+        asian: { trades: 0, wins: 0, pnl: 0 },
+        london: { trades: 0, wins: 0, pnl: 0 },
+        newyork: { trades: 0, wins: 0, pnl: 0 },
+        overlap: { trades: 0, wins: 0, pnl: 0 }
+      }
+      
       return {
         totalTrades: 0, winners: 0, losers: 0, breakeven: 0,
         winRate: 0, totalPnL: 0, avgWin: 0, avgLoss: 0,
         largestWin: 0, largestLoss: 0, profitFactor: 0,
         avgRMultiple: 0, expectancy: 0, avgHoldingTime: 0,
-        bySetup: {}, byDay: {}, byHour: {}, bySession: {},
-        byInstrument: {}, byEmotion: {}, streaks: { currentStreak: 0, longestWinStreak: 0, longestLoseStreak: 0 },
+        bySetup: {}, 
+        byDay: emptyByDay, 
+        byHour: emptyByHour, 
+        bySession: emptyBySession,
+        byInstrument: {}, 
+        byEmotion: {}, 
+        streaks: { currentStreak: 0, longestWinStreak: 0, longestLoseStreak: 0 },
         calendarData: {}
       }
     }
@@ -8009,13 +8029,25 @@ Sent from Aureus App
               {analyticsTab === 'time' && (() => {
                 const analytics = calculateTradingAnalytics(selectedAnalyticsAccount, analyticsDateRange)
                 
+                if (analytics.totalTrades === 0) {
+                  return (
+                    <div style={{ padding: '60px 20px', textAlign: 'center' as const }}>
+                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏰</div>
+                      <h3 style={{ color: theme.text, margin: '0 0 8px 0' }}>No Trade Data Yet</h3>
+                      <p style={{ color: theme.textMuted, margin: 0 }}>
+                        Log some trades to see your performance by day, hour, and session.
+                      </p>
+                    </div>
+                  )
+                }
+                
                 return (
                   <div>
                     <div style={{ marginBottom: '24px' }}>
                       <h4 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '14px' }}>📆 Performance by Day of Week</h4>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
                         {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => {
-                          const data = analytics.byDay[day]
+                          const data = analytics.byDay[day] || { trades: 0, wins: 0, pnl: 0 }
                           return (
                             <div key={day} style={{ 
                               padding: '12px', 
@@ -8047,7 +8079,8 @@ Sent from Aureus App
                       <h4 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '14px' }}>⏰ Performance by Hour (24h)</h4>
                       <div style={{ display: 'flex', gap: '2px', height: '100px', alignItems: 'flex-end' }}>
                         {Object.entries(analytics.byHour).map(([hour, data]) => {
-                          const maxPnl = Math.max(...Object.values(analytics.byHour).map(d => Math.abs(d.pnl)), 1)
+                          const allPnLs = Object.values(analytics.byHour).map(d => Math.abs(d.pnl))
+                          const maxPnl = allPnLs.length > 0 ? Math.max(...allPnLs, 1) : 1
                           const height = data.trades > 0 ? (Math.abs(data.pnl) / maxPnl) * 80 + 20 : 5
                           return (
                             <div 
@@ -8084,7 +8117,7 @@ Sent from Aureus App
                           { key: 'newyork', label: 'New York', time: '13:00-21:00', emoji: '🇺🇸' },
                           { key: 'overlap', label: 'Overlap', time: '13:00-16:00', emoji: '🔥' }
                         ].map(session => {
-                          const data = analytics.bySession[session.key]
+                          const data = analytics.bySession[session.key] || { trades: 0, wins: 0, pnl: 0 }
                           return (
                             <div key={session.key} style={{ 
                               padding: '16px', 
@@ -8101,7 +8134,7 @@ Sent from Aureus App
                                 {data.trades > 0 ? `$${data.pnl.toFixed(0)}` : '-'}
                               </div>
                               <div style={{ color: theme.textMuted, fontSize: '11px' }}>
-                                {data.trades} trades • {data.trades > 0 ? `${((data.wins / data.trades) * 100).toFixed(0)}% WR` : ''}
+                                {data.trades} trades{data.trades > 0 ? ` • ${((data.wins / data.trades) * 100).toFixed(0)}% WR` : ''}
                               </div>
                             </div>
                           )
