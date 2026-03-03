@@ -272,7 +272,7 @@ export default function Dashboard() {
     plan: 'free',
     status: 'none',
     aiChatsUsed: 0,
-    aiChatsLimit: 5, // Free tier limit
+    aiChatsLimit: 5,
     expiresAt: null,
     customerId: null
   })
@@ -280,209 +280,12 @@ export default function Dashboard() {
   const [showPricingModal, setShowPricingModal] = useState(false)
   
   // ==================== BUDGET ENHANCEMENTS ====================
-  // Wealth Position History (tracks over time)
   const [wealthHistory, setWealthHistory] = useState<{date: string, amount: number}[]>([])
-  
-  // Bill reminders
   const [billReminders, setBillReminders] = useState<{id: number, name: string, amount: string, dueDate: string, autoPay: boolean, paid: boolean}[]>([])
-  
-  // Subscription audit
   const [subscriptionAudit, setSubscriptionAudit] = useState<{id: number, name: string, cost: string, frequency: string, lastUsed: string, category: string}[]>([])
-  
-  // Financial milestones/achievements
   const [financialMilestones, setFinancialMilestones] = useState<{id: number, title: string, date: string, amount?: number, type: string}[]>([])
-  
-  // Budget analytics view
   const [budgetAnalyticsTab, setBudgetAnalyticsTab] = useState<'spending' | 'wealth' | 'bills' | 'subscriptions' | 'milestones'>('spending')
   const [showBudgetAnalytics, setShowBudgetAnalytics] = useState(false)
-  
-  // Calculate spending by category
-  const calculateSpendingAnalytics = () => {
-    const categoryTotals: {[key: string]: number} = {}
-    const monthlyExpenseTotal = expenses.reduce((sum, e) => {
-      const amount = parseFloat(e.amount || '0')
-      const monthly = e.frequency === 'weekly' ? amount * 4.33 : e.frequency === 'fortnightly' ? amount * 2.17 : e.frequency === 'yearly' ? amount / 12 : amount
-      const cat = e.category || 'other'
-      categoryTotals[cat] = (categoryTotals[cat] || 0) + monthly
-      return sum + monthly
-    }, 0)
-    
-    // Calculate month-over-month change (simulated for now)
-    const lastMonthTotal = monthlyExpenseTotal * 0.95 // Placeholder
-    const change = monthlyExpenseTotal - lastMonthTotal
-    const changePercent = lastMonthTotal > 0 ? (change / lastMonthTotal) * 100 : 0
-    
-    return {
-      total: monthlyExpenseTotal,
-      byCategory: categoryTotals,
-      change,
-      changePercent,
-      topCategory: Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0] || ['none', 0]
-    }
-  }
-  
-  // Calculate wealth position
-  const calculateWealthPosition = () => {
-    const totalAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || '0'), 0)
-    const totalLiabilitiesAmount = liabilities.reduce((sum, l) => sum + parseFloat(l.value || '0'), 0)
-    const totalDebtAmount = debts.reduce((sum, d) => sum + parseFloat(d.balance || '0'), 0)
-    const tradingBalance = tradingAccounts.reduce((sum, acc) => sum + parseFloat(acc.currentBalance || acc.startingBalance || '0'), 0)
-    const tradingPnL = trades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
-    const totalPayoutsValue = payouts.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0)
-    
-    return {
-      assets: totalAssets,
-      tradingAssets: tradingBalance,
-      tradingPnL,
-      payouts: totalPayoutsValue,
-      liabilities: totalLiabilitiesAmount + totalDebtAmount,
-      netWorth: totalAssets + tradingBalance - totalLiabilitiesAmount - totalDebtAmount
-    }
-  }
-  
-  // Track wealth history (run on mount and when assets change)
-  useEffect(() => {
-    const today = new Date().toISOString().split('T')[0]
-    const wealth = calculateWealthPosition()
-    
-    setWealthHistory(prev => {
-      // Only add if we don't have today's entry
-      if (prev.length === 0 || prev[prev.length - 1].date !== today) {
-        return [...prev.slice(-365), { date: today, amount: wealth.netWorth }] // Keep 1 year
-      }
-      // Update today's entry
-      return [...prev.slice(0, -1), { date: today, amount: wealth.netWorth }]
-    })
-  }, [assets, liabilities, debts, tradingAccounts])
-  
-  // Generate weekly report for trading
-  const generateWeeklyReport = () => {
-    const now = new Date()
-    const weekStart = new Date(now)
-    weekStart.setDate(now.getDate() - 7)
-    
-    const weekTrades = trades.filter(t => new Date(t.date) >= weekStart)
-    const weekPnL = weekTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
-    const weekWins = weekTrades.filter(t => parseFloat(t.profitLoss || '0') > 0)
-    const weekLosses = weekTrades.filter(t => parseFloat(t.profitLoss || '0') < 0)
-    const weekWinRate = weekTrades.length > 0 ? (weekWins.length / weekTrades.length) * 100 : 0
-    
-    // Best/worst setups
-    const setupStats: {[key: string]: {pnl: number, trades: number}} = {}
-    weekTrades.forEach(t => {
-      const setup = t.setupType || 'Untagged'
-      if (!setupStats[setup]) setupStats[setup] = { pnl: 0, trades: 0 }
-      setupStats[setup].pnl += parseFloat(t.profitLoss || '0')
-      setupStats[setup].trades++
-    })
-    const sortedSetups = Object.entries(setupStats).sort((a, b) => b[1].pnl - a[1].pnl)
-    
-    // Best/worst days
-    const dayStats: {[key: string]: number} = {}
-    weekTrades.forEach(t => {
-      const day = new Date(t.date).toLocaleDateString('en-US', { weekday: 'long' })
-      dayStats[day] = (dayStats[day] || 0) + parseFloat(t.profitLoss || '0')
-    })
-    const bestDay = Object.entries(dayStats).sort((a, b) => b[1] - a[1])[0]
-    const worstDay = Object.entries(dayStats).sort((a, b) => a[1] - b[1])[0]
-    
-    // Rules followed
-    const rulesFollowed = weekTrades.filter(t => t.followedPlan).length
-    const rulesRate = weekTrades.length > 0 ? (rulesFollowed / weekTrades.length) * 100 : 0
-    
-    return {
-      totalTrades: weekTrades.length,
-      pnl: weekPnL,
-      winRate: weekWinRate,
-      wins: weekWins.length,
-      losses: weekLosses.length,
-      bestSetup: sortedSetups[0] || null,
-      worstSetup: sortedSetups[sortedSetups.length - 1] || null,
-      bestDay,
-      worstDay,
-      rulesFollowed: rulesRate,
-      avgTradeSize: weekTrades.length > 0 ? weekPnL / weekTrades.length : 0
-    }
-  }
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
-  const [feedbackText, setFeedbackText] = useState('')
-  const [feedbackType, setFeedbackType] = useState<'bug' | 'feature' | 'general'>('general')
-  const [feedbackSent, setFeedbackSent] = useState(false)
-  
-  // REPLACE WITH YOUR EMAIL
-  const FEEDBACK_EMAIL = 'your-email@example.com'
-  
-  const sendFeedback = () => {
-    if (!feedbackText.trim()) return
-    
-    const subject = encodeURIComponent(`[Aureus ${feedbackType}] Feedback from ${budgetMemory.name || tradingMemory.name || 'User'}`)
-    const body = encodeURIComponent(`
-Feedback Type: ${feedbackType}
-User: ${budgetMemory.name || tradingMemory.name || 'Anonymous'}
-Mode: ${appMode}
-Plan: ${userSubscription.plan}
-
-Message:
-${feedbackText}
-
----
-Sent from Aureus App
-    `.trim())
-    
-    window.open(`mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`, '_blank')
-    setFeedbackSent(true)
-    setTimeout(() => {
-      setShowFeedbackModal(false)
-      setFeedbackText('')
-      setFeedbackSent(false)
-    }, 2000)
-  }
-  
-  // Lemon Squeezy checkout URLs - REPLACE WITH YOUR ACTUAL URLS
-  const LEMONSQUEEZY_URLS = {
-    pro_monthly: 'https://aureus.lemonsqueezy.com/checkout/buy/YOUR_PRO_MONTHLY_PRODUCT_ID',
-    pro_annual: 'https://aureus.lemonsqueezy.com/checkout/buy/YOUR_PRO_ANNUAL_PRODUCT_ID',
-    // Customer portal for managing subscription
-    customer_portal: 'https://aureus.lemonsqueezy.com/billing'
-  }
-  
-  // Check if user can use AI (within limits or subscribed)
-  const canUseAI = () => {
-    if (userSubscription.plan === 'pro' || userSubscription.plan === 'annual') {
-      return { allowed: true, remaining: Infinity }
-    }
-    const remaining = userSubscription.aiChatsLimit - userSubscription.aiChatsUsed
-    return { allowed: remaining > 0, remaining }
-  }
-  
-  // Track AI usage
-  const trackAIUsage = () => {
-    if (userSubscription.plan === 'free') {
-      setUserSubscription(prev => ({
-        ...prev,
-        aiChatsUsed: prev.aiChatsUsed + 1
-      }))
-    }
-  }
-  
-  // Reset monthly usage on new month
-  useEffect(() => {
-    const lastReset = localStorage.getItem('aureus_usage_reset')
-    const now = new Date()
-    const currentMonth = `${now.getFullYear()}-${now.getMonth()}`
-    
-    if (lastReset !== currentMonth) {
-      setUserSubscription(prev => ({ ...prev, aiChatsUsed: 0 }))
-      localStorage.setItem('aureus_usage_reset', currentMonth)
-    }
-  }, [])
-  
-  // Selected quest for detail view
-  const [showQuestDetail, setShowQuestDetail] = useState(false)
-  const [selectedBabyStep, setSelectedBabyStep] = useState<number | null>(null)
-  const [homeBuyingPrice, setHomeBuyingPrice] = useState('')
-  const [selectedQuestForWalkthrough, setSelectedQuestForWalkthrough] = useState<number | null>(null)
   
   // ==================== BUDGET STATE ====================
   const [incomeStreams, setIncomeStreams] = useState<any[]>([])
@@ -530,7 +333,7 @@ Sent from Aureus App
     name: '', 
     targetAmount: '', 
     targetDate: '', 
-    category: 'savings', // savings, debt, income, lifestyle
+    category: 'savings',
     icon: '🎯',
     notes: ''
   })
@@ -655,26 +458,26 @@ Sent from Aureus App
   const [trades, setTrades] = useState<any[]>([])
   const [newTrade, setNewTrade] = useState({ 
     date: new Date().toISOString().split('T')[0], 
-    time: new Date().toTimeString().slice(0,5), // HH:MM
+    time: new Date().toTimeString().slice(0,5),
     instrument: '', 
     direction: 'long', 
     entryPrice: '', 
     exitPrice: '', 
     profitLoss: '', 
     riskAmount: '',
-    rMultiple: '', // R-Multiple (profit / risk)
+    rMultiple: '',
     accountId: 0,
-    setupType: '', // User's tagged setup type
-    setupGrade: 'A', // A, B, C setup quality
-    emotionBefore: 'neutral', // confident, neutral, anxious, fomo, revenge
+    setupType: '',
+    setupGrade: 'A',
+    emotionBefore: 'neutral',
     emotionAfter: 'neutral',
     followedPlan: true,
     notes: '',
     screenshot: '',
-    tags: [] as string[], // Custom tags
-    session: 'london', // asian, london, newyork
-    holdingTime: '', // Duration of trade
-    mistakes: [] as string[] // What went wrong
+    tags: [] as string[],
+    session: 'london',
+    holdingTime: '',
+    mistakes: [] as string[]
   })
   const [tradingCalendarMonth, setTradingCalendarMonth] = useState(new Date())
   
@@ -704,9 +507,9 @@ Sent from Aureus App
   const [showPostSessionModal, setShowPostSessionModal] = useState(false)
   const [postSessionReview, setPostSessionReview] = useState({
     date: todayStr,
-    overallRating: 0, // 1-5 stars
+    overallRating: 0,
     followedPlan: true,
-    emotionalControl: 'good', // great, good, struggled
+    emotionalControl: 'good',
     lessonsLearned: '',
     tomorrowFocus: ''
   })
@@ -716,7 +519,7 @@ Sent from Aureus App
   const [tradingRoadmapGoal, setTradingRoadmapGoal] = useState({
     title: '',
     targetDate: '',
-    type: 'prop_funded' // prop_funded, consistent_profit, skill_mastery, income_target
+    type: 'prop_funded'
   })
   const [tradingRoadmapPhases, setTradingRoadmapPhases] = useState<any[]>([])
   const [showCreateRoadmapModal, setShowCreateRoadmapModal] = useState(false)
@@ -778,381 +581,78 @@ Sent from Aureus App
   const [importMapping, setImportMapping] = useState<{[key: string]: string}>({})
   const tradeFileInputRef = useRef<HTMLInputElement>(null)
   
-  // Generate AI daily insight based on trading data
-  const generateDailyInsight = () => {
-    const analytics = calculateTradingAnalytics('all', '30d')
-    const todaysTrades = trades.filter(t => t.date === todayStr)
-    const weekTrades = trades.filter(t => {
-      const tradeDate = new Date(t.date)
-      const weekAgo = new Date()
-      weekAgo.setDate(weekAgo.getDate() - 7)
-      return tradeDate >= weekAgo
-    })
-    
-    const insights: string[] = []
-    
-    // Best setup insight
-    const setupStats = Object.entries(analytics.bySetup).sort((a, b) => (b[1].wins / b[1].trades) - (a[1].wins / a[1].trades))
-    if (setupStats.length > 0 && setupStats[0][1].trades >= 3) {
-      const bestSetup = setupStats[0]
-      insights.push(`Your best setup is **${bestSetup[0]}** with ${((bestSetup[1].wins / bestSetup[1].trades) * 100).toFixed(0)}% win rate.`)
-    }
-    
-    // Best day insight
-    const dayStats = Object.entries(analytics.byDay).filter(([_, d]) => d.trades > 0).sort((a, b) => b[1].pnl - a[1].pnl)
-    if (dayStats.length > 0 && dayStats[0][1].trades >= 2) {
-      insights.push(`You perform best on **${dayStats[0][0]}s** (+$${dayStats[0][1].pnl.toFixed(0)}).`)
-    }
-    
-    // Worst emotion insight
-    const emotionStats = Object.entries(analytics.byEmotion).filter(([_, d]) => d.trades > 0 && d.pnl < 0).sort((a, b) => a[1].pnl - b[1].pnl)
-    if (emotionStats.length > 0 && emotionStats[0][1].trades >= 2) {
-      const worstEmotion = emotionStats[0][0]
-      insights.push(`**${worstEmotion.charAt(0).toUpperCase() + worstEmotion.slice(1)}** trades cost you $${Math.abs(emotionStats[0][1].pnl).toFixed(0)}. Stay patient.`)
-    }
-    
-    // Streak insight
-    if (analytics.streaks.currentStreak > 0) {
-      insights.push(`You're on a **${analytics.streaks.currentStreak} win streak** 🔥 Keep it going!`)
-    } else if (analytics.streaks.currentStreak < -2) {
-      insights.push(`You've had ${Math.abs(analytics.streaks.currentStreak)} losses in a row. Consider taking a break.`)
-    }
-    
-    // Week performance
-    const weekPnL = weekTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
-    const weekWins = weekTrades.filter(t => parseFloat(t.profitLoss || '0') > 0).length
-    if (weekTrades.length > 0) {
-      insights.push(`This week: ${weekPnL >= 0 ? '+' : ''}$${weekPnL.toFixed(0)} | ${weekWins}W/${weekTrades.length - weekWins}L`)
-    }
-    
-    return insights.length > 0 ? insights : ['Log some trades to get personalized insights!']
-  }
+  // ==================== TRADING ACCOUNTS ====================
+  const [tradingAccounts, setTradingAccounts] = useState<any[]>([])
+  const [newAccount, setNewAccount] = useState({
+    name: '',
+    type: 'personal',
+    propFirm: '',
+    phase: '',
+    startingBalance: '',
+    currentBalance: '',
+    maxDrawdown: '',
+    dailyDrawdown: '',
+    profitTarget: '',
+    riskPerTrade: '1',
+    isActive: true,
+    customRules: [] as string[],
+    minTradingDays: '',
+    maxTradingDays: '',
+    consistencyRule: '',
+    newsRestriction: false,
+    weekendHolding: true,
+    scalingPlan: false,
+    profitSplit: ''
+  })
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
+  const [showAddAccount, setShowAddAccount] = useState(false)
   
-  // Calculate comprehensive trading analytics
-  const calculateTradingAnalytics = (accountFilter: number | 'all' = 'all', dateRange: string = '30d') => {
-    let filteredTrades = [...trades]
-    
-    // Filter by account
-    if (accountFilter !== 'all') {
-      filteredTrades = filteredTrades.filter(t => t.accountId === accountFilter)
-    }
-    
-    // Filter by date range
-    const now = new Date()
-    const daysMap: {[key: string]: number} = { '7d': 7, '30d': 30, '90d': 90, 'all': 9999 }
-    const days = daysMap[dateRange] || 30
-    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-    filteredTrades = filteredTrades.filter(t => new Date(t.date) >= cutoff)
-    
-    if (filteredTrades.length === 0) {
-      // Return empty but properly structured data
-      const emptyByDay: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
-      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-      dayNames.forEach(d => emptyByDay[d] = { trades: 0, wins: 0, pnl: 0 })
-      
-      const emptyByHour: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
-      for (let i = 0; i < 24; i++) emptyByHour[i.toString().padStart(2, '0')] = { trades: 0, wins: 0, pnl: 0 }
-      
-      const emptyBySession: {[key: string]: { trades: number, wins: number, pnl: number }} = {
-        asian: { trades: 0, wins: 0, pnl: 0 },
-        london: { trades: 0, wins: 0, pnl: 0 },
-        newyork: { trades: 0, wins: 0, pnl: 0 },
-        overlap: { trades: 0, wins: 0, pnl: 0 }
-      }
-      
-      return {
-        totalTrades: 0, winners: 0, losers: 0, breakeven: 0,
-        winRate: 0, totalPnL: 0, avgWin: 0, avgLoss: 0,
-        largestWin: 0, largestLoss: 0, profitFactor: 0,
-        avgRMultiple: 0, expectancy: 0, avgHoldingTime: 0,
-        bySetup: {}, 
-        byDay: emptyByDay, 
-        byHour: emptyByHour, 
-        bySession: emptyBySession,
-        byInstrument: {}, 
-        byEmotion: {}, 
-        streaks: { currentStreak: 0, longestWinStreak: 0, longestLoseStreak: 0 },
-        calendarData: {}
-      }
-    }
-    
-    // Basic stats
-    const winners = filteredTrades.filter(t => parseFloat(t.profitLoss || '0') > 0)
-    const losers = filteredTrades.filter(t => parseFloat(t.profitLoss || '0') < 0)
-    const breakeven = filteredTrades.filter(t => parseFloat(t.profitLoss || '0') === 0)
-    
-    const totalPnL = filteredTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
-    const totalWins = winners.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
-    const totalLosses = Math.abs(losers.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0))
-    
-    const avgWin = winners.length > 0 ? totalWins / winners.length : 0
-    const avgLoss = losers.length > 0 ? totalLosses / losers.length : 0
-    const largestWin = winners.length > 0 ? Math.max(...winners.map(t => parseFloat(t.profitLoss || '0'))) : 0
-    const largestLoss = losers.length > 0 ? Math.min(...losers.map(t => parseFloat(t.profitLoss || '0'))) : 0
-    
-    const profitFactor = totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? Infinity : 0
-    
-    // R-Multiple stats
-    const tradesWithR = filteredTrades.filter(t => t.rMultiple && !isNaN(parseFloat(t.rMultiple)))
-    const avgRMultiple = tradesWithR.length > 0 
-      ? tradesWithR.reduce((sum, t) => sum + parseFloat(t.rMultiple), 0) / tradesWithR.length 
-      : 0
-    
-    // Expectancy = (Win% × AvgWin) - (Loss% × AvgLoss)
-    const winRate = filteredTrades.length > 0 ? (winners.length / filteredTrades.length) * 100 : 0
-    const lossRate = filteredTrades.length > 0 ? (losers.length / filteredTrades.length) * 100 : 0
-    const expectancy = ((winRate / 100) * avgWin) - ((lossRate / 100) * avgLoss)
-    
-    // Performance by Setup
-    const bySetup: {[key: string]: { trades: number, wins: number, pnl: number, avgR: number }} = {}
-    filteredTrades.forEach(t => {
-      const setup = t.setupType || 'Untagged'
-      if (!bySetup[setup]) bySetup[setup] = { trades: 0, wins: 0, pnl: 0, avgR: 0 }
-      bySetup[setup].trades++
-      if (parseFloat(t.profitLoss || '0') > 0) bySetup[setup].wins++
-      bySetup[setup].pnl += parseFloat(t.profitLoss || '0')
-      if (t.rMultiple) bySetup[setup].avgR += parseFloat(t.rMultiple)
-    })
-    Object.keys(bySetup).forEach(k => {
-      if (bySetup[k].trades > 0) bySetup[k].avgR /= bySetup[k].trades
-    })
-    
-    // Performance by Day of Week
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    const byDay: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
-    dayNames.forEach(d => byDay[d] = { trades: 0, wins: 0, pnl: 0 })
-    filteredTrades.forEach(t => {
-      const day = dayNames[new Date(t.date).getDay()]
-      byDay[day].trades++
-      if (parseFloat(t.profitLoss || '0') > 0) byDay[day].wins++
-      byDay[day].pnl += parseFloat(t.profitLoss || '0')
-    })
-    
-    // Performance by Hour
-    const byHour: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
-    for (let i = 0; i < 24; i++) byHour[i.toString().padStart(2, '0')] = { trades: 0, wins: 0, pnl: 0 }
-    filteredTrades.forEach(t => {
-      if (t.time) {
-        const hour = t.time.split(':')[0]
-        if (byHour[hour]) {
-          byHour[hour].trades++
-          if (parseFloat(t.profitLoss || '0') > 0) byHour[hour].wins++
-          byHour[hour].pnl += parseFloat(t.profitLoss || '0')
-        }
-      }
-    })
-    
-    // Performance by Session
-    const bySession: {[key: string]: { trades: number, wins: number, pnl: number }} = {
-      asian: { trades: 0, wins: 0, pnl: 0 },
-      london: { trades: 0, wins: 0, pnl: 0 },
-      newyork: { trades: 0, wins: 0, pnl: 0 },
-      overlap: { trades: 0, wins: 0, pnl: 0 }
-    }
-    filteredTrades.forEach(t => {
-      const session = t.session || 'london'
-      if (bySession[session]) {
-        bySession[session].trades++
-        if (parseFloat(t.profitLoss || '0') > 0) bySession[session].wins++
-        bySession[session].pnl += parseFloat(t.profitLoss || '0')
-      }
-    })
-    
-    // Performance by Instrument
-    const byInstrument: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
-    filteredTrades.forEach(t => {
-      const inst = t.instrument || 'Unknown'
-      if (!byInstrument[inst]) byInstrument[inst] = { trades: 0, wins: 0, pnl: 0 }
-      byInstrument[inst].trades++
-      if (parseFloat(t.profitLoss || '0') > 0) byInstrument[inst].wins++
-      byInstrument[inst].pnl += parseFloat(t.profitLoss || '0')
-    })
-    
-    // Performance by Pre-trade Emotion
-    const byEmotion: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
-    filteredTrades.forEach(t => {
-      const emotion = t.emotionBefore || 'neutral'
-      if (!byEmotion[emotion]) byEmotion[emotion] = { trades: 0, wins: 0, pnl: 0 }
-      byEmotion[emotion].trades++
-      if (parseFloat(t.profitLoss || '0') > 0) byEmotion[emotion].wins++
-      byEmotion[emotion].pnl += parseFloat(t.profitLoss || '0')
-    })
-    
-    // Win/Loss streaks
-    let currentStreak = 0
-    let longestWinStreak = 0
-    let longestLoseStreak = 0
-    let tempWinStreak = 0
-    let tempLoseStreak = 0
-    const sortedTrades = [...filteredTrades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    
-    sortedTrades.forEach(t => {
-      const pnl = parseFloat(t.profitLoss || '0')
-      if (pnl > 0) {
-        tempWinStreak++
-        tempLoseStreak = 0
-        longestWinStreak = Math.max(longestWinStreak, tempWinStreak)
-      } else if (pnl < 0) {
-        tempLoseStreak++
-        tempWinStreak = 0
-        longestLoseStreak = Math.max(longestLoseStreak, tempLoseStreak)
-      }
-    })
-    
-    // Current streak
-    if (sortedTrades.length > 0) {
-      const lastTrade = sortedTrades[sortedTrades.length - 1]
-      const lastPnL = parseFloat(lastTrade.profitLoss || '0')
-      if (lastPnL > 0) currentStreak = tempWinStreak
-      else if (lastPnL < 0) currentStreak = -tempLoseStreak
-    }
-    
-    // Calendar data (P&L by day)
-    const calendarData: {[date: string]: { pnl: number, trades: number, wins: number }} = {}
-    filteredTrades.forEach(t => {
-      const date = t.date
-      if (!calendarData[date]) calendarData[date] = { pnl: 0, trades: 0, wins: 0 }
-      calendarData[date].pnl += parseFloat(t.profitLoss || '0')
-      calendarData[date].trades++
-      if (parseFloat(t.profitLoss || '0') > 0) calendarData[date].wins++
-    })
-    
-    return {
-      totalTrades: filteredTrades.length,
-      winners: winners.length,
-      losers: losers.length,
-      breakeven: breakeven.length,
-      winRate,
-      totalPnL,
-      avgWin,
-      avgLoss,
-      largestWin,
-      largestLoss,
-      profitFactor,
-      avgRMultiple,
-      expectancy,
-      avgHoldingTime: 0, // Would need to calculate from holdingTime
-      bySetup,
-      byDay,
-      byHour,
-      bySession,
-      byInstrument,
-      byEmotion,
-      streaks: { currentStreak, longestWinStreak, longestLoseStreak },
-      calendarData
-    }
-  }
+  // ==================== TRADING RULES ====================
+  const [tradingRules, setTradingRules] = useState<any[]>([
+    { id: 1, rule: 'Max 3 trades per day', enabled: true, category: 'risk' },
+    { id: 2, rule: 'No trading after a loss', enabled: false, category: 'psychology' },
+    { id: 3, rule: 'No trading in first 15 mins', enabled: true, category: 'timing' },
+    { id: 4, rule: 'Stop loss on every trade', enabled: true, category: 'risk' },
+    { id: 5, rule: 'No trading during news', enabled: true, category: 'timing' },
+    { id: 6, rule: 'Max 1% risk per trade', enabled: true, category: 'risk' },
+    { id: 7, rule: 'No revenge trading', enabled: true, category: 'psychology' },
+    { id: 8, rule: 'Journal every trade', enabled: true, category: 'discipline' }
+  ])
+  const [showRuleEditor, setShowRuleEditor] = useState(false)
+  const [newCustomRule, setNewCustomRule] = useState({ rule: '', category: 'risk' })
   
-  // Parse CSV for trade import
-  const parseTradeCSV = (csvText: string, platform: string) => {
-    const lines = csvText.trim().split('\n')
-    if (lines.length < 2) return []
-    
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''))
-    const trades: any[] = []
-    
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''))
-      const row: {[key: string]: string} = {}
-      headers.forEach((h, idx) => row[h] = values[idx] || '')
-      
-      // Map based on platform
-      let trade: any = {
-        id: Date.now() + i,
-        date: new Date().toISOString().split('T')[0],
-        time: '',
-        instrument: '',
-        direction: 'long',
-        entryPrice: '',
-        exitPrice: '',
-        profitLoss: '',
-        riskAmount: '',
-        rMultiple: '',
-        accountId: selectedAccountId || 0,
-        setupType: '',
-        notes: 'Imported from ' + platform,
-        selected: true
-      }
-      
-      if (platform === 'metatrader') {
-        // MetaTrader export format
-        trade.date = row['time'] || row['open time'] || row['date'] || ''
-        trade.instrument = row['symbol'] || row['item'] || ''
-        trade.direction = (row['type'] || '').toLowerCase().includes('sell') ? 'short' : 'long'
-        trade.entryPrice = row['price'] || row['open price'] || ''
-        trade.exitPrice = row['close price'] || row['s/l'] || ''
-        trade.profitLoss = row['profit'] || row['pnl'] || ''
-      } else if (platform === 'tradingview') {
-        // TradingView export format
-        trade.date = row['date'] || row['time'] || ''
-        trade.instrument = row['symbol'] || row['ticker'] || ''
-        trade.direction = (row['side'] || row['type'] || '').toLowerCase().includes('sell') ? 'short' : 'long'
-        trade.profitLoss = row['profit'] || row['pnl'] || row['return'] || ''
-      } else {
-        // Generic - try to auto-detect
-        trade.date = row['date'] || row['time'] || row['datetime'] || row['open time'] || ''
-        trade.instrument = row['symbol'] || row['instrument'] || row['ticker'] || row['pair'] || row['asset'] || ''
-        trade.direction = (row['direction'] || row['side'] || row['type'] || '').toLowerCase().includes('sell') || 
-                         (row['direction'] || row['side'] || row['type'] || '').toLowerCase().includes('short') ? 'short' : 'long'
-        trade.entryPrice = row['entry'] || row['entry price'] || row['open'] || row['open price'] || row['price'] || ''
-        trade.exitPrice = row['exit'] || row['exit price'] || row['close'] || row['close price'] || ''
-        trade.profitLoss = row['pnl'] || row['profit'] || row['profit/loss'] || row['return'] || row['result'] || ''
-        trade.riskAmount = row['risk'] || row['risk amount'] || ''
-      }
-      
-      // Parse date if needed
-      if (trade.date && !trade.date.includes('-')) {
-        try {
-          const parsed = new Date(trade.date)
-          if (!isNaN(parsed.getTime())) {
-            trade.date = parsed.toISOString().split('T')[0]
-            trade.time = parsed.toTimeString().slice(0, 5)
-          }
-        } catch (e) {}
-      }
-      
-      if (trade.instrument || trade.profitLoss) {
-        trades.push(trade)
-      }
-    }
-    
-    return trades
-  }
+  // ==================== TRADING ROADMAP ====================
+  const [tradingRoadmap, setTradingRoadmap] = useState<any[]>([])
+  const [showAddTradingMilestone, setShowAddTradingMilestone] = useState(false)
+  const [newTradingMilestone, setNewTradingMilestone] = useState({
+    name: '',
+    targetAmount: '',
+    targetDate: '',
+    category: 'prop',
+    icon: '🎯',
+    notes: '',
+    currentAmount: 0
+  })
   
-  const handleTradeFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const text = event.target?.result as string
-      const parsed = parseTradeCSV(text, importPlatform)
-      setImportedTrades(parsed)
-    }
-    reader.readAsText(file)
-  }
+  // ==================== CHART ANALYSIS STATE ====================
+  const [chartAnalysisMode, setChartAnalysisMode] = useState<'single' | 'multi'>('single')
+  const [multiTimeframeCharts, setMultiTimeframeCharts] = useState<{
+    small?: string,
+    mid?: string,
+    high?: string
+  }>({})
   
-  const confirmTradeImport = () => {
-    const selected = importedTrades.filter(t => t.selected)
-    const newTrades = selected.map(t => ({
-      ...t,
-      id: Date.now() + Math.random(),
-      selected: undefined
-    }))
-    setTrades(prev => [...prev, ...newTrades])
-    setImportedTrades([])
-    setShowTradeImport(false)
-    
-    // Update account balances if applicable
-    if (selectedAccountId) {
-      const totalPnL = newTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
-      setTradingAccounts(prev => prev.map(acc => 
-        acc.id === selectedAccountId 
-          ? { ...acc, currentBalance: (parseFloat(acc.currentBalance || acc.startingBalance) + totalPnL).toString() }
-          : acc
-      ))
-    }
-  }
+  // ==================== TRADE IDEA SETTINGS ====================
+  const [tradeIdeaSettings, setTradeIdeaSettings] = useState({
+    minRR: '3',
+    maxRiskPercent: '1',
+    preferredInstruments: [] as string[],
+    tradingStyle: 'day'
+  })
+  
+  // ==================== PSYCHOLOGY TRACKING ====================
+  const [dailyMood, setDailyMood] = useState<{[date: string]: { mood: string, notes: string, tiltRisk: number }}>({})
+  const [todaysMood, setTodaysMood] = useState({ mood: 'neutral', notes: '', tiltRisk: 0 })
   
   // ==================== PAYOUT TRACKING ====================
   const [payouts, setPayouts] = useState<any[]>([])
@@ -1167,99 +667,9 @@ Sent from Aureus App
     addToIncome: true
   })
   
-  // Calculate total payouts
-  const totalPayouts = payouts.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0)
-  const thisMonthPayouts = payouts
-    .filter(p => p.date.startsWith(new Date().toISOString().slice(0, 7)))
-    .reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0)
-  
-  const addPayout = () => {
-    if (!newPayout.amount) return
-    
-    const payout = {
-      ...newPayout,
-      id: Date.now(),
-      amount: parseFloat(newPayout.amount)
-    }
-    
-    setPayouts(prev => [...prev, payout])
-    
-    // Optionally add as income to budget
-    if (newPayout.addToIncome) {
-      const incomeName = newPayout.propFirm 
-        ? `${newPayout.propFirm} Payout` 
-        : newPayout.accountName 
-          ? `${newPayout.accountName} Payout`
-          : 'Trading Payout'
-      
-      setIncomeStreams(prev => [...prev, {
-        id: Date.now(),
-        name: incomeName,
-        amount: newPayout.amount,
-        frequency: 'once', // One-time income
-        type: 'trading',
-        startDate: newPayout.date,
-        notes: newPayout.notes
-      }])
-    }
-    
-    // Reset form
-    setNewPayout({
-      date: new Date().toISOString().split('T')[0],
-      amount: '',
-      accountId: 0,
-      accountName: '',
-      propFirm: '',
-      notes: '',
-      addToIncome: true
-    })
-    setShowPayoutModal(false)
-  }
-  
-  const deletePayout = (id: number) => {
-    setPayouts(prev => prev.filter(p => p.id !== id))
-  }
-  
   // ==================== WEEKLY REPORT ====================
   const [weeklyReports, setWeeklyReports] = useState<any[]>([])
   const [showWeeklyReport, setShowWeeklyReport] = useState(false)
-  
-  // Generate weekly stats
-  const getWeeklyStats = () => {
-    const now = new Date()
-    const weekStart = new Date(now)
-    weekStart.setDate(now.getDate() - now.getDay()) // Start of week (Sunday)
-    weekStart.setHours(0, 0, 0, 0)
-    
-    const weekTrades = trades.filter(t => new Date(t.date) >= weekStart)
-    const weekWins = weekTrades.filter(t => parseFloat(t.profitLoss || '0') > 0)
-    const weekLosses = weekTrades.filter(t => parseFloat(t.profitLoss || '0') < 0)
-    const weekPnL = weekTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
-    const weekWinRate = weekTrades.length > 0 ? (weekWins.length / weekTrades.length) * 100 : 0
-    
-    // Find best and worst setup this week
-    const setupStats: {[key: string]: { pnl: number, trades: number }} = {}
-    weekTrades.forEach(t => {
-      const setup = t.setupType || 'Untagged'
-      if (!setupStats[setup]) setupStats[setup] = { pnl: 0, trades: 0 }
-      setupStats[setup].pnl += parseFloat(t.profitLoss || '0')
-      setupStats[setup].trades++
-    })
-    
-    const sortedSetups = Object.entries(setupStats).sort((a, b) => b[1].pnl - a[1].pnl)
-    const bestSetup = sortedSetups[0]
-    const worstSetup = sortedSetups[sortedSetups.length - 1]
-    
-    return {
-      trades: weekTrades.length,
-      wins: weekWins.length,
-      losses: weekLosses.length,
-      pnl: weekPnL,
-      winRate: weekWinRate,
-      bestSetup: bestSetup ? { name: bestSetup[0], ...bestSetup[1] } : null,
-      worstSetup: worstSetup && sortedSetups.length > 1 ? { name: worstSetup[0], ...worstSetup[1] } : null
-    }
-  }
   
   // ==================== PROP FIRM PROFILES ====================
   const propFirmProfiles: {[key: string]: any} = {
@@ -1393,214 +803,12 @@ Sent from Aureus App
     }
   }
   
-  // ==================== TRADING ACCOUNTS ====================
-  const [tradingAccounts, setTradingAccounts] = useState<any[]>([
-    // Example structure - user will add their own
-  ])
-  const [newAccount, setNewAccount] = useState({
-    name: '',
-    type: 'personal', // personal, prop_challenge, prop_funded
-    propFirm: '',
-    phase: '',
-    startingBalance: '',
-    currentBalance: '',
-    maxDrawdown: '',
-    dailyDrawdown: '',
-    profitTarget: '',
-    riskPerTrade: '1',
-    isActive: true,
-    // Custom rules for the account
-    customRules: [] as string[],
-    // Additional prop firm settings
-    minTradingDays: '',
-    maxTradingDays: '',
-    consistencyRule: '', // e.g., "No single trade can be >15% of total profit"
-    newsRestriction: false,
-    weekendHolding: true,
-    scalingPlan: false,
-    profitSplit: ''
-  })
-  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
-  const [showAddAccount, setShowAddAccount] = useState(false)
-  
-  // ==================== TRADING RULES ====================
-  const [tradingRules, setTradingRules] = useState<any[]>([
-    { id: 1, rule: 'Max 3 trades per day', enabled: true, category: 'risk' },
-    { id: 2, rule: 'No trading after a loss', enabled: false, category: 'psychology' },
-    { id: 3, rule: 'No trading in first 15 mins', enabled: true, category: 'timing' },
-    { id: 4, rule: 'Stop loss on every trade', enabled: true, category: 'risk' },
-    { id: 5, rule: 'No trading during news', enabled: true, category: 'timing' },
-    { id: 6, rule: 'Max 1% risk per trade', enabled: true, category: 'risk' },
-    { id: 7, rule: 'No revenge trading', enabled: true, category: 'psychology' },
-    { id: 8, rule: 'Journal every trade', enabled: true, category: 'discipline' }
-  ])
-  const [showRuleEditor, setShowRuleEditor] = useState(false)
-  const [newCustomRule, setNewCustomRule] = useState({ rule: '', category: 'risk' })
-  
-  // ==================== TRADING ROADMAP ====================
-  const [tradingRoadmap, setTradingRoadmap] = useState<any[]>([])
-  const [showAddTradingMilestone, setShowAddTradingMilestone] = useState(false)
-  const [newTradingMilestone, setNewTradingMilestone] = useState({
-    name: '',
-    targetAmount: '',
-    targetDate: '',
-    category: 'prop', // prop, personal, skill, income
-    icon: '🎯',
-    notes: '',
-    currentAmount: 0
-  })
-  
-  // ==================== CHART ANALYSIS STATE ====================
-  const [chartAnalysisMode, setChartAnalysisMode] = useState<'single' | 'multi'>('single')
-  const [multiTimeframeCharts, setMultiTimeframeCharts] = useState<{
-    small?: string, // e.g., 1m, 5m, 15m
-    mid?: string,   // e.g., 1h, 4h
-    high?: string   // e.g., daily, weekly
-  }>({})
-  
-  // ==================== TRADE IDEA SETTINGS ====================
-  const [tradeIdeaSettings, setTradeIdeaSettings] = useState({
-    minRR: '3', // Minimum risk:reward ratio
-    maxRiskPercent: '1',
-    preferredInstruments: [] as string[],
-    tradingStyle: 'day' // scalp, day, swing
-  })
-  
-  // ==================== PSYCHOLOGY TRACKING ====================
-  const [dailyMood, setDailyMood] = useState<{[date: string]: { mood: string, notes: string, tiltRisk: number }}>({})
-  const [todaysMood, setTodaysMood] = useState({ mood: 'neutral', notes: '', tiltRisk: 0 })
-  
-  // Tilt detection based on trading patterns
-  const detectTilt = () => {
-    const today = new Date().toISOString().split('T')[0]
-    const todaysTrades = trades.filter(t => t.date === today)
-    const recentLosses = todaysTrades.filter(t => parseFloat(t.profitLoss || '0') < 0)
-    
-    let tiltScore = 0
-    let warnings: string[] = []
-    
-    // Check for revenge trading (multiple trades after a loss)
-    if (recentLosses.length >= 2) {
-      tiltScore += 30
-      warnings.push('Multiple losses today - consider stepping away')
-    }
-    
-    // Check for overtrading
-    if (todaysTrades.length > 5) {
-      tiltScore += 25
-      warnings.push('High trade count - are you overtrading?')
-    }
-    
-    // Check for increasing position sizes after losses
-    const positionSizes = todaysTrades.map(t => Math.abs(parseFloat(t.riskAmount || t.profitLoss || '0')))
-    if (positionSizes.length >= 2) {
-      const increasing = positionSizes.slice(1).every((size, i) => size > positionSizes[i])
-      if (increasing && recentLosses.length > 0) {
-        tiltScore += 35
-        warnings.push('⚠️ Position sizes increasing after losses - TILT WARNING')
-      }
-    }
-    
-    // Check for broken rules
-    const brokenRules = tradingRules.filter(r => r.enabled && !checkRuleCompliance(r, todaysTrades))
-    if (brokenRules.length > 0) {
-      tiltScore += brokenRules.length * 10
-      warnings.push(`${brokenRules.length} trading rules broken today`)
-    }
-    
-    return { tiltScore: Math.min(tiltScore, 100), warnings, todaysTrades: todaysTrades.length, todaysLosses: recentLosses.length }
-  }
-  
-  const checkRuleCompliance = (rule: any, todaysTrades: any[]) => {
-    if (rule.rule.includes('Max') && rule.rule.includes('trades')) {
-      const maxTrades = parseInt(rule.rule.match(/\d+/)?.[0] || '3')
-      return todaysTrades.length <= maxTrades
-    }
-    if (rule.rule.includes('Stop loss')) {
-      return todaysTrades.every(t => t.notes?.toLowerCase().includes('sl') || t.riskAmount)
-    }
-    return true // Can't verify other rules automatically
-  }
-  
-  // ==================== COMPOUNDING CALCULATOR ====================
-  const calculateCompounding = (starting: number, monthlyAdd: number, dailyReturn: number, tradingDays: number, months: number) => {
-    let balance = starting
-    const history: {month: number, balance: number}[] = [{ month: 0, balance: starting }]
-    
-    for (let m = 1; m <= months; m++) {
-      // Add monthly contribution at start of month
-      balance += monthlyAdd
-      
-      // Apply daily returns for trading days
-      for (let d = 0; d < tradingDays; d++) {
-        balance *= (1 + dailyReturn / 100)
-      }
-      
-      history.push({ month: m, balance: Math.round(balance) })
-    }
-    
-    return { finalBalance: Math.round(balance), history, totalGain: Math.round(balance - starting - (monthlyAdd * months)) }
-  }
-  
-  // Forex Prop Calculator
-  const [forexPropPhase, setForexPropPhase] = useState<'phase1' | 'phase2' | 'funded'>('phase1')
-  const [forexProp, setForexProp] = useState({
-    accountSize: '100000',
-    profitTarget: '10',
-    maxDrawdown: '10',
-    dailyDrawdown: '5',
-    currentBalance: '100000',
-    daysInChallenge: '30',
-    minTradingDays: '4',
-    profitSplit: '80'
-  })
-  
-  // Futures Prop Calculator
-  const [futuresPropPhase, setFuturesPropPhase] = useState<'evaluation' | 'funded'>('evaluation')
-  const [futuresProp, setFuturesProp] = useState({
-    accountSize: '50000',
-    profitTarget: '3000',
-    maxDrawdown: '2500',
-    dailyLossLimit: '1000',
-    currentBalance: '50000',
-    contractSize: '1',
-    tickValue: '12.50',
-    riskPerTrade: '200',
-    tradesPerDay: '3',
-    winRate: '50',
-    avgWin: '300',
-    avgLoss: '200',
-    profitSplit: '90'
-  })
-  
-  // Trading Calculator
-  const [tradingCalculator, setTradingCalculator] = useState({
-    currency: '$',
-    startingCapital: '100',
-    returnRate: '100',
-    returnPeriod: 'daily', // daily, weekly, monthly
-    years: '0',
-    months: '6',
-    days: '0',
-    includeWeekends: false,
-    includeDays: ['M', 'T', 'W', 'T', 'F'], // Days to include
-    reinvestRate: '100', // % of profits to reinvest
-    additionalContributions: 'none', // none, deposits, withdrawals
-    depositAmount: '0',
-    depositFrequency: 'monthly',
-    withdrawAmount: '0',
-    withdrawFrequency: 'monthly',
-    startDate: new Date().toISOString().split('T')[0]
-  })
-  const [compoundBreakdown, setCompoundBreakdown] = useState<any[]>([])
-  const [compoundView, setCompoundView] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily')
-  
   // ==================== AI AGENT STATE ====================
   const [budgetMemory, setBudgetMemory] = useState<any>({
     name: '',
     onboardingComplete: false,
-    financialPath: '', // babysteps, fire, home, automated, optimise
-    bigGoals: {}, // { home: '', fire: '', debtFree: '', wealthTarget: '', passiveTarget: '' }
+    financialPath: '',
+    bigGoals: {},
     lifeEvents: [],
     patterns: [],
     preferences: { communicationStyle: 'direct', checkInFrequency: 'when-needed', motivators: [] },
@@ -1611,9 +819,9 @@ Sent from Aureus App
   const [tradingMemory, setTradingMemory] = useState<any>({
     name: '',
     onboardingComplete: false,
-    tradingStyle: '', // scalper, day_trader, swing_trader
-    experience: '', // beginner, intermediate, advanced
-    instruments: [], // forex, futures, stocks, crypto
+    tradingStyle: '',
+    experience: '',
+    instruments: [],
     tradingRules: [],
     patterns: [],
     psychology: { 
@@ -1634,12 +842,12 @@ Sent from Aureus App
       targetFirm: '', 
       accountSizeGoal: 0,
       currentPhase: '',
-      fundedBy: '' // target date
+      fundedBy: ''
     },
     personalAccountGoals: {
       targetBalance: 0,
       monthlyTarget: 0,
-      compoundingStrategy: '' // full_compound, withdraw_50, withdraw_profits
+      compoundingStrategy: ''
     }
   })
   
@@ -1647,7 +855,7 @@ Sent from Aureus App
   const [tradingOnboarding, setTradingOnboarding] = useState({ isActive: false, step: 'greeting' })
   
   const [chatInput, setChatInput] = useState('')
-  const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
+  const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string, image?: string}>>([])
   const [isLoading, setIsLoading] = useState(false)
   const [proactiveInsight, setProactiveInsight] = useState<any>(null)
 
@@ -1692,96 +900,1615 @@ Sent from Aureus App
     { name: 'Petrol', category: 'transport', frequency: 'weekly' },
   ]
 
-  // ==================== LOAD/SAVE FROM LOCALSTORAGE ====================
+  // ==================== ADVANCED FINANCIAL METRICS FUNCTIONS ====================
+  const calculateSpendingAnalytics = () => {
+    const categoryTotals: {[key: string]: number} = {}
+    const monthlyExpenseTotal = expenses.reduce((sum, e) => {
+      const amount = parseFloat(e.amount || '0')
+      const monthly = e.frequency === 'weekly' ? amount * 4.33 : e.frequency === 'fortnightly' ? amount * 2.17 : e.frequency === 'yearly' ? amount / 12 : amount
+      const cat = e.category || 'other'
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + monthly
+      return sum + monthly
+    }, 0)
+    
+    const lastMonthTotal = monthlyExpenseTotal * 0.95
+    const change = monthlyExpenseTotal - lastMonthTotal
+    const changePercent = lastMonthTotal > 0 ? (change / lastMonthTotal) * 100 : 0
+    
+    return {
+      total: monthlyExpenseTotal,
+      byCategory: categoryTotals,
+      change,
+      changePercent,
+      topCategory: Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0] || ['none', 0]
+    }
+  }
+  
+  const calculateWealthPosition = () => {
+    const totalAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || '0'), 0)
+    const totalLiabilitiesAmount = liabilities.reduce((sum, l) => sum + parseFloat(l.value || '0'), 0)
+    const totalDebtAmount = debts.reduce((sum, d) => sum + parseFloat(d.balance || '0'), 0)
+    const tradingBalance = tradingAccounts.reduce((sum, acc) => sum + parseFloat(acc.currentBalance || acc.startingBalance || '0'), 0)
+    const tradingPnL = trades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+    const totalPayoutsValue = payouts.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0)
+    
+    return {
+      assets: totalAssets,
+      tradingAssets: tradingBalance,
+      tradingPnL,
+      payouts: totalPayoutsValue,
+      liabilities: totalLiabilitiesAmount + totalDebtAmount,
+      netWorth: totalAssets + tradingBalance - totalLiabilitiesAmount - totalDebtAmount
+    }
+  }
+  
+  const generateWeeklyReport = () => {
+    const now = new Date()
+    const weekStart = new Date(now)
+    weekStart.setDate(now.getDate() - 7)
+    
+    const weekTrades = trades.filter(t => new Date(t.date) >= weekStart)
+    const weekPnL = weekTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+    const weekWins = weekTrades.filter(t => parseFloat(t.profitLoss || '0') > 0)
+    const weekLosses = weekTrades.filter(t => parseFloat(t.profitLoss || '0') < 0)
+    const weekWinRate = weekTrades.length > 0 ? (weekWins.length / weekTrades.length) * 100 : 0
+    
+    const setupStats: {[key: string]: {pnl: number, trades: number}} = {}
+    weekTrades.forEach(t => {
+      const setup = t.setupType || 'Untagged'
+      if (!setupStats[setup]) setupStats[setup] = { pnl: 0, trades: 0 }
+      setupStats[setup].pnl += parseFloat(t.profitLoss || '0')
+      setupStats[setup].trades++
+    })
+    const sortedSetups = Object.entries(setupStats).sort((a, b) => b[1].pnl - a[1].pnl)
+    
+    const dayStats: {[key: string]: number} = {}
+    weekTrades.forEach(t => {
+      const day = new Date(t.date).toLocaleDateString('en-US', { weekday: 'long' })
+      dayStats[day] = (dayStats[day] || 0) + parseFloat(t.profitLoss || '0')
+    })
+    const bestDay = Object.entries(dayStats).sort((a, b) => b[1] - a[1])[0]
+    const worstDay = Object.entries(dayStats).sort((a, b) => a[1] - b[1])[0]
+    
+    const rulesFollowed = weekTrades.filter(t => t.followedPlan).length
+    const rulesRate = weekTrades.length > 0 ? (rulesFollowed / weekTrades.length) * 100 : 0
+    
+    return {
+      totalTrades: weekTrades.length,
+      pnl: weekPnL,
+      winRate: weekWinRate,
+      wins: weekWins.length,
+      losses: weekLosses.length,
+      bestSetup: sortedSetups[0] || null,
+      worstSetup: sortedSetups[sortedSetups.length - 1] || null,
+      bestDay,
+      worstDay,
+      rulesFollowed: rulesRate,
+      avgTradeSize: weekTrades.length > 0 ? weekPnL / weekTrades.length : 0
+    }
+  }
+
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [feedbackText, setFeedbackText] = useState('')
+  const [feedbackType, setFeedbackType] = useState<'bug' | 'feature' | 'general'>('general')
+  const [feedbackSent, setFeedbackSent] = useState(false)
+  
+  const FEEDBACK_EMAIL = 'your-email@example.com'
+  
+  const sendFeedback = () => {
+    if (!feedbackText.trim()) return
+    
+    const subject = encodeURIComponent(`[Aureus ${feedbackType}] Feedback from ${budgetMemory.name || tradingMemory.name || 'User'}`)
+    const body = encodeURIComponent(`
+Feedback Type: ${feedbackType}
+User: ${budgetMemory.name || tradingMemory.name || 'Anonymous'}
+Mode: ${appMode}
+Plan: ${userSubscription.plan}
+
+Message:
+${feedbackText}
+
+---
+Sent from Aureus App
+    `.trim())
+    
+    window.open(`mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`, '_blank')
+    setFeedbackSent(true)
+    setTimeout(() => {
+      setShowFeedbackModal(false)
+      setFeedbackText('')
+      setFeedbackSent(false)
+    }, 2000)
+  }
+  
+  const LEMONSQUEEZY_URLS = {
+    pro_monthly: 'https://aureus.lemonsqueezy.com/checkout/buy/YOUR_PRO_MONTHLY_PRODUCT_ID',
+    pro_annual: 'https://aureus.lemonsqueezy.com/checkout/buy/YOUR_PRO_ANNUAL_PRODUCT_ID',
+    customer_portal: 'https://aureus.lemonsqueezy.com/billing'
+  }
+  
+  const canUseAI = () => {
+    if (userSubscription.plan === 'pro' || userSubscription.plan === 'annual') {
+      return { allowed: true, remaining: Infinity }
+    }
+    const remaining = userSubscription.aiChatsLimit - userSubscription.aiChatsUsed
+    return { allowed: remaining > 0, remaining }
+  }
+  
+  const trackAIUsage = () => {
+    if (userSubscription.plan === 'free') {
+      setUserSubscription(prev => ({
+        ...prev,
+        aiChatsUsed: prev.aiChatsUsed + 1
+      }))
+    }
+  }
+  
   useEffect(() => {
-    const saved = localStorage.getItem('aureus_data')
-    if (saved) {
-      const data = JSON.parse(saved)
-      if (data.incomeStreams) setIncomeStreams(data.incomeStreams)
-      if (data.expenses) setExpenses(data.expenses)
-      if (data.debts) setDebts(data.debts)
-      if (data.goals) setGoals(data.goals)
-      if (data.assets) setAssets(data.assets)
-      if (data.liabilities) setLiabilities(data.liabilities)
-      if (data.trades) setTrades(data.trades)
-      if (data.budgetMemory) setBudgetMemory(data.budgetMemory)
-      if (data.tradingMemory) setTradingMemory(data.tradingMemory)
-      if (data.paidOccurrences) setPaidOccurrences(new Set(data.paidOccurrences))
-      if (data.roadmapMilestones) setRoadmapMilestones(data.roadmapMilestones)
-      if (data.tradingRoadmap) setTradingRoadmap(data.tradingRoadmap)
-      if (data.tradingRules) setTradingRules(data.tradingRules)
-      if (data.tradingAccounts) setTradingAccounts(data.tradingAccounts)
-      if (data.tradeIdeaSettings) setTradeIdeaSettings(data.tradeIdeaSettings)
-      if (data.budgetOnboarding) setBudgetOnboarding(data.budgetOnboarding)
-      if (data.tradingOnboarding) setTradingOnboarding(data.tradingOnboarding)
-      if (data.chatMessages) setChatMessages(data.chatMessages)
-      if (data.userCountry) setUserCountry(data.userCountry)
-      if (data.userSubscription) setUserSubscription(data.userSubscription)
-      if (data.tradeSetups) setTradeSetups(data.tradeSetups)
-      if (data.tradeTags) setTradeTags(data.tradeTags)
-      if (data.tradeMistakes) setTradeMistakes(data.tradeMistakes)
-      if (data.payouts) setPayouts(data.payouts)
-      if (data.preSessionChecklist) setPreSessionChecklist(data.preSessionChecklist)
-      if (data.customChecklistItems) setCustomChecklistItems(data.customChecklistItems)
-      if (data.dailyReviews) setDailyReviews(data.dailyReviews)
-      if (data.tradingRoadmapGoal) setTradingRoadmapGoal(data.tradingRoadmapGoal)
-      if (data.tradingRoadmapPhases) setTradingRoadmapPhases(data.tradingRoadmapPhases)
-      if (data.roadmapProgress) setRoadmapProgress(data.roadmapProgress)
-      if (data.tradeTemplates) setTradeTemplates(data.tradeTemplates)
-      // Budget enhancements
-      if (data.wealthHistory) setWealthHistory(data.wealthHistory)
-      if (data.billReminders) setBillReminders(data.billReminders)
-      if (data.subscriptionAudit) setSubscriptionAudit(data.subscriptionAudit)
-      if (data.financialMilestones) setFinancialMilestones(data.financialMilestones)
+    const lastReset = localStorage.getItem('aureus_usage_reset')
+    const now = new Date()
+    const currentMonth = `${now.getFullYear()}-${now.getMonth()}`
+    
+    if (lastReset !== currentMonth) {
+      setUserSubscription(prev => ({ ...prev, aiChatsUsed: 0 }))
+      localStorage.setItem('aureus_usage_reset', currentMonth)
     }
   }, [])
-
-  useEffect(() => {
-    const data = {
-      incomeStreams, expenses, debts, goals, assets, liabilities, trades,
-      budgetMemory, tradingMemory,
-      paidOccurrences: Array.from(paidOccurrences),
-      roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings,
-      budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription,
-      tradeSetups, tradeTags, tradeMistakes, payouts,
-      preSessionChecklist, customChecklistItems, dailyReviews,
-      tradingRoadmapGoal, tradingRoadmapPhases, roadmapProgress, tradeTemplates,
-      // Budget enhancements
-      wealthHistory, billReminders, subscriptionAudit, financialMilestones
-    }
-    localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings, budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription, tradeSetups, tradeTags, tradeMistakes, payouts, preSessionChecklist, customChecklistItems, dailyReviews, tradingRoadmapGoal, tradingRoadmapPhases, roadmapProgress, tradeTemplates, wealthHistory, billReminders, subscriptionAudit, financialMilestones])
-
-  // Scroll chat to bottom - use scrollTop instead of scrollIntoView to avoid page jump
-  const chatContainerRef = useRef<HTMLDivElement>(null)
-  const aureusChatRef = useRef<HTMLDivElement>(null)
-  const prevMessageCount = useRef(0)
   
-  // Scroll chat to bottom when messages change AND scroll Aureus into view
+  const [showQuestDetail, setShowQuestDetail] = useState(false)
+  const [selectedBabyStep, setSelectedBabyStep] = useState<number | null>(null)
+  const [homeBuyingPrice, setHomeBuyingPrice] = useState('')
+  const [selectedQuestForWalkthrough, setSelectedQuestForWalkthrough] = useState<number | null>(null)
+
+  // ==================== TRACK WEALTH HISTORY - MOVED AFTER ALL STATE DECLARATIONS ====================
   useEffect(() => {
-    // Scroll chat container to bottom
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    const today = new Date().toISOString().split('T')[0]
+    const wealth = calculateWealthPosition()
+    
+    setWealthHistory(prev => {
+      if (prev.length === 0 || prev[prev.length - 1].date !== today) {
+        return [...prev.slice(-365), { date: today, amount: wealth.netWorth }]
+      }
+      return [...prev.slice(0, -1), { date: today, amount: wealth.netWorth }]
+    })
+  }, [assets, liabilities, debts, tradingAccounts])
+
+  const parseTradeCSV = (csvText: string, platform: string) => {
+    const lines = csvText.trim().split('\n')
+    if (lines.length < 2) return []
+    
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''))
+    const trades: any[] = []
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''))
+      const row: {[key: string]: string} = {}
+      headers.forEach((h, idx) => row[h] = values[idx] || '')
+      
+      let trade: any = {
+        id: Date.now() + i,
+        date: new Date().toISOString().split('T')[0],
+        time: '',
+        instrument: '',
+        direction: 'long',
+        entryPrice: '',
+        exitPrice: '',
+        profitLoss: '',
+        riskAmount: '',
+        rMultiple: '',
+        accountId: selectedAccountId || 0,
+        setupType: '',
+        notes: 'Imported from ' + platform,
+        selected: true
+      }
+      
+      if (platform === 'metatrader') {
+        trade.date = row['time'] || row['open time'] || row['date'] || ''
+        trade.instrument = row['symbol'] || row['item'] || ''
+        trade.direction = (row['type'] || '').toLowerCase().includes('sell') ? 'short' : 'long'
+        trade.entryPrice = row['price'] || row['open price'] || ''
+        trade.exitPrice = row['close price'] || row['s/l'] || ''
+        trade.profitLoss = row['profit'] || row['pnl'] || ''
+      } else if (platform === 'tradingview') {
+        trade.date = row['date'] || row['time'] || ''
+        trade.instrument = row['symbol'] || row['ticker'] || ''
+        trade.direction = (row['side'] || row['type'] || '').toLowerCase().includes('sell') ? 'short' : 'long'
+        trade.profitLoss = row['profit'] || row['pnl'] || row['return'] || ''
+      } else {
+        trade.date = row['date'] || row['time'] || row['datetime'] || row['open time'] || ''
+        trade.instrument = row['symbol'] || row['instrument'] || row['ticker'] || row['pair'] || row['asset'] || ''
+        trade.direction = (row['direction'] || row['side'] || row['type'] || '').toLowerCase().includes('sell') || 
+                         (row['direction'] || row['side'] || row['type'] || '').toLowerCase().includes('short') ? 'short' : 'long'
+        trade.entryPrice = row['entry'] || row['entry price'] || row['open'] || row['open price'] || row['price'] || ''
+        trade.exitPrice = row['exit'] || row['exit price'] || row['close'] || row['close price'] || ''
+        trade.profitLoss = row['pnl'] || row['profit'] || row['profit/loss'] || row['return'] || row['result'] || ''
+        trade.riskAmount = row['risk'] || row['risk amount'] || ''
+      }
+      
+      if (trade.date && !trade.date.includes('-')) {
+        try {
+          const parsed = new Date(trade.date)
+          if (!isNaN(parsed.getTime())) {
+            trade.date = parsed.toISOString().split('T')[0]
+            trade.time = parsed.toTimeString().slice(0, 5)
+          }
+        } catch (e) {}
+      }
+      
+      if (trade.instrument || trade.profitLoss) {
+        trades.push(trade)
+      }
     }
     
-    // Only scroll into view when NEW messages arrive (not on initial render)
-    if (chatMessages.length > prevMessageCount.current && chatMessages.length > 0) {
-      // Find the Aureus chat card on the current page and scroll to it
-      setTimeout(() => {
-        const aureusCard = document.querySelector('[data-aureus-chat]')
-        if (aureusCard) {
-          aureusCard.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        }
-      }, 100)
+    return trades
+  }
+  
+  const handleTradeFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const text = event.target?.result as string
+      const parsed = parseTradeCSV(text, importPlatform)
+      setImportedTrades(parsed)
     }
-    prevMessageCount.current = chatMessages.length
-  }, [chatMessages])
+    reader.readAsText(file)
+  }
+  
+  const confirmTradeImport = () => {
+    const selected = importedTrades.filter(t => t.selected)
+    const newTrades = selected.map(t => ({
+      ...t,
+      id: Date.now() + Math.random(),
+      selected: undefined
+    }))
+    setTrades(prev => [...prev, ...newTrades])
+    setImportedTrades([])
+    setShowTradeImport(false)
+    
+    if (selectedAccountId) {
+      const totalPnL = newTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+      setTradingAccounts(prev => prev.map(acc => 
+        acc.id === selectedAccountId 
+          ? { ...acc, currentBalance: (parseFloat(acc.currentBalance || acc.startingBalance) + totalPnL).toString() }
+          : acc
+      ))
+    }
+  }
+  
+  const totalPayouts = payouts.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0)
+  const thisMonthPayouts = payouts
+    .filter(p => p.date.startsWith(new Date().toISOString().slice(0, 7)))
+    .reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0)
+  
+  const addPayout = () => {
+    if (!newPayout.amount) return
+    
+    const payout = {
+      ...newPayout,
+      id: Date.now(),
+      amount: parseFloat(newPayout.amount)
+    }
+    
+    setPayouts(prev => [...prev, payout])
+    
+    if (newPayout.addToIncome) {
+      const incomeName = newPayout.propFirm 
+        ? `${newPayout.propFirm} Payout` 
+        : newPayout.accountName 
+          ? `${newPayout.accountName} Payout`
+          : 'Trading Payout'
+      
+      setIncomeStreams(prev => [...prev, {
+        id: Date.now(),
+        name: incomeName,
+        amount: newPayout.amount,
+        frequency: 'once',
+        type: 'trading',
+        startDate: newPayout.date,
+        notes: newPayout.notes
+      }])
+    }
+    
+    setNewPayout({
+      date: new Date().toISOString().split('T')[0],
+      amount: '',
+      accountId: 0,
+      accountName: '',
+      propFirm: '',
+      notes: '',
+      addToIncome: true
+    })
+    setShowPayoutModal(false)
+  }
+  
+  const deletePayout = (id: number) => {
+    setPayouts(prev => prev.filter(p => p.id !== id))
+  }
+  
+  const getWeeklyStats = () => {
+    const now = new Date()
+    const weekStart = new Date(now)
+    weekStart.setDate(now.getDate() - now.getDay())
+    weekStart.setHours(0, 0, 0, 0)
+    
+    const weekTrades = trades.filter(t => new Date(t.date) >= weekStart)
+    const weekWins = weekTrades.filter(t => parseFloat(t.profitLoss || '0') > 0)
+    const weekLosses = weekTrades.filter(t => parseFloat(t.profitLoss || '0') < 0)
+    const weekPnL = weekTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+    const weekWinRate = weekTrades.length > 0 ? (weekWins.length / weekTrades.length) * 100 : 0
+    
+    const setupStats: {[key: string]: { pnl: number, trades: number }} = {}
+    weekTrades.forEach(t => {
+      const setup = t.setupType || 'Untagged'
+      if (!setupStats[setup]) setupStats[setup] = { pnl: 0, trades: 0 }
+      setupStats[setup].pnl += parseFloat(t.profitLoss || '0')
+      setupStats[setup].trades++
+    })
+    
+    const sortedSetups = Object.entries(setupStats).sort((a, b) => b[1].pnl - a[1].pnl)
+    const bestSetup = sortedSetups[0]
+    const worstSetup = sortedSetups[sortedSetups.length - 1]
+    
+    return {
+      trades: weekTrades.length,
+      wins: weekWins.length,
+      losses: weekLosses.length,
+      pnl: weekPnL,
+      winRate: weekWinRate,
+      bestSetup: bestSetup ? { name: bestSetup[0], ...bestSetup[1] } : null,
+      worstSetup: worstSetup && sortedSetups.length > 1 ? { name: worstSetup[0], ...worstSetup[1] } : null
+    }
+  }
+  
+  const generateDailyInsight = () => {
+    const analytics = calculateTradingAnalytics('all', '30d')
+    const todaysTrades = trades.filter(t => t.date === todayStr)
+    const weekTrades = trades.filter(t => {
+      const tradeDate = new Date(t.date)
+      const weekAgo = new Date()
+      weekAgo.setDate(weekAgo.getDate() - 7)
+      return tradeDate >= weekAgo
+    })
+    
+    const insights: string[] = []
+    
+    const setupStats = Object.entries(analytics.bySetup).sort((a, b) => (b[1].wins / b[1].trades) - (a[1].wins / a[1].trades))
+    if (setupStats.length > 0 && setupStats[0][1].trades >= 3) {
+      const bestSetup = setupStats[0]
+      insights.push(`Your best setup is **${bestSetup[0]}** with ${((bestSetup[1].wins / bestSetup[1].trades) * 100).toFixed(0)}% win rate.`)
+    }
+    
+    const dayStats = Object.entries(analytics.byDay).filter(([_, d]) => d.trades > 0).sort((a, b) => b[1].pnl - a[1].pnl)
+    if (dayStats.length > 0 && dayStats[0][1].trades >= 2) {
+      insights.push(`You perform best on **${dayStats[0][0]}s** (+$${dayStats[0][1].pnl.toFixed(0)}).`)
+    }
+    
+    const emotionStats = Object.entries(analytics.byEmotion).filter(([_, d]) => d.trades > 0 && d.pnl < 0).sort((a, b) => a[1].pnl - b[1].pnl)
+    if (emotionStats.length > 0 && emotionStats[0][1].trades >= 2) {
+      const worstEmotion = emotionStats[0][0]
+      insights.push(`**${worstEmotion.charAt(0).toUpperCase() + worstEmotion.slice(1)}** trades cost you $${Math.abs(emotionStats[0][1].pnl).toFixed(0)}. Stay patient.`)
+    }
+    
+    if (analytics.streaks.currentStreak > 0) {
+      insights.push(`You're on a **${analytics.streaks.currentStreak} win streak** 🔥 Keep it going!`)
+    } else if (analytics.streaks.currentStreak < -2) {
+      insights.push(`You've had ${Math.abs(analytics.streaks.currentStreak)} losses in a row. Consider taking a break.`)
+    }
+    
+    const weekPnL = weekTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+    const weekWins = weekTrades.filter(t => parseFloat(t.profitLoss || '0') > 0).length
+    if (weekTrades.length > 0) {
+      insights.push(`This week: ${weekPnL >= 0 ? '+' : ''}$${weekPnL.toFixed(0)} | ${weekWins}W/${weekTrades.length - weekWins}L`)
+    }
+    
+    return insights.length > 0 ? insights : ['Log some trades to get personalized insights!']
+  }
+  
+  const calculateTradingAnalytics = (accountFilter: number | 'all' = 'all', dateRange: string = '30d') => {
+    let filteredTrades = [...trades]
+    
+    if (accountFilter !== 'all') {
+      filteredTrades = filteredTrades.filter(t => t.accountId === accountFilter)
+    }
+    
+    const now = new Date()
+    const daysMap: {[key: string]: number} = { '7d': 7, '30d': 30, '90d': 90, 'all': 9999 }
+    const days = daysMap[dateRange] || 30
+    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+    filteredTrades = filteredTrades.filter(t => new Date(t.date) >= cutoff)
+    
+    if (filteredTrades.length === 0) {
+      const emptyByDay: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      dayNames.forEach(d => emptyByDay[d] = { trades: 0, wins: 0, pnl: 0 })
+      
+      const emptyByHour: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
+      for (let i = 0; i < 24; i++) emptyByHour[i.toString().padStart(2, '0')] = { trades: 0, wins: 0, pnl: 0 }
+      
+      const emptyBySession: {[key: string]: { trades: number, wins: number, pnl: number }} = {
+        asian: { trades: 0, wins: 0, pnl: 0 },
+        london: { trades: 0, wins: 0, pnl: 0 },
+        newyork: { trades: 0, wins: 0, pnl: 0 },
+        overlap: { trades: 0, wins: 0, pnl: 0 }
+      }
+      
+      return {
+        totalTrades: 0, winners: 0, losers: 0, breakeven: 0,
+        winRate: 0, totalPnL: 0, avgWin: 0, avgLoss: 0,
+        largestWin: 0, largestLoss: 0, profitFactor: 0,
+        avgRMultiple: 0, expectancy: 0, avgHoldingTime: 0,
+        bySetup: {}, 
+        byDay: emptyByDay, 
+        byHour: emptyByHour, 
+        bySession: emptyBySession,
+        byInstrument: {}, 
+        byEmotion: {}, 
+        streaks: { currentStreak: 0, longestWinStreak: 0, longestLoseStreak: 0 },
+        calendarData: {}
+      }
+    }
+    
+    const winners = filteredTrades.filter(t => parseFloat(t.profitLoss || '0') > 0)
+    const losers = filteredTrades.filter(t => parseFloat(t.profitLoss || '0') < 0)
+    const breakeven = filteredTrades.filter(t => parseFloat(t.profitLoss || '0') === 0)
+    
+    const totalPnL = filteredTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+    const totalWins = winners.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+    const totalLosses = Math.abs(losers.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0))
+    
+    const avgWin = winners.length > 0 ? totalWins / winners.length : 0
+    const avgLoss = losers.length > 0 ? totalLosses / losers.length : 0
+    const largestWin = winners.length > 0 ? Math.max(...winners.map(t => parseFloat(t.profitLoss || '0'))) : 0
+    const largestLoss = losers.length > 0 ? Math.min(...losers.map(t => parseFloat(t.profitLoss || '0'))) : 0
+    
+    const profitFactor = totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? Infinity : 0
+    
+    const tradesWithR = filteredTrades.filter(t => t.rMultiple && !isNaN(parseFloat(t.rMultiple)))
+    const avgRMultiple = tradesWithR.length > 0 
+      ? tradesWithR.reduce((sum, t) => sum + parseFloat(t.rMultiple), 0) / tradesWithR.length 
+      : 0
+    
+    const winRate = filteredTrades.length > 0 ? (winners.length / filteredTrades.length) * 100 : 0
+    const lossRate = filteredTrades.length > 0 ? (losers.length / filteredTrades.length) * 100 : 0
+    const expectancy = ((winRate / 100) * avgWin) - ((lossRate / 100) * avgLoss)
+    
+    const bySetup: {[key: string]: { trades: number, wins: number, pnl: number, avgR: number }} = {}
+    filteredTrades.forEach(t => {
+      const setup = t.setupType || 'Untagged'
+      if (!bySetup[setup]) bySetup[setup] = { trades: 0, wins: 0, pnl: 0, avgR: 0 }
+      bySetup[setup].trades++
+      if (parseFloat(t.profitLoss || '0') > 0) bySetup[setup].wins++
+      bySetup[setup].pnl += parseFloat(t.profitLoss || '0')
+      if (t.rMultiple) bySetup[setup].avgR += parseFloat(t.rMultiple)
+    })
+    Object.keys(bySetup).forEach(k => {
+      if (bySetup[k].trades > 0) bySetup[k].avgR /= bySetup[k].trades
+    })
+    
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const byDay: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
+    dayNames.forEach(d => byDay[d] = { trades: 0, wins: 0, pnl: 0 })
+    filteredTrades.forEach(t => {
+      const day = dayNames[new Date(t.date).getDay()]
+      byDay[day].trades++
+      if (parseFloat(t.profitLoss || '0') > 0) byDay[day].wins++
+      byDay[day].pnl += parseFloat(t.profitLoss || '0')
+    })
+    
+    const byHour: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
+    for (let i = 0; i < 24; i++) byHour[i.toString().padStart(2, '0')] = { trades: 0, wins: 0, pnl: 0 }
+    filteredTrades.forEach(t => {
+      if (t.time) {
+        const hour = t.time.split(':')[0]
+        if (byHour[hour]) {
+          byHour[hour].trades++
+          if (parseFloat(t.profitLoss || '0') > 0) byHour[hour].wins++
+          byHour[hour].pnl += parseFloat(t.profitLoss || '0')
+        }
+      }
+    })
+    
+    const bySession: {[key: string]: { trades: number, wins: number, pnl: number }} = {
+      asian: { trades: 0, wins: 0, pnl: 0 },
+      london: { trades: 0, wins: 0, pnl: 0 },
+      newyork: { trades: 0, wins: 0, pnl: 0 },
+      overlap: { trades: 0, wins: 0, pnl: 0 }
+    }
+    filteredTrades.forEach(t => {
+      const session = t.session || 'london'
+      if (bySession[session]) {
+        bySession[session].trades++
+        if (parseFloat(t.profitLoss || '0') > 0) bySession[session].wins++
+        bySession[session].pnl += parseFloat(t.profitLoss || '0')
+      }
+    })
+    
+    const byInstrument: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
+    filteredTrades.forEach(t => {
+      const inst = t.instrument || 'Unknown'
+      if (!byInstrument[inst]) byInstrument[inst] = { trades: 0, wins: 0, pnl: 0 }
+      byInstrument[inst].trades++
+      if (parseFloat(t.profitLoss || '0') > 0) byInstrument[inst].wins++
+      byInstrument[inst].pnl += parseFloat(t.profitLoss || '0')
+    })
+    
+    const byEmotion: {[key: string]: { trades: number, wins: number, pnl: number }} = {}
+    filteredTrades.forEach(t => {
+      const emotion = t.emotionBefore || 'neutral'
+      if (!byEmotion[emotion]) byEmotion[emotion] = { trades: 0, wins: 0, pnl: 0 }
+      byEmotion[emotion].trades++
+      if (parseFloat(t.profitLoss || '0') > 0) byEmotion[emotion].wins++
+      byEmotion[emotion].pnl += parseFloat(t.profitLoss || '0')
+    })
+    
+    let currentStreak = 0
+    let longestWinStreak = 0
+    let longestLoseStreak = 0
+    let tempWinStreak = 0
+    let tempLoseStreak = 0
+    const sortedTrades = [...filteredTrades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    
+    sortedTrades.forEach(t => {
+      const pnl = parseFloat(t.profitLoss || '0')
+      if (pnl > 0) {
+        tempWinStreak++
+        tempLoseStreak = 0
+        longestWinStreak = Math.max(longestWinStreak, tempWinStreak)
+      } else if (pnl < 0) {
+        tempLoseStreak++
+        tempWinStreak = 0
+        longestLoseStreak = Math.max(longestLoseStreak, tempLoseStreak)
+      }
+    })
+    
+    if (sortedTrades.length > 0) {
+      const lastTrade = sortedTrades[sortedTrades.length - 1]
+      const lastPnL = parseFloat(lastTrade.profitLoss || '0')
+      if (lastPnL > 0) currentStreak = tempWinStreak
+      else if (lastPnL < 0) currentStreak = -tempLoseStreak
+    }
+    
+    const calendarData: {[date: string]: { pnl: number, trades: number, wins: number }} = {}
+    filteredTrades.forEach(t => {
+      const date = t.date
+      if (!calendarData[date]) calendarData[date] = { pnl: 0, trades: 0, wins: 0 }
+      calendarData[date].pnl += parseFloat(t.profitLoss || '0')
+      calendarData[date].trades++
+      if (parseFloat(t.profitLoss || '0') > 0) calendarData[date].wins++
+    })
+    
+    return {
+      totalTrades: filteredTrades.length,
+      winners: winners.length,
+      losers: losers.length,
+      breakeven: breakeven.length,
+      winRate,
+      totalPnL,
+      avgWin,
+      avgLoss,
+      largestWin,
+      largestLoss,
+      profitFactor,
+      avgRMultiple,
+      expectancy,
+      avgHoldingTime: 0,
+      bySetup,
+      byDay,
+      byHour,
+      bySession,
+      byInstrument,
+      byEmotion,
+      streaks: { currentStreak, longestWinStreak, longestLoseStreak },
+      calendarData
+    }
+  }
 
-  // ==================== CALCULATIONS ====================
-  // Simple intuitive conversions that match how people think about money
+  const detectTilt = () => {
+    const today = new Date().toISOString().split('T')[0]
+    const todaysTrades = trades.filter(t => t.date === today)
+    const recentLosses = todaysTrades.filter(t => parseFloat(t.profitLoss || '0') < 0)
+    
+    let tiltScore = 0
+    let warnings: string[] = []
+    
+    if (recentLosses.length >= 2) {
+      tiltScore += 30
+      warnings.push('Multiple losses today - consider stepping away')
+    }
+    
+    if (todaysTrades.length > 5) {
+      tiltScore += 25
+      warnings.push('High trade count - are you overtrading?')
+    }
+    
+    const positionSizes = todaysTrades.map(t => Math.abs(parseFloat(t.riskAmount || t.profitLoss || '0')))
+    if (positionSizes.length >= 2) {
+      const increasing = positionSizes.slice(1).every((size, i) => size > positionSizes[i])
+      if (increasing && recentLosses.length > 0) {
+        tiltScore += 35
+        warnings.push('⚠️ Position sizes increasing after losses - TILT WARNING')
+      }
+    }
+    
+    const brokenRules = tradingRules.filter(r => r.enabled && !checkRuleCompliance(r, todaysTrades))
+    if (brokenRules.length > 0) {
+      tiltScore += brokenRules.length * 10
+      warnings.push(`${brokenRules.length} trading rules broken today`)
+    }
+    
+    return { tiltScore: Math.min(tiltScore, 100), warnings, todaysTrades: todaysTrades.length, todaysLosses: recentLosses.length }
+  }
+  
+  const checkRuleCompliance = (rule: any, todaysTrades: any[]) => {
+    if (rule.rule.includes('Max') && rule.rule.includes('trades')) {
+      const maxTrades = parseInt(rule.rule.match(/\d+/)?.[0] || '3')
+      return todaysTrades.length <= maxTrades
+    }
+    if (rule.rule.includes('Stop loss')) {
+      return todaysTrades.every(t => t.notes?.toLowerCase().includes('sl') || t.riskAmount)
+    }
+    return true
+  }
+  
+  const calculateCompounding = (starting: number, monthlyAdd: number, dailyReturn: number, tradingDays: number, months: number) => {
+    let balance = starting
+    const history: {month: number, balance: number}[] = [{ month: 0, balance: starting }]
+    
+    for (let m = 1; m <= months; m++) {
+      balance += monthlyAdd
+      for (let d = 0; d < tradingDays; d++) {
+        balance *= (1 + dailyReturn / 100)
+      }
+      history.push({ month: m, balance: Math.round(balance) })
+    }
+    
+    return { finalBalance: Math.round(balance), history, totalGain: Math.round(balance - starting - (monthlyAdd * months)) }
+  }
+  
+  const [forexPropPhase, setForexPropPhase] = useState<'phase1' | 'phase2' | 'funded'>('phase1')
+  const [forexProp, setForexProp] = useState({
+    accountSize: '100000',
+    profitTarget: '10',
+    maxDrawdown: '10',
+    dailyDrawdown: '5',
+    currentBalance: '100000',
+    daysInChallenge: '30',
+    minTradingDays: '4',
+    profitSplit: '80'
+  })
+  
+  const [futuresPropPhase, setFuturesPropPhase] = useState<'evaluation' | 'funded'>('evaluation')
+  const [futuresProp, setFuturesProp] = useState({
+    accountSize: '50000',
+    profitTarget: '3000',
+    maxDrawdown: '2500',
+    dailyLossLimit: '1000',
+    currentBalance: '50000',
+    contractSize: '1',
+    tickValue: '12.50',
+    riskPerTrade: '200',
+    tradesPerDay: '3',
+    winRate: '50',
+    avgWin: '300',
+    avgLoss: '200',
+    profitSplit: '90'
+  })
+  
+  const [tradingCalculator, setTradingCalculator] = useState({
+    currency: '$',
+    startingCapital: '100',
+    returnRate: '100',
+    returnPeriod: 'daily',
+    years: '0',
+    months: '6',
+    days: '0',
+    includeWeekends: false,
+    includeDays: ['M', 'T', 'W', 'T', 'F'],
+    reinvestRate: '100',
+    additionalContributions: 'none',
+    depositAmount: '0',
+    depositFrequency: 'monthly',
+    withdrawAmount: '0',
+    withdrawFrequency: 'monthly',
+    startDate: new Date().toISOString().split('T')[0]
+  })
+  const [compoundBreakdown, setCompoundBreakdown] = useState<any[]>([])
+  const [compoundView, setCompoundView] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily')
+  
+  const [compoundCalcSettings, setCompoundCalcSettings] = useState({
+    startingBalance: '10000',
+    monthlyAdd: '0',
+    dailyReturn: '0.5',
+    tradingDays: '20',
+    months: '12'
+  })
+
+  const handleChartUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    const base64 = await new Promise<string>((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.readAsDataURL(file)
+    })
+    
+    setPendingChartImage(base64)
+    setChatInput(prev => prev || "Analyze this chart for me")
+  }
+
+  const sendQuickMessage = async (message: string) => {
+    if (!message.trim() || isLoading) return
+    
+    setChatMessages(prev => [...prev, { role: 'user', content: message }])
+    setChatInput('')
+    setIsLoading(true)
+    
+    try {
+      const endpoint = appMode === 'budget' ? '/api/budget-coach' : '/api/trading-coach'
+      const recentHistory = [...chatMessages.slice(-10), { role: 'user', content: message }]
+        .map(m => `${m.role === 'user' ? 'User' : 'Aureus'}: ${m.content}`)
+        .join('\n')
+      
+      const body = appMode === 'budget'
+        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones }, memory: budgetMemory, countryConfig: currentCountryConfig }
+        : { mode: 'question', question: message, conversationHistory: recentHistory, tradingData: { trades, accounts: tradingAccounts, roadmap: tradingRoadmap }, memory: tradingMemory, tradeIdeaSettings, tradingRules }
+      
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const data = await response.json()
+      
+      if (data.actions && Array.isArray(data.actions)) {
+        executeAIActions(data.actions)
+      }
+      setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
+    } catch (error) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I had trouble with that. Let's try again!" }])
+    }
+    setIsLoading(false)
+  }
+
+  const handleChatMessage = async () => {
+    if ((!chatInput.trim() && !pendingChartImage) || isLoading) return
+    const message = chatInput.trim()
+    
+    const aiStatus = canUseAI()
+    if (!aiStatus.allowed && !budgetOnboarding.isActive && !tradingOnboarding.isActive) {
+      setShowUpgradePrompt(true)
+      return
+    }
+    
+    if ((appMode === 'budget' && budgetOnboarding.isActive) || (appMode === 'trading' && tradingOnboarding.isActive)) {
+      await handleOnboardingResponse(message, appMode!)
+      setPendingChartImage(null)
+      return
+    }
+    
+    trackAIUsage()
+    
+    const userMessageContent = pendingChartImage 
+      ? `${message}\n[📊 Chart image attached]`
+      : message
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessageContent, image: pendingChartImage || undefined }])
+    setChatInput('')
+    setIsLoading(true)
+    
+    try {
+      const endpoint = appMode === 'budget' ? '/api/budget-coach' : '/api/trading-coach'
+      
+      const recentHistory = [...chatMessages.slice(-10), { role: 'user', content: message }]
+        .map(m => `${m.role === 'user' ? 'User' : 'Aureus'}: ${m.content}`)
+        .join('\n')
+      
+      const body = appMode === 'budget'
+        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones }, memory: budgetMemory, countryConfig: currentCountryConfig }
+        : { 
+            mode: 'question', 
+            question: message, 
+            conversationHistory: recentHistory, 
+            tradingData: { trades, accounts: tradingAccounts, roadmap: tradingRoadmap }, 
+            memory: tradingMemory,
+            chartImage: pendingChartImage || undefined,
+            tradeIdeaSettings,
+            tradingRules
+          }
+      
+      setPendingChartImage(null)
+      
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const data = await response.json()
+      
+      if (data.actions && Array.isArray(data.actions)) {
+        executeAIActions(data.actions)
+        const addedItems = data.actions.filter((a: any) => a.type.startsWith('add'))
+        if (addedItems.length > 0) {
+          const summary = addedItems.map((a: any) => `${a.type.replace('add', '')}: ${a.data.name}`).join(', ')
+          setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "Done!" }])
+          if (!data.message?.toLowerCase().includes('added')) {
+            setChatMessages(prev => [...prev, { role: 'assistant', content: `✅ Added: ${summary}` }])
+          }
+        } else {
+          setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
+        }
+      } else {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
+      }
+    } catch (error) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: "Sorry, something went wrong. Please try again." }])
+    }
+    setIsLoading(false)
+  }
+
+  const startOnboarding = (mode: 'budget' | 'trading') => {
+    setChatMessages([])
+    if (mode === 'budget') {
+      setBudgetOnboarding({ isActive: true, step: 'greeting' })
+      setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial operations coach. I'll help you optimize your cash flow, eliminate liabilities, and build automated revenue streams.\n\nLet's get to know each other. What should I call you?" }])
+    } else {
+      setTradingOnboarding({ isActive: true, step: 'greeting' })
+      setChatMessages([{ role: 'assistant', content: "Hey! 📈 I'm Aureus, your trading operations coach.\n\nI'll help you optimize capital deployment, maintain psychological discipline, and systematically scale your accounts.\n\nWhat's your name?" }])
+    }
+  }
+
+  const handleModeSelect = (mode: 'budget' | 'trading') => {
+    setAppMode(mode)
+    setShowModeSelector(false)
+    setProactiveInsight(null)
+    setTourStep(0)
+    
+    const memory = mode === 'budget' ? budgetMemory : tradingMemory
+    const tourDone = mode === 'budget' ? budgetTourCompleted : tradingTourCompleted
+    const currentOnboarding = mode === 'budget' ? budgetOnboarding : tradingOnboarding
+    
+    if (currentOnboarding.isActive && currentOnboarding.step !== 'complete') {
+      setActiveTab('dashboard')
+      return
+    }
+    
+    if (!memory.onboardingComplete && !tourDone) {
+      setChatMessages([])
+      setShowTour(true)
+    } else if (!memory.onboardingComplete) {
+      if (currentOnboarding.step && currentOnboarding.step !== 'greeting' && currentOnboarding.step !== 'complete') {
+        setActiveTab('dashboard')
+        if (mode === 'budget') {
+          setBudgetOnboarding({ ...currentOnboarding, isActive: true })
+        } else {
+          setTradingOnboarding({ ...currentOnboarding, isActive: true })
+        }
+      } else {
+        setActiveTab('dashboard')
+        setChatMessages([])
+        startOnboarding(mode)
+      }
+    } else {
+      setActiveTab('quickview')
+      fetchProactiveInsight(mode)
+    }
+  }
+
+  const calculateForexProp = () => {
+    const size = parseFloat(forexProp.accountSize) || 0
+    const target = parseFloat(forexProp.profitTarget) / 100
+    const maxDD = parseFloat(forexProp.maxDrawdown) / 100
+    const dailyDD = parseFloat(forexProp.dailyDrawdown) / 100
+    const current = parseFloat(forexProp.currentBalance) || size
+    const days = parseInt(forexProp.daysInChallenge) || 30
+    const split = parseFloat(forexProp.profitSplit) / 100
+
+    const profitTargetAmount = size * target
+    const maxDrawdownAmount = size * maxDD
+    const dailyDrawdownAmount = current * dailyDD
+    const profitMade = current - size
+    const progressPercent = profitTargetAmount > 0 ? (profitMade / profitTargetAmount) * 100 : 0
+    const remainingProfit = profitTargetAmount - profitMade
+    const dailyTargetToPass = days > 0 ? remainingProfit / days : 0
+    const drawdownRemaining = current - (size - maxDrawdownAmount)
+
+    return { profitTargetAmount, maxDrawdownAmount, dailyDrawdownAmount, profitMade, progressPercent, remainingProfit, dailyTargetToPass, drawdownRemaining, split }
+  }
+
+  const calculateFuturesProp = () => {
+    const size = parseFloat(futuresProp.accountSize) || 0
+    const target = parseFloat(futuresProp.profitTarget) || 0
+    const maxDD = parseFloat(futuresProp.maxDrawdown) || 0
+    const dailyLimit = parseFloat(futuresProp.dailyLossLimit) || 0
+    const current = parseFloat(futuresProp.currentBalance) || size
+    const split = parseFloat(futuresProp.profitSplit) / 100
+
+    const profitMade = current - size
+    const progressPercent = target > 0 ? (profitMade / target) * 100 : 0
+    const remainingProfit = target - profitMade
+    const drawdownThreshold = size - maxDD
+    const drawdownUsed = size - current
+    const drawdownRemaining = maxDD - drawdownUsed
+
+    return { target, profitMade, progressPercent, remainingProfit, drawdownThreshold, drawdownUsed, drawdownRemaining, dailyLimit, split, accountSize: size, currentBalance: current }
+  }
+
+  const calculateTradingCompound = () => {
+    const capital = parseFloat(tradingCalculator.startingCapital) || 0
+    const rate = parseFloat(tradingCalculator.returnRate) / 100 || 0
+    const reinvest = parseFloat(tradingCalculator.reinvestRate) / 100 || 1
+    const years = parseInt(tradingCalculator.years) || 0
+    const months = parseInt(tradingCalculator.months) || 0
+    const days = parseInt(tradingCalculator.days) || 0
+    
+    const totalCalendarDays = years * 365 + months * 30 + days
+    
+    const tradingDaysPerWeek = tradingCalculator.includeDays.length
+    const totalTradingDays = Math.floor(totalCalendarDays * (tradingDaysPerWeek / 7))
+    
+    const breakdown: any[] = []
+    let balance = capital
+    let totalEarnings = 0
+    let totalContributed = capital
+    
+    const startDate = new Date(tradingCalculator.startDate || Date.now())
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const activeDays = tradingCalculator.includeDays.map(d => {
+      if (d === 'M') return 1
+      if (d === 'T') return 2
+      if (d === 'W') return 3
+      if (d === 'T2') return 4
+      if (d === 'F') return 5
+      if (d === 'S') return 6
+      if (d === 'S2') return 0
+      return 1
+    })
+    
+    let currentDate = new Date(startDate)
+    let tradingDayCount = 0
+    
+    for (let d = 0; d < totalCalendarDays && tradingDayCount < totalTradingDays; d++) {
+      const dayOfWeek = currentDate.getDay()
+      const isActiveTradingDay = activeDays.includes(dayOfWeek)
+      
+      if (!isActiveTradingDay) {
+        breakdown.push({
+          date: new Date(currentDate),
+          dayName: dayNames[dayOfWeek],
+          excluded: true,
+          earnings: 0,
+          totalEarnings: totalEarnings,
+          balance: balance
+        })
+      } else {
+        const dailyEarnings = balance * rate * reinvest
+        balance += dailyEarnings
+        totalEarnings += dailyEarnings
+        tradingDayCount++
+        
+        breakdown.push({
+          date: new Date(currentDate),
+          dayName: dayNames[dayOfWeek],
+          excluded: false,
+          earnings: dailyEarnings,
+          totalEarnings: totalEarnings,
+          balance: balance
+        })
+      }
+      
+      if (tradingCalculator.additionalContributions === 'deposits') {
+        const depositAmt = parseFloat(tradingCalculator.depositAmount) || 0
+        if (tradingCalculator.depositFrequency === 'daily' && !breakdown[breakdown.length-1]?.excluded) {
+          balance += depositAmt
+          totalContributed += depositAmt
+        } else if (tradingCalculator.depositFrequency === 'weekly' && d % 7 === 0 && d > 0) {
+          balance += depositAmt
+          totalContributed += depositAmt
+        } else if (tradingCalculator.depositFrequency === 'monthly' && d % 30 === 0 && d > 0) {
+          balance += depositAmt
+          totalContributed += depositAmt
+        }
+      } else if (tradingCalculator.additionalContributions === 'withdrawals') {
+        const withdrawAmt = parseFloat(tradingCalculator.withdrawAmount) || 0
+        if (tradingCalculator.withdrawFrequency === 'monthly' && d % 30 === 0 && d > 0) {
+          balance = Math.max(0, balance - withdrawAmt)
+        }
+      }
+      
+      currentDate.setDate(currentDate.getDate() + 1)
+    }
+    
+    const endDate = new Date(startDate)
+    endDate.setDate(endDate.getDate() + totalCalendarDays)
+    
+    return { 
+      futureValue: balance, 
+      totalContributed, 
+      profit: balance - totalContributed, 
+      totalCalendarDays, 
+      totalTradingDays: tradingDayCount,
+      breakdown,
+      endDate,
+      excludedDays: tradingCalculator.includeWeekends ? [] : ['Sat', 'Sun']
+    }
+  }
+
+  const forexPropResults = calculateForexProp()
+  const futuresPropResults = calculateFuturesProp()
+  const tradingResults = calculateTradingCompound()
+
+  const budgetTourSteps = [
+    {
+      title: "Welcome to Aureus! 🌟",
+      content: "I'm your AI financial companion, here to help you achieve financial freedom - where your passive income covers all your expenses so you can live life on YOUR terms.",
+      icon: "✨"
+    },
+    {
+      title: "The FIRE Number 🔥",
+      content: "FIRE = Financial Independence, Retire Early. Your FIRE number is 25x your annual expenses. When your Super + investments reach this amount, you can live off the returns forever!",
+      icon: "🔥",
+      highlight: "path"
+    },
+    {
+      title: "Australian Baby Steps 👶",
+      content: "We follow localised Baby Steps: 1) $2K emergency fund, 2) Kill bad debt (not HECS!), 3) 3-6 months savings, 4) Invest 15% + Super, 5) Home deposit, 6) Pay off mortgage, 7) Build wealth!",
+      icon: "👶",
+      highlight: "path"
+    },
+    {
+      title: "Escape the Rat Race 🐀",
+      content: "The goal: Passive Income > Monthly Expenses = FREEDOM! I'll suggest passive income 'quests' - from high-interest savings to dividend ETFs - and help you automate your money.",
+      icon: "🚀",
+      highlight: "path"
+    },
+    {
+      title: "Set & Forget Automation 🤖",
+      content: "Once we know your budget, I'll help you set up automatic transfers so your bills pay themselves and savings grow without thinking about it. No more manual transfers!",
+      icon: "🤖"
+    },
+    {
+      title: "Let's Get Started! 💪",
+      content: "I'll ask about your income, expenses, debts, and goals. You can upload a payslip to speed things up! Just tell me what you know - I'll ask for anything I need.",
+      icon: "💬"
+    }
+  ]
+
+  const tradingTourSteps = [
+    {
+      title: "Welcome, Trader! 📈",
+      content: "I'm Aureus, your AI trading mentor. I'll help you stay disciplined, track your psychology, manage prop firm challenges, and compound your personal account.",
+      icon: "✨"
+    },
+    {
+      title: "Prop Firm Mastery 🏆",
+      content: "I know the rules for FTMO, MyFundedFX, The5ers, Funded Next, and more. I'll track your progress, warn you about drawdown limits, and keep you compliant.",
+      icon: "🏆"
+    },
+    {
+      title: "Psychology & Tilt Detection 🧠",
+      content: "Trading is 80% psychology. I monitor for revenge trading, overtrading, and emotional decisions. When you're tilting, I'll tell you to step away before you blow an account.",
+      icon: "🧠"
+    },
+    {
+      title: "Personal Account Compounding 💎",
+      content: "For your personal capital, consistency beats big wins. 0.5% daily = 214% yearly. I'll show you the power of compounding and help you stay patient.",
+      icon: "💎"
+    },
+    {
+      title: "Trading Rules & Discipline 📋",
+      content: "Set your own trading rules and I'll track compliance. Max trades per day, risk per trade, no trading during news - whatever keeps you profitable.",
+      icon: "📋"
+    },
+    {
+      title: "Let's Build Your Edge! 🚀",
+      content: "I'll learn your trading style, experience level, and psychological weaknesses. Then I'll be your accountability partner every trading day.",
+      icon: "💬"
+    }
+  ]
+
+  const tourSteps = appMode === 'budget' ? budgetTourSteps : tradingTourSteps
+
+  const addIncome = () => {
+    if (!newIncome.name || !newIncome.amount) return
+    setIncomeStreams([...incomeStreams, { ...newIncome, id: Date.now() }])
+    setNewIncome({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0] })
+  }
+  const deleteIncome = (id: number) => setIncomeStreams(incomeStreams.filter(i => i.id !== id))
+
+  const addExpense = () => {
+    if (!newExpense.name || !newExpense.amount) return
+    setExpenses([...expenses, { ...newExpense, id: Date.now() }])
+    setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: new Date().toISOString().split('T')[0] })
+  }
+  const deleteExpense = (id: number) => setExpenses(expenses.filter(e => e.id !== id))
+
+  const addDebt = () => {
+    if (!newDebt.name || !newDebt.balance) return
+    setDebts([...debts, { ...newDebt, id: Date.now(), originalBalance: newDebt.balance }])
+    setNewDebt({ name: '', balance: '', interestRate: '', minPayment: '', frequency: 'monthly', paymentDate: new Date().toISOString().split('T')[0] })
+  }
+  const deleteDebt = (id: number) => setDebts(debts.filter(d => d.id !== id))
+
+  const addGoal = () => {
+    if (!newGoal.name || !newGoal.target) return
+    setGoals([...goals, { ...newGoal, id: Date.now() }])
+    setNewGoal({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: new Date().toISOString().split('T')[0], paymentAmount: '' })
+  }
+  
+  const addToRoadmap = (name: string, category: string, targetAmount: string | number, icon: string, notes?: string, currentAmount?: number, linkedGoalId?: number) => {
+    if (roadmapMilestones.some(m => m.name.toLowerCase() === name.toLowerCase())) {
+      alert(`"${name}" is already in your roadmap!`)
+      return
+    }
+    
+    const newMilestoneItem = {
+      id: Date.now(),
+      name,
+      category,
+      icon,
+      targetAmount: typeof targetAmount === 'number' ? targetAmount.toString() : targetAmount,
+      currentAmount: currentAmount || 0,
+      targetDate: '',
+      notes: notes || '',
+      completed: false,
+      createdAt: new Date().toISOString(),
+      linkedGoalId: linkedGoalId || null,
+      calendarAlerts: false,
+      alertFrequency: 'weekly',
+      alertDay: 1
+    }
+    
+    setRoadmapMilestones(prev => [...prev, newMilestoneItem])
+    
+    alert(`✅ Added "${name}" to your roadmap! You can configure calendar reminders in the Roadmap section.`)
+  }
+  
+  useEffect(() => {
+    setRoadmapMilestones(prev => prev.map(milestone => {
+      if (milestone.linkedGoalId) {
+        const linkedGoal = goals.find(g => g.id === milestone.linkedGoalId)
+        if (linkedGoal) {
+          return {
+            ...milestone,
+            currentAmount: parseFloat(linkedGoal.saved || '0'),
+            targetAmount: linkedGoal.target,
+            completed: parseFloat(linkedGoal.saved || '0') >= parseFloat(linkedGoal.target || '0')
+          }
+        }
+      }
+      return milestone
+    }))
+  }, [goals])
+  
+  const addLinkedGoalAndMilestone = (goalData: any, milestoneCategory: string, icon: string) => {
+    const goalId = Date.now()
+    const goal = { ...goalData, id: goalId }
+    setGoals(prev => [...prev, goal])
+    
+    const milestone = {
+      id: goalId + 1,
+      name: goalData.name,
+      category: milestoneCategory,
+      icon,
+      targetAmount: goalData.target,
+      currentAmount: parseFloat(goalData.saved || '0'),
+      targetDate: goalData.deadline || '',
+      notes: `Linked to goal: ${goalData.name}`,
+      completed: false,
+      createdAt: new Date().toISOString(),
+      linkedGoalId: goalId,
+      calendarAlerts: false,
+      alertFrequency: goalData.savingsFrequency || 'weekly',
+      alertDay: 1
+    }
+    setRoadmapMilestones(prev => [...prev, milestone])
+  }
+  const deleteGoal = (id: number) => setGoals(goals.filter(g => g.id !== id))
+
+  const addAsset = () => {
+    if (!newAsset.name || !newAsset.value) return
+    setAssets([...assets, { ...newAsset, id: Date.now() }])
+    setNewAsset({ name: '', value: '', type: 'savings' })
+  }
+  const deleteAsset = (id: number) => setAssets(assets.filter(a => a.id !== id))
+
+  const addLiability = () => {
+    if (!newLiability.name || !newLiability.value) return
+    setLiabilities([...liabilities, { ...newLiability, id: Date.now() }])
+    setNewLiability({ name: '', value: '', type: 'loan' })
+  }
+  const deleteLiability = (id: number) => setLiabilities(liabilities.filter(l => l.id !== id))
+
+  const handlePayslipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    setPayslipProcessing(true)
+    
+    try {
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.readAsDataURL(file)
+      })
+      
+      const response = await fetch('/api/extract-payslip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, filename: file.name })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setExtractedPayslip(data)
+        setShowPayslipUpload(true)
+      } else {
+        alert('Could not process payslip. Please try again or enter manually.')
+      }
+    } catch (error) {
+      console.error('Payslip upload error:', error)
+      alert('Could not process payslip. Please try again or enter manually.')
+    }
+    
+    setPayslipProcessing(false)
+  }
+  
+  const confirmPayslipIncome = () => {
+    if (extractedPayslip) {
+      setIncomeStreams([...incomeStreams, {
+        id: Date.now(),
+        name: extractedPayslip.employer || 'Salary',
+        amount: extractedPayslip.netPay || extractedPayslip.amount || '',
+        frequency: extractedPayslip.frequency || 'fortnightly',
+        type: 'active',
+        startDate: extractedPayslip.payDate || new Date().toISOString().split('T')[0]
+      }])
+      setExtractedPayslip(null)
+      setShowPayslipUpload(false)
+    }
+  }
+
+  const calculateAutomation = () => {
+    const payFrequency = incomeStreams[0]?.frequency || 'fortnightly'
+    const payAmount = parseFloat(incomeStreams[0]?.amount || '0')
+    
+    const convertToPayPeriod = (amount: number, freq: string) => {
+      if (freq === payFrequency) return amount
+      if (payFrequency === 'fortnightly') {
+        if (freq === 'weekly') return amount * 2
+        if (freq === 'monthly') return amount / 2
+      }
+      if (payFrequency === 'weekly') {
+        if (freq === 'fortnightly') return amount / 2
+        if (freq === 'monthly') return amount / 4
+      }
+      if (payFrequency === 'monthly') {
+        if (freq === 'weekly') return amount * 4
+        if (freq === 'fortnightly') return amount * 2
+      }
+      return amount
+    }
+    
+    const billsTotal = expenses.filter(e => !e.targetDebtId && !e.targetGoalId).reduce((sum, exp) => 
+      sum + convertToPayPeriod(parseFloat(exp.amount || '0'), exp.frequency), 0)
+    const debtTotal = debts.reduce((sum, debt) => 
+      sum + convertToPayPeriod(parseFloat(debt.minPayment || '0'), debt.frequency || 'monthly'), 0)
+    const billsBucket = billsTotal + debtTotal
+    
+    const savingsBucket = goals.reduce((sum, goal) => 
+      sum + convertToPayPeriod(parseFloat(goal.paymentAmount || '0'), goal.savingsFrequency || 'monthly'), 0)
+    
+    const spendingBucket = payAmount - billsBucket - savingsBucket
+    
+    return {
+      payFrequency,
+      payAmount,
+      bills: {
+        total: billsBucket,
+        breakdown: [
+          ...expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(e => ({ 
+            name: e.name, 
+            amount: convertToPayPeriod(parseFloat(e.amount || '0'), e.frequency),
+            original: `$${e.amount}/${e.frequency}`
+          })),
+          ...debts.map(d => ({ 
+            name: `${d.name} payment`, 
+            amount: convertToPayPeriod(parseFloat(d.minPayment || '0'), d.frequency || 'monthly'),
+            original: `$${d.minPayment}/${d.frequency || 'monthly'}`
+          }))
+        ]
+      },
+      savings: {
+        total: savingsBucket,
+        breakdown: goals.map(g => ({ 
+          name: g.name, 
+          amount: convertToPayPeriod(parseFloat(g.paymentAmount || '0'), g.savingsFrequency || 'monthly'),
+          original: `$${g.paymentAmount}/${g.savingsFrequency}`
+        }))
+      },
+      spending: spendingBucket
+    }
+  }
+
+  const startQuest = (questId: number) => {
+    setPassiveQuests(passiveQuests.map(q => 
+      q.id === questId ? { ...q, status: 'in_progress', progress: 10 } : q
+    ))
+  }
+  
+  const updateQuestProgress = (questId: number, stepIndex: number) => {
+    setPassiveQuests(passiveQuests.map(q => {
+      if (q.id === questId) {
+        const newProgress = Math.min(100, ((stepIndex + 1) / q.steps.length) * 100)
+        return { 
+          ...q, 
+          progress: newProgress,
+          status: newProgress >= 100 ? 'completed' : 'in_progress'
+        }
+      }
+      return q
+    }))
+  }
+  
+  const completeQuest = (questId: number, monthlyIncome: number) => {
+    setPassiveQuests(passiveQuests.map(q => 
+      q.id === questId ? { ...q, status: 'completed', progress: 100, monthlyIncome } : q
+    ))
+  }
+  
+  const totalPassiveQuestIncome = passiveQuests.filter(q => q.status === 'completed').reduce((sum, q) => sum + q.monthlyIncome, 0)
+
+  const addTrade = () => {
+    if (!newTrade.instrument) return
+    
+    const tradeWithId = { ...newTrade, id: Date.now() }
+    setTrades(prev => [...prev, tradeWithId].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()))
+    
+    if (newTrade.accountId && newTrade.accountId > 0) {
+      const pnl = parseFloat(newTrade.profitLoss) || 0
+      setTradingAccounts(prev => prev.map(acc => {
+        if (acc.id === newTrade.accountId) {
+          const newBalance = parseFloat(acc.currentBalance || '0') + pnl
+          return { ...acc, currentBalance: newBalance.toString() }
+        }
+        return acc
+      }))
+    }
+    
+    setNewTrade({ 
+      date: new Date().toISOString().split('T')[0], 
+      time: new Date().toTimeString().slice(0,5),
+      instrument: '', 
+      direction: 'long', 
+      entryPrice: '', 
+      exitPrice: '', 
+      profitLoss: '', 
+      riskAmount: '',
+      rMultiple: '',
+      accountId: newTrade.accountId,
+      setupType: '',
+      setupGrade: 'A',
+      emotionBefore: 'neutral',
+      emotionAfter: 'neutral',
+      followedPlan: true,
+      notes: '',
+      screenshot: '',
+      tags: [],
+      session: 'london',
+      holdingTime: '',
+      mistakes: []
+    })
+  }
+  
+  const deleteTrade = (id: number) => {
+    const trade = trades.find(t => t.id === id)
+    
+    if (trade && trade.accountId && trade.accountId > 0) {
+      const pnl = parseFloat(trade.profitLoss) || 0
+      setTradingAccounts(prev => prev.map(acc => {
+        if (acc.id === trade.accountId) {
+          const newBalance = parseFloat(acc.currentBalance || '0') - pnl
+          return { ...acc, currentBalance: newBalance.toString() }
+        }
+        return acc
+      }))
+    }
+    
+    setTrades(trades.filter(t => t.id !== id))
+  }
+
+  const addPresetBill = (preset: any) => {
+    const amount = prompt(`Enter amount for ${preset.name}:`, preset.amount || '')
+    if (!amount) return
+    setExpenses([...expenses, { id: Date.now(), name: preset.name, amount, frequency: preset.frequency, category: preset.category, dueDate: new Date().toISOString().split('T')[0] }])
+  }
+
+  const addGoalToCalendar = (goal: any) => {
+    const payment = parseFloat(goal.paymentAmount || '0')
+    if (payment <= 0) { 
+      alert('Set a savings amount first (how much you want to save each period)'); 
+      return 
+    }
+    
+    if (goal.addedToCalendar) {
+      alert('This goal is already on your calendar!')
+      return
+    }
+    
+    const today = new Date().toISOString().split('T')[0]
+    setGoalCalendarPicker({
+      goalId: goal.id,
+      startDate: today
+    })
+  }
+  
+  const confirmGoalToCalendar = () => {
+    if (!goalCalendarPicker) return
+    
+    const goalId = goalCalendarPicker.goalId
+    const selectedDate = goalCalendarPicker.startDate
+    
+    const goal = goals.find(g => g.id === goalId)
+    if (!goal) {
+      alert('Goal not found!')
+      return
+    }
+    
+    setGoals(prevGoals => {
+      return prevGoals.map(g => {
+        if (g.id === goalId) {
+          console.log(`Updating goal ${g.name}: startDate from ${g.startDate} to ${selectedDate}`)
+          return { 
+            ...g, 
+            startDate: selectedDate,
+            addedToCalendar: true 
+          }
+        }
+        return g
+      })
+    })
+    
+    const alertMsg = `✅ ${goal.name} added to calendar!\n\nFirst payment: ${selectedDate}\nFrequency: ${goal.savingsFrequency}\nAmount: $${goal.paymentAmount}`
+    alert(alertMsg)
+    
+    setGoalCalendarPicker(null)
+  }
+
+  const calculateSingleDebtPayoff = (debt: any) => {
+    const balance = parseFloat(debt.balance || '0')
+    const interestRate = parseFloat(debt.interestRate || '0') / 100 / 12
+    const minPayment = convertToMonthly(parseFloat(debt.minPayment || '0'), debt.frequency || 'monthly')
+    
+    const extraPayments = expenses.filter(e => e.targetDebtId === debt.id)
+      .reduce((sum, e) => sum + convertToMonthly(parseFloat(e.amount || '0'), e.frequency), 0)
+    
+    const totalPayment = minPayment + extraPayments
+    
+    if (balance <= 0) return { months: 0, totalInterest: 0, payoffDate: 'Paid off!' }
+    if (totalPayment <= 0) return { months: 999, totalInterest: 0, payoffDate: 'No payment set' }
+    
+    const monthlyInterest = balance * interestRate
+    if (totalPayment <= monthlyInterest) {
+      return { months: 999, totalInterest: 0, payoffDate: 'Payment too low!' }
+    }
+    
+    let remaining = balance
+    let months = 0
+    let totalInterest = 0
+    
+    while (remaining > 0 && months < 600) {
+      const interest = remaining * interestRate
+      totalInterest += interest
+      remaining = remaining + interest - totalPayment
+      months++
+    }
+    
+    const payoffDate = new Date()
+    payoffDate.setMonth(payoffDate.getMonth() + months)
+    
+    return {
+      months,
+      totalInterest,
+      payoffDate: months < 600 ? payoffDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Never',
+      extraPayments,
+      totalPayment
+    }
+  }
+
+  const addExtraPaymentToDebt = (debtId: number) => {
+    const extra = debtExtraPayment[debtId]
+    if (!extra || !extra.amount || parseFloat(extra.amount) <= 0) { 
+      alert('Please enter an extra payment amount')
+      return 
+    }
+    const debt = debts.find(d => d.id === debtId)
+    if (!debt) return
+    
+    setExpenses([...expenses, { 
+      id: Date.now(), 
+      name: `Extra → ${debt.name}`, 
+      amount: extra.amount, 
+      frequency: extra.frequency, 
+      category: 'debt',
+      dueDate: new Date().toISOString().split('T')[0], 
+      targetDebtId: debt.id 
+    }])
+    
+    alert(`Extra payment of $${extra.amount}/${extra.frequency} added to ${debt.name}`)
+    setDebtExtraPayment(prev => ({ ...prev, [debtId]: { amount: '', frequency: 'monthly' } }))
+    setShowExtraInput(null)
+  }
+
+  const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const lines = (ev.target?.result as string).split('\n').slice(1).filter(l => l.trim())
+      const txns = lines.map((line, i) => {
+        const parts = line.split(',').map(p => p.replace(/"/g, '').trim())
+        const amt = parseFloat(parts.find(p => /^-?\$?[\d,.]+$/.test(p.replace(/[$,]/g, '')))?.replace(/[$,]/g, '') || '0')
+        const desc = parts.find(p => p.length > 3 && !/^-?\$?[\d,.]+$/.test(p.replace(/[$,]/g, ''))) || 'Transaction'
+        return { id: Date.now() + i, description: desc, amount: Math.abs(amt), isExpense: amt < 0, selected: amt < 0, category: 'other' }
+      }).filter(t => t.amount > 0)
+      setCsvTransactions(txns)
+      setShowCsvImport(true)
+    }
+    reader.readAsText(file)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const importCsvTransactions = () => {
+    csvTransactions.filter(t => t.selected).forEach(t => {
+      if (t.isExpense) {
+        setExpenses(prev => [...prev, { id: Date.now() + Math.random(), name: t.description, amount: t.amount.toString(), frequency: 'once', category: t.category, dueDate: new Date().toISOString().split('T')[0] }])
+      } else {
+        setIncomeStreams(prev => [...prev, { id: Date.now() + Math.random(), name: t.description, amount: t.amount.toString(), frequency: 'once', type: 'active', startDate: new Date().toISOString().split('T')[0] }])
+      }
+    })
+    alert(`Imported ${csvTransactions.filter(t => t.selected).length} transactions`)
+    setShowCsvImport(false)
+    setCsvTransactions([])
+  }
+
+  const startEdit = (type: string, item: any) => {
+    setEditingItem({ type, id: item.id, data: { ...item } })
+  }
+
+  const cancelEdit = () => {
+    setEditingItem(null)
+  }
+
+  const saveEdit = () => {
+    if (!editingItem) return
+    const { type, id, data } = editingItem
+
+    switch (type) {
+      case 'income':
+        setIncomeStreams(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
+        break
+      case 'expense':
+        setExpenses(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
+        break
+      case 'debt':
+        setDebts(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
+        break
+      case 'goal':
+        setGoals(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
+        break
+      case 'asset':
+        setAssets(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
+        break
+      case 'liability':
+        setLiabilities(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
+        break
+    }
+    setEditingItem(null)
+  }
+
+  const updateEditField = (field: string, value: string) => {
+    if (!editingItem) return
+    setEditingItem({ ...editingItem, data: { ...editingItem.data, [field]: value } })
+  }
+
   const convertToMonthly = (amount: number, frequency: string) => {
-    if (frequency === 'weekly') return amount * 4       // 4 weeks per month
-    if (frequency === 'fortnightly') return amount * 2  // 2 fortnights per month
+    if (frequency === 'weekly') return amount * 4
+    if (frequency === 'fortnightly') return amount * 2
     if (frequency === 'quarterly') return amount / 3
     if (frequency === 'yearly') return amount / 12
     return amount
@@ -1812,13 +2539,10 @@ Sent from Aureus App
   const passiveIncome = incomeStreams.filter(i => i.type === 'passive').reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0)
   const activeIncome = monthlyIncome - passiveIncome
   
-  // Expenses that are NOT linked to a debt (to avoid double-counting debt payments)
   const monthlyExpenses = expenses.filter(e => !e.targetDebtId && !e.targetGoalId && !e.isDebtPayment).reduce((sum, exp) => sum + convertToMonthly(parseFloat(exp.amount || '0'), exp.frequency), 0)
   
-  // Debt payments (from the debts themselves)
   const monthlyDebtPayments = debts.reduce((sum, debt) => sum + convertToMonthly(parseFloat(debt.minPayment || '0'), debt.frequency || 'monthly'), 0)
   
-  // Goal savings contributions
   const monthlyGoalSavings = goals.reduce((sum, goal) => sum + convertToMonthly(parseFloat(goal.paymentAmount || '0'), goal.savingsFrequency || 'monthly'), 0)
   
   const totalDebtBalance = debts.reduce((sum, d) => sum + parseFloat(d.balance || '0'), 0)
@@ -1830,19 +2554,16 @@ Sent from Aureus App
   const savingsRate = monthlyIncome > 0 ? (monthlySurplus / monthlyIncome * 100) : 0
   const passiveCoverage = monthlyExpenses > 0 ? (passiveIncome / monthlyExpenses * 100) : 0
 
-  // This month specific calculations
   const currentMonthTotals = (() => {
     const month = calendarMonth.getMonth()
     const year = calendarMonth.getFullYear()
     const incomeTotal = incomeStreams.reduce((sum, inc) => sum + parseFloat(inc.amount || '0') * getOccurrencesInMonth(inc.startDate, inc.frequency, month, year), 0)
-    // Exclude debt-linked expenses to avoid double counting
     const expenseTotal = expenses.filter(e => !e.targetDebtId && !e.targetGoalId && !e.isDebtPayment).reduce((sum, exp) => sum + parseFloat(exp.amount || '0') * getOccurrencesInMonth(exp.dueDate, exp.frequency, month, year), 0)
     const debtTotal = debts.reduce((sum, debt) => sum + parseFloat(debt.minPayment || '0') * getOccurrencesInMonth(debt.paymentDate, debt.frequency || 'monthly', month, year), 0)
     const goalTotal = goals.reduce((sum, goal) => sum + parseFloat(goal.paymentAmount || '0') * getOccurrencesInMonth(goal.startDate, goal.savingsFrequency || 'monthly', month, year), 0)
     return { incomeTotal, expenseTotal, debtTotal, goalTotal, total: incomeTotal - expenseTotal - debtTotal - goalTotal }
   })()
 
-  // Trading calculations
   const totalPL = trades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
   const winningTrades = trades.filter(t => parseFloat(t.profitLoss || '0') > 0)
   const losingTrades = trades.filter(t => parseFloat(t.profitLoss || '0') < 0)
@@ -1850,7 +2571,6 @@ Sent from Aureus App
   const avgWin = winningTrades.length > 0 ? winningTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0) / winningTrades.length : 0
   const avgLoss = losingTrades.length > 0 ? Math.abs(losingTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0) / losingTrades.length) : 0
 
-  // FIRE calculations
   const fiPath = {
     monthlyNeed: totalOutgoing,
     passiveGap: totalOutgoing - passiveIncome,
@@ -1860,53 +2580,29 @@ Sent from Aureus App
     yearsToFI: monthlySurplus > 0 ? Math.ceil(((totalOutgoing * 12) * 25) / (monthlySurplus * 12)) : 999
   }
 
-  // ==================== ADVANCED FINANCIAL METRICS ====================
-  // These metrics help users understand their financial progress scientifically
-  
-  // 1️⃣ Capital Efficiency Ratio (CER) - How much of income is being deployed productively
-  const productiveCapital = (monthlyGoalSavings + passiveIncome) // Money working for you
+  const productiveCapital = (monthlyGoalSavings + passiveIncome)
   const capitalEfficiencyRatio = monthlyIncome > 0 ? (productiveCapital / monthlyIncome) * 100 : 0
-  
-  // 2️⃣ Risk Management Factor - Measures financial safety buffers
   const emergencyFund = assets.filter(a => a.type === 'savings').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
   const emergencyMonths = monthlyExpenses > 0 ? emergencyFund / monthlyExpenses : 0
-  const riskManagementFactor = Math.min(emergencyMonths / 6, 1) // 1.0 = 6+ months saved
-  
-  // 3️⃣ Liquidity Factor - How accessible are your assets
+  const riskManagementFactor = Math.min(emergencyMonths / 6, 1)
   const liquidAssets = assets.filter(a => a.type === 'savings' || a.type === 'investment').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
   const illiquidAssets = assets.filter(a => a.type === 'property' || a.type === 'vehicle').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
   const liquidityFactor = (liquidAssets + illiquidAssets) > 0 ? liquidAssets / (liquidAssets + illiquidAssets) : 0
-  
-  // 4️⃣ Allocation Optimality - Based on diversification (simplified)
   const assetTypes = [...new Set(assets.map(a => a.type))]
-  const allocationOptimality = Math.min(assetTypes.length / 4, 1) // Target 4+ asset types
-  
-  // 5️⃣ Adjusted Capital Efficiency (ACE) - Sophisticated deployment metric
+  const allocationOptimality = Math.min(assetTypes.length / 4, 1)
   const adjustedCapitalEfficiency = capitalEfficiencyRatio * riskManagementFactor * liquidityFactor * (allocationOptimality || 0.25)
-  
-  // 6️⃣ Drawdown-Adjusted Efficiency (DAE) - Risk-adjusted based on debt load
   const debtToIncomeRatio = monthlyIncome > 0 ? monthlyDebtPayments / monthlyIncome : 0
   const drawdownAdjustedEfficiency = capitalEfficiencyRatio * (1 - Math.min(debtToIncomeRatio, 0.5) * 2)
-  
-  // 7️⃣ Compounding Velocity (CV) - Would need historical data, using proxy
-  // Using savings rate as proxy for potential compounding velocity
   const compoundingVelocity = savingsRate > 0 ? savingsRate * (1 + (passiveIncome / Math.max(monthlyIncome, 1))) : 0
-  
-  // 8️⃣ Allocation Diversity Score (ADS) - 0-100 score
   const incomeStreamCount = incomeStreams.length
   const assetTypeCount = assetTypes.length
   const allocationDiversityScore = Math.min(((incomeStreamCount * 15) + (assetTypeCount * 20)), 100)
-  
-  // 9️⃣ Forecast Accuracy Index (FAI) - Would need historical projections vs actuals
-  // Placeholder based on whether user is hitting savings targets
   const forecastAccuracyIndex = goals.length > 0 
     ? goals.reduce((sum, g) => {
         const progress = parseFloat(g.saved || '0') / parseFloat(g.target || '1')
         return sum + Math.min(progress * 100, 100)
       }, 0) / goals.length
-    : 50 // Default if no goals
-
-  // Overall Financial Health Score (0-100)
+    : 50
   const financialHealthScore = Math.round(
     (capitalEfficiencyRatio * 0.2) +
     (riskManagementFactor * 100 * 0.2) +
@@ -1916,14 +2612,10 @@ Sent from Aureus App
     (Math.min(passiveCoverage, 100) * 0.15)
   )
 
-  // ==================== DYNAMIC QUEST UNLOCK LOGIC ====================
-  // All quests are unlocked from the start - let users explore freely
   const getQuestUnlockStatus = (questId: number): { isUnlocked: boolean, reason?: string } => {
-    // All quests unlocked - no artificial gates
     return { isUnlocked: true }
   }
 
-  // Australian Baby Steps with detailed content
   const australianBabySteps = [
     { 
       step: 1, 
@@ -2034,587 +2726,46 @@ Sent from Aureus App
   
   const getBabyStep = () => {
     const emergencyFund = assets.filter(a => a.type === 'savings').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
-    const badDebt = debts.filter(d => parseFloat(d.interestRate || '0') > 5) // Credit cards, personal loans
+    const badDebt = debts.filter(d => parseFloat(d.interestRate || '0') > 5)
     const allDebt = debts.filter(d => d.name?.toLowerCase() !== 'mortgage' && d.name?.toLowerCase() !== 'hecs' && d.name?.toLowerCase() !== 'help')
     const mortgageDebt = debts.filter(d => d.name?.toLowerCase().includes('mortgage'))
     const monthlyExpenses3 = monthlyExpenses * 3
     const monthlyExpenses6 = monthlyExpenses * 6
     
-    // Step 1: $2,000 starter emergency fund (higher for AU cost of living)
     if (emergencyFund < 2000) {
       return { step: 1, title: 'Starter Emergency Fund', desc: 'Save $2,000 for emergencies', progress: (emergencyFund / 2000) * 100, icon: '🛡️', target: 2000, current: emergencyFund }
     }
     
-    // Step 2: Pay off bad debt (credit cards, personal loans, BNPL - NOT HECS/HELP)
     if (badDebt.length > 0) {
       const totalBadDebt = badDebt.reduce((s, d) => s + parseFloat(d.balance || '0'), 0)
-      const paidOff = 0 // Would need to track original balances
+      const paidOff = 0
       return { step: 2, title: 'Kill Bad Debt', desc: 'Pay off credit cards, personal loans, BNPL', progress: 0, icon: '💳', target: totalBadDebt, current: 0, debts: badDebt }
     }
     
-    // Step 3: Full emergency fund (3-6 months expenses)
     if (emergencyFund < monthlyExpenses3) {
       return { step: 3, title: 'Full Emergency Fund', desc: '3-6 months expenses saved', progress: (emergencyFund / monthlyExpenses3) * 100, icon: '🏦', target: monthlyExpenses3, current: emergencyFund }
     }
     
-    // Step 4: Invest 15% (Super + extra)
     const investmentGoalMet = passiveIncome > 0 || assets.filter(a => a.type === 'investment').length > 0
     if (!investmentGoalMet) {
       return { step: 4, title: 'Invest 15% + Super', desc: 'Salary sacrifice + investments', progress: 50, icon: '📈', target: monthlyIncome * 0.15, current: 0 }
     }
     
-    // Step 5: Home deposit (if no mortgage)
     if (mortgageDebt.length === 0 && !assets.some(a => a.type === 'property')) {
-      const depositGoal = 100000 // Example target
+      const depositGoal = 100000
       const currentDeposit = assets.filter(a => a.name?.toLowerCase().includes('deposit') || a.name?.toLowerCase().includes('house')).reduce((s, a) => s + parseFloat(a.value || '0'), 0)
       return { step: 5, title: 'Home Deposit', desc: 'Save 10-20% for your home', progress: (currentDeposit / depositGoal) * 100, icon: '🏠', target: depositGoal, current: currentDeposit }
     }
     
-    // Step 6: Pay off home early
     if (mortgageDebt.length > 0) {
       const mortgageBalance = mortgageDebt.reduce((s, d) => s + parseFloat(d.balance || '0'), 0)
       return { step: 6, title: 'Pay Off Home Early', desc: 'Extra mortgage payments', progress: 0, icon: '🔑', target: mortgageBalance, current: 0 }
     }
     
-    // Step 7: Build wealth
     return { step: 7, title: 'Build Wealth & Give', desc: 'Invest, enjoy, and be generous', progress: 100, icon: '💎', target: 0, current: 0 }
   }
   const currentBabyStep = getBabyStep()
 
-  // ==================== CRUD FUNCTIONS ====================
-  const addIncome = () => {
-    if (!newIncome.name || !newIncome.amount) return
-    setIncomeStreams([...incomeStreams, { ...newIncome, id: Date.now() }])
-    setNewIncome({ name: '', amount: '', frequency: 'monthly', type: 'active', startDate: new Date().toISOString().split('T')[0] })
-  }
-  const deleteIncome = (id: number) => setIncomeStreams(incomeStreams.filter(i => i.id !== id))
-
-  const addExpense = () => {
-    if (!newExpense.name || !newExpense.amount) return
-    setExpenses([...expenses, { ...newExpense, id: Date.now() }])
-    setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: new Date().toISOString().split('T')[0] })
-  }
-  const deleteExpense = (id: number) => setExpenses(expenses.filter(e => e.id !== id))
-
-  const addDebt = () => {
-    if (!newDebt.name || !newDebt.balance) return
-    setDebts([...debts, { ...newDebt, id: Date.now(), originalBalance: newDebt.balance }])
-    setNewDebt({ name: '', balance: '', interestRate: '', minPayment: '', frequency: 'monthly', paymentDate: new Date().toISOString().split('T')[0] })
-  }
-  const deleteDebt = (id: number) => setDebts(debts.filter(d => d.id !== id))
-
-  const addGoal = () => {
-    if (!newGoal.name || !newGoal.target) return
-    setGoals([...goals, { ...newGoal, id: Date.now() }])
-    setNewGoal({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: new Date().toISOString().split('T')[0], paymentAmount: '' })
-  }
-  
-  // Helper function to add items to roadmap
-  const addToRoadmap = (name: string, category: string, targetAmount: string | number, icon: string, notes?: string, currentAmount?: number, linkedGoalId?: number) => {
-    // Check if already exists
-    if (roadmapMilestones.some(m => m.name.toLowerCase() === name.toLowerCase())) {
-      alert(`"${name}" is already in your roadmap!`)
-      return
-    }
-    
-    const newMilestoneItem = {
-      id: Date.now(),
-      name,
-      category,
-      icon,
-      targetAmount: typeof targetAmount === 'number' ? targetAmount.toString() : targetAmount,
-      currentAmount: currentAmount || 0,
-      targetDate: '',
-      notes: notes || '',
-      completed: false,
-      createdAt: new Date().toISOString(),
-      linkedGoalId: linkedGoalId || null, // Link to goal if exists
-      calendarAlerts: false, // OFF by default - user can enable and configure
-      alertFrequency: 'weekly', // weekly, fortnightly, monthly
-      alertDay: 1 // 0=Sunday, 1=Monday, etc. OR day of month for monthly
-    }
-    
-    setRoadmapMilestones(prev => [...prev, newMilestoneItem])
-    
-    // Show confirmation
-    alert(`✅ Added "${name}" to your roadmap! You can configure calendar reminders in the Roadmap section.`)
-  }
-  
-  // Sync Goals ↔ Roadmap - when a goal updates, update linked roadmap milestone
-  useEffect(() => {
-    // Update roadmap milestones that are linked to goals
-    setRoadmapMilestones(prev => prev.map(milestone => {
-      if (milestone.linkedGoalId) {
-        const linkedGoal = goals.find(g => g.id === milestone.linkedGoalId)
-        if (linkedGoal) {
-          return {
-            ...milestone,
-            currentAmount: parseFloat(linkedGoal.saved || '0'),
-            targetAmount: linkedGoal.target,
-            completed: parseFloat(linkedGoal.saved || '0') >= parseFloat(linkedGoal.target || '0')
-          }
-        }
-      }
-      return milestone
-    }))
-  }, [goals])
-  
-  // Helper to add goal AND roadmap milestone together (linked)
-  const addLinkedGoalAndMilestone = (goalData: any, milestoneCategory: string, icon: string) => {
-    const goalId = Date.now()
-    const goal = { ...goalData, id: goalId }
-    setGoals(prev => [...prev, goal])
-    
-    // Add linked roadmap milestone
-    const milestone = {
-      id: goalId + 1,
-      name: goalData.name,
-      category: milestoneCategory,
-      icon,
-      targetAmount: goalData.target,
-      currentAmount: parseFloat(goalData.saved || '0'),
-      targetDate: goalData.deadline || '',
-      notes: `Linked to goal: ${goalData.name}`,
-      completed: false,
-      createdAt: new Date().toISOString(),
-      linkedGoalId: goalId,
-      calendarAlerts: false, // OFF by default
-      alertFrequency: goalData.savingsFrequency || 'weekly',
-      alertDay: 1
-    }
-    setRoadmapMilestones(prev => [...prev, milestone])
-  }
-  const deleteGoal = (id: number) => setGoals(goals.filter(g => g.id !== id))
-
-  const addAsset = () => {
-    if (!newAsset.name || !newAsset.value) return
-    setAssets([...assets, { ...newAsset, id: Date.now() }])
-    setNewAsset({ name: '', value: '', type: 'savings' })
-  }
-  const deleteAsset = (id: number) => setAssets(assets.filter(a => a.id !== id))
-
-  const addLiability = () => {
-    if (!newLiability.name || !newLiability.value) return
-    setLiabilities([...liabilities, { ...newLiability, id: Date.now() }])
-    setNewLiability({ name: '', value: '', type: 'loan' })
-  }
-  const deleteLiability = (id: number) => setLiabilities(liabilities.filter(l => l.id !== id))
-
-  // ==================== PAYSLIP UPLOAD ====================
-  const handlePayslipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    
-    setPayslipProcessing(true)
-    
-    try {
-      // Convert to base64 for API
-      const base64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result as string)
-        reader.readAsDataURL(file)
-      })
-      
-      // Send to AI for extraction
-      const response = await fetch('/api/extract-payslip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, filename: file.name })
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        setExtractedPayslip(data)
-        setShowPayslipUpload(true)
-      } else {
-        alert('Could not process payslip. Please try again or enter manually.')
-      }
-    } catch (error) {
-      console.error('Payslip upload error:', error)
-      alert('Could not process payslip. Please try again or enter manually.')
-    }
-    
-    setPayslipProcessing(false)
-  }
-  
-  const confirmPayslipIncome = () => {
-    if (extractedPayslip) {
-      setIncomeStreams([...incomeStreams, {
-        id: Date.now(),
-        name: extractedPayslip.employer || 'Salary',
-        amount: extractedPayslip.netPay || extractedPayslip.amount || '',
-        frequency: extractedPayslip.frequency || 'fortnightly',
-        type: 'active',
-        startDate: extractedPayslip.payDate || new Date().toISOString().split('T')[0]
-      }])
-      setExtractedPayslip(null)
-      setShowPayslipUpload(false)
-    }
-  }
-
-  // ==================== AUTOMATION CALCULATOR ====================
-  const calculateAutomation = () => {
-    // Calculate how much should go to each "bucket" per pay period
-    const payFrequency = incomeStreams[0]?.frequency || 'fortnightly'
-    const payAmount = parseFloat(incomeStreams[0]?.amount || '0')
-    
-    // Convert all expenses to match pay frequency
-    const convertToPayPeriod = (amount: number, freq: string) => {
-      if (freq === payFrequency) return amount
-      if (payFrequency === 'fortnightly') {
-        if (freq === 'weekly') return amount * 2
-        if (freq === 'monthly') return amount / 2
-      }
-      if (payFrequency === 'weekly') {
-        if (freq === 'fortnightly') return amount / 2
-        if (freq === 'monthly') return amount / 4
-      }
-      if (payFrequency === 'monthly') {
-        if (freq === 'weekly') return amount * 4
-        if (freq === 'fortnightly') return amount * 2
-      }
-      return amount
-    }
-    
-    // Bills bucket: all expenses + debt payments
-    const billsTotal = expenses.filter(e => !e.targetDebtId && !e.targetGoalId).reduce((sum, exp) => 
-      sum + convertToPayPeriod(parseFloat(exp.amount || '0'), exp.frequency), 0)
-    const debtTotal = debts.reduce((sum, debt) => 
-      sum + convertToPayPeriod(parseFloat(debt.minPayment || '0'), debt.frequency || 'monthly'), 0)
-    const billsBucket = billsTotal + debtTotal
-    
-    // Savings bucket: all goal contributions
-    const savingsBucket = goals.reduce((sum, goal) => 
-      sum + convertToPayPeriod(parseFloat(goal.paymentAmount || '0'), goal.savingsFrequency || 'monthly'), 0)
-    
-    // Spending: what's left
-    const spendingBucket = payAmount - billsBucket - savingsBucket
-    
-    return {
-      payFrequency,
-      payAmount,
-      bills: {
-        total: billsBucket,
-        breakdown: [
-          ...expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(e => ({ 
-            name: e.name, 
-            amount: convertToPayPeriod(parseFloat(e.amount || '0'), e.frequency),
-            original: `$${e.amount}/${e.frequency}`
-          })),
-          ...debts.map(d => ({ 
-            name: `${d.name} payment`, 
-            amount: convertToPayPeriod(parseFloat(d.minPayment || '0'), d.frequency || 'monthly'),
-            original: `$${d.minPayment}/${d.frequency || 'monthly'}`
-          }))
-        ]
-      },
-      savings: {
-        total: savingsBucket,
-        breakdown: goals.map(g => ({ 
-          name: g.name, 
-          amount: convertToPayPeriod(parseFloat(g.paymentAmount || '0'), g.savingsFrequency || 'monthly'),
-          original: `$${g.paymentAmount}/${g.savingsFrequency}`
-        }))
-      },
-      spending: spendingBucket
-    }
-  }
-
-  // ==================== QUEST FUNCTIONS ====================
-  const startQuest = (questId: number) => {
-    setPassiveQuests(passiveQuests.map(q => 
-      q.id === questId ? { ...q, status: 'in_progress', progress: 10 } : q
-    ))
-  }
-  
-  const updateQuestProgress = (questId: number, stepIndex: number) => {
-    setPassiveQuests(passiveQuests.map(q => {
-      if (q.id === questId) {
-        const newProgress = Math.min(100, ((stepIndex + 1) / q.steps.length) * 100)
-        return { 
-          ...q, 
-          progress: newProgress,
-          status: newProgress >= 100 ? 'completed' : 'in_progress'
-        }
-      }
-      return q
-    }))
-  }
-  
-  const completeQuest = (questId: number, monthlyIncome: number) => {
-    setPassiveQuests(passiveQuests.map(q => 
-      q.id === questId ? { ...q, status: 'completed', progress: 100, monthlyIncome } : q
-    ))
-  }
-  
-  const totalPassiveQuestIncome = passiveQuests.filter(q => q.status === 'completed').reduce((sum, q) => sum + q.monthlyIncome, 0)
-
-  const addTrade = () => {
-    if (!newTrade.instrument) return
-    
-    const tradeWithId = { ...newTrade, id: Date.now() }
-    setTrades(prev => [...prev, tradeWithId].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()))
-    
-    // Update account balance if trade is linked to an account
-    if (newTrade.accountId && newTrade.accountId > 0) {
-      const pnl = parseFloat(newTrade.profitLoss) || 0
-      setTradingAccounts(prev => prev.map(acc => {
-        if (acc.id === newTrade.accountId) {
-          const newBalance = parseFloat(acc.currentBalance || '0') + pnl
-          return { ...acc, currentBalance: newBalance.toString() }
-        }
-        return acc
-      }))
-    }
-    
-    setNewTrade({ 
-      date: new Date().toISOString().split('T')[0], 
-      time: new Date().toTimeString().slice(0,5),
-      instrument: '', 
-      direction: 'long', 
-      entryPrice: '', 
-      exitPrice: '', 
-      profitLoss: '', 
-      riskAmount: '',
-      rMultiple: '',
-      accountId: newTrade.accountId, // Keep same account selected
-      setupType: '',
-      setupGrade: 'A',
-      emotionBefore: 'neutral',
-      emotionAfter: 'neutral',
-      followedPlan: true,
-      notes: '',
-      screenshot: '',
-      tags: [],
-      session: 'london',
-      holdingTime: '',
-      mistakes: []
-    })
-  }
-  
-  const deleteTrade = (id: number) => {
-    const trade = trades.find(t => t.id === id)
-    
-    // Reverse the P&L from account if linked
-    if (trade && trade.accountId && trade.accountId > 0) {
-      const pnl = parseFloat(trade.profitLoss) || 0
-      setTradingAccounts(prev => prev.map(acc => {
-        if (acc.id === trade.accountId) {
-          const newBalance = parseFloat(acc.currentBalance || '0') - pnl
-          return { ...acc, currentBalance: newBalance.toString() }
-        }
-        return acc
-      }))
-    }
-    
-    setTrades(trades.filter(t => t.id !== id))
-  }
-
-  const addPresetBill = (preset: any) => {
-    const amount = prompt(`Enter amount for ${preset.name}:`, preset.amount || '')
-    if (!amount) return
-    setExpenses([...expenses, { id: Date.now(), name: preset.name, amount, frequency: preset.frequency, category: preset.category, dueDate: new Date().toISOString().split('T')[0] }])
-  }
-
-  const addGoalToCalendar = (goal: any) => {
-    const payment = parseFloat(goal.paymentAmount || '0')
-    if (payment <= 0) { 
-      alert('Set a savings amount first (how much you want to save each period)'); 
-      return 
-    }
-    
-    // Check if already added to calendar
-    if (goal.addedToCalendar) {
-      alert('This goal is already on your calendar!')
-      return
-    }
-    
-    // Open the date picker for this goal - default to today
-    const today = new Date().toISOString().split('T')[0]
-    setGoalCalendarPicker({
-      goalId: goal.id,
-      startDate: today
-    })
-  }
-  
-  const confirmGoalToCalendar = () => {
-    if (!goalCalendarPicker) return
-    
-    const goalId = goalCalendarPicker.goalId
-    const selectedDate = goalCalendarPicker.startDate
-    
-    const goal = goals.find(g => g.id === goalId)
-    if (!goal) {
-      alert('Goal not found!')
-      return
-    }
-    
-    // Update the goal with the SELECTED date AND mark as added to calendar
-    setGoals(prevGoals => {
-      return prevGoals.map(g => {
-        if (g.id === goalId) {
-          console.log(`Updating goal ${g.name}: startDate from ${g.startDate} to ${selectedDate}`)
-          return { 
-            ...g, 
-            startDate: selectedDate,  // Use the date from the picker
-            addedToCalendar: true 
-          }
-        }
-        return g
-      })
-    })
-    
-    const alertMsg = `✅ ${goal.name} added to calendar!\n\nFirst payment: ${selectedDate}\nFrequency: ${goal.savingsFrequency}\nAmount: $${goal.paymentAmount}`
-    alert(alertMsg)
-    
-    setGoalCalendarPicker(null)
-  }
-
-  // Debt payoff calculator - calculates months to payoff
-  const calculateSingleDebtPayoff = (debt: any) => {
-    const balance = parseFloat(debt.balance || '0')
-    const interestRate = parseFloat(debt.interestRate || '0') / 100 / 12 // Monthly rate
-    const minPayment = convertToMonthly(parseFloat(debt.minPayment || '0'), debt.frequency || 'monthly')
-    
-    // Get any extra payments targeting this debt
-    const extraPayments = expenses.filter(e => e.targetDebtId === debt.id)
-      .reduce((sum, e) => sum + convertToMonthly(parseFloat(e.amount || '0'), e.frequency), 0)
-    
-    const totalPayment = minPayment + extraPayments
-    
-    if (balance <= 0) return { months: 0, totalInterest: 0, payoffDate: 'Paid off!' }
-    if (totalPayment <= 0) return { months: 999, totalInterest: 0, payoffDate: 'No payment set' }
-    
-    // Check if payment covers interest
-    const monthlyInterest = balance * interestRate
-    if (totalPayment <= monthlyInterest) {
-      return { months: 999, totalInterest: 0, payoffDate: 'Payment too low!' }
-    }
-    
-    // Calculate payoff
-    let remaining = balance
-    let months = 0
-    let totalInterest = 0
-    
-    while (remaining > 0 && months < 600) {
-      const interest = remaining * interestRate
-      totalInterest += interest
-      remaining = remaining + interest - totalPayment
-      months++
-    }
-    
-    const payoffDate = new Date()
-    payoffDate.setMonth(payoffDate.getMonth() + months)
-    
-    return {
-      months,
-      totalInterest,
-      payoffDate: months < 600 ? payoffDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Never',
-      extraPayments,
-      totalPayment
-    }
-  }
-
-  // Add extra payment to a specific debt
-  const addExtraPaymentToDebt = (debtId: number) => {
-    const extra = debtExtraPayment[debtId]
-    if (!extra || !extra.amount || parseFloat(extra.amount) <= 0) { 
-      alert('Please enter an extra payment amount')
-      return 
-    }
-    const debt = debts.find(d => d.id === debtId)
-    if (!debt) return
-    
-    setExpenses([...expenses, { 
-      id: Date.now(), 
-      name: `Extra → ${debt.name}`, 
-      amount: extra.amount, 
-      frequency: extra.frequency, 
-      category: 'debt',
-      dueDate: new Date().toISOString().split('T')[0], 
-      targetDebtId: debt.id 
-    }])
-    
-    alert(`Extra payment of $${extra.amount}/${extra.frequency} added to ${debt.name}`)
-    setDebtExtraPayment(prev => ({ ...prev, [debtId]: { amount: '', frequency: 'monthly' } }))
-    setShowExtraInput(null)
-  }
-
-  // ==================== CSV IMPORT ====================
-  const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const lines = (ev.target?.result as string).split('\n').slice(1).filter(l => l.trim())
-      const txns = lines.map((line, i) => {
-        const parts = line.split(',').map(p => p.replace(/"/g, '').trim())
-        const amt = parseFloat(parts.find(p => /^-?\$?[\d,.]+$/.test(p.replace(/[$,]/g, '')))?.replace(/[$,]/g, '') || '0')
-        const desc = parts.find(p => p.length > 3 && !/^-?\$?[\d,.]+$/.test(p.replace(/[$,]/g, ''))) || 'Transaction'
-        return { id: Date.now() + i, description: desc, amount: Math.abs(amt), isExpense: amt < 0, selected: amt < 0, category: 'other' }
-      }).filter(t => t.amount > 0)
-      setCsvTransactions(txns)
-      setShowCsvImport(true)
-    }
-    reader.readAsText(file)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  const importCsvTransactions = () => {
-    csvTransactions.filter(t => t.selected).forEach(t => {
-      if (t.isExpense) {
-        setExpenses(prev => [...prev, { id: Date.now() + Math.random(), name: t.description, amount: t.amount.toString(), frequency: 'once', category: t.category, dueDate: new Date().toISOString().split('T')[0] }])
-      } else {
-        setIncomeStreams(prev => [...prev, { id: Date.now() + Math.random(), name: t.description, amount: t.amount.toString(), frequency: 'once', type: 'active', startDate: new Date().toISOString().split('T')[0] }])
-      }
-    })
-    alert(`Imported ${csvTransactions.filter(t => t.selected).length} transactions`)
-    setShowCsvImport(false)
-    setCsvTransactions([])
-  }
-
-  // ==================== EDIT FUNCTIONS ====================
-  const startEdit = (type: string, item: any) => {
-    setEditingItem({ type, id: item.id, data: { ...item } })
-  }
-
-  const cancelEdit = () => {
-    setEditingItem(null)
-  }
-
-  const saveEdit = () => {
-    if (!editingItem) return
-    const { type, id, data } = editingItem
-
-    switch (type) {
-      case 'income':
-        setIncomeStreams(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
-        break
-      case 'expense':
-        setExpenses(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
-        break
-      case 'debt':
-        setDebts(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
-        break
-      case 'goal':
-        setGoals(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
-        break
-      case 'asset':
-        setAssets(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
-        break
-      case 'liability':
-        setLiabilities(prev => prev.map(item => item.id === id ? { ...item, ...data } : item))
-        break
-    }
-    setEditingItem(null)
-  }
-
-  const updateEditField = (field: string, value: string) => {
-    if (!editingItem) return
-    setEditingItem({ ...editingItem, data: { ...editingItem.data, [field]: value } })
-  }
-
-  // ==================== CALENDAR FUNCTIONS ====================
   const getDaysInMonth = () => {
     const year = calendarMonth.getFullYear()
     const month = calendarMonth.getMonth()
@@ -2625,7 +2776,6 @@ Sent from Aureus App
     const { month, year } = getDaysInMonth()
     const items: any[] = []
     
-    // Parse date string "YYYY-MM-DD" without timezone issues
     const parseDateParts = (dateStr: string) => {
       if (!dateStr) return null
       const parts = dateStr.split('-')
@@ -2639,7 +2789,6 @@ Sent from Aureus App
       const start = parseDateParts(startDate)
       if (!start) return false
       
-      // Check if start date is in the future relative to this calendar day
       const startTime = new Date(start.year, start.month, start.day).getTime()
       const checkTime = new Date(year, month, day).getTime()
       if (startTime > checkTime) return false
@@ -2695,9 +2844,7 @@ Sent from Aureus App
       }
     })
     
-    // Roadmap milestone deadlines and check-ins
     roadmapMilestones.filter(m => !m.completed && m.calendarAlerts === true).forEach(milestone => {
-      // Show on target date if set (deadline)
       if (milestone.targetDate) {
         const target = parseDateParts(milestone.targetDate)
         if (target && target.day === day && target.month === month && target.year === year) {
@@ -2713,23 +2860,19 @@ Sent from Aureus App
         }
       }
       
-      // Show recurring check-in based on frequency and day settings
       const checkDate = new Date(year, month, day)
-      const alertDay = milestone.alertDay ?? 1 // Default to Monday (1) or 1st of month
+      const alertDay = milestone.alertDay ?? 1
       const alertFrequency = milestone.alertFrequency || 'weekly'
       
       let shouldShow = false
       
       if (alertFrequency === 'weekly') {
-        // alertDay is day of week (0=Sun, 1=Mon, 2=Tue, etc.)
         shouldShow = checkDate.getDay() === alertDay
       } else if (alertFrequency === 'fortnightly') {
-        // Every 2 weeks on the specified day
         const dayOfWeek = checkDate.getDay()
         const weekOfYear = Math.floor((checkDate.getTime() - new Date(year, 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))
         shouldShow = dayOfWeek === alertDay && weekOfYear % 2 === 0
       } else if (alertFrequency === 'monthly') {
-        // alertDay is day of month (1-31)
         shouldShow = day === alertDay
       }
       
@@ -2737,7 +2880,6 @@ Sent from Aureus App
         const progress = parseFloat(milestone.targetAmount || '0') > 0 
           ? (milestone.currentAmount / parseFloat(milestone.targetAmount || '1') * 100).toFixed(0)
           : 0
-        // Only show if not complete and has a target
         if (parseFloat(milestone.targetAmount || '0') > 0 && milestone.currentAmount < parseFloat(milestone.targetAmount || '0')) {
           const id = `milestone-checkin-${milestone.id}-${year}-${month}-${day}`
           items.push({
@@ -2762,7 +2904,6 @@ Sent from Aureus App
     setPaidOccurrences(newPaid)
   }
 
-  // ==================== AI AGENT FUNCTIONS ====================
   const fetchProactiveInsight = async (mode: 'budget' | 'trading') => {
     setIsLoading(true)
     try {
@@ -2792,12 +2933,10 @@ Sent from Aureus App
       const currentStep = mode === 'budget' ? budgetOnboarding.step : tradingOnboarding.step
       const memory = mode === 'budget' ? budgetMemory : tradingMemory
       
-      // Include recent conversation history so AI has context
       const recentHistory = [...chatMessages.slice(-10), newUserMessage]
         .map(m => `${m.role === 'user' ? 'User' : 'Aureus'}: ${m.content}`)
         .join('\n')
       
-      // Build appropriate body based on mode
       const bodyData = mode === 'budget' 
         ? { 
             mode: 'onboarding', 
@@ -2827,18 +2966,15 @@ Sent from Aureus App
       
       const data = await apiResponse.json()
       
-      // Execute any actions returned by the AI FIRST
       let addedSummary = ''
       if (data.actions && Array.isArray(data.actions) && data.actions.length > 0) {
         executeAIActions(data.actions)
         
-        // Build summary of what was added (budget mode)
         const incomeAdded = data.actions.filter((a: any) => a.type === 'addIncome')
         const expenseAdded = data.actions.filter((a: any) => a.type === 'addExpense')
         const debtAdded = data.actions.filter((a: any) => a.type === 'addDebt')
         const goalAdded = data.actions.filter((a: any) => a.type === 'addGoal')
         
-        // Trading mode actions
         const accountAdded = data.actions.filter((a: any) => a.type === 'addAccount')
         const ruleAdded = data.actions.filter((a: any) => a.type === 'addTradingRule')
         const tradeAdded = data.actions.filter((a: any) => a.type === 'addTrade')
@@ -2861,7 +2997,6 @@ Sent from Aureus App
           const names = goalAdded.map((a: any) => a.data?.name || 'Goal').join(', ')
           parts.push(`🎯 Goal: ${names}`)
         }
-        // Trading actions
         if (accountAdded.length > 0) {
           const names = accountAdded.map((a: any) => a.data?.name || 'Account').join(', ')
           parts.push(`📊 Account: ${names}`)
@@ -2886,12 +3021,10 @@ Sent from Aureus App
       
       setChatMessages(prev => [...prev, { role: 'assistant', content: (data.message || data.raw || "I'm processing that - what would you like to do next?") + addedSummary }])
       
-      // Debug: log if we got an unexpected response
       if (!data.message && !data.raw) {
         console.log('Unexpected API response:', data)
       }
       
-      // Legacy support for extractedData
       if (data.extractedData) {
         if (mode === 'budget') setBudgetMemory((prev: any) => ({ ...prev, ...data.extractedData }))
         else setTradingMemory((prev: any) => ({ ...prev, ...data.extractedData }))
@@ -2902,7 +3035,6 @@ Sent from Aureus App
           setBudgetOnboarding({ isActive: false, step: 'complete' })
           setBudgetMemory((prev: any) => ({ ...prev, onboardingComplete: true }))
           
-          // After a brief pause, suggest automation setup
           setTimeout(() => {
             const auto = calculateAutomation()
             if (auto.payAmount > 0) {
@@ -2928,14 +3060,11 @@ Sent from Aureus App
       } else if (data.nextStep) {
         if (mode === 'budget') {
           setBudgetOnboarding(prev => ({ ...prev, step: data.nextStep }))
-          // When moving to 'choice' or 'income' step, switch to dashboard/command centre AFTER a delay
-          // This ensures user sees the message first
           if (data.nextStep === 'choice' || data.nextStep === 'income') {
             setTimeout(() => {
               setActiveTab('dashboard')
-            }, 1500) // Wait 1.5 seconds so user sees the message
+            }, 1500)
           }
-          // When moving to 'path' step, switch to path tab to show options
           if (data.nextStep === 'path') {
             setTimeout(() => {
               setActiveTab('path')
@@ -2957,9 +3086,7 @@ Sent from Aureus App
     setIsLoading(false)
   }
 
-  // Execute actions returned by AI
   const executeAIActions = (actions: any[]) => {
-    // Helper to validate and use date from AI, or default to today
     const getValidDate = (dateStr?: string): string => {
       if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
         return dateStr
@@ -2971,7 +3098,6 @@ Sent from Aureus App
       const { type, data } = action
       
       switch (type) {
-        // ===== ADD ACTIONS =====
         case 'addIncome':
           if (data.name && data.amount) {
             setIncomeStreams(prev => [...prev, {
@@ -3068,7 +3194,6 @@ Sent from Aureus App
           }
           break
 
-        // ===== UPDATE ACTIONS =====
         case 'updateIncome':
           if (data.id) {
             setIncomeStreams(prev => prev.map(item => {
@@ -3142,7 +3267,6 @@ Sent from Aureus App
           }
           break
 
-        // ===== DELETE ACTIONS =====
         case 'deleteIncome':
           if (data.id) {
             setIncomeStreams(prev => prev.filter(item => item.id !== data.id && Math.floor(item.id) !== Math.floor(data.id)))
@@ -3167,10 +3291,8 @@ Sent from Aureus App
           }
           break
 
-        // ===== BUDGET ROADMAP ACTIONS =====
         case 'addRoadmapMilestone':
           if (data.name) {
-            // Check if already exists
             const exists = roadmapMilestones.some(m => m.name.toLowerCase() === data.name.toLowerCase())
             if (!exists) {
               setRoadmapMilestones(prev => [...prev, {
@@ -3215,7 +3337,6 @@ Sent from Aureus App
           }
           break
           
-        // ===== ASSET ACTIONS =====
         case 'addAsset':
           if (data.name && data.value) {
             setAssets(prev => [...prev, {
@@ -3249,9 +3370,7 @@ Sent from Aureus App
           }
           break
 
-        // ===== MEMORY ACTIONS =====
         case 'setMemory':
-          // Check if this is for trading or budget
           if (appMode === 'trading') {
             setTradingMemory((prev: any) => {
               const updated = { ...prev }
@@ -3283,7 +3402,6 @@ Sent from Aureus App
           }
           break
         
-        // ===== TRADING ACTIONS =====
         case 'addAccount':
           if (data.name && data.startingBalance) {
             setTradingAccounts(prev => [...prev, {
@@ -3348,7 +3466,6 @@ Sent from Aureus App
             }
             setTrades(prev => [...prev, newTradeData])
             
-            // Update account balance if linked
             if (data.accountId && data.accountId > 0) {
               const pnl = parseFloat(data.profitLoss?.toString().replace(/[$,]/g, '') || '0')
               setTradingAccounts(prev => prev.map(acc => {
@@ -3393,7 +3510,6 @@ Sent from Aureus App
             }
             setPayouts(prev => [...prev, payoutData])
             
-            // Also add to income if requested
             if (payoutData.addToIncome) {
               const incomeName = payoutData.propFirm 
                 ? `${payoutData.propFirm} Payout` 
@@ -3415,7 +3531,6 @@ Sent from Aureus App
           break
           
         case 'showAnalytics':
-          // Switch to trading tab and analytics subtab
           setActiveTab('trading')
           setTradingSubTab('analytics')
           if (data.tab) {
@@ -3427,12 +3542,9 @@ Sent from Aureus App
           break
           
         case 'showCompoundCalculator':
-          // Switch to trading tab and open compound calculator
           setActiveTab('trading')
           setTradingSubTab('accounts')
-          // Set calculator values if provided
           if (data.startingBalance || data.monthlyAdd || data.dailyReturn) {
-            // Store compound calc settings - these will be picked up by the calculator UI
             setCompoundCalcSettings({
               startingBalance: data.startingBalance || '10000',
               monthlyAdd: data.monthlyAdd || '0',
@@ -3460,7 +3572,6 @@ Sent from Aureus App
                 completed: m.completed || false
               }))
             })))
-            // Switch to roadmap view
             setActiveTab('trading')
             setTradingSubTab('accounts')
           }
@@ -3486,9 +3597,7 @@ Sent from Aureus App
           break
           
         case 'generateWeeklyReport':
-          // Generate and show weekly report
           const report = generateWeeklyReport()
-          // The report data is used by Aureus in its response
           setActiveTab('trading')
           setTradingSubTab('analytics')
           setAnalyticsTab('overview')
@@ -3544,425 +3653,83 @@ Sent from Aureus App
       }
     })
   }
+
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const aureusChatRef = useRef<HTMLDivElement>(null)
+  const prevMessageCount = useRef(0)
   
-  // Compound calculator settings (can be set by Aureus)
-  const [compoundCalcSettings, setCompoundCalcSettings] = useState({
-    startingBalance: '10000',
-    monthlyAdd: '0',
-    dailyReturn: '0.5',
-    tradingDays: '20',
-    months: '12'
-  })
-
-  // Handle chart image upload for trading analysis
-  const handleChartUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    
-    // Convert to base64 for display and sending to API
-    const base64 = await new Promise<string>((resolve) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.readAsDataURL(file)
-    })
-    
-    setPendingChartImage(base64)
-    setChatInput(prev => prev || "Analyze this chart for me")
-  }
-
-  // Quick message sender for "Ask Aureus" buttons - bypasses state timing issues
-  const sendQuickMessage = async (message: string) => {
-    if (!message.trim() || isLoading) return
-    
-    setChatMessages(prev => [...prev, { role: 'user', content: message }])
-    setChatInput('')
-    setIsLoading(true)
-    
-    try {
-      const endpoint = appMode === 'budget' ? '/api/budget-coach' : '/api/trading-coach'
-      const recentHistory = [...chatMessages.slice(-10), { role: 'user', content: message }]
-        .map(m => `${m.role === 'user' ? 'User' : 'Aureus'}: ${m.content}`)
-        .join('\n')
-      
-      const body = appMode === 'budget'
-        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones }, memory: budgetMemory, countryConfig: currentCountryConfig }
-        : { mode: 'question', question: message, conversationHistory: recentHistory, tradingData: { trades, accounts: tradingAccounts, roadmap: tradingRoadmap }, memory: tradingMemory, tradeIdeaSettings, tradingRules }
-      
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      const data = await response.json()
-      
-      if (data.actions && Array.isArray(data.actions)) {
-        executeAIActions(data.actions)
-      }
-      setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
-    } catch (error) {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I had trouble with that. Let's try again!" }])
-    }
-    setIsLoading(false)
-  }
-
-  const handleChatMessage = async () => {
-    if ((!chatInput.trim() && !pendingChartImage) || isLoading) return
-    const message = chatInput.trim()
-    
-    // Check AI usage limits (skip for onboarding)
-    const aiStatus = canUseAI()
-    if (!aiStatus.allowed && !budgetOnboarding.isActive && !tradingOnboarding.isActive) {
-      setShowUpgradePrompt(true)
-      return
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
     }
     
-    if ((appMode === 'budget' && budgetOnboarding.isActive) || (appMode === 'trading' && tradingOnboarding.isActive)) {
-      await handleOnboardingResponse(message, appMode!)
-      setPendingChartImage(null)
-      return
-    }
-    
-    // Track AI usage for free tier
-    trackAIUsage()
-    
-    // Show user message (with image indicator if present)
-    const userMessageContent = pendingChartImage 
-      ? `${message}\n[📊 Chart image attached]`
-      : message
-    setChatMessages(prev => [...prev, { role: 'user', content: userMessageContent, image: pendingChartImage || undefined }])
-    setChatInput('')
-    setIsLoading(true)
-    
-    try {
-      const endpoint = appMode === 'budget' ? '/api/budget-coach' : '/api/trading-coach'
-      
-      // Build conversation history for context
-      const recentHistory = [...chatMessages.slice(-10), { role: 'user', content: message }]
-        .map(m => `${m.role === 'user' ? 'User' : 'Aureus'}: ${m.content}`)
-        .join('\n')
-      
-      const body = appMode === 'budget'
-        ? { mode: 'question', question: message, conversationHistory: recentHistory, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones }, memory: budgetMemory, countryConfig: currentCountryConfig }
-        : { 
-            mode: 'question', 
-            question: message, 
-            conversationHistory: recentHistory, 
-            tradingData: { trades, accounts: tradingAccounts, roadmap: tradingRoadmap }, 
-            memory: tradingMemory,
-            chartImage: pendingChartImage || undefined, // Send image to trading coach
-            tradeIdeaSettings, // User's R:R and risk preferences
-            tradingRules // User's custom rules
-          }
-      
-      // Clear pending image
-      setPendingChartImage(null)
-      
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      const data = await response.json()
-      
-      // Execute any actions
-      if (data.actions && Array.isArray(data.actions)) {
-        executeAIActions(data.actions)
-        // Add confirmation of what was added
-        const addedItems = data.actions.filter((a: any) => a.type.startsWith('add'))
-        if (addedItems.length > 0) {
-          const summary = addedItems.map((a: any) => `${a.type.replace('add', '')}: ${a.data.name}`).join(', ')
-          setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "Done!" }])
-          // Show what was added in a subtle way
-          if (!data.message?.toLowerCase().includes('added')) {
-            setChatMessages(prev => [...prev, { role: 'assistant', content: `✅ Added: ${summary}` }])
-          }
-        } else {
-          setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
+    if (chatMessages.length > prevMessageCount.current && chatMessages.length > 0) {
+      setTimeout(() => {
+        const aureusCard = document.querySelector('[data-aureus-chat]')
+        if (aureusCard) {
+          aureusCard.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
-      } else {
-        setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
-      }
-    } catch (error) {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: "Sorry, something went wrong. Please try again." }])
+      }, 100)
     }
-    setIsLoading(false)
-  }
+    prevMessageCount.current = chatMessages.length
+  }, [chatMessages])
 
-  const startOnboarding = (mode: 'budget' | 'trading') => {
-    setChatMessages([])
-    if (mode === 'budget') {
-      setBudgetOnboarding({ isActive: true, step: 'greeting' })
-      setChatMessages([{ role: 'assistant', content: "Hey! 👋 I'm Aureus, your financial operations coach. I'll help you optimize your cash flow, eliminate liabilities, and build automated revenue streams.\n\nLet's get to know each other. What should I call you?" }])
-    } else {
-      setTradingOnboarding({ isActive: true, step: 'greeting' })
-      setChatMessages([{ role: 'assistant', content: "Hey! 📈 I'm Aureus, your trading operations coach.\n\nI'll help you optimize capital deployment, maintain psychological discipline, and systematically scale your accounts.\n\nWhat's your name?" }])
+  useEffect(() => {
+    const saved = localStorage.getItem('aureus_data')
+    if (saved) {
+      const data = JSON.parse(saved)
+      if (data.incomeStreams) setIncomeStreams(data.incomeStreams)
+      if (data.expenses) setExpenses(data.expenses)
+      if (data.debts) setDebts(data.debts)
+      if (data.goals) setGoals(data.goals)
+      if (data.assets) setAssets(data.assets)
+      if (data.liabilities) setLiabilities(data.liabilities)
+      if (data.trades) setTrades(data.trades)
+      if (data.budgetMemory) setBudgetMemory(data.budgetMemory)
+      if (data.tradingMemory) setTradingMemory(data.tradingMemory)
+      if (data.paidOccurrences) setPaidOccurrences(new Set(data.paidOccurrences))
+      if (data.roadmapMilestones) setRoadmapMilestones(data.roadmapMilestones)
+      if (data.tradingRoadmap) setTradingRoadmap(data.tradingRoadmap)
+      if (data.tradingRules) setTradingRules(data.tradingRules)
+      if (data.tradingAccounts) setTradingAccounts(data.tradingAccounts)
+      if (data.tradeIdeaSettings) setTradeIdeaSettings(data.tradeIdeaSettings)
+      if (data.budgetOnboarding) setBudgetOnboarding(data.budgetOnboarding)
+      if (data.tradingOnboarding) setTradingOnboarding(data.tradingOnboarding)
+      if (data.chatMessages) setChatMessages(data.chatMessages)
+      if (data.userCountry) setUserCountry(data.userCountry)
+      if (data.userSubscription) setUserSubscription(data.userSubscription)
+      if (data.tradeSetups) setTradeSetups(data.tradeSetups)
+      if (data.tradeTags) setTradeTags(data.tradeTags)
+      if (data.tradeMistakes) setTradeMistakes(data.tradeMistakes)
+      if (data.payouts) setPayouts(data.payouts)
+      if (data.preSessionChecklist) setPreSessionChecklist(data.preSessionChecklist)
+      if (data.customChecklistItems) setCustomChecklistItems(data.customChecklistItems)
+      if (data.dailyReviews) setDailyReviews(data.dailyReviews)
+      if (data.tradingRoadmapGoal) setTradingRoadmapGoal(data.tradingRoadmapGoal)
+      if (data.tradingRoadmapPhases) setTradingRoadmapPhases(data.tradingRoadmapPhases)
+      if (data.roadmapProgress) setRoadmapProgress(data.roadmapProgress)
+      if (data.tradeTemplates) setTradeTemplates(data.tradeTemplates)
+      if (data.wealthHistory) setWealthHistory(data.wealthHistory)
+      if (data.billReminders) setBillReminders(data.billReminders)
+      if (data.subscriptionAudit) setSubscriptionAudit(data.subscriptionAudit)
+      if (data.financialMilestones) setFinancialMilestones(data.financialMilestones)
     }
-  }
+  }, [])
 
-  const handleModeSelect = (mode: 'budget' | 'trading') => {
-    setAppMode(mode)
-    setShowModeSelector(false)
-    setProactiveInsight(null)
-    setTourStep(0) // Reset tour step
-    
-    const memory = mode === 'budget' ? budgetMemory : tradingMemory
-    const tourDone = mode === 'budget' ? budgetTourCompleted : tradingTourCompleted
-    const currentOnboarding = mode === 'budget' ? budgetOnboarding : tradingOnboarding
-    
-    // If onboarding is currently active (in progress), keep the chat and continue
-    if (currentOnboarding.isActive && currentOnboarding.step !== 'complete') {
-      // Don't clear chat - let them continue where they left off
-      setActiveTab('dashboard')
-      return
+  useEffect(() => {
+    const data = {
+      incomeStreams, expenses, debts, goals, assets, liabilities, trades,
+      budgetMemory, tradingMemory,
+      paidOccurrences: Array.from(paidOccurrences),
+      roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings,
+      budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription,
+      tradeSetups, tradeTags, tradeMistakes, payouts,
+      preSessionChecklist, customChecklistItems, dailyReviews,
+      tradingRoadmapGoal, tradingRoadmapPhases, roadmapProgress, tradeTemplates,
+      wealthHistory, billReminders, subscriptionAudit, financialMilestones
     }
-    
-    if (!memory.onboardingComplete && !tourDone) {
-      // Show tour for new users of THIS mode
-      setChatMessages([])
-      setShowTour(true)
-    } else if (!memory.onboardingComplete) {
-      // Tour completed but onboarding not done - check if we were mid-onboarding
-      if (currentOnboarding.step && currentOnboarding.step !== 'greeting' && currentOnboarding.step !== 'complete') {
-        // Resume onboarding where they left off
-        setActiveTab('dashboard')
-        if (mode === 'budget') {
-          setBudgetOnboarding({ ...currentOnboarding, isActive: true })
-        } else {
-          setTradingOnboarding({ ...currentOnboarding, isActive: true })
-        }
-      } else {
-        // Start fresh onboarding
-        setActiveTab('dashboard')
-        setChatMessages([])
-        startOnboarding(mode)
-      }
-    } else {
-      // Returning user - go to quickview, keep existing chat
-      setActiveTab('quickview')
-      fetchProactiveInsight(mode)
-    }
-  }
-
-  // ==================== PROP FIRM CALCULATIONS ====================
-  const calculateForexProp = () => {
-    const size = parseFloat(forexProp.accountSize) || 0
-    const target = parseFloat(forexProp.profitTarget) / 100
-    const maxDD = parseFloat(forexProp.maxDrawdown) / 100
-    const dailyDD = parseFloat(forexProp.dailyDrawdown) / 100
-    const current = parseFloat(forexProp.currentBalance) || size
-    const days = parseInt(forexProp.daysInChallenge) || 30
-    const split = parseFloat(forexProp.profitSplit) / 100
-
-    const profitTargetAmount = size * target
-    const maxDrawdownAmount = size * maxDD
-    const dailyDrawdownAmount = current * dailyDD
-    const profitMade = current - size
-    const progressPercent = profitTargetAmount > 0 ? (profitMade / profitTargetAmount) * 100 : 0
-    const remainingProfit = profitTargetAmount - profitMade
-    const dailyTargetToPass = days > 0 ? remainingProfit / days : 0
-    const drawdownRemaining = current - (size - maxDrawdownAmount)
-
-    return { profitTargetAmount, maxDrawdownAmount, dailyDrawdownAmount, profitMade, progressPercent, remainingProfit, dailyTargetToPass, drawdownRemaining, split }
-  }
-
-  const calculateFuturesProp = () => {
-    const size = parseFloat(futuresProp.accountSize) || 0
-    const target = parseFloat(futuresProp.profitTarget) || 0
-    const maxDD = parseFloat(futuresProp.maxDrawdown) || 0
-    const dailyLimit = parseFloat(futuresProp.dailyLossLimit) || 0
-    const current = parseFloat(futuresProp.currentBalance) || size
-    const split = parseFloat(futuresProp.profitSplit) / 100
-
-    const profitMade = current - size
-    const progressPercent = target > 0 ? (profitMade / target) * 100 : 0
-    const remainingProfit = target - profitMade
-    const drawdownThreshold = size - maxDD
-    const drawdownUsed = size - current
-    const drawdownRemaining = maxDD - drawdownUsed
-
-    return { target, profitMade, progressPercent, remainingProfit, drawdownThreshold, drawdownUsed, drawdownRemaining, dailyLimit, split, accountSize: size, currentBalance: current }
-  }
-
-  const calculateTradingCompound = () => {
-    const capital = parseFloat(tradingCalculator.startingCapital) || 0
-    const rate = parseFloat(tradingCalculator.returnRate) / 100 || 0
-    const reinvest = parseFloat(tradingCalculator.reinvestRate) / 100 || 1
-    const years = parseInt(tradingCalculator.years) || 0
-    const months = parseInt(tradingCalculator.months) || 0
-    const days = parseInt(tradingCalculator.days) || 0
-    
-    // Calculate total calendar days
-    const totalCalendarDays = years * 365 + months * 30 + days
-    
-    // Calculate trading days based on selected days
-    const tradingDaysPerWeek = tradingCalculator.includeDays.length
-    const totalTradingDays = Math.floor(totalCalendarDays * (tradingDaysPerWeek / 7))
-    
-    // Generate breakdown
-    const breakdown: any[] = []
-    let balance = capital
-    let totalEarnings = 0
-    let totalContributed = capital
-    
-    // Get start date
-    const startDate = new Date(tradingCalculator.startDate || Date.now())
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const dayMap: {[key: string]: number} = { 'S': 0, 'M': 1, 'T': 2, 'W': 3, 'T2': 4, 'F': 5, 'S2': 6 }
-    const activeDays = tradingCalculator.includeDays.map(d => {
-      if (d === 'T') return 2
-      if (d === 'T2') return 4
-      if (d === 'S') return 6
-      return dayMap[d] || 1
-    })
-    
-    let currentDate = new Date(startDate)
-    let tradingDayCount = 0
-    
-    for (let d = 0; d < totalCalendarDays && tradingDayCount < totalTradingDays; d++) {
-      const dayOfWeek = currentDate.getDay()
-      const isActiveTradingDay = activeDays.includes(dayOfWeek === 0 ? 7 : dayOfWeek) || 
-        (tradingCalculator.includeDays.includes('M') && dayOfWeek === 1) ||
-        (tradingCalculator.includeDays.includes('T') && dayOfWeek === 2) ||
-        (tradingCalculator.includeDays.includes('W') && dayOfWeek === 3) ||
-        (tradingCalculator.includeDays.includes('T2') && dayOfWeek === 4) ||
-        (tradingCalculator.includeDays.includes('F') && dayOfWeek === 5) ||
-        (tradingCalculator.includeDays.includes('S') && dayOfWeek === 6) ||
-        (tradingCalculator.includeDays.includes('S2') && dayOfWeek === 0)
-      
-      if (!isActiveTradingDay) {
-        // Add excluded day to breakdown
-        breakdown.push({
-          date: new Date(currentDate),
-          dayName: dayNames[dayOfWeek],
-          excluded: true,
-          earnings: 0,
-          totalEarnings: totalEarnings,
-          balance: balance
-        })
-      } else {
-        // Calculate daily return
-        const dailyEarnings = balance * rate * reinvest
-        balance += dailyEarnings
-        totalEarnings += dailyEarnings
-        tradingDayCount++
-        
-        breakdown.push({
-          date: new Date(currentDate),
-          dayName: dayNames[dayOfWeek],
-          excluded: false,
-          earnings: dailyEarnings,
-          totalEarnings: totalEarnings,
-          balance: balance
-        })
-      }
-      
-      // Add deposits/withdrawals
-      if (tradingCalculator.additionalContributions === 'deposits') {
-        const depositAmt = parseFloat(tradingCalculator.depositAmount) || 0
-        if (tradingCalculator.depositFrequency === 'daily' && !breakdown[breakdown.length-1]?.excluded) {
-          balance += depositAmt
-          totalContributed += depositAmt
-        } else if (tradingCalculator.depositFrequency === 'weekly' && d % 7 === 0 && d > 0) {
-          balance += depositAmt
-          totalContributed += depositAmt
-        } else if (tradingCalculator.depositFrequency === 'monthly' && d % 30 === 0 && d > 0) {
-          balance += depositAmt
-          totalContributed += depositAmt
-        }
-      } else if (tradingCalculator.additionalContributions === 'withdrawals') {
-        const withdrawAmt = parseFloat(tradingCalculator.withdrawAmount) || 0
-        if (tradingCalculator.withdrawFrequency === 'monthly' && d % 30 === 0 && d > 0) {
-          balance = Math.max(0, balance - withdrawAmt)
-        }
-      }
-      
-      currentDate.setDate(currentDate.getDate() + 1)
-    }
-    
-    // Calculate end date
-    const endDate = new Date(startDate)
-    endDate.setDate(endDate.getDate() + totalCalendarDays)
-    
-    return { 
-      futureValue: balance, 
-      totalContributed, 
-      profit: balance - totalContributed, 
-      totalCalendarDays, 
-      totalTradingDays: tradingDayCount,
-      breakdown,
-      endDate,
-      excludedDays: tradingCalculator.includeWeekends ? [] : ['Sat', 'Sun']
-    }
-  }
-
-  const forexPropResults = calculateForexProp()
-  const futuresPropResults = calculateFuturesProp()
-  const tradingResults = calculateTradingCompound()
-
-  // Budget Tour content
-  const budgetTourSteps = [
-    {
-      title: "Welcome to Aureus! 🌟",
-      content: "I'm your AI financial companion, here to help you achieve financial freedom - where your passive income covers all your expenses so you can live life on YOUR terms.",
-      icon: "✨"
-    },
-    {
-      title: "The FIRE Number 🔥",
-      content: "FIRE = Financial Independence, Retire Early. Your FIRE number is 25x your annual expenses. When your Super + investments reach this amount, you can live off the returns forever!",
-      icon: "🔥",
-      highlight: "path"
-    },
-    {
-      title: "Australian Baby Steps 👶",
-      content: "We follow localised Baby Steps: 1) $2K emergency fund, 2) Kill bad debt (not HECS!), 3) 3-6 months savings, 4) Invest 15% + Super, 5) Home deposit, 6) Pay off mortgage, 7) Build wealth!",
-      icon: "👶",
-      highlight: "path"
-    },
-    {
-      title: "Escape the Rat Race 🐀",
-      content: "The goal: Passive Income > Monthly Expenses = FREEDOM! I'll suggest passive income 'quests' - from high-interest savings to dividend ETFs - and help you automate your money.",
-      icon: "🚀",
-      highlight: "path"
-    },
-    {
-      title: "Set & Forget Automation 🤖",
-      content: "Once we know your budget, I'll help you set up automatic transfers so your bills pay themselves and savings grow without thinking about it. No more manual transfers!",
-      icon: "🤖"
-    },
-    {
-      title: "Let's Get Started! 💪",
-      content: "I'll ask about your income, expenses, debts, and goals. You can upload a payslip to speed things up! Just tell me what you know - I'll ask for anything I need.",
-      icon: "💬"
-    }
-  ]
-
-  // Trading Tour content
-  const tradingTourSteps = [
-    {
-      title: "Welcome, Trader! 📈",
-      content: "I'm Aureus, your AI trading mentor. I'll help you stay disciplined, track your psychology, manage prop firm challenges, and compound your personal account.",
-      icon: "✨"
-    },
-    {
-      title: "Prop Firm Mastery 🏆",
-      content: "I know the rules for FTMO, MyFundedFX, The5ers, Funded Next, and more. I'll track your progress, warn you about drawdown limits, and keep you compliant.",
-      icon: "🏆"
-    },
-    {
-      title: "Psychology & Tilt Detection 🧠",
-      content: "Trading is 80% psychology. I monitor for revenge trading, overtrading, and emotional decisions. When you're tilting, I'll tell you to step away before you blow an account.",
-      icon: "🧠"
-    },
-    {
-      title: "Personal Account Compounding 💎",
-      content: "For your personal capital, consistency beats big wins. 0.5% daily = 214% yearly. I'll show you the power of compounding and help you stay patient.",
-      icon: "💎"
-    },
-    {
-      title: "Trading Rules & Discipline 📋",
-      content: "Set your own trading rules and I'll track compliance. Max trades per day, risk per trade, no trading during news - whatever keeps you profitable.",
-      icon: "📋"
-    },
-    {
-      title: "Let's Build Your Edge! 🚀",
-      content: "I'll learn your trading style, experience level, and psychological weaknesses. Then I'll be your accountability partner every trading day.",
-      icon: "💬"
-    }
-  ]
-
-  const tourSteps = appMode === 'budget' ? budgetTourSteps : tradingTourSteps
+    localStorage.setItem('aureus_data', JSON.stringify(data))
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings, budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription, tradeSetups, tradeTags, tradeMistakes, payouts, preSessionChecklist, customChecklistItems, dailyReviews, tradingRoadmapGoal, tradingRoadmapPhases, roadmapProgress, tradeTemplates, wealthHistory, billReminders, subscriptionAudit, financialMilestones])
 
   // ==================== RENDER: TOUR ====================
   if (showTour) {
@@ -3971,23 +3738,18 @@ Sent from Aureus App
     return (
       <div style={{ minHeight: '100vh', background: darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)' : 'linear-gradient(135deg, #f0f9ff 0%, #faf5ff 100%)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ maxWidth: '600px', width: '100%', background: theme.cardBg, borderRadius: '24px', padding: '48px', textAlign: 'center' as const, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
-          {/* Progress dots */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '32px' }}>
             {tourSteps.map((_, i) => (
               <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', background: i === tourStep ? (isBudgetMode ? theme.accent : theme.warning) : theme.border, transition: 'all 0.3s' }} />
             ))}
           </div>
           
-          {/* Icon */}
           <div style={{ fontSize: '72px', marginBottom: '24px' }}>{currentTourStep.icon}</div>
           
-          {/* Title */}
           <h1 style={{ fontSize: '28px', fontWeight: 700, color: theme.text, margin: '0 0 16px 0' }}>{currentTourStep.title}</h1>
           
-          {/* Content */}
           <p style={{ fontSize: '16px', color: theme.textMuted, lineHeight: 1.7, margin: '0 0 32px 0' }}>{currentTourStep.content}</p>
           
-          {/* Visual highlights for BUDGET mode */}
           {isBudgetMode && tourStep === 1 && (
             <div style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', borderRadius: '16px', padding: '20px', marginBottom: '24px' }}>
               <div style={{ color: 'white', fontSize: '14px', opacity: 0.9 }}>Your FIRE Number</div>
@@ -4021,7 +3783,6 @@ Sent from Aureus App
             </div>
           )}
           
-          {/* Visual highlights for TRADING mode */}
           {!isBudgetMode && tourStep === 1 && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
               <div style={{ background: theme.warning + '20', borderRadius: '12px', padding: '16px', border: '1px solid ' + theme.warning }}>
@@ -4055,7 +3816,6 @@ Sent from Aureus App
             </div>
           )}
           
-          {/* Buttons */}
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
             {tourStep > 0 && (
               <button onClick={() => setTourStep(tourStep - 1)} style={{ padding: '14px 28px', background: 'transparent', border: '2px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontWeight: 600 }}>
@@ -4070,7 +3830,7 @@ Sent from Aureus App
             ) : (
               <button onClick={() => { 
                 setShowTour(false); 
-                setActiveTab('chat'); // Go to dedicated chat page
+                setActiveTab('chat');
                 if (isBudgetMode) {
                   setBudgetTourCompleted(true);
                   setBudgetOnboarding({ isActive: true, step: 'greeting' }); 
@@ -4086,10 +3846,9 @@ Sent from Aureus App
             )}
           </div>
           
-          {/* Skip link */}
           <button onClick={() => { 
             setShowTour(false); 
-            setActiveTab('chat'); // Go to dedicated chat page
+            setActiveTab('chat');
             if (isBudgetMode) {
               setBudgetTourCompleted(true);
               setBudgetOnboarding({ isActive: true, step: 'greeting' }); 
@@ -4112,7 +3871,6 @@ Sent from Aureus App
     return (
       <div style={{ minHeight: '100vh', background: darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)' : 'linear-gradient(135deg, #f0f9ff 0%, #faf5ff 100%)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ textAlign: 'center' as const, marginBottom: '48px' }}>
-          {/* Gold Coin Logo */}
           <div style={{ 
             width: '80px', 
             height: '80px', 
@@ -4158,8 +3916,6 @@ Sent from Aureus App
     )
   }
 
-  // Continued in render return...
-
   // ==================== RENDER: MAIN APP ====================
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
@@ -4173,7 +3929,6 @@ Sent from Aureus App
             </div>
             
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '32px' }}>
-              {/* FREE TIER */}
               <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', border: '2px solid ' + theme.border }}>
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ color: theme.textMuted, fontSize: '14px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Free</div>
@@ -4199,7 +3954,6 @@ Sent from Aureus App
                 </button>
               </div>
               
-              {/* PRO MONTHLY - RECOMMENDED */}
               <div style={{ padding: '24px', background: 'linear-gradient(135deg, ' + theme.success + '20, ' + theme.accent + '20)', borderRadius: '16px', border: '3px solid ' + theme.success, position: 'relative' as const }}>
                 <div style={{ position: 'absolute' as const, top: '-12px', left: '50%', transform: 'translateX(-50%)', background: theme.success, color: 'white', padding: '4px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>MOST POPULAR</div>
                 <div style={{ marginBottom: '16px' }}>
@@ -4222,7 +3976,6 @@ Sent from Aureus App
                 </button>
               </div>
               
-              {/* PRO ANNUAL - BEST VALUE */}
               <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', border: '2px solid ' + theme.purple, position: 'relative' as const }}>
                 <div style={{ position: 'absolute' as const, top: '-12px', left: '50%', transform: 'translateX(-50%)', background: theme.purple, color: 'white', padding: '4px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>SAVE 30%</div>
                 <div style={{ marginBottom: '16px' }}>
@@ -4247,7 +4000,6 @@ Sent from Aureus App
               </div>
             </div>
             
-            {/* Comparison Table */}
             <div style={{ background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
               <h4 style={{ color: theme.text, margin: '0 0 16px 0', fontSize: '16px' }}>Why Aureus Pro?</h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
@@ -4279,7 +4031,7 @@ Sent from Aureus App
         </div>
       )}
       
-      {/* UPGRADE PROMPT (shown when free tier limit reached) */}
+      {/* UPGRADE PROMPT */}
       {showUpgradePrompt && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowUpgradePrompt(false)}>
           <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '32px', maxWidth: '500px', width: '100%', textAlign: 'center' as const }} onClick={e => e.stopPropagation()}>
@@ -4644,7 +4396,6 @@ Sent from Aureus App
               <button onClick={() => setShowSetupManager(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
             </div>
             
-            {/* Trade Setups */}
             <div style={{ marginBottom: '24px' }}>
               <h3 style={{ color: theme.text, fontSize: '16px', margin: '0 0 12px 0' }}>📊 Trade Setups (Strategies)</h3>
               <p style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '12px' }}>
@@ -4691,7 +4442,6 @@ Sent from Aureus App
               </div>
             </div>
             
-            {/* Trade Tags */}
             <div style={{ marginBottom: '24px' }}>
               <h3 style={{ color: theme.text, fontSize: '16px', margin: '0 0 12px 0' }}>🏷️ Trade Tags</h3>
               <p style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '12px' }}>
@@ -4719,7 +4469,6 @@ Sent from Aureus App
               </div>
             </div>
             
-            {/* Mistake Tags */}
             <div>
               <h3 style={{ color: theme.text, fontSize: '16px', margin: '0 0 12px 0' }}>❌ Mistake Tags</h3>
               <p style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '12px' }}>
@@ -4782,7 +4531,6 @@ Sent from Aureus App
             </p>
             
             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
-              {/* Amount */}
               <div>
                 <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Amount *</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -4797,7 +4545,6 @@ Sent from Aureus App
                 </div>
               </div>
               
-              {/* Date */}
               <div>
                 <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Date</label>
                 <input
@@ -4808,7 +4555,6 @@ Sent from Aureus App
                 />
               </div>
               
-              {/* Account Selection */}
               {tradingAccounts.length > 0 && (
                 <div>
                   <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>From Account</label>
@@ -4835,7 +4581,6 @@ Sent from Aureus App
                 </div>
               )}
               
-              {/* Prop Firm (if no accounts) */}
               {tradingAccounts.length === 0 && (
                 <div>
                   <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Prop Firm / Source</label>
@@ -4849,7 +4594,6 @@ Sent from Aureus App
                 </div>
               )}
               
-              {/* Notes */}
               <div>
                 <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Notes (optional)</label>
                 <input
@@ -4861,7 +4605,6 @@ Sent from Aureus App
                 />
               </div>
               
-              {/* Add to Income Toggle */}
               <div 
                 onClick={() => setNewPayout({ ...newPayout, addToIncome: !newPayout.addToIncome })}
                 style={{ 
@@ -4895,7 +4638,6 @@ Sent from Aureus App
               </div>
             </div>
             
-            {/* Payout History Summary */}
             {payouts.length > 0 && (
               <div style={{ marginTop: '20px', padding: '12px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -4957,7 +4699,6 @@ Sent from Aureus App
               <button onClick={() => setShowQuickTradeModal(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
             </div>
             
-            {/* Quick Win/Loss Buttons */}
             {!quickTradeType && (
               <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
                 <button 
@@ -4978,7 +4719,6 @@ Sent from Aureus App
             )}
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              {/* P&L Amount */}
               <div>
                 <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>P&L Amount *</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -4995,7 +4735,6 @@ Sent from Aureus App
                 </div>
               </div>
               
-              {/* Risk Amount (for R calculation) */}
               <div>
                 <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Risk Amount (1R)</label>
                 <input
@@ -5017,7 +4756,6 @@ Sent from Aureus App
                 )}
               </div>
               
-              {/* Instrument */}
               <div>
                 <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Instrument</label>
                 <input
@@ -5029,7 +4767,6 @@ Sent from Aureus App
                 />
               </div>
               
-              {/* Direction */}
               <div>
                 <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Direction</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -5062,7 +4799,6 @@ Sent from Aureus App
                 </div>
               </div>
               
-              {/* Setup Type */}
               <div>
                 <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Setup</label>
                 <select
@@ -5077,7 +4813,6 @@ Sent from Aureus App
                 </select>
               </div>
               
-              {/* Grade */}
               <div>
                 <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Grade</label>
                 <div style={{ display: 'flex', gap: '6px' }}>
@@ -5101,7 +4836,6 @@ Sent from Aureus App
               </div>
             </div>
             
-            {/* Pre-trade Emotion */}
             <div style={{ marginTop: '20px' }}>
               <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px' }}>How did you feel BEFORE the trade?</label>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
@@ -5130,7 +4864,6 @@ Sent from Aureus App
               </div>
             </div>
             
-            {/* Mistakes (for losses) */}
             {quickTradeType === 'loss' && (
               <div style={{ marginTop: '20px' }}>
                 <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px' }}>What went wrong? (optional)</label>
@@ -5162,7 +4895,6 @@ Sent from Aureus App
               </div>
             )}
             
-            {/* Notes */}
             <div style={{ marginTop: '20px' }}>
               <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Notes (optional)</label>
               <input
@@ -5174,7 +4906,6 @@ Sent from Aureus App
               />
             </div>
             
-            {/* Account Selection */}
             {tradingAccounts.length > 0 && (
               <div style={{ marginTop: '20px' }}>
                 <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Account</label>
@@ -5191,7 +4922,6 @@ Sent from Aureus App
               </div>
             )}
             
-            {/* Save Button */}
             <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
               <button
                 onClick={() => {
@@ -5229,297 +4959,6 @@ Sent from Aureus App
                 Cancel
               </button>
             </div>
-          </div>
-        </div>
-      )}
-      
-      {/* QUICK TRADE MODAL */}
-      {showQuickTradeModal && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => { setShowQuickTradeModal(false); setQuickTradeType(null) }}>
-          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '32px', maxWidth: '500px', width: '100%', maxHeight: '90vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2 style={{ color: theme.text, fontSize: '22px', fontWeight: 700, margin: 0 }}>📝 Log Trade</h2>
-              <button onClick={() => { setShowQuickTradeModal(false); setQuickTradeType(null) }} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
-            </div>
-            
-            {/* Quick Win/Loss Buttons */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-              <button
-                onClick={() => setQuickTradeType('win')}
-                style={{
-                  flex: 1,
-                  padding: '16px',
-                  background: quickTradeType === 'win' ? theme.success : theme.success + '20',
-                  color: quickTradeType === 'win' ? 'white' : theme.success,
-                  border: `2px solid ${theme.success}`,
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                  fontSize: '16px'
-                }}
-              >
-                ✅ WIN
-              </button>
-              <button
-                onClick={() => setQuickTradeType('loss')}
-                style={{
-                  flex: 1,
-                  padding: '16px',
-                  background: quickTradeType === 'loss' ? theme.danger : theme.danger + '20',
-                  color: quickTradeType === 'loss' ? 'white' : theme.danger,
-                  border: `2px solid ${theme.danger}`,
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                  fontSize: '16px'
-                }}
-              >
-                ❌ LOSS
-              </button>
-            </div>
-            
-            {/* Trade Form */}
-            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
-              {/* P&L Amount */}
-              <div>
-                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>
-                  {quickTradeType === 'loss' ? 'Loss Amount' : 'Profit Amount'} *
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: quickTradeType === 'loss' ? theme.danger : theme.success, fontSize: '20px', fontWeight: 700 }}>
-                    {quickTradeType === 'loss' ? '-$' : '+$'}
-                  </span>
-                  <input
-                    type="number"
-                    value={newTrade.profitLoss.replace('-', '')}
-                    onChange={e => setNewTrade({ 
-                      ...newTrade, 
-                      profitLoss: quickTradeType === 'loss' ? `-${e.target.value}` : e.target.value 
-                    })}
-                    placeholder="0.00"
-                    style={{ ...inputStyle, flex: 1, fontSize: '24px', fontWeight: 700, padding: '12px' }}
-                  />
-                </div>
-              </div>
-              
-              {/* Risk Amount (for R calculation) */}
-              <div>
-                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>
-                  Risk (1R) - for R-multiple calc
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: theme.text, fontSize: '16px' }}>$</span>
-                  <input
-                    type="number"
-                    value={newTrade.riskAmount}
-                    onChange={e => {
-                      const risk = parseFloat(e.target.value) || 0
-                      const pnl = Math.abs(parseFloat(newTrade.profitLoss) || 0)
-                      const rMultiple = risk > 0 ? (pnl / risk).toFixed(2) : ''
-                      setNewTrade({ 
-                        ...newTrade, 
-                        riskAmount: e.target.value,
-                        rMultiple: quickTradeType === 'loss' ? `-${rMultiple}` : rMultiple
-                      })
-                    }}
-                    placeholder="75"
-                    style={{ ...inputStyle, flex: 1 }}
-                  />
-                  {newTrade.riskAmount && newTrade.profitLoss && (
-                    <span style={{ 
-                      padding: '8px 12px', 
-                      background: quickTradeType === 'loss' ? theme.danger + '20' : theme.success + '20',
-                      color: quickTradeType === 'loss' ? theme.danger : theme.success,
-                      borderRadius: '8px',
-                      fontWeight: 700
-                    }}>
-                      {newTrade.rMultiple}R
-                    </span>
-                  )}
-                </div>
-              </div>
-              
-              {/* Instrument & Direction */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Instrument</label>
-                  <input
-                    value={newTrade.instrument}
-                    onChange={e => setNewTrade({ ...newTrade, instrument: e.target.value })}
-                    placeholder="EURUSD"
-                    style={{ ...inputStyle, width: '100%' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Direction</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={() => setNewTrade({ ...newTrade, direction: 'long' })}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        background: newTrade.direction === 'long' ? theme.success + '30' : theme.cardBg,
-                        border: `2px solid ${newTrade.direction === 'long' ? theme.success : theme.border}`,
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        color: theme.text,
-                        fontWeight: 600
-                      }}
-                    >
-                      📈 Long
-                    </button>
-                    <button
-                      onClick={() => setNewTrade({ ...newTrade, direction: 'short' })}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        background: newTrade.direction === 'short' ? theme.danger + '30' : theme.cardBg,
-                        border: `2px solid ${newTrade.direction === 'short' ? theme.danger : theme.border}`,
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        color: theme.text,
-                        fontWeight: 600
-                      }}
-                    >
-                      📉 Short
-                    </button>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Setup Type */}
-              <div>
-                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Setup/Strategy</label>
-                <select
-                  value={newTrade.setupType}
-                  onChange={e => setNewTrade({ ...newTrade, setupType: e.target.value })}
-                  style={{ ...inputStyle, width: '100%' }}
-                >
-                  <option value="">Select setup...</option>
-                  {tradeSetups.map(setup => (
-                    <option key={setup} value={setup}>{setup}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* Pre-Trade Emotion */}
-              <div>
-                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px' }}>How did you feel BEFORE this trade?</label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                  {[
-                    { key: 'confident', emoji: '😎', label: 'Confident' },
-                    { key: 'neutral', emoji: '😐', label: 'Neutral' },
-                    { key: 'anxious', emoji: '😰', label: 'Anxious' },
-                    { key: 'fomo', emoji: '🤑', label: 'FOMO' },
-                    { key: 'revenge', emoji: '😤', label: 'Revenge' }
-                  ].map(emotion => (
-                    <button
-                      key={emotion.key}
-                      onClick={() => setNewTrade({ ...newTrade, emotionBefore: emotion.key })}
-                      style={{
-                        padding: '8px 12px',
-                        background: newTrade.emotionBefore === emotion.key ? theme.warning + '30' : theme.cardBg,
-                        border: `2px solid ${newTrade.emotionBefore === emotion.key ? theme.warning : theme.border}`,
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <span style={{ fontSize: '16px' }}>{emotion.emoji}</span>
-                      <span style={{ color: theme.text, fontSize: '12px' }}>{emotion.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Mistakes (for losses) */}
-              {quickTradeType === 'loss' && (
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px' }}>What went wrong?</label>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                    {tradeMistakes.slice(0, 6).map(mistake => (
-                      <button
-                        key={mistake}
-                        onClick={() => {
-                          const mistakes = newTrade.mistakes || []
-                          if (mistakes.includes(mistake)) {
-                            setNewTrade({ ...newTrade, mistakes: mistakes.filter(m => m !== mistake) })
-                          } else {
-                            setNewTrade({ ...newTrade, mistakes: [...mistakes, mistake] })
-                          }
-                        }}
-                        style={{
-                          padding: '6px 12px',
-                          background: (newTrade.mistakes || []).includes(mistake) ? theme.danger + '30' : theme.cardBg,
-                          border: `2px solid ${(newTrade.mistakes || []).includes(mistake) ? theme.danger : theme.border}`,
-                          borderRadius: '20px',
-                          cursor: 'pointer',
-                          color: theme.text,
-                          fontSize: '12px'
-                        }}
-                      >
-                        {mistake}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Account Selection */}
-              {tradingAccounts.length > 0 && (
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Account</label>
-                  <select
-                    value={newTrade.accountId}
-                    onChange={e => setNewTrade({ ...newTrade, accountId: parseInt(e.target.value) })}
-                    style={{ ...inputStyle, width: '100%' }}
-                  >
-                    <option value={0}>No account linked</option>
-                    {tradingAccounts.map(acc => (
-                      <option key={acc.id} value={acc.id}>{acc.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              
-              {/* Notes */}
-              <div>
-                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '6px' }}>Notes (optional)</label>
-                <input
-                  value={newTrade.notes}
-                  onChange={e => setNewTrade({ ...newTrade, notes: e.target.value })}
-                  placeholder="What did you learn?"
-                  style={{ ...inputStyle, width: '100%' }}
-                />
-              </div>
-            </div>
-            
-            {/* Save Button */}
-            <button
-              onClick={() => {
-                if (!newTrade.profitLoss) return
-                addTrade()
-                setShowQuickTradeModal(false)
-                setQuickTradeType(null)
-              }}
-              disabled={!newTrade.profitLoss}
-              style={{
-                width: '100%',
-                marginTop: '24px',
-                padding: '16px',
-                background: newTrade.profitLoss ? (quickTradeType === 'loss' ? theme.danger : theme.success) : theme.textMuted,
-                color: 'white',
-                border: 'none',
-                borderRadius: '12px',
-                cursor: newTrade.profitLoss ? 'pointer' : 'not-allowed',
-                fontWeight: 700,
-                fontSize: '16px'
-              }}
-            >
-              💾 Save Trade
-            </button>
           </div>
         </div>
       )}
@@ -5623,7 +5062,6 @@ Sent from Aureus App
       {/* Header */}
       <header style={{ padding: '12px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky' as const, top: 0, zIndex: 100 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Gold Coin Logo */}
           <div style={{ 
             width: '36px', 
             height: '36px', 
@@ -5663,7 +5101,6 @@ Sent from Aureus App
           )}
           <button onClick={() => setDarkMode(!darkMode)} style={{ padding: '8px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>{darkMode ? '☀️' : '🌙'}</button>
           
-          {/* Country/Region Selector */}
           <select 
             value={userCountry} 
             onChange={e => setUserCountry(e.target.value as any)}
@@ -5685,7 +5122,6 @@ Sent from Aureus App
             <option value="CA">🇨🇦 CA</option>
           </select>
           
-          {/* Subscription Status / Upgrade Button */}
           {userSubscription.plan === 'free' ? (
             <button 
               onClick={() => setShowPricingModal(true)}
@@ -5731,7 +5167,6 @@ Sent from Aureus App
             </button>
           )}
           
-          {/* Feedback Button */}
           <button 
             onClick={() => setShowFeedbackModal(true)}
             style={{ 
@@ -5751,7 +5186,7 @@ Sent from Aureus App
       </header>
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
-        {/* MOTIVATIONAL QUOTE - Only show on quickview */}
+        {/* MOTIVATIONAL QUOTE */}
         {activeTab === 'quickview' && !budgetOnboarding.isActive && !tradingOnboarding.isActive && (
           <div style={{ background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', padding: '16px 20px', marginBottom: '16px', borderLeft: `4px solid ${theme.purple}` }}>
             <p style={{ color: theme.text, fontSize: '14px', fontStyle: 'italic', margin: 0 }}>"{currentQuote.quote}"</p>
@@ -5759,13 +5194,12 @@ Sent from Aureus App
           </div>
         )}
 
-        {/* UPCOMING PAYMENT ALERTS - Only show on quickview */}
+        {/* UPCOMING PAYMENT ALERTS */}
         {activeTab === 'quickview' && alertsEnabled && !budgetOnboarding.isActive && (() => {
           const today = new Date()
           const upcomingDays = alertDaysBefore
           const upcoming: any[] = []
           
-          // Check expenses
           expenses.filter(e => !e.targetDebtId && !e.targetGoalId).forEach(exp => {
             if (!exp.dueDate) return
             const [year, month, day] = exp.dueDate.split('-').map(Number)
@@ -5776,7 +5210,6 @@ Sent from Aureus App
             }
           })
           
-          // Check debts
           debts.forEach(debt => {
             if (!debt.paymentDate) return
             const [year, month, day] = debt.paymentDate.split('-').map(Number)
@@ -5809,11 +5242,10 @@ Sent from Aureus App
           )
         })()}
 
-        {/* CHAT TAB - Dedicated Aureus Conversation */}
+        {/* CHAT TAB */}
         {activeTab === 'chat' && (
           <div style={{ maxWidth: '800px', margin: '0 auto' }}>
             <div style={{ background: `linear-gradient(135deg, ${appMode === 'budget' ? theme.success : theme.warning}15, ${theme.purple}15)`, border: `2px solid ${appMode === 'budget' ? theme.success : theme.warning}`, borderRadius: '20px', padding: '24px', minHeight: '70vh', display: 'flex', flexDirection: 'column' as const }}>
-              {/* Aureus Header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid ' + theme.border }}>
                 <div style={{ 
                   width: '64px', 
@@ -5841,14 +5273,12 @@ Sent from Aureus App
                 </div>
               </div>
               
-              {/* AI Disclaimer */}
               <div style={{ padding: '8px 12px', background: theme.warning + '15', borderRadius: '8px', marginBottom: '12px', border: '1px solid ' + theme.warning + '30' }}>
                 <p style={{ margin: 0, color: theme.textMuted, fontSize: '11px', lineHeight: 1.4 }}>
                   ⚠️ <strong>Important:</strong> Aureus is an AI assistant, not a licensed financial advisor. Always verify information and consult qualified professionals for major financial decisions. AI can make mistakes.
                 </p>
               </div>
 
-              {/* Chat Messages */}
               <div ref={chatContainerRef} style={{ flex: 1, overflowY: 'auto' as const, marginBottom: '16px', padding: '8px' }}>
                 {proactiveInsight && !budgetOnboarding.isActive && !tradingOnboarding.isActive && chatMessages.length === 0 && (
                   <div style={{ marginBottom: '16px' }}>
@@ -5885,7 +5315,6 @@ Sent from Aureus App
                 )}
               </div>
               
-              {/* Chat Input */}
               <div style={{ display: 'flex', gap: '12px' }}>
                 <input 
                   type="text" 
@@ -5917,11 +5346,10 @@ Sent from Aureus App
           </div>
         )}
 
-        {/* QUICK VIEW TAB - Mobile-friendly metrics dashboard */}
+        {/* QUICK VIEW TAB */}
         {activeTab === 'quickview' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
             
-            {/* Aureus Chat Card - Always visible */}
             <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${appMode === 'budget' ? theme.success : theme.warning}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + (appMode === 'budget' ? theme.success : theme.warning) }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
                 <div style={{ 
@@ -5944,7 +5372,6 @@ Sent from Aureus App
                 </div>
               </div>
               
-              {/* Proactive insight when no messages */}
               {proactiveInsight && chatMessages.length === 0 && (
                 <div style={{ marginBottom: '12px' }}>
                   <p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{proactiveInsight.insight || proactiveInsight.message}</p>
@@ -5954,7 +5381,6 @@ Sent from Aureus App
                 </div>
               )}
               
-              {/* Chat Messages */}
               {chatMessages.length > 0 && (
                 <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
                   {chatMessages.map((msg, idx) => (
@@ -5983,7 +5409,6 @@ Sent from Aureus App
                 </div>
               )}
               
-              {/* Chat Input */}
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input 
                   type="text" 
@@ -6016,7 +5441,6 @@ Sent from Aureus App
 
             {appMode === 'budget' && (
               <>
-                {/* Key Metrics Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
                   <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
                     <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Monthly Revenue</div>
@@ -6037,7 +5461,6 @@ Sent from Aureus App
                   </div>
                 </div>
 
-                {/* Operations Score */}
                 <div style={{ padding: '20px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '16px', border: '1px solid #334155' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
@@ -6050,7 +5473,6 @@ Sent from Aureus App
                   </div>
                 </div>
 
-                {/* Freedom Progress */}
                 <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <div style={{ color: theme.text, fontWeight: 600 }}>🐀 Rat Race Escape</div>
@@ -6067,7 +5489,6 @@ Sent from Aureus App
                   </div>
                 </div>
 
-                {/* Current Baby Step */}
                 <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: theme.warning, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>{currentBabyStep.icon}</div>
@@ -6078,7 +5499,6 @@ Sent from Aureus App
                   </div>
                 </div>
 
-                {/* Quick Actions */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
                   <button onClick={() => setActiveTab('dashboard')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
                     <div style={{ fontSize: '24px', marginBottom: '8px' }}>🎛️</div>
@@ -6094,7 +5514,6 @@ Sent from Aureus App
                   </button>
                 </div>
                 
-                {/* Recent Payouts */}
                 {payouts.length > 0 && (
                   <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -6124,7 +5543,6 @@ Sent from Aureus App
 
             {appMode === 'trading' && (
               <>
-                {/* Trading Key Metrics */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
                   <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
                     <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>Total P&L</div>
@@ -6146,7 +5564,6 @@ Sent from Aureus App
                   </div>
                 </div>
 
-                {/* Tilt Status */}
                 {(() => {
                   const tilt = detectTilt()
                   return (
@@ -6167,7 +5584,6 @@ Sent from Aureus App
                   )
                 })()}
 
-                {/* Quick Action */}
                 <button onClick={() => setActiveTab('trading')} style={{ padding: '16px', background: theme.warning, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
                   <div style={{ color: 'white', fontWeight: 600, fontSize: '16px' }}>📈 Open Trading Dashboard</div>
                 </button>
@@ -6180,7 +5596,6 @@ Sent from Aureus App
         {appMode === 'budget' && activeTab === 'dashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             
-            {/* Aureus Onboarding Chat - Shows when onboarding is active */}
             {budgetOnboarding.isActive && (
               <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, border: `2px solid ${theme.success}`, borderRadius: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
@@ -6249,7 +5664,6 @@ Sent from Aureus App
               </div>
             )}
             
-            {/* Aureus Chat - Shows when NOT onboarding (at TOP of page) */}
             {!budgetOnboarding.isActive && (
               <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
@@ -6262,7 +5676,6 @@ Sent from Aureus App
               </div>
             )}
             
-            {/* Monthly Summary - uses standard monthly calculations */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Income /month</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>${monthlyIncome.toFixed(0)}</div></div>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Expenses /month</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 700 }}>${monthlyExpenses.toFixed(0)}</div></div>
@@ -6272,7 +5685,6 @@ Sent from Aureus App
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-              {/* Revenue Streams */}
               <div style={cardStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{ margin: 0, color: theme.success, fontSize: '18px' }}>💰 Revenue Streams</h3>
@@ -6321,7 +5733,6 @@ Sent from Aureus App
                 </div>
               </div>
 
-              {/* Operating Costs */}
               <div style={cardStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{ margin: 0, color: theme.danger, fontSize: '18px' }}>💸 Operating Costs</h3>
@@ -6374,7 +5785,6 @@ Sent from Aureus App
               </div>
             </div>
 
-            {/* Calendar */}
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))} style={{ ...btnPrimary, padding: '8px 16px' }}>←</button>
@@ -6401,7 +5811,6 @@ Sent from Aureus App
               </div>
             </div>
 
-            {/* ==================== BUDGET ANALYTICS DASHBOARD ==================== */}
             <div style={{ padding: '24px', background: `linear-gradient(135deg, ${theme.accent}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.accent }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -6413,7 +5822,6 @@ Sent from Aureus App
                 </div>
               </div>
               
-              {/* Analytics Tabs */}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' as const }}>
                 {[
                   { key: 'spending', icon: '💸', label: 'Spending' },
@@ -6445,7 +5853,6 @@ Sent from Aureus App
                 ))}
               </div>
               
-              {/* SPENDING TAB */}
               {budgetAnalyticsTab === 'spending' && (() => {
                 const analytics = calculateSpendingAnalytics()
                 const categoryColors: {[key: string]: string} = {
@@ -6460,7 +5867,6 @@ Sent from Aureus App
                 
                 return (
                   <div>
-                    {/* Summary Cards */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
                       <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
                         <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Monthly Spending</div>
@@ -6481,7 +5887,6 @@ Sent from Aureus App
                       </div>
                     </div>
                     
-                    {/* Category Breakdown */}
                     <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px' }}>
                       <h4 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '15px' }}>Spending by Category</h4>
                       <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
@@ -6508,13 +5913,11 @@ Sent from Aureus App
                 )
               })()}
               
-              {/* WEALTH POSITION TAB */}
               {budgetAnalyticsTab === 'wealth' && (() => {
                 const wealth = calculateWealthPosition()
                 
                 return (
                   <div>
-                    {/* Main Wealth Card */}
                     <div style={{ padding: '24px', background: `linear-gradient(135deg, ${theme.success}20, ${theme.accent}20)`, borderRadius: '16px', marginBottom: '20px', textAlign: 'center' as const }}>
                       <div style={{ color: theme.textMuted, fontSize: '14px', marginBottom: '8px' }}>Total Wealth Position</div>
                       <div style={{ color: wealth.netWorth >= 0 ? theme.success : theme.danger, fontSize: '42px', fontWeight: 700 }}>
@@ -6525,7 +5928,6 @@ Sent from Aureus App
                       </div>
                     </div>
                     
-                    {/* Breakdown */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
                       <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px' }}>
                         <h4 style={{ margin: '0 0 16px 0', color: theme.success, fontSize: '15px' }}>💰 Assets</h4>
@@ -6563,7 +5965,6 @@ Sent from Aureus App
                       </div>
                     </div>
                     
-                    {/* Trading P&L Summary */}
                     {trades.length > 0 && (
                       <div style={{ padding: '16px', background: theme.warning + '20', borderRadius: '12px', marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
@@ -6582,7 +5983,6 @@ Sent from Aureus App
                 )
               })()}
               
-              {/* UPCOMING BILLS TAB */}
               {budgetAnalyticsTab === 'bills' && (
                 <div>
                   <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px' }}>
@@ -6629,7 +6029,6 @@ Sent from Aureus App
                 </div>
               )}
               
-              {/* SUBSCRIPTIONS TAB */}
               {budgetAnalyticsTab === 'subscriptions' && (
                 <div>
                   <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', marginBottom: '16px' }}>
@@ -6658,7 +6057,6 @@ Sent from Aureus App
                       )
                     })()}
                     
-                    {/* Aureus suggestion */}
                     <div style={{ marginTop: '16px', padding: '12px', background: theme.warning + '20', borderRadius: '8px', borderLeft: '4px solid ' + theme.warning }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                         <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, color: '#78350f' }}>A</div>
@@ -6672,7 +6070,6 @@ Sent from Aureus App
                 </div>
               )}
               
-              {/* MILESTONES TAB */}
               {budgetAnalyticsTab === 'milestones' && (
                 <div>
                   <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px' }}>
@@ -6719,9 +6116,7 @@ Sent from Aureus App
               )}
             </div>
 
-            {/* Debts & Goals */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-              {/* Debts with Payoff Calculator */}
               <div style={cardStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <h3 style={{ margin: 0, color: theme.warning, fontSize: '18px' }}>💳 Liabilities</h3>
@@ -6746,7 +6141,6 @@ Sent from Aureus App
                     const progress = debt.originalBalance ? ((parseFloat(debt.originalBalance) - parseFloat(debt.balance)) / parseFloat(debt.originalBalance)) * 100 : 0
                     const extraPaymentData = debtExtraPayment[debt.id] || { amount: '', frequency: 'monthly' }
                     
-                    // Edit mode
                     if (editingItem?.type === 'debt' && editingItem.id === debt.id) {
                       return (
                         <div key={debt.id} style={{ padding: '16px', marginBottom: '12px', background: darkMode ? '#3a2e1e' : '#fefce8', borderRadius: '12px', border: '2px solid ' + theme.warning }}>
@@ -6792,21 +6186,18 @@ Sent from Aureus App
                           </div>
                         </div>
                         
-                        {/* Progress bar */}
                         {debt.originalBalance && (
                           <div style={{ height: '8px', background: darkMode ? '#1e293b' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}>
                             <div style={{ width: `${Math.min(progress, 100)}%`, height: '100%', background: `linear-gradient(90deg, ${theme.success}, #059669)`, borderRadius: '4px' }} />
                           </div>
                         )}
                         
-                        {/* Payoff info */}
                         <div style={{ display: 'flex', gap: '16px', fontSize: '12px', marginBottom: '12px' }}>
                           <div><span style={{ color: theme.textMuted }}>Payoff: </span><span style={{ color: theme.text, fontWeight: 600 }}>{payoff.payoffDate}</span></div>
                           <div><span style={{ color: theme.textMuted }}>Months: </span><span style={{ color: theme.text, fontWeight: 600 }}>{payoff.months < 600 ? payoff.months : '∞'}</span></div>
                           <div><span style={{ color: theme.textMuted }}>Interest: </span><span style={{ color: theme.danger, fontWeight: 600 }}>${payoff.totalInterest.toFixed(0)}</span></div>
                         </div>
                         
-                        {/* Extra payment input */}
                         {showExtraInput === debt.id ? (
                           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <input type="number" placeholder="Extra $" value={extraPaymentData.amount} onChange={e => setDebtExtraPayment({...debtExtraPayment, [debt.id]: {...extraPaymentData, amount: e.target.value}})} style={{...inputStyle, width: '80px', padding: '6px 10px'}} />
@@ -6827,7 +6218,6 @@ Sent from Aureus App
                 </div>
               </div>
 
-              {/* Goals */}
               <div style={cardStyle}>
                 <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🎯 Capital Targets</h3>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
@@ -6844,7 +6234,6 @@ Sent from Aureus App
                   <button onClick={addGoal} style={btnPurple}>+</button>
                 </div>
                 
-                {/* Time to Goal Preview */}
                 {newGoal.target && newGoal.paymentAmount && parseFloat(newGoal.paymentAmount) > 0 && (
                   <div style={{ padding: '12px', marginBottom: '12px', background: theme.purple + '15', borderRadius: '8px', border: '1px solid ' + theme.purple }}>
                     {(() => {
@@ -6894,7 +6283,6 @@ Sent from Aureus App
                     const progress = (parseFloat(goal.saved || '0') / parseFloat(goal.target || '1')) * 100
                     const remaining = parseFloat(goal.target || '0') - parseFloat(goal.saved || '0')
                     
-                    // Calculate time to goal based on payment amount
                     let timeToGoal = ''
                     let paymentNeeded = 0
                     const payment = parseFloat(goal.paymentAmount || '0')
@@ -6912,7 +6300,6 @@ Sent from Aureus App
                       }
                     }
                     
-                    // Calculate payment needed for deadline (if set and no payment amount)
                     const deadline = goal.deadline ? new Date(goal.deadline) : null
                     if (deadline && remaining > 0 && !payment) {
                       const now = new Date()
@@ -6968,7 +6355,6 @@ Sent from Aureus App
                             <span style={{ color: theme.purple, fontWeight: 700 }}>{progress.toFixed(0)}%</span>
                             <button onClick={() => startEdit('goal', goal)} style={{ padding: '4px 8px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} title="Edit">✏️</button>
                             <button onClick={() => addGoalToCalendar(goal)} style={{ padding: '4px 8px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} title="Add to Calendar">📅</button>
-                            {/* Link to Roadmap button - only show if not already linked */}
                             {!roadmapMilestones.some(m => m.linkedGoalId === goal.id) && (
                               <button 
                                 onClick={() => addToRoadmap(goal.name, 'savings', goal.target, '🎯', `Saving ${goal.paymentAmount}/${goal.savingsFrequency}`, parseFloat(goal.saved || '0'), goal.id)} 
@@ -6983,7 +6369,6 @@ Sent from Aureus App
                           </div>
                         </div>
                         
-                        {/* Date picker for adding to calendar */}
                         {goalCalendarPicker?.goalId === goal.id && goalCalendarPicker && (
                           <div style={{ marginTop: '12px', padding: '12px', background: theme.cardBg, borderRadius: '8px', border: '1px solid ' + theme.purple }}>
                             <div style={{ color: theme.text, fontSize: '13px', marginBottom: '8px', fontWeight: 600 }}>📅 When do you want to start saving?</div>
@@ -7011,7 +6396,6 @@ Sent from Aureus App
               </div>
             </div>
             
-            {/* ASSETS & NET WORTH - Added to Command Centre */}
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h3 style={{ margin: 0, color: theme.success, fontSize: '18px' }}>💰 Assets</h3>
@@ -7021,7 +6405,6 @@ Sent from Aureus App
                 </div>
               </div>
               
-              {/* Quick add presets - country-aware */}
               <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
                 {[
                   { name: 'Savings Account', type: 'savings' },
@@ -7047,7 +6430,6 @@ Sent from Aureus App
                 <button onClick={addAsset} style={btnSuccess}>+</button>
               </div>
               
-              {/* Compact asset list */}
               {assets.length === 0 ? (
                 <div style={{ textAlign: 'center' as const, padding: '16px', color: theme.textMuted, fontSize: '13px' }}>
                   No assets yet. Add your savings, {currentCountryConfig?.terminology?.retirement || 'super'}, and investments!
@@ -7069,7 +6451,6 @@ Sent from Aureus App
                 </div>
               )}
               
-              {/* Summary row */}
               {assets.length > 0 && (
                 <div style={{ marginTop: '12px', padding: '10px', background: theme.success + '10', borderRadius: '8px', display: 'flex', justifyContent: 'space-around', fontSize: '12px' }}>
                   <div><span style={{ color: theme.textMuted }}>Liquid:</span> <span style={{ color: theme.success, fontWeight: 600 }}>${assets.filter(a => a.type === 'savings' || a.type === 'investment').reduce((s, a) => s + parseFloat(a.value || '0'), 0).toLocaleString()}</span></div>
@@ -7081,11 +6462,10 @@ Sent from Aureus App
           </div>
         )}
 
-        {/* OVERVIEW TAB - Financial Freedom Dashboard */}
+        {/* OVERVIEW TAB */}
         {appMode === 'budget' && activeTab === 'overview' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             
-            {/* Aureus Chat - At TOP */}
             <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
                 <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
@@ -7096,7 +6476,6 @@ Sent from Aureus App
               <div style={{ display: 'flex', gap: '8px' }}><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button></div>
             </div>
             
-            {/* FINANCIAL OPERATIONS SCORE */}
             <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
@@ -7118,7 +6497,6 @@ Sent from Aureus App
               </div>
             </div>
 
-            {/* CASH FLOW QUADRANT */}
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div>
@@ -7192,13 +6570,11 @@ Sent from Aureus App
               </div>
             </div>
 
-            {/* ADVANCED METRICS DASHBOARD - Under Financial Operations Score */}
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>📊 Performance Metrics</h2>
               <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>KPIs that drive your Financial Operations Score</p>
               
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                {/* Capital Efficiency Ratio */}
                 <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                     <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>CER</div>
@@ -7213,7 +6589,6 @@ Sent from Aureus App
                   </div>
                 </div>
 
-                {/* Risk Management Factor */}
                 <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                     <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>RMF</div>
@@ -7228,7 +6603,6 @@ Sent from Aureus App
                   </div>
                 </div>
 
-                {/* Liquidity Factor */}
                 <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                     <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>LF</div>
@@ -7243,7 +6617,6 @@ Sent from Aureus App
                   </div>
                 </div>
 
-                {/* Adjusted Capital Efficiency */}
                 <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                     <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>ACE</div>
@@ -7258,7 +6631,6 @@ Sent from Aureus App
                   </div>
                 </div>
 
-                {/* Compounding Velocity */}
                 <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                     <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>CV</div>
@@ -7273,7 +6645,6 @@ Sent from Aureus App
                   </div>
                 </div>
 
-                {/* Allocation Diversity Score */}
                 <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                     <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>ADS</div>
@@ -7289,7 +6660,6 @@ Sent from Aureus App
                 </div>
               </div>
 
-              {/* Forecast Accuracy */}
               <div style={{ marginTop: '16px', padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
@@ -7306,7 +6676,6 @@ Sent from Aureus App
               </div>
             </div>
 
-            {/* NET WORTH & ASSETS/LIABILITIES */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Monthly Revenue</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 700 }}>${monthlyIncome.toFixed(0)}</div></div>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Operating Costs</div><div style={{ color: theme.danger, fontSize: '24px', fontWeight: 700 }}>${totalOutgoing.toFixed(0)}</div></div>
@@ -7318,7 +6687,6 @@ Sent from Aureus App
               <div style={cardStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}><h3 style={{ margin: 0, color: theme.success }}>📈 Assets</h3><span style={{ color: theme.success, fontWeight: 700 }}>${totalAssets.toLocaleString()}</span></div>
                 
-                {/* Quick add buttons for common accounts */}
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
                   {['Savings Account', 'Super/401K', 'ETF Portfolio', 'Emergency Fund', 'Term Deposit'].map(preset => (
                     <button key={preset} onClick={() => setNewAsset({...newAsset, name: preset, type: preset.includes('Super') ? 'super' : preset.includes('ETF') || preset.includes('Portfolio') ? 'investment' : 'savings'})} style={{ padding: '4px 10px', background: theme.cardBg, color: theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', fontSize: '11px' }}>+ {preset}</button>
@@ -7340,14 +6708,12 @@ Sent from Aureus App
                   <button onClick={addAsset} style={btnSuccess}>+</button>
                 </div>
                 
-                {/* Group assets by type */}
                 {assets.length === 0 ? (
                   <div style={{ textAlign: 'center' as const, padding: '20px', color: theme.textMuted }}>
                     <p style={{ margin: 0, fontSize: '13px' }}>No assets added yet. Add your savings, super, and investments!</p>
                   </div>
                 ) : (
                   <>
-                    {/* Liquid Assets (Savings + Emergency) */}
                     {assets.filter(a => a.type === 'savings').length > 0 && (
                       <div style={{ marginBottom: '8px' }}>
                         <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px', textTransform: 'uppercase' as const }}>💰 Savings ({assets.filter(a => a.type === 'savings').length})</div>
@@ -7360,7 +6726,6 @@ Sent from Aureus App
                       </div>
                     )}
                     
-                    {/* Super/Retirement */}
                     {assets.filter(a => a.type === 'super').length > 0 && (
                       <div style={{ marginBottom: '8px' }}>
                         <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px', textTransform: 'uppercase' as const }}>🏦 Super/Retirement</div>
@@ -7373,7 +6738,6 @@ Sent from Aureus App
                       </div>
                     )}
                     
-                    {/* Investments */}
                     {assets.filter(a => a.type === 'investment' || a.type === 'crypto').length > 0 && (
                       <div style={{ marginBottom: '8px' }}>
                         <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px', textTransform: 'uppercase' as const }}>📊 Investments</div>
@@ -7386,7 +6750,6 @@ Sent from Aureus App
                       </div>
                     )}
                     
-                    {/* Property & Other */}
                     {assets.filter(a => a.type === 'property' || a.type === 'vehicle' || a.type === 'other').length > 0 && (
                       <div>
                         <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px', textTransform: 'uppercase' as const }}>🏠 Property & Other</div>
@@ -7401,7 +6764,6 @@ Sent from Aureus App
                   </>
                 )}
                 
-                {/* Summary by category */}
                 {assets.length > 0 && (
                   <div style={{ marginTop: '12px', padding: '12px', background: theme.success + '15', borderRadius: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: theme.text }}>
@@ -7439,11 +6801,10 @@ Sent from Aureus App
           </div>
         )}
 
-        {/* PATH TAB - Baby Steps & Quest Board */}
+        {/* PATH TAB */}
         {appMode === 'budget' && activeTab === 'path' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             
-            {/* Financial Disclaimer Banner */}
             <div style={{ padding: '12px 16px', background: 'linear-gradient(135deg, #f59e0b15, #ef444415)', borderRadius: '12px', border: '1px solid #f59e0b40' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                 <span style={{ fontSize: '20px' }}>⚠️</span>
@@ -7459,7 +6820,6 @@ Sent from Aureus App
               </div>
             </div>
             
-            {/* Aureus Chat - At TOP */}
             <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: chatMessages.length > 0 ? '16px' : '12px' }}>
                 <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
@@ -7470,7 +6830,6 @@ Sent from Aureus App
               <div style={{ display: 'flex', gap: '8px' }}><input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ padding: '10px 16px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button></div>
             </div>
             
-            {/* Selected Financial Path */}
             {budgetMemory.financialPath && (
               <div style={{ padding: '20px', background: `linear-gradient(135deg, ${
                 budgetMemory.financialPath === 'babysteps' ? '#10b98120' :
@@ -7517,7 +6876,6 @@ Sent from Aureus App
               </div>
             )}
             
-            {/* Big Goals Display */}
             {budgetMemory.bigGoals && Object.keys(budgetMemory.bigGoals).length > 0 && (
               <div style={{ padding: '20px', background: 'linear-gradient(135deg, #8b5cf615, #f59e0b15)', borderRadius: '16px', border: '2px solid ' + theme.purple }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -7620,7 +6978,6 @@ Sent from Aureus App
               </div>
             )}
             
-            {/* ==================== MY ROADMAP - Visual Path to Goals ==================== */}
             <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: '16px', border: '2px solid ' + theme.purple }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div>
@@ -7636,7 +6993,6 @@ Sent from Aureus App
                   {roadmapMilestones.length > 0 && (
                     <button
                       onClick={() => {
-                        // Build roadmap summary for Aureus
                         const milestoneSummary = roadmapMilestones.map(m => 
                           `- ${m.name}: Target $${parseFloat(m.targetAmount).toLocaleString()}, Current $${m.currentAmount?.toLocaleString() || 0}${m.targetDate ? `, Deadline: ${m.targetDate}` : ''}`
                         ).join('\n')
@@ -7662,7 +7018,6 @@ Sent from Aureus App
                 </div>
               </div>
               
-              {/* Add Milestone Form */}
               {showAddMilestone && (
                 <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', marginBottom: '20px', border: '1px solid ' + theme.border }}>
                   <h4 style={{ margin: '0 0 16px 0', color: theme.text }}>✨ Add New Milestone</h4>
@@ -7748,7 +7103,6 @@ Sent from Aureus App
                 </div>
               )}
               
-              {/* Visual Timeline */}
               {roadmapMilestones.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', background: theme.cardBg, borderRadius: '12px' }}>
                   <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
@@ -7760,10 +7114,8 @@ Sent from Aureus App
                 </div>
               ) : (
                 <div style={{ position: 'relative' }}>
-                  {/* Timeline line */}
                   <div style={{ position: 'absolute', left: '24px', top: '24px', bottom: '24px', width: '4px', background: 'linear-gradient(180deg, ' + theme.purple + ', ' + theme.success + ')', borderRadius: '2px' }} />
                   
-                  {/* Milestones */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {roadmapMilestones
                       .sort((a, b) => new Date(a.targetDate || '2099-12-31').getTime() - new Date(b.targetDate || '2099-12-31').getTime())
@@ -7774,18 +7126,16 @@ Sent from Aureus App
                         
                         return (
                           <div key={milestone.id} style={{ display: 'flex', gap: '16px', position: 'relative' }}>
-                            {/* Timeline dot */}
                             <div style={{ 
                               width: '48px', height: '48px', borderRadius: '50%', 
                               background: isCompleted ? theme.success : theme.cardBg, 
                               border: '4px solid ' + (isCompleted ? theme.success : theme.purple),
                               display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                              fontSize: '24px', flexShrink: 0, zIndex: 1
+                              fontSize: '24px', zIndex: 1, flexShrink: 0
                             }}>
                               {isCompleted ? '✓' : milestone.icon}
                             </div>
                             
-                            {/* Milestone card */}
                             <div style={{ 
                               flex: 1, padding: '20px', background: theme.cardBg, borderRadius: '12px', 
                               border: '1px solid ' + (isCompleted ? theme.success : theme.border),
@@ -7810,7 +7160,6 @@ Sent from Aureus App
                                         {daysUntil !== null && daysUntil > 0 && ` (${daysUntil} days)`}
                                       </span>
                                     )}
-                                    {/* Calendar alerts toggle */}
                                     <button
                                       onClick={() => {
                                         const updated = roadmapMilestones.map(m => 
@@ -7859,7 +7208,6 @@ Sent from Aureus App
                                 </div>
                               </div>
                               
-                              {/* Calendar Alert Settings - only show when enabled */}
                               {milestone.calendarAlerts === true && !isCompleted && (
                                 <div style={{ padding: '12px', marginBottom: '12px', background: theme.accent + '10', borderRadius: '8px', border: '1px solid ' + theme.accent + '30' }}>
                                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' as const }}>
@@ -7920,7 +7268,6 @@ Sent from Aureus App
                                 </div>
                               )}
                               
-                              {/* Progress bar */}
                               {!isCompleted && (
                                 <div style={{ marginBottom: '12px' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -7933,7 +7280,6 @@ Sent from Aureus App
                                 </div>
                               )}
                               
-                              {/* Update progress */}
                               {!isCompleted && (
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                   <span style={{ color: theme.textMuted, fontSize: '12px' }}>Current:</span>
@@ -7963,7 +7309,6 @@ Sent from Aureus App
                 </div>
               )}
               
-              {/* Quick Add Suggestions */}
               {roadmapMilestones.length < 3 && (
                 <div style={{ marginTop: '20px', padding: '16px', background: theme.purple + '15', borderRadius: '12px' }}>
                   <p style={{ color: theme.text, fontSize: '13px', margin: '0 0 12px 0' }}>💡 <strong>Suggested milestones based on your data:</strong></p>
@@ -8036,7 +7381,6 @@ Sent from Aureus App
               )}
             </div>
             
-            {/* Current Progress Summary */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
                 <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Current Baby Step</div>
@@ -8060,7 +7404,6 @@ Sent from Aureus App
               </div>
             </div>
 
-            {/* Money Automation System */}
             {incomeStreams.length > 0 && (
               <div style={{ padding: '24px', background: 'linear-gradient(135deg, #3b82f615, #8b5cf615)', borderRadius: '16px', border: '2px solid ' + theme.accent }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -8159,7 +7502,6 @@ Sent from Aureus App
               </div>
             )}
 
-            {/* FIRE Progress */}
             <div style={{ padding: '24px', background: 'linear-gradient(135deg, ' + theme.purple + '15, ' + theme.success + '15)', borderRadius: '16px', border: '2px solid ' + theme.purple }}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>🔥 Escape the Rat Race</h2>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
@@ -8186,12 +7528,10 @@ Sent from Aureus App
               </div>
             </div>
 
-            {/* Australian Baby Steps - Enhanced Interactive */}
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>👶 Australian Baby Steps</h2>
               <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 20px 0' }}>Click any step for detailed guidance from Aureus!</p>
               
-              {/* Baby Step Detail Modal */}
               {selectedBabyStep !== null && (() => {
                 const step = australianBabySteps.find(s => s.step === selectedBabyStep)
                 if (!step) return null
@@ -8242,7 +7582,6 @@ Sent from Aureus App
                         ))}
                       </ul>
                       
-                      {/* Home Ownership Calculator for Step 5 */}
                       {step.step === 5 && (
                         <div style={{ marginTop: '24px', padding: '20px', background: darkMode ? '#1e293b' : '#fef3c7', borderRadius: '12px', border: '2px solid ' + theme.warning }}>
                           <h4 style={{ color: theme.warning, margin: '0 0 16px 0' }}>🏠 Australian Home Buying Calculator</h4>
@@ -8296,7 +7635,6 @@ Sent from Aureus App
                       
                       <button onClick={() => {
                         setSelectedBabyStep(null)
-                        // Send message to Aureus about this step
                         setChatInput(`Tell me more about ${step.title}`)
                       }} style={{ width: '100%', marginTop: '20px', padding: '14px', background: theme.accent, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}>
                         💬 Ask Aureus About This Step
@@ -8366,7 +7704,6 @@ Sent from Aureus App
               </div>
             </div>
 
-            {/* AUSTRALIAN HOME BUYING ROADMAP */}
             <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
                 <div style={{ width: '56px', height: '56px', borderRadius: '12px', background: 'linear-gradient(135deg, #f59e0b, #10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🏠</div>
@@ -8385,7 +7722,6 @@ Sent from Aureus App
                 </button>
               </div>
               
-              {/* Uploaded Documents */}
               {homeDocuments.length > 0 && (
                 <div style={{ marginBottom: '16px', padding: '12px', background: theme.cardBg, borderRadius: '8px' }}>
                   <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '8px' }}>YOUR DOCUMENTS ({homeDocuments.length})</div>
@@ -8401,7 +7737,6 @@ Sent from Aureus App
                 </div>
               )}
               
-              {/* Phase 1: Get Financially Ready */}
               <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + theme.border }}>
                 <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === 'phase1' ? null : 'phase1')} style={{ width: '100%', padding: '16px 20px', background: homeGuideExpanded === 'phase1' ? 'linear-gradient(135deg, #f59e0b20, transparent)' : theme.cardBg, border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -8436,7 +7771,6 @@ Sent from Aureus App
                 )}
               </div>
               
-              {/* Phase 2: Understand the Costs */}
               <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + theme.border }}>
                 <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === 'phase2' ? null : 'phase2')} style={{ width: '100%', padding: '16px 20px', background: homeGuideExpanded === 'phase2' ? 'linear-gradient(135deg, #8b5cf620, transparent)' : theme.cardBg, border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -8450,7 +7784,6 @@ Sent from Aureus App
                 </button>
                 {homeGuideExpanded === 'phase2' && (
                   <div style={{ padding: '20px', background: darkMode ? '#1a1a2e' : '#f8fafc' }}>
-                    {/* COMPREHENSIVE COST CALCULATOR */}
                     <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', marginBottom: '16px' }}>
                       <div style={{ color: theme.text, fontWeight: 700, marginBottom: '12px' }}>🧮 Complete Cost Calculator</div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
@@ -8484,29 +7817,25 @@ Sent from Aureus App
                       {homeBuyingPrice && parseFloat(homeBuyingPrice) > 0 && (() => {
                         const price = parseFloat(homeBuyingPrice)
                         
-                        // Stamp duty calculation by state (simplified)
                         let stampDuty = 0
                         if (homeCalcFirstHome) {
-                          // First home buyer exemptions
                           if (homeCalcState === 'QLD' && price <= 500000) stampDuty = 0
                           else if (homeCalcState === 'QLD' && price <= 550000) stampDuty = (price - 500000) * 0.035
                           else if (homeCalcState === 'NSW' && price <= 800000) stampDuty = 0
                           else if (homeCalcState === 'VIC' && price <= 600000) stampDuty = 0
-                          else stampDuty = price * 0.04 // Default rate
+                          else stampDuty = price * 0.04
                         } else {
-                          stampDuty = price * 0.045 // Non-first-home rate
+                          stampDuty = price * 0.045
                         }
                         
-                        // FHOG (only for new builds)
                         let fhog = 0
                         if (homeCalcFirstHome && homeCalcNewBuild) {
                           if (homeCalcState === 'QLD' && price <= 750000) fhog = 30000
                           else if (homeCalcState === 'NSW' && price <= 600000) fhog = 10000
                           else if (homeCalcState === 'VIC' && price <= 750000) fhog = 10000
-                          else fhog = 10000 // Other states
+                          else fhog = 10000
                         }
                         
-                        // All costs breakdown
                         const deposit5 = price * 0.05
                         const deposit10 = price * 0.10
                         const deposit20 = price * 0.20
@@ -8521,7 +7850,7 @@ Sent from Aureus App
                         const councilRatesAdjust = 500
                         const insurance = 1500
                         const movingCosts = 1500
-                        const connectionFees = 500 // Power, gas, internet
+                        const connectionFees = 500
                         
                         const fixedCosts = conveyancing + buildingInspection + pestInspection + loanApplication + titleSearch + settlementFee + councilRatesAdjust + insurance + movingCosts + connectionFees
                         
@@ -8531,7 +7860,6 @@ Sent from Aureus App
                         
                         return (
                           <>
-                            {/* Deposit Options */}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
                               <div style={{ padding: '16px', background: '#334155', borderRadius: '12px', textAlign: 'center' as const }}>
                                 <div style={{ color: theme.danger, fontSize: '11px', fontWeight: 600 }}>5% DEPOSIT</div>
@@ -8553,7 +7881,6 @@ Sent from Aureus App
                               </div>
                             </div>
                             
-                            {/* Full Cost Breakdown */}
                             <div style={{ padding: '16px', background: '#1e293b', borderRadius: '8px' }}>
                               <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, marginBottom: '12px' }}>FULL COST BREAKDOWN</div>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
@@ -8583,7 +7910,6 @@ Sent from Aureus App
                 )}
               </div>
               
-              {/* Phase 3: Government Schemes */}
               <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + theme.border }}>
                 <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === 'phase3' ? null : 'phase3')} style={{ width: '100%', padding: '16px 20px', background: homeGuideExpanded === 'phase3' ? 'linear-gradient(135deg, #3b82f620, transparent)' : theme.cardBg, border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -8618,7 +7944,6 @@ Sent from Aureus App
                 )}
               </div>
               
-              {/* Phase 4: Get Pre-Approved */}
               <div style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + theme.border }}>
                 <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === 'phase4' ? null : 'phase4')} style={{ width: '100%', padding: '16px 20px', background: homeGuideExpanded === 'phase4' ? 'linear-gradient(135deg, #10b98120, transparent)' : theme.cardBg, border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -8652,7 +7977,6 @@ Sent from Aureus App
                 )}
               </div>
               
-              {/* Phase 5: Buy Smart */}
               <div style={{ marginBottom: '24px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + theme.border }}>
                 <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === 'phase5' ? null : 'phase5')} style={{ width: '100%', padding: '16px 20px', background: homeGuideExpanded === 'phase5' ? 'linear-gradient(135deg, #ef444420, transparent)' : theme.cardBg, border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -8687,7 +8011,6 @@ Sent from Aureus App
                 )}
               </div>
               
-              {/* Ready to Start CTA */}
               <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', borderRadius: '12px', textAlign: 'center' as const }}>
                 <div style={{ fontSize: '24px', marginBottom: '8px' }}>🎯</div>
                 <h4 style={{ color: theme.text, margin: '0 0 8px 0' }}>Ready to start?</h4>
@@ -8713,7 +8036,6 @@ Sent from Aureus App
               </div>
             </div>
 
-            {/* RAT RACE ESCAPE TRACKER - Connected to Automated Revenue */}
             <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div>
@@ -8733,7 +8055,6 @@ Sent from Aureus App
                 </div>
               </div>
               
-              {/* Progress Bar */}
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ height: '12px', background: '#334155', borderRadius: '6px', overflow: 'hidden' }}>
                   <div style={{ 
@@ -8751,7 +8072,6 @@ Sent from Aureus App
                 </div>
               </div>
               
-              {/* Stats Row */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
                 <div style={{ padding: '12px', background: '#334155', borderRadius: '8px', textAlign: 'center' as const }}>
                   <div style={{ color: theme.success, fontSize: '20px', fontWeight: 700 }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</div>
@@ -8774,7 +8094,6 @@ Sent from Aureus App
               </div>
             </div>
 
-            {/* Automated Revenue Strategies - Professional Design */}
             <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', border: '1px solid ' + theme.border }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
                 <div>
@@ -8788,2579 +8107,4 @@ Sent from Aureus App
                   <span style={{ color: theme.warning, fontWeight: 700, fontSize: '18px' }}>{passiveQuests.filter(q => getQuestUnlockStatus(q.id).isUnlocked || q.status === 'in_progress' || q.status === 'completed').length}/{passiveQuests.length}</span>
                   <div style={{ color: theme.warning, fontSize: '11px' }}>UNLOCKED</div>
                 </div>
-              </div>
-              
-              {/* All Quests in Professional 2-column Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                {passiveQuests.map(quest => {
-                  // Use dynamic unlock status based on actual user data
-                  const unlockStatus = getQuestUnlockStatus(quest.id)
-                  const isLocked = !unlockStatus.isUnlocked && quest.status !== 'in_progress' && quest.status !== 'completed'
-                  const isExpanded = activeQuestId === quest.id
-                  const difficultyStars = quest.difficulty === 'Easy' ? 1 : quest.difficulty === 'Medium' ? 2 : quest.difficulty === 'Hard' ? 3 : 4
-                  
-                  return (
-                    <div key={quest.id} style={{ 
-                      padding: '20px', 
-                      background: darkMode ? '#1e293b' : '#f8fafc', 
-                      borderRadius: '12px', 
-                      border: '1px solid ' + theme.border,
-                      opacity: isLocked ? 0.7 : 1
-                    }}>
-                      {/* Header Row */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                          <div style={{ width: '44px', height: '44px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
-                            {isLocked ? '🔒' : quest.icon}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 600, color: theme.text, fontSize: '15px' }}>{quest.name}</div>
-                            <div style={{ color: theme.textMuted, fontSize: '13px' }}>{quest.description}</div>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '4px' }}>
-                          {isLocked ? (
-                            <span style={{ padding: '4px 10px', background: '#f59e0b30', color: '#f59e0b', borderRadius: '4px', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              🔒 LOCKED
-                            </span>
-                          ) : quest.status === 'completed' ? (
-                            <span style={{ padding: '4px 10px', background: theme.success + '30', color: theme.success, borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
-                              ✓ COMPLETE
-                            </span>
-                          ) : quest.status === 'in_progress' ? (
-                            <span style={{ padding: '4px 10px', background: theme.accent + '30', color: theme.accent, borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
-                              IN PROGRESS
-                            </span>
-                          ) : null}
-                          {/* Star Rating */}
-                          <div style={{ color: '#f59e0b', fontSize: '12px' }}>
-                            {'★'.repeat(difficultyStars)}{'☆'.repeat(4 - difficultyStars)}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Tags Row */}
-                      <div style={{ display: 'flex', gap: '8px', margin: '12px 0', marginLeft: '56px', flexWrap: 'wrap' as const }}>
-                        <span style={{ padding: '3px 8px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          💰 {quest.potentialIncome}
-                        </span>
-                        <span style={{ padding: '3px 8px', background: darkMode ? '#334155' : '#e2e8f0', color: theme.textMuted, borderRadius: '4px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          ⏱ {quest.timeToSetup}
-                        </span>
-                        {!isLocked && quest.status !== 'completed' && (
-                          <button
-                            onClick={() => {
-                              // Parse potential income to get a target (use middle estimate)
-                              let targetAmount = '0'
-                              const income = quest.potentialIncome || ''
-                              const match = income.match(/\$?([\d,]+)/)
-                              if (match) targetAmount = match[1].replace(',', '')
-                              
-                              addToRoadmap(
-                                `Quest: ${quest.name}`,
-                                'income',
-                                targetAmount,
-                                quest.icon,
-                                quest.description,
-                                quest.monthlyIncome || 0
-                              )
-                            }}
-                            disabled={roadmapMilestones.some(m => m.name.toLowerCase().includes(quest.name.toLowerCase()))}
-                            style={{ 
-                              padding: '3px 8px', 
-                              background: roadmapMilestones.some(m => m.name.toLowerCase().includes(quest.name.toLowerCase())) ? theme.border : theme.purple + '20', 
-                              color: roadmapMilestones.some(m => m.name.toLowerCase().includes(quest.name.toLowerCase())) ? theme.textMuted : theme.purple, 
-                              borderRadius: '4px', 
-                              fontSize: '11px', 
-                              border: 'none',
-                              cursor: roadmapMilestones.some(m => m.name.toLowerCase().includes(quest.name.toLowerCase())) ? 'default' : 'pointer',
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: '4px' 
-                            }}
-                          >
-                            {roadmapMilestones.some(m => m.name.toLowerCase().includes(quest.name.toLowerCase())) ? '✓ In Roadmap' : '+ Roadmap'}
-                          </button>
-                        )}
-                      </div>
-                      
-                      {/* Progress bar for in-progress quests */}
-                      {quest.status === 'in_progress' && (
-                        <div style={{ marginLeft: '56px', marginBottom: '12px' }}>
-                          <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
-                            <div style={{ width: quest.progress + '%', height: '100%', background: theme.accent }} />
-                          </div>
-                          <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '4px' }}>Step {(quest.currentStep || 0) + 1} of {quest.steps?.length || 4}</div>
-                        </div>
-                      )}
-                      
-                      {/* Expand Guide Button */}
-                      <button 
-                        onClick={() => isLocked ? null : setActiveQuestId(isExpanded ? null : quest.id)}
-                        disabled={isLocked}
-                        style={{ 
-                          background: 'none', 
-                          border: 'none', 
-                          color: isLocked ? theme.textMuted : theme.accent, 
-                          fontSize: '13px', 
-                          cursor: isLocked ? 'not-allowed' : 'pointer',
-                          padding: 0,
-                          marginLeft: '56px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        {isLocked ? (
-                          <span style={{ color: theme.warning, fontSize: '12px' }}>🔐 {unlockStatus.reason || quest.unlockRequirement}</span>
-                        ) : (
-                          <>▼ {isExpanded ? 'Hide' : 'Expand'} guide</>
-                        )}
-                      </button>
-                      
-                      {/* Expanded Content */}
-                      {isExpanded && !isLocked && (
-                        <div style={{ marginTop: '16px', marginLeft: '56px', padding: '16px', background: darkMode ? '#0f172a' : '#f1f5f9', borderRadius: '8px' }}>
-                          <div style={{ background: theme.success + '15', padding: '12px', borderRadius: '8px', marginBottom: '16px', borderLeft: '3px solid ' + theme.success }}>
-                            <p style={{ margin: 0, color: theme.text, fontSize: '13px', lineHeight: 1.6 }}>💡 {quest.aureusAdvice}</p>
-                          </div>
-                          
-                          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                            {quest.steps?.map((step: any, idx: number) => (
-                              <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                                <div style={{ 
-                                  width: '24px', height: '24px', borderRadius: '50%', 
-                                  background: idx < (quest.currentStep || 0) ? theme.success : idx === (quest.currentStep || 0) ? theme.warning : theme.border, 
-                                  color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                                  fontSize: '12px', fontWeight: 'bold', flexShrink: 0 
-                                }}>
-                                  {idx < (quest.currentStep || 0) ? '✓' : idx + 1}
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontWeight: 500, color: theme.text, fontSize: '13px' }}>{step.title}</div>
-                                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>{step.description}</div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          
-                          <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                            {quest.status === 'not_started' && (
-                              <>
-                                <button onClick={() => {
-                                  setPassiveQuests(passiveQuests.map(q => q.id === quest.id ? { ...q, status: 'in_progress', currentStep: 0, progress: 0 } : q))
-                                }} style={{ flex: 1, padding: '10px 20px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                                  🚀 Start Quest
-                                </button>
-                                <button onClick={() => {
-                                  setActiveTab('dashboard')
-                                  setSelectedQuestForWalkthrough(quest.id)
-                                  setChatMessages([{ 
-                                    role: 'assistant', 
-                                    content: `Great choice! Let's build your ${quest.title} strategy together. 💪\n\n**${quest.aureusAdvice}**\n\nI'll walk you through each step personally. Here's our plan:\n\n${quest.steps?.map((s: any, i: number) => `${i + 1}. **${s.title}** - ${s.description}`).join('\n')}\n\nReady to start with Step 1: **${quest.steps?.[0]?.title}**?\n\nTell me about your current situation and I'll give you specific guidance for YOUR finances.`
-                                  }])
-                                }} style={{ flex: 1, padding: '10px 20px', background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                                  🤖 Build with Aureus
-                                </button>
-                              </>
-                            )}
-                          </div>
-                          
-                          {quest.status === 'in_progress' && (
-                            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                              <button onClick={() => {
-                                const newStep = (quest.currentStep || 0) + 1
-                                const newProgress = (newStep / (quest.steps?.length || 4)) * 100
-                                setPassiveQuests(passiveQuests.map(q => q.id === quest.id ? { ...q, currentStep: newStep, progress: newProgress, status: newProgress >= 100 ? 'completed' : 'in_progress' } : q))
-                              }} style={{ flex: 1, padding: '10px 20px', background: theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                                ✓ Complete Step {(quest.currentStep || 0) + 1}
-                              </button>
-                              <button onClick={() => {
-                                const currentStep = quest.steps?.[quest.currentStep || 0]
-                                setActiveTab('dashboard')
-                                setSelectedQuestForWalkthrough(quest.id)
-                                setChatMessages([{ 
-                                  role: 'assistant', 
-                                  content: `Welcome back! Let's continue your ${quest.title} journey. 🎯\n\nYou're on **Step ${(quest.currentStep || 0) + 1}: ${currentStep?.title}**\n\n${currentStep?.description}\n\nHow's it going? Tell me what you've done so far and any challenges you're facing.`
-                                }])
-                              }} style={{ flex: 1, padding: '10px 20px', background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                                💬 Get Aureus Help
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-          </div>
-        )}
-
-        {/* TRADING TAB */}
-        {appMode === 'trading' && activeTab === 'trading' && (
-          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
-            
-            {/* TRADING SUB-TABS */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-              {[
-                { key: 'today', label: '🏠 Today', desc: 'Daily hub' },
-                { key: 'journal', label: '📓 Journal', desc: 'Log trades' },
-                { key: 'analytics', label: '📊 Analytics', desc: 'Performance' },
-                { key: 'accounts', label: '💼 Accounts', desc: 'Multi-account' }
-              ].map(tab => (
-                <button 
-                  key={tab.key}
-                  onClick={() => setTradingSubTab(tab.key as any)}
-                  style={{ 
-                    padding: '12px 20px', 
-                    background: tradingSubTab === tab.key ? theme.warning : theme.cardBg, 
-                    color: tradingSubTab === tab.key ? 'white' : theme.text, 
-                    border: '2px solid ' + (tradingSubTab === tab.key ? theme.warning : theme.border), 
-                    borderRadius: '12px', 
-                    cursor: 'pointer', 
-                    fontSize: '14px', 
-                    fontWeight: 600,
-                    flex: '1 1 auto',
-                    minWidth: '120px'
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            
-            {/* ==================== TODAY TAB ==================== */}
-            {tradingSubTab === 'today' && (
-              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
-                
-                {/* Good Morning Header */}
-                <div style={{ padding: '24px', background: `linear-gradient(135deg, ${theme.warning}20, ${theme.purple}20)`, borderRadius: '16px', border: '2px solid ' + theme.warning }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                    <div>
-                      <h2 style={{ margin: '0 0 4px 0', color: theme.text, fontSize: '24px' }}>
-                        {new Date().getHours() < 12 ? '☀️ Good morning!' : new Date().getHours() < 17 ? '🌤️ Good afternoon!' : '🌙 Good evening!'}
-                      </h2>
-                      <div style={{ color: theme.textMuted, fontSize: '14px' }}>
-                        {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => setShowQuickTradeModal(true)}
-                      style={{ 
-                        padding: '14px 24px', 
-                        background: 'linear-gradient(135deg, #10b981, #059669)', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: '12px', 
-                        cursor: 'pointer', 
-                        fontWeight: 700,
-                        fontSize: '15px',
-                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
-                      }}
-                    >
-                      + Log Trade
-                    </button>
-                  </div>
-                  
-                  {/* AI Daily Insight */}
-                  <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', borderLeft: '4px solid ' + theme.warning }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 800, color: '#78350f' }}>A</div>
-                      <span style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>Aureus Daily Insight</span>
-                    </div>
-                    <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6 }}>
-                      {generateDailyInsight().map((insight, i) => (
-                        <p key={i} style={{ margin: i === 0 ? 0 : '8px 0 0 0' }} dangerouslySetInnerHTML={{ __html: insight.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Quick Stats Row */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                  {(() => {
-                    const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
-                    const weekTrades = trades.filter(t => new Date(t.date) >= weekAgo)
-                    const weekPnL = weekTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
-                    const weekWins = weekTrades.filter(t => parseFloat(t.profitLoss || '0') > 0).length
-                    const todayTrades = trades.filter(t => t.date === todayStr)
-                    const todayPnL = todayTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
-                    const analytics = calculateTradingAnalytics('all', '30d')
-                    
-                    return (
-                      <>
-                        <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>TODAY</div>
-                          <div style={{ color: todayPnL >= 0 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 700 }}>
-                            {todayPnL >= 0 ? '+' : ''}${todayPnL.toFixed(0)}
-                          </div>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>{todayTrades.length} trades</div>
-                        </div>
-                        <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>THIS WEEK</div>
-                          <div style={{ color: weekPnL >= 0 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 700 }}>
-                            {weekPnL >= 0 ? '+' : ''}${weekPnL.toFixed(0)}
-                          </div>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>{weekWins}W / {weekTrades.length - weekWins}L</div>
-                        </div>
-                        <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>WIN RATE</div>
-                          <div style={{ color: winRate >= 50 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 700 }}>
-                            {winRate.toFixed(0)}%
-                          </div>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>30 day</div>
-                        </div>
-                        <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>STREAK</div>
-                          <div style={{ color: analytics.streaks.currentStreak >= 0 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 700 }}>
-                            {analytics.streaks.currentStreak > 0 ? '+' : ''}{analytics.streaks.currentStreak}
-                          </div>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>{analytics.streaks.currentStreak > 0 ? '🔥 wins' : analytics.streaks.currentStreak < 0 ? 'losses' : 'neutral'}</div>
-                        </div>
-                      </>
-                    )
-                  })()}
-                </div>
-                
-                {/* Tilt Detector */}
-                {(() => {
-                  const tilt = detectTilt()
-                  return (
-                    <div style={{ 
-                      padding: '16px 20px', 
-                      background: tilt.tiltScore > 50 ? theme.danger + '20' : theme.success + '20', 
-                      borderRadius: '12px', 
-                      border: '2px solid ' + (tilt.tiltScore > 50 ? theme.danger : theme.success),
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ fontSize: '28px' }}>{tilt.tiltScore > 70 ? '🚨' : tilt.tiltScore > 40 ? '⚠️' : '✅'}</div>
-                        <div>
-                          <div style={{ color: theme.text, fontWeight: 600 }}>
-                            {tilt.tiltScore > 70 ? 'HIGH TILT - Step Away!' : tilt.tiltScore > 40 ? 'Caution' : 'Clear to Trade'}
-                          </div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>{tilt.todaysTrades} trades today • {tilt.todaysLosses} losses</div>
-                        </div>
-                      </div>
-                      <div style={{ color: tilt.tiltScore > 50 ? theme.danger : theme.success, fontSize: '24px', fontWeight: 700 }}>{tilt.tiltScore}%</div>
-                    </div>
-                  )
-                })()}
-                
-                {/* Pre-Session Checklist */}
-                <div style={cardStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h3 style={{ margin: 0, color: theme.text, fontSize: '16px' }}>📋 Pre-Session Checklist</h3>
-                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>
-                      {preSessionChecklist.filter(i => i.completed).length}/{preSessionChecklist.length} complete
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                    {preSessionChecklist.map(item => (
-                      <div 
-                        key={item.id}
-                        onClick={() => setPreSessionChecklist(preSessionChecklist.map(i => i.id === item.id ? { ...i, completed: !i.completed } : i))}
-                        style={{ 
-                          padding: '12px 16px', 
-                          background: item.completed ? theme.success + '20' : (darkMode ? '#1e293b' : '#f8fafc'),
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          border: item.completed ? `2px solid ${theme.success}40` : '2px solid transparent'
-                        }}
-                      >
-                        <div style={{ 
-                          width: '24px', height: '24px', borderRadius: '6px', 
-                          background: item.completed ? theme.success : theme.border,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: 'white', fontWeight: 700, fontSize: '14px'
-                        }}>
-                          {item.completed ? '✓' : ''}
-                        </div>
-                        <span style={{ color: theme.text, fontSize: '14px', textDecoration: item.completed ? 'line-through' : 'none', opacity: item.completed ? 0.7 : 1 }}>
-                          {item.task}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Mental State Check */}
-                  <div style={{ marginTop: '16px', padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px' }}>
-                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px', marginBottom: '12px' }}>How are you feeling?</div>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                      {[
-                        { key: 'great', emoji: '😎', label: 'Great' },
-                        { key: 'good', emoji: '🙂', label: 'Good' },
-                        { key: 'okay', emoji: '😐', label: 'Okay' },
-                        { key: 'tired', emoji: '😴', label: 'Tired' },
-                        { key: 'stressed', emoji: '😰', label: 'Stressed' }
-                      ].map(mood => (
-                        <button
-                          key={mood.key}
-                          onClick={() => setDailyMentalState(mood.key as any)}
-                          style={{
-                            padding: '8px 16px',
-                            background: dailyMentalState === mood.key ? theme.warning + '30' : theme.cardBg,
-                            border: `2px solid ${dailyMentalState === mood.key ? theme.warning : theme.border}`,
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                          }}
-                        >
-                          <span style={{ fontSize: '18px' }}>{mood.emoji}</span>
-                          <span style={{ color: theme.text, fontSize: '13px' }}>{mood.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {(dailyMentalState === 'tired' || dailyMentalState === 'stressed') && (
-                      <div style={{ marginTop: '12px', padding: '10px', background: theme.warning + '20', borderRadius: '6px', color: theme.warning, fontSize: '13px' }}>
-                        ⚠️ Consider reducing position size or skipping today. Tired/stressed traders make mistakes.
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Weekly Report Card */}
-                <div style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.purple}20, ${theme.accent}20)`, borderRadius: '16px', border: '2px solid ' + theme.purple }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ fontSize: '24px' }}>📈</span>
-                      <div>
-                        <div style={{ color: theme.text, fontWeight: 600 }}>Weekly Report</div>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>Last 7 days performance</div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        const report = generateWeeklyReport()
-                        sendQuickMessage(`Give me my weekly trading report with insights and recommendations.\n\nMy stats this week:\n- Trades: ${report.totalTrades}\n- P&L: $${report.pnl.toFixed(0)}\n- Win Rate: ${report.winRate.toFixed(0)}%\n- Wins: ${report.wins} | Losses: ${report.losses}\n- Rules Followed: ${report.rulesFollowed.toFixed(0)}%\n${report.bestSetup ? `- Best Setup: ${report.bestSetup[0]} ($${report.bestSetup[1].pnl.toFixed(0)})` : ''}\n${report.bestDay ? `- Best Day: ${report.bestDay[0]} ($${report.bestDay[1].toFixed(0)})` : ''}\n\nWhat should I focus on next week?`)
-                      }}
-                      style={{ padding: '10px 20px', background: theme.purple, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}
-                    >
-                      🤖 Get AI Report
-                    </button>
-                  </div>
-                  
-                  {(() => {
-                    const report = generateWeeklyReport()
-                    return (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                        <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px', textAlign: 'center' as const }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>P&L</div>
-                          <div style={{ color: report.pnl >= 0 ? theme.success : theme.danger, fontSize: '18px', fontWeight: 700 }}>
-                            {report.pnl >= 0 ? '+' : ''}${report.pnl.toFixed(0)}
-                          </div>
-                        </div>
-                        <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px', textAlign: 'center' as const }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Win Rate</div>
-                          <div style={{ color: report.winRate >= 50 ? theme.success : theme.warning, fontSize: '18px', fontWeight: 700 }}>
-                            {report.winRate.toFixed(0)}%
-                          </div>
-                        </div>
-                        <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px', textAlign: 'center' as const }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Trades</div>
-                          <div style={{ color: theme.text, fontSize: '18px', fontWeight: 700 }}>
-                            {report.wins}W / {report.losses}L
-                          </div>
-                        </div>
-                        <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px', textAlign: 'center' as const }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Rules Followed</div>
-                          <div style={{ color: report.rulesFollowed >= 80 ? theme.success : report.rulesFollowed >= 50 ? theme.warning : theme.danger, fontSize: '18px', fontWeight: 700 }}>
-                            {report.rulesFollowed.toFixed(0)}%
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })()}
-                </div>
-                
-                {/* Aureus Chat */}
-                <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 800, color: '#78350f' }}>A</div>
-                    <div style={{ color: theme.text, fontWeight: 600 }}>Ask Aureus</div>
-                  </div>
-                  
-                  {pendingChartImage && (
-                    <div style={{ marginBottom: '12px', padding: '8px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <img src={pendingChartImage} alt="Chart" style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
-                      <span style={{ color: theme.text, fontSize: '12px', flex: 1 }}>📊 Chart attached</span>
-                      <button onClick={() => setPendingChartImage(null)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button>
-                    </div>
-                  )}
-                  
-                  {chatMessages.length > 0 && (
-                    <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
-                      {chatMessages.map((msg, idx) => (
-                        <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                          <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.warning : (darkMode ? '#1e293b' : '#f8fafc'), color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
-                        </div>
-                      ))}
-                      {isLoading && <div style={{ display: 'flex', gap: '4px', padding: '10px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.2s' }} /><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.textMuted, animation: 'pulse 1s infinite 0.4s' }} /></div>}
-                    </div>
-                  )}
-                  
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input type="file" ref={chartInputRef} accept="image/*" onChange={handleChartUpload} style={{ display: 'none' }} />
-                    <button onClick={() => chartInputRef.current?.click()} style={{ padding: '10px 12px', background: darkMode ? '#1e293b' : '#f8fafc', color: theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '16px' }} title="Upload chart">📷</button>
-                    <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder={pendingChartImage ? "What should I analyze?" : "Ask about your trading, analyze a chart..."} style={{ ...inputStyle, flex: 1, padding: '10px 14px', fontSize: '13px' }} disabled={isLoading} />
-                    <button onClick={handleChatMessage} disabled={isLoading || (!chatInput.trim() && !pendingChartImage)} style={{ padding: '10px 16px', background: theme.warning, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', opacity: isLoading || (!chatInput.trim() && !pendingChartImage) ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button>
-                  </div>
-                </div>
-                
-                {/* Today's Trades */}
-                {(() => {
-                  const todayTrades = trades.filter(t => t.date === todayStr).sort((a, b) => (b.time || '').localeCompare(a.time || ''))
-                  if (todayTrades.length === 0) return null
-                  return (
-                    <div style={cardStyle}>
-                      <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '16px' }}>📈 Today's Trades</h3>
-                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                        {todayTrades.map(trade => (
-                          <div key={trade.id} style={{ 
-                            padding: '12px 16px', 
-                            background: parseFloat(trade.profitLoss) >= 0 ? theme.success + '15' : theme.danger + '15',
-                            borderRadius: '8px',
-                            borderLeft: `4px solid ${parseFloat(trade.profitLoss) >= 0 ? theme.success : theme.danger}`,
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                          }}>
-                            <div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ color: parseFloat(trade.profitLoss) >= 0 ? theme.success : theme.danger, fontWeight: 700 }}>
-                                  {parseFloat(trade.profitLoss) >= 0 ? '🟢' : '🔴'} {trade.instrument}
-                                </span>
-                                <span style={{ color: theme.textMuted, fontSize: '12px' }}>{trade.time}</span>
-                              </div>
-                              <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>
-                                {trade.setupType || 'No setup'} • {trade.direction} • Grade: {trade.setupGrade}
-                              </div>
-                            </div>
-                            <div style={{ textAlign: 'right' as const }}>
-                              <div style={{ color: parseFloat(trade.profitLoss) >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '18px' }}>
-                                {parseFloat(trade.profitLoss) >= 0 ? '+' : ''}${parseFloat(trade.profitLoss).toFixed(0)}
-                              </div>
-                              {trade.rMultiple && <div style={{ color: theme.textMuted, fontSize: '11px' }}>{trade.rMultiple}R</div>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })()}
-                
-                {/* Quick Actions */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                  <button onClick={() => setTradingSubTab('journal')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
-                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>📓</div>
-                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>Journal</div>
-                  </button>
-                  <button onClick={() => setTradingSubTab('analytics')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
-                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>📊</div>
-                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>Analytics</div>
-                  </button>
-                  <button onClick={() => setShowTradeImport(true)} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
-                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>📥</div>
-                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>Import</div>
-                  </button>
-                  <button onClick={() => setShowPayoutModal(true)} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
-                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>💰</div>
-                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>Payout</div>
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {/* ==================== JOURNAL TAB ==================== */}
-            {tradingSubTab === 'journal' && (
-              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
-                
-                {/* Quick Log Button */}
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <button 
-                    onClick={() => { setQuickTradeType('win'); setShowQuickTradeModal(true) }}
-                    style={{ 
-                      flex: 1, padding: '20px', 
-                      background: 'linear-gradient(135deg, #10b981, #059669)', 
-                      border: 'none', borderRadius: '12px', 
-                      cursor: 'pointer', 
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
-                    }}
-                  >
-                    <span style={{ fontSize: '28px' }}>🟢</span>
-                    <span style={{ color: 'white', fontWeight: 700, fontSize: '18px' }}>Log Win</span>
-                  </button>
-                  <button 
-                    onClick={() => { setQuickTradeType('loss'); setShowQuickTradeModal(true) }}
-                    style={{ 
-                      flex: 1, padding: '20px', 
-                      background: 'linear-gradient(135deg, #ef4444, #dc2626)', 
-                      border: 'none', borderRadius: '12px', 
-                      cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
-                    }}
-                  >
-                    <span style={{ fontSize: '28px' }}>🔴</span>
-                    <span style={{ color: 'white', fontWeight: 700, fontSize: '18px' }}>Log Loss</span>
-                  </button>
-                </div>
-                
-                {/* Trade List with Filters */}
-                <div style={cardStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h3 style={{ margin: 0, color: theme.text }}>📓 Trade Journal</h3>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <select 
-                        value={analyticsDateRange} 
-                        onChange={e => setAnalyticsDateRange(e.target.value as any)}
-                        style={{ ...inputStyle, padding: '6px 12px', fontSize: '12px' }}
-                      >
-                        <option value="7d">Last 7 days</option>
-                        <option value="30d">Last 30 days</option>
-                        <option value="90d">Last 90 days</option>
-                        <option value="all">All time</option>
-                      </select>
-                      <button onClick={() => setShowTradeImport(true)} style={{ padding: '6px 12px', background: theme.accent, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>📥 Import</button>
-                    </div>
-                  </div>
-                  
-                  {trades.length === 0 ? (
-                    <div style={{ padding: '60px 20px', textAlign: 'center' as const }}>
-                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>📓</div>
-                      <h3 style={{ color: theme.text, margin: '0 0 8px 0' }}>No Trades Yet</h3>
-                      <p style={{ color: theme.textMuted, margin: '0 0 20px 0' }}>Start logging your trades to track your performance.</p>
-                      <button onClick={() => setShowQuickTradeModal(true)} style={{ padding: '12px 24px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>+ Log Your First Trade</button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', maxHeight: '500px', overflowY: 'auto' as const }}>
-                      {trades
-                        .filter(t => {
-                          const tradeDate = new Date(t.date)
-                          const now = new Date()
-                          const daysMap: {[key: string]: number} = { '7d': 7, '30d': 30, '90d': 90, 'all': 9999 }
-                          const days = daysMap[analyticsDateRange] || 30
-                          const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-                          return tradeDate >= cutoff
-                        })
-                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || (b.time || '').localeCompare(a.time || ''))
-                        .map(trade => (
-                          <div key={trade.id} style={{ 
-                            padding: '16px', 
-                            background: darkMode ? '#1e293b' : '#f8fafc',
-                            borderRadius: '12px',
-                            borderLeft: `4px solid ${parseFloat(trade.profitLoss) >= 0 ? theme.success : theme.danger}`
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                  <span style={{ color: parseFloat(trade.profitLoss) >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '16px' }}>
-                                    {parseFloat(trade.profitLoss) >= 0 ? '🟢' : '🔴'} {trade.instrument || 'Unknown'}
-                                  </span>
-                                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>{trade.direction}</span>
-                                  {trade.setupType && <span style={{ padding: '2px 8px', background: theme.accent + '20', color: theme.accent, borderRadius: '4px', fontSize: '11px' }}>{trade.setupType}</span>}
-                                </div>
-                                <div style={{ color: theme.textMuted, fontSize: '12px' }}>
-                                  {trade.date} {trade.time && `• ${trade.time}`} • Grade: {trade.setupGrade}
-                                  {trade.emotionBefore && trade.emotionBefore !== 'neutral' && ` • Felt: ${trade.emotionBefore}`}
-                                </div>
-                                {trade.notes && <div style={{ color: theme.text, fontSize: '13px', marginTop: '8px', fontStyle: 'italic' }}>"{trade.notes}"</div>}
-                              </div>
-                              <div style={{ textAlign: 'right' as const }}>
-                                <div style={{ color: parseFloat(trade.profitLoss) >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '20px' }}>
-                                  {parseFloat(trade.profitLoss) >= 0 ? '+' : ''}${parseFloat(trade.profitLoss).toFixed(2)}
-                                </div>
-                                {trade.rMultiple && <div style={{ color: theme.textMuted, fontSize: '12px' }}>{trade.rMultiple}R</div>}
-                                <button onClick={() => deleteTrade(trade.id)} style={{ marginTop: '8px', padding: '4px 8px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Delete</button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            {/* ==================== ANALYTICS TAB ==================== */}
-            {tradingSubTab === 'analytics' && (
-              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
-                
-                {/* Analytics Sub-Tabs */}
-                <div style={cardStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap' as const, gap: '12px' }}>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                      {[
-                        { key: 'overview', label: '📊 Overview' },
-                        { key: 'calendar', label: '📅 Calendar' },
-                        { key: 'setups', label: '🎯 Setups' },
-                        { key: 'time', label: '⏰ Time' },
-                        { key: 'psychology', label: '🧠 Psychology' }
-                      ].map(tab => (
-                        <button 
-                          key={tab.key}
-                          onClick={() => setAnalyticsTab(tab.key as any)}
-                          style={{ 
-                            padding: '8px 16px', 
-                            background: analyticsTab === tab.key ? theme.warning : (darkMode ? '#1e293b' : '#f8fafc'), 
-                            color: analyticsTab === tab.key ? 'white' : theme.text, 
-                            border: '1px solid ' + (analyticsTab === tab.key ? theme.warning : theme.border), 
-                            borderRadius: '8px', 
-                            cursor: 'pointer', 
-                            fontSize: '13px', 
-                            fontWeight: 600 
-                          }}
-                        >
-                          {tab.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <select 
-                        value={analyticsDateRange} 
-                        onChange={e => setAnalyticsDateRange(e.target.value as any)}
-                        style={{ ...inputStyle, padding: '6px 12px', fontSize: '12px' }}
-                      >
-                        <option value="7d">Last 7 days</option>
-                        <option value="30d">Last 30 days</option>
-                        <option value="90d">Last 90 days</option>
-                        <option value="all">All time</option>
-                      </select>
-                      {tradingAccounts.length > 0 && (
-                        <select 
-                          value={selectedAnalyticsAccount === 'all' ? 'all' : selectedAnalyticsAccount} 
-                          onChange={e => setSelectedAnalyticsAccount(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                          style={{ ...inputStyle, padding: '6px 12px', fontSize: '12px' }}
-                        >
-                          <option value="all">All Accounts</option>
-                          {tradingAccounts.map(acc => (
-                            <option key={acc.id} value={acc.id}>{acc.name}</option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  </div> 
-                        padding: '8px 16px', 
-                        background: analyticsTab === tab.key ? theme.warning : theme.cardBg, 
-                        color: analyticsTab === tab.key ? 'white' : theme.text, 
-                        border: '1px solid ' + (analyticsTab === tab.key ? theme.warning : theme.border), 
-                        borderRadius: '8px', 
-                        cursor: 'pointer', 
-                        fontSize: '13px', 
-                        fontWeight: 600 
-                      }}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <select 
-                    value={analyticsDateRange} 
-                    onChange={e => setAnalyticsDateRange(e.target.value as any)}
-                    style={{ ...inputStyle, padding: '6px 12px', fontSize: '12px' }}
-                  >
-                    <option value="7d">Last 7 days</option>
-                    <option value="30d">Last 30 days</option>
-                    <option value="90d">Last 90 days</option>
-                    <option value="all">All time</option>
-                  </select>
-                  <select 
-                    value={selectedAnalyticsAccount === 'all' ? 'all' : selectedAnalyticsAccount} 
-                    onChange={e => setSelectedAnalyticsAccount(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    style={{ ...inputStyle, padding: '6px 12px', fontSize: '12px' }}
-                  >
-                    <option value="all">All Accounts</option>
-                    {tradingAccounts.map(acc => (
-                      <option key={acc.id} value={acc.id}>{acc.name}</option>
-                    ))}
-                  </select>
-                  <button 
-                    onClick={() => setShowTradeImport(true)}
-                    style={{ padding: '6px 12px', background: theme.accent, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
-                  >
-                    📥 Import
-                  </button>
-                </div>
-              </div>
-              
-              {/* OVERVIEW TAB */}
-              {analyticsTab === 'overview' && (() => {
-                const analytics = calculateTradingAnalytics(selectedAnalyticsAccount, analyticsDateRange)
-                return (
-                  <div>
-                    {/* Main Stats Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px', marginBottom: '24px' }}>
-                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Total P&L</div>
-                        <div style={{ color: analytics.totalPnL >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${analytics.totalPnL.toFixed(0)}</div>
-                      </div>
-                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Win Rate</div>
-                        <div style={{ color: analytics.winRate >= 50 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>{analytics.winRate.toFixed(1)}%</div>
-                      </div>
-                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Profit Factor</div>
-                        <div style={{ color: analytics.profitFactor >= 1 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>{analytics.profitFactor === Infinity ? '∞' : analytics.profitFactor.toFixed(2)}</div>
-                      </div>
-                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Expectancy</div>
-                        <div style={{ color: analytics.expectancy >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>${analytics.expectancy.toFixed(0)}</div>
-                      </div>
-                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Avg R-Multiple</div>
-                        <div style={{ color: analytics.avgRMultiple >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>{analytics.avgRMultiple.toFixed(2)}R</div>
-                      </div>
-                      <div style={{ padding: '16px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Streak</div>
-                        <div style={{ color: analytics.streaks.currentStreak >= 0 ? theme.success : theme.danger, fontSize: '24px', fontWeight: 700 }}>
-                          {analytics.streaks.currentStreak > 0 ? '+' : ''}{analytics.streaks.currentStreak}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Secondary Stats */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
-                      <div style={{ padding: '12px', background: theme.success + '20', borderRadius: '8px' }}>
-                        <div style={{ color: theme.success, fontSize: '12px' }}>Winners</div>
-                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>{analytics.winners} <span style={{ fontSize: '12px', color: theme.textMuted }}>trades</span></div>
-                        <div style={{ color: theme.success, fontSize: '13px' }}>Avg: ${analytics.avgWin.toFixed(0)} • Best: ${analytics.largestWin.toFixed(0)}</div>
-                      </div>
-                      <div style={{ padding: '12px', background: theme.danger + '20', borderRadius: '8px' }}>
-                        <div style={{ color: theme.danger, fontSize: '12px' }}>Losers</div>
-                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>{analytics.losers} <span style={{ fontSize: '12px', color: theme.textMuted }}>trades</span></div>
-                        <div style={{ color: theme.danger, fontSize: '13px' }}>Avg: ${analytics.avgLoss.toFixed(0)} • Worst: ${analytics.largestLoss.toFixed(0)}</div>
-                      </div>
-                      <div style={{ padding: '12px', background: theme.purple + '20', borderRadius: '8px' }}>
-                        <div style={{ color: theme.purple, fontSize: '12px' }}>Total Trades</div>
-                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>{analytics.totalTrades}</div>
-                        <div style={{ color: theme.textMuted, fontSize: '13px' }}>BE: {analytics.breakeven}</div>
-                      </div>
-                      <div style={{ padding: '12px', background: theme.warning + '20', borderRadius: '8px' }}>
-                        <div style={{ color: theme.warning, fontSize: '12px' }}>Best Streak</div>
-                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>+{analytics.streaks.longestWinStreak}</div>
-                        <div style={{ color: theme.textMuted, fontSize: '13px' }}>Worst: -{analytics.streaks.longestLoseStreak}</div>
-                      </div>
-                    </div>
-                    
-                    {/* Top Instruments */}
-                    <div style={{ marginBottom: '20px' }}>
-                      <h4 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '14px' }}>📈 Performance by Instrument</h4>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                        {Object.entries(analytics.byInstrument)
-                          .sort((a, b) => b[1].pnl - a[1].pnl)
-                          .slice(0, 8)
-                          .map(([inst, data]) => (
-                            <div key={inst} style={{ 
-                              padding: '8px 12px', 
-                              background: darkMode ? '#1e293b' : '#f8fafc', 
-                              borderRadius: '8px',
-                              borderLeft: `3px solid ${data.pnl >= 0 ? theme.success : theme.danger}`
-                            }}>
-                              <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{inst}</div>
-                              <div style={{ color: data.pnl >= 0 ? theme.success : theme.danger, fontSize: '12px' }}>
-                                ${data.pnl.toFixed(0)} • {data.trades} trades • {((data.wins / data.trades) * 100).toFixed(0)}% WR
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })()}
-              
-              {/* CALENDAR TAB */}
-              {analyticsTab === 'calendar' && (() => {
-                const analytics = calculateTradingAnalytics(selectedAnalyticsAccount, 'all')
-                const year = tradingCalendarMonth.getFullYear()
-                const month = tradingCalendarMonth.getMonth()
-                const firstDay = new Date(year, month, 1).getDay()
-                const daysInMonth = new Date(year, month + 1, 0).getDate()
-                const days = []
-                
-                // Empty cells before first day
-                for (let i = 0; i < firstDay; i++) {
-                  days.push(<div key={`empty-${i}`} style={{ padding: '8px' }} />)
-                }
-                
-                // Day cells
-                for (let d = 1; d <= daysInMonth; d++) {
-                  const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-                  const dayData = analytics.calendarData[dateStr]
-                  const pnl = dayData?.pnl || 0
-                  const tradeCount = dayData?.trades || 0
-                  const isToday = new Date().toISOString().split('T')[0] === dateStr
-                  
-                  days.push(
-                    <div 
-                      key={d}
-                      style={{ 
-                        padding: '8px', 
-                        background: tradeCount > 0 
-                          ? (pnl >= 0 ? theme.success + '30' : theme.danger + '30')
-                          : (darkMode ? '#1e293b' : '#f8fafc'),
-                        borderRadius: '8px',
-                        textAlign: 'center' as const,
-                        border: isToday ? `2px solid ${theme.warning}` : 'none',
-                        minHeight: '60px'
-                      }}
-                    >
-                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '2px' }}>{d}</div>
-                      {tradeCount > 0 ? (
-                        <>
-                          <div style={{ color: pnl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '14px' }}>
-                            {pnl >= 0 ? '+' : ''}${pnl.toFixed(0)}
-                          </div>
-                          <div style={{ color: theme.textMuted, fontSize: '10px' }}>{tradeCount} trade{tradeCount > 1 ? 's' : ''}</div>
-                        </>
-                      ) : (
-                        <div style={{ color: theme.textMuted, fontSize: '10px', marginTop: '8px' }}>-</div>
-                      )}
-                    </div>
-                  )
-                }
-                
-                // Monthly totals
-                const monthTrades = Object.entries(analytics.calendarData)
-                  .filter(([date]) => date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`))
-                const monthPnL = monthTrades.reduce((sum, [_, data]) => sum + data.pnl, 0)
-                const monthTradeCount = monthTrades.reduce((sum, [_, data]) => sum + data.trades, 0)
-                const greenDays = monthTrades.filter(([_, d]) => d.pnl > 0).length
-                const redDays = monthTrades.filter(([_, d]) => d.pnl < 0).length
-                
-                return (
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                      <button onClick={() => setTradingCalendarMonth(new Date(year, month - 1))} style={{ padding: '8px 16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>←</button>
-                      <div style={{ textAlign: 'center' as const }}>
-                        <div style={{ color: theme.text, fontWeight: 700, fontSize: '18px' }}>
-                          {tradingCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                        </div>
-                        <div style={{ color: monthPnL >= 0 ? theme.success : theme.danger, fontSize: '14px' }}>
-                          {monthPnL >= 0 ? '+' : ''}${monthPnL.toFixed(0)} • {monthTradeCount} trades • {greenDays}🟢 {redDays}🔴
-                        </div>
-                      </div>
-                      <button onClick={() => setTradingCalendarMonth(new Date(year, month + 1))} style={{ padding: '8px 16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>→</button>
-                    </div>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '8px' }}>
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} style={{ textAlign: 'center' as const, color: theme.textMuted, fontSize: '11px', padding: '4px' }}>{day}</div>
-                      ))}
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
-                      {days}
-                    </div>
-                  </div>
-                )
-              })()}
-              
-              {/* SETUPS TAB */}
-              {analyticsTab === 'setups' && (() => {
-                const analytics = calculateTradingAnalytics(selectedAnalyticsAccount, analyticsDateRange)
-                const setupStats = Object.entries(analytics.bySetup)
-                  .sort((a, b) => b[1].pnl - a[1].pnl)
-                
-                return (
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                      <h4 style={{ color: theme.text, margin: 0, fontSize: '14px' }}>🎯 Performance by Setup/Strategy</h4>
-                      <button onClick={() => setShowSetupManager(true)} style={{ padding: '6px 12px', background: theme.accent, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
-                        ⚙️ Manage Setups
-                      </button>
-                    </div>
-                    
-                    {setupStats.length === 0 ? (
-                      <div style={{ padding: '40px', textAlign: 'center' as const, color: theme.textMuted }}>
-                        <div style={{ fontSize: '32px', marginBottom: '12px' }}>🏷️</div>
-                        <div>No setups tagged yet. Tag your trades with setups to see performance breakdowns.</div>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                        {setupStats.map(([setup, data]) => (
-                          <div key={setup} style={{ 
-                            padding: '16px', 
-                            background: darkMode ? '#1e293b' : '#f8fafc', 
-                            borderRadius: '12px',
-                            display: 'grid',
-                            gridTemplateColumns: '200px repeat(5, 1fr)',
-                            alignItems: 'center',
-                            gap: '16px'
-                          }}>
-                            <div>
-                              <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{setup}</div>
-                              <div style={{ color: theme.textMuted, fontSize: '12px' }}>{data.trades} trades</div>
-                            </div>
-                            <div style={{ textAlign: 'center' as const }}>
-                              <div style={{ color: theme.textMuted, fontSize: '10px' }}>P&L</div>
-                              <div style={{ color: data.pnl >= 0 ? theme.success : theme.danger, fontWeight: 700 }}>${data.pnl.toFixed(0)}</div>
-                            </div>
-                            <div style={{ textAlign: 'center' as const }}>
-                              <div style={{ color: theme.textMuted, fontSize: '10px' }}>Win Rate</div>
-                              <div style={{ color: (data.wins / data.trades) >= 0.5 ? theme.success : theme.danger, fontWeight: 700 }}>{((data.wins / data.trades) * 100).toFixed(0)}%</div>
-                            </div>
-                            <div style={{ textAlign: 'center' as const }}>
-                              <div style={{ color: theme.textMuted, fontSize: '10px' }}>Avg R</div>
-                              <div style={{ color: data.avgR >= 0 ? theme.success : theme.danger, fontWeight: 700 }}>{data.avgR.toFixed(2)}R</div>
-                            </div>
-                            <div style={{ textAlign: 'center' as const }}>
-                              <div style={{ color: theme.textMuted, fontSize: '10px' }}>Wins</div>
-                              <div style={{ color: theme.success, fontWeight: 700 }}>{data.wins}</div>
-                            </div>
-                            <div>
-                              {/* Visual bar */}
-                              <div style={{ height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
-                                <div style={{ 
-                                  height: '100%', 
-                                  width: `${(data.wins / data.trades) * 100}%`, 
-                                  background: (data.wins / data.trades) >= 0.5 ? theme.success : theme.danger,
-                                  borderRadius: '4px'
-                                }} />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })()}
-              
-              {/* TIME TAB */}
-              {analyticsTab === 'time' && (() => {
-                const analytics = calculateTradingAnalytics(selectedAnalyticsAccount, analyticsDateRange)
-                
-                if (analytics.totalTrades === 0) {
-                  return (
-                    <div style={{ padding: '60px 20px', textAlign: 'center' as const }}>
-                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏰</div>
-                      <h3 style={{ color: theme.text, margin: '0 0 8px 0' }}>No Trade Data Yet</h3>
-                      <p style={{ color: theme.textMuted, margin: 0 }}>
-                        Log some trades to see your performance by day, hour, and session.
-                      </p>
-                    </div>
-                  )
-                }
-                
-                return (
-                  <div>
-                    <div style={{ marginBottom: '24px' }}>
-                      <h4 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '14px' }}>📆 Performance by Day of Week</h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
-                        {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => {
-                          const data = analytics.byDay[day] || { trades: 0, wins: 0, pnl: 0 }
-                          return (
-                            <div key={day} style={{ 
-                              padding: '12px', 
-                              background: data.trades > 0 
-                                ? (data.pnl >= 0 ? theme.success + '20' : theme.danger + '20')
-                                : (darkMode ? '#1e293b' : '#f8fafc'),
-                              borderRadius: '8px',
-                              textAlign: 'center' as const
-                            }}>
-                              <div style={{ color: theme.textMuted, fontSize: '11px' }}>{day.slice(0, 3)}</div>
-                              <div style={{ color: data.pnl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '16px' }}>
-                                {data.trades > 0 ? `$${data.pnl.toFixed(0)}` : '-'}
-                              </div>
-                              <div style={{ color: theme.textMuted, fontSize: '10px' }}>
-                                {data.trades > 0 ? `${data.trades} trades` : 'No trades'}
-                              </div>
-                              {data.trades > 0 && (
-                                <div style={{ color: (data.wins / data.trades) >= 0.5 ? theme.success : theme.danger, fontSize: '10px' }}>
-                                  {((data.wins / data.trades) * 100).toFixed(0)}% WR
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                    
-                    <div style={{ marginBottom: '24px' }}>
-                      <h4 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '14px' }}>⏰ Performance by Hour (24h)</h4>
-                      <div style={{ display: 'flex', gap: '2px', height: '100px', alignItems: 'flex-end' }}>
-                        {Object.entries(analytics.byHour).map(([hour, data]) => {
-                          const allPnLs = Object.values(analytics.byHour).map(d => Math.abs(d.pnl))
-                          const maxPnl = allPnLs.length > 0 ? Math.max(...allPnLs, 1) : 1
-                          const height = data.trades > 0 ? (Math.abs(data.pnl) / maxPnl) * 80 + 20 : 5
-                          return (
-                            <div 
-                              key={hour}
-                              style={{ 
-                                flex: 1, 
-                                height: `${height}%`,
-                                background: data.trades > 0 
-                                  ? (data.pnl >= 0 ? theme.success : theme.danger)
-                                  : theme.border,
-                                borderRadius: '2px 2px 0 0',
-                                position: 'relative' as const
-                              }}
-                              title={`${hour}:00 - $${data.pnl.toFixed(0)} (${data.trades} trades)`}
-                            />
-                          )
-                        })}
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-                        <span style={{ color: theme.textMuted, fontSize: '10px' }}>00:00</span>
-                        <span style={{ color: theme.textMuted, fontSize: '10px' }}>06:00</span>
-                        <span style={{ color: theme.textMuted, fontSize: '10px' }}>12:00</span>
-                        <span style={{ color: theme.textMuted, fontSize: '10px' }}>18:00</span>
-                        <span style={{ color: theme.textMuted, fontSize: '10px' }}>23:00</span>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h4 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '14px' }}>🌍 Performance by Session</h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                        {[
-                          { key: 'asian', label: 'Asian', time: '00:00-08:00', emoji: '🌏' },
-                          { key: 'london', label: 'London', time: '08:00-16:00', emoji: '🇬🇧' },
-                          { key: 'newyork', label: 'New York', time: '13:00-21:00', emoji: '🇺🇸' },
-                          { key: 'overlap', label: 'Overlap', time: '13:00-16:00', emoji: '🔥' }
-                        ].map(session => {
-                          const data = analytics.bySession[session.key] || { trades: 0, wins: 0, pnl: 0 }
-                          return (
-                            <div key={session.key} style={{ 
-                              padding: '16px', 
-                              background: data.trades > 0 
-                                ? (data.pnl >= 0 ? theme.success + '20' : theme.danger + '20')
-                                : (darkMode ? '#1e293b' : '#f8fafc'),
-                              borderRadius: '12px',
-                              textAlign: 'center' as const
-                            }}>
-                              <div style={{ fontSize: '24px', marginBottom: '4px' }}>{session.emoji}</div>
-                              <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{session.label}</div>
-                              <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '8px' }}>{session.time}</div>
-                              <div style={{ color: data.pnl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '18px' }}>
-                                {data.trades > 0 ? `$${data.pnl.toFixed(0)}` : '-'}
-                              </div>
-                              <div style={{ color: theme.textMuted, fontSize: '11px' }}>
-                                {data.trades} trades{data.trades > 0 ? ` • ${((data.wins / data.trades) * 100).toFixed(0)}% WR` : ''}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })()}
-              
-              {/* PSYCHOLOGY TAB */}
-              {analyticsTab === 'psychology' && (() => {
-                const analytics = calculateTradingAnalytics(selectedAnalyticsAccount, analyticsDateRange)
-                
-                return (
-                  <div>
-                    <div style={{ marginBottom: '24px' }}>
-                      <h4 style={{ color: theme.text, margin: '0 0 12px 0', fontSize: '14px' }}>🧠 Performance by Pre-Trade Emotion</h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
-                        {[
-                          { key: 'confident', label: 'Confident', emoji: '😎' },
-                          { key: 'neutral', label: 'Neutral', emoji: '😐' },
-                          { key: 'anxious', label: 'Anxious', emoji: '😰' },
-                          { key: 'fomo', label: 'FOMO', emoji: '😱' },
-                          { key: 'revenge', label: 'Revenge', emoji: '😤' }
-                        ].map(emotion => {
-                          const data = analytics.byEmotion[emotion.key] || { trades: 0, wins: 0, pnl: 0 }
-                          return (
-                            <div key={emotion.key} style={{ 
-                              padding: '16px', 
-                              background: data.trades > 0 
-                                ? (data.pnl >= 0 ? theme.success + '15' : theme.danger + '15')
-                                : (darkMode ? '#1e293b' : '#f8fafc'),
-                              borderRadius: '12px',
-                              textAlign: 'center' as const,
-                              border: data.trades > 0 && data.pnl < 0 ? `2px solid ${theme.danger}40` : 'none'
-                            }}>
-                              <div style={{ fontSize: '28px', marginBottom: '4px' }}>{emotion.emoji}</div>
-                              <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{emotion.label}</div>
-                              <div style={{ color: data.pnl >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '18px', margin: '4px 0' }}>
-                                {data.trades > 0 ? `$${data.pnl.toFixed(0)}` : '-'}
-                              </div>
-                              <div style={{ color: theme.textMuted, fontSize: '11px' }}>
-                                {data.trades} trades
-                              </div>
-                              {data.trades > 0 && (
-                                <div style={{ color: (data.wins / data.trades) >= 0.5 ? theme.success : theme.danger, fontSize: '11px' }}>
-                                  {((data.wins / data.trades) * 100).toFixed(0)}% WR
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                    
-                    {/* Insights */}
-                    <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px' }}>
-                      <h4 style={{ color: theme.text, margin: '0 0 16px 0', fontSize: '14px' }}>💡 Psychology Insights</h4>
-                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
-                        {(() => {
-                          const insights = []
-                          const fomoData = analytics.byEmotion['fomo'] || { trades: 0, pnl: 0 }
-                          const revengeData = analytics.byEmotion['revenge'] || { trades: 0, pnl: 0 }
-                          const confidentData = analytics.byEmotion['confident'] || { trades: 0, pnl: 0, wins: 0 }
-                          
-                          if (fomoData.trades > 0 && fomoData.pnl < 0) {
-                            insights.push({ type: 'warning', text: `FOMO trades cost you $${Math.abs(fomoData.pnl).toFixed(0)}. Consider waiting for your setups.` })
-                          }
-                          if (revengeData.trades > 0 && revengeData.pnl < 0) {
-                            insights.push({ type: 'danger', text: `Revenge trading lost you $${Math.abs(revengeData.pnl).toFixed(0)}. Step away after losses.` })
-                          }
-                          if (confidentData.trades > 3 && (confidentData.wins / confidentData.trades) > 0.6) {
-                            insights.push({ type: 'success', text: `You perform well when confident (${((confidentData.wins / confidentData.trades) * 100).toFixed(0)}% WR). Trust your analysis!` })
-                          }
-                          if (analytics.streaks.longestLoseStreak >= 3) {
-                            insights.push({ type: 'warning', text: `Your longest losing streak was ${analytics.streaks.longestLoseStreak}. Consider a break after 2 consecutive losses.` })
-                          }
-                          
-                          if (insights.length === 0) {
-                            insights.push({ type: 'info', text: 'Track more trades with emotions to get personalized insights.' })
-                          }
-                          
-                          return insights.map((insight, i) => (
-                            <div key={i} style={{ 
-                              padding: '12px 16px', 
-                              background: insight.type === 'danger' ? theme.danger + '20' : 
-                                         insight.type === 'warning' ? theme.warning + '20' : 
-                                         insight.type === 'success' ? theme.success + '20' : theme.accent + '20',
-                              borderRadius: '8px',
-                              color: theme.text,
-                              fontSize: '13px'
-                            }}>
-                              {insight.type === 'danger' && '🚨 '}
-                              {insight.type === 'warning' && '⚠️ '}
-                              {insight.type === 'success' && '✅ '}
-                              {insight.type === 'info' && '💡 '}
-                              {insight.text}
-                            </div>
-                          ))
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })()}
-            </div>
-            )}
-            
-            {/* ==================== ACCOUNTS TAB ==================== */}
-            {tradingSubTab === 'accounts' && (
-              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
-                
-                {/* Accounts Summary */}
-                {tradingAccounts.length > 0 && (
-                  <div style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.accent}20, ${theme.purple}20)`, borderRadius: '16px', border: '2px solid ' + theme.accent }}>
-                    <h3 style={{ margin: '0 0 16px 0', color: theme.text }}>💼 Portfolio Overview</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                      <div style={{ textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>Total Balance</div>
-                        <div style={{ color: theme.text, fontSize: '28px', fontWeight: 700 }}>
-                          ${tradingAccounts.reduce((sum, acc) => sum + parseFloat(acc.currentBalance || acc.startingBalance || '0'), 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>Total P&L</div>
-                        <div style={{ 
-                          color: tradingAccounts.reduce((sum, acc) => sum + (parseFloat(acc.currentBalance || '0') - parseFloat(acc.startingBalance || '0')), 0) >= 0 ? theme.success : theme.danger, 
-                          fontSize: '28px', 
-                          fontWeight: 700 
-                        }}>
-                          {tradingAccounts.reduce((sum, acc) => sum + (parseFloat(acc.currentBalance || '0') - parseFloat(acc.startingBalance || '0')), 0) >= 0 ? '+' : ''}
-                          ${tradingAccounts.reduce((sum, acc) => sum + (parseFloat(acc.currentBalance || '0') - parseFloat(acc.startingBalance || '0')), 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>Active Accounts</div>
-                        <div style={{ color: theme.text, fontSize: '28px', fontWeight: 700 }}>
-                          {tradingAccounts.filter(a => a.isActive).length}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-            {/* TRADING ACCOUNTS */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>💼 Trading Accounts</h2>
-                <button onClick={() => setShowAddAccount(!showAddAccount)} style={{ padding: '8px 16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                  + Add Account
-                </button>
-              </div>
-              
-              {/* Add Account Form */}
-              {showAddAccount && (
-                <div style={{ padding: '20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', marginBottom: '20px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '12px' }}>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Account Name *</label>
-                      <input value={newAccount.name} onChange={e => setNewAccount({...newAccount, name: e.target.value})} placeholder="My FTMO 100k" style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Type</label>
-                      <select value={newAccount.type} onChange={e => setNewAccount({...newAccount, type: e.target.value})} style={{...inputStyle, width: '100%'}}>
-                        <option value="personal">💼 Personal Account</option>
-                        <option value="prop_challenge">🎯 Prop Challenge</option>
-                        <option value="prop_funded">🏆 Prop Funded</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Prop Firm (or Custom)</label>
-                      <select value={newAccount.propFirm} onChange={e => {
-                        const firmName = e.target.value
-                        if (firmName === 'Custom') {
-                          setNewAccount({
-                            ...newAccount, 
-                            propFirm: 'Custom',
-                            maxDrawdown: '',
-                            dailyDrawdown: '',
-                            profitTarget: ''
-                          })
-                        } else {
-                          const firm = propFirmProfiles[firmName]
-                          const phase = newAccount.type === 'prop_funded' ? 'funded' : 'challenge'
-                          setNewAccount({
-                            ...newAccount, 
-                            propFirm: firmName,
-                            maxDrawdown: firm?.phases?.[phase]?.maxDrawdown?.toString() || firm?.phases?.challenge?.maxDrawdown?.toString() || '',
-                            dailyDrawdown: firm?.phases?.[phase]?.dailyDrawdown?.toString() || firm?.phases?.challenge?.dailyDrawdown?.toString() || '',
-                            profitTarget: firm?.phases?.[phase]?.profitTarget?.toString() || firm?.phases?.challenge?.profitTarget?.toString() || ''
-                          })
-                        }
-                      }} style={{...inputStyle, width: '100%'}}>
-                        <option value="">Select or Custom...</option>
-                        {Object.keys(propFirmProfiles).map(firm => (
-                          <option key={firm} value={firm}>{firm}</option>
-                        ))}
-                        <option value="Custom">✏️ Custom (enter rules below)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Starting Balance *</label>
-                      <input type="number" value={newAccount.startingBalance} onChange={e => setNewAccount({...newAccount, startingBalance: e.target.value, currentBalance: e.target.value})} placeholder="100000" style={{...inputStyle, width: '100%'}} />
-                    </div>
-                  </div>
-                  
-                  {/* Custom firm name input */}
-                  {newAccount.propFirm === 'Custom' && (
-                    <div style={{ marginBottom: '12px' }}>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Custom Prop Firm Name</label>
-                      <input 
-                        value={newAccount.phase || ''} 
-                        onChange={e => setNewAccount({...newAccount, phase: e.target.value})} 
-                        placeholder="Enter prop firm name (e.g., Topstep, Apex, etc.)" 
-                        style={{...inputStyle, width: '100%'}} 
-                      />
-                    </div>
-                  )}
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '12px' }}>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Max Drawdown %</label>
-                      <input type="number" value={newAccount.maxDrawdown} onChange={e => setNewAccount({...newAccount, maxDrawdown: e.target.value})} placeholder="10" style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Daily Drawdown %</label>
-                      <input type="number" value={newAccount.dailyDrawdown} onChange={e => setNewAccount({...newAccount, dailyDrawdown: e.target.value})} placeholder="5" style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Profit Target %</label>
-                      <input type="number" value={newAccount.profitTarget} onChange={e => setNewAccount({...newAccount, profitTarget: e.target.value})} placeholder="10" style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Risk Per Trade %</label>
-                      <input type="number" value={newAccount.riskPerTrade} onChange={e => setNewAccount({...newAccount, riskPerTrade: e.target.value})} placeholder="1" style={{...inputStyle, width: '100%'}} />
-                    </div>
-                  </div>
-                  
-                  {/* Additional Prop Firm Settings */}
-                  {newAccount.type !== 'personal' && (
-                    <>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '12px' }}>
-                        <div>
-                          <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Min Trading Days</label>
-                          <input type="number" value={newAccount.minTradingDays} onChange={e => setNewAccount({...newAccount, minTradingDays: e.target.value})} placeholder="4" style={{...inputStyle, width: '100%'}} />
-                        </div>
-                        <div>
-                          <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Max Days (0=none)</label>
-                          <input type="number" value={newAccount.maxTradingDays} onChange={e => setNewAccount({...newAccount, maxTradingDays: e.target.value})} placeholder="30" style={{...inputStyle, width: '100%'}} />
-                        </div>
-                        <div>
-                          <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Profit Split %</label>
-                          <input type="number" value={newAccount.profitSplit} onChange={e => setNewAccount({...newAccount, profitSplit: e.target.value})} placeholder="80" style={{...inputStyle, width: '100%'}} />
-                        </div>
-                        <div>
-                          <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Consistency Rule</label>
-                          <input value={newAccount.consistencyRule} onChange={e => setNewAccount({...newAccount, consistencyRule: e.target.value})} placeholder="e.g., 15%" style={{...inputStyle, width: '100%'}} />
-                        </div>
-                      </div>
-                      
-                      {/* Toggle Rules */}
-                      <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexWrap: 'wrap' as const }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: theme.text, fontSize: '13px', cursor: 'pointer' }}>
-                          <input type="checkbox" checked={newAccount.newsRestriction} onChange={e => setNewAccount({...newAccount, newsRestriction: e.target.checked})} />
-                          📰 News trading restricted
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: theme.text, fontSize: '13px', cursor: 'pointer' }}>
-                          <input type="checkbox" checked={newAccount.weekendHolding} onChange={e => setNewAccount({...newAccount, weekendHolding: e.target.checked})} />
-                          📅 Weekend holding allowed
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: theme.text, fontSize: '13px', cursor: 'pointer' }}>
-                          <input type="checkbox" checked={newAccount.scalingPlan} onChange={e => setNewAccount({...newAccount, scalingPlan: e.target.checked})} />
-                          📈 Scaling plan available
-                        </label>
-                      </div>
-                      
-                      {/* Custom Rules */}
-                      <div style={{ marginBottom: '12px' }}>
-                        <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '8px' }}>Custom Rules (one per line - Aureus will enforce these!)</label>
-                        <textarea
-                          value={newAccount.customRules.join('\n')}
-                          onChange={e => setNewAccount({...newAccount, customRules: e.target.value.split('\n').filter(r => r.trim())})}
-                          placeholder="Stop loss required on every trade&#10;No martingale strategies&#10;Must close all positions by Friday close&#10;etc."
-                          style={{...inputStyle, width: '100%', minHeight: '80px', resize: 'vertical' as const}}
-                        />
-                      </div>
-                    </>
-                  )}
-                  
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => {
-                      if (newAccount.name && newAccount.startingBalance) {
-                        const accountToAdd = {
-                          ...newAccount,
-                          id: Date.now(),
-                          currentBalance: newAccount.startingBalance,
-                          propFirm: newAccount.propFirm === 'Custom' ? (newAccount.phase || 'Custom') : newAccount.propFirm
-                        }
-                        setTradingAccounts([...tradingAccounts, accountToAdd])
-                        setNewAccount({ name: '', type: 'personal', propFirm: '', phase: '', startingBalance: '', currentBalance: '', maxDrawdown: '', dailyDrawdown: '', profitTarget: '', riskPerTrade: '1', isActive: true, customRules: [], minTradingDays: '', maxTradingDays: '', consistencyRule: '', newsRestriction: false, weekendHolding: true, scalingPlan: false, profitSplit: '' })
-                        setShowAddAccount(false)
-                      }
-                    }} style={{...btnSuccess, opacity: (!newAccount.name || !newAccount.startingBalance) ? 0.5 : 1}} disabled={!newAccount.name || !newAccount.startingBalance}>Add Account</button>
-                    <button onClick={() => setShowAddAccount(false)} style={{ ...btnPrimary, background: theme.textMuted }}>Cancel</button>
-                  </div>
-                </div>
-              )}
-              
-              {/* Account Cards */}
-              {tradingAccounts.length === 0 ? (
-                <div style={{ textAlign: 'center' as const, padding: '40px', color: theme.textMuted }}>
-                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>💼</div>
-                  <p>No accounts yet. Add your first trading account to get started!</p>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '16px' }}>
-                  {tradingAccounts.map(account => {
-                    const startBal = parseFloat(account.startingBalance || '0')
-                    const currBal = parseFloat(account.currentBalance || '0')
-                    const pnl = currBal - startBal
-                    const pnlPercent = startBal > 0 ? (pnl / startBal) * 100 : 0
-                    const maxDD = parseFloat(account.maxDrawdown || '0')
-                    const dailyDD = parseFloat(account.dailyDrawdown || '0')
-                    const profitTarget = parseFloat(account.profitTarget || '0')
-                    const progressToTarget = profitTarget > 0 ? Math.min((pnlPercent / profitTarget) * 100, 100) : 0
-                    const drawdownUsed = pnl < 0 ? Math.abs(pnlPercent) : 0
-                    const drawdownRemaining = maxDD - drawdownUsed
-                    
-                    // Get account-specific trades
-                    const accountTrades = trades.filter(t => t.accountId === account.id)
-                    const accountWins = accountTrades.filter(t => parseFloat(t.profitLoss || '0') > 0).length
-                    const accountWinRate = accountTrades.length > 0 ? (accountWins / accountTrades.length) * 100 : 0
-                    
-                    // Today's P&L for daily drawdown check
-                    const today = new Date().toISOString().split('T')[0]
-                    const todaysTrades = accountTrades.filter(t => t.date === today)
-                    const todaysPnl = todaysTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
-                    const todaysPnlPercent = startBal > 0 ? (todaysPnl / startBal) * 100 : 0
-                    const dailyDDRemaining = dailyDD > 0 ? dailyDD - Math.abs(Math.min(0, todaysPnlPercent)) : null
-                    
-                    // Warning states
-                    const isNearMaxDD = drawdownRemaining < maxDD * 0.3 && maxDD > 0
-                    const isNearDailyDD = dailyDDRemaining !== null && dailyDDRemaining < dailyDD * 0.3
-                    const isNearTarget = progressToTarget >= 80 && progressToTarget < 100
-                    const hitTarget = progressToTarget >= 100
-                    
-                    return (
-                      <div key={account.id} style={{ 
-                        padding: '20px', 
-                        background: darkMode ? '#1e293b' : '#f8fafc', 
-                        borderRadius: '12px',
-                        border: '2px solid ' + (
-                          hitTarget ? theme.success :
-                          isNearMaxDD || isNearDailyDD ? theme.danger :
-                          account.type === 'personal' ? theme.purple : 
-                          account.type === 'prop_funded' ? theme.success : theme.warning
-                        )
-                      }}>
-                        {/* Header */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                              <span style={{ fontSize: '20px' }}>{hitTarget ? '🏆' : account.type === 'personal' ? '👤' : account.type === 'prop_funded' ? '💰' : '🎯'}</span>
-                              <span style={{ fontWeight: 700, color: theme.text, fontSize: '16px' }}>{account.name}</span>
-                            </div>
-                            <div style={{ fontSize: '12px', color: theme.textMuted }}>
-                              {account.propFirm || 'Personal Account'} {account.type === 'prop_challenge' ? '• Challenge' : account.type === 'prop_funded' ? '• Funded' : ''}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '4px' }}>
-                            <div style={{ 
-                              padding: '4px 10px', 
-                              background: pnl >= 0 ? theme.success + '20' : theme.danger + '20', 
-                              color: pnl >= 0 ? theme.success : theme.danger,
-                              borderRadius: '4px',
-                              fontSize: '14px',
-                              fontWeight: 700
-                            }}>
-                              {pnl >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%
-                            </div>
-                            <button onClick={() => {
-                              if (confirm('Delete this account? This cannot be undone.')) {
-                                setTradingAccounts(prev => prev.filter(a => a.id !== account.id))
-                              }
-                            }} style={{ padding: '2px 6px', background: 'transparent', color: theme.textMuted, border: 'none', cursor: 'pointer', fontSize: '11px' }}>🗑️ Delete</button>
-                          </div>
-                        </div>
-                        
-                        {/* Balance & P&L */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
-                          <div style={{ background: theme.cardBg, padding: '12px', borderRadius: '8px', textAlign: 'center' as const }}>
-                            <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>Balance</div>
-                            <div style={{ color: theme.text, fontSize: '18px', fontWeight: 700 }}>${currBal.toLocaleString()}</div>
-                          </div>
-                          <div style={{ background: theme.cardBg, padding: '12px', borderRadius: '8px', textAlign: 'center' as const }}>
-                            <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>Total P&L</div>
-                            <div style={{ color: pnl >= 0 ? theme.success : theme.danger, fontSize: '18px', fontWeight: 700 }}>${pnl.toFixed(0)}</div>
-                          </div>
-                          <div style={{ background: theme.cardBg, padding: '12px', borderRadius: '8px', textAlign: 'center' as const }}>
-                            <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>Win Rate</div>
-                            <div style={{ color: accountWinRate >= 50 ? theme.success : theme.warning, fontSize: '18px', fontWeight: 700 }}>{accountWinRate.toFixed(0)}%</div>
-                            <div style={{ color: theme.textMuted, fontSize: '10px' }}>{accountTrades.length} trades</div>
-                          </div>
-                        </div>
-                        
-                        {account.type !== 'personal' && (
-                          <>
-                            {/* Progress to Target */}
-                            {profitTarget > 0 && (
-                              <div style={{ marginBottom: '12px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
-                                  <span style={{ color: theme.textMuted }}>🎯 Target: {profitTarget}%</span>
-                                  <span style={{ color: hitTarget ? theme.success : theme.warning, fontWeight: 600 }}>
-                                    {hitTarget ? '✅ TARGET HIT!' : `${pnlPercent.toFixed(2)}% / ${profitTarget}%`}
-                                  </span>
-                                </div>
-                                <div style={{ height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
-                                  <div style={{ width: Math.min(progressToTarget, 100) + '%', height: '100%', background: hitTarget ? theme.success : 'linear-gradient(90deg, ' + theme.warning + ', ' + theme.success + ')' }} />
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Drawdown Status */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                              {/* Max Drawdown */}
-                              <div style={{ 
-                                padding: '10px', 
-                                background: isNearMaxDD ? theme.danger + '20' : theme.cardBg, 
-                                borderRadius: '8px',
-                                border: isNearMaxDD ? '1px solid ' + theme.danger : 'none'
-                              }}>
-                                <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>Max DD Remaining</div>
-                                <div style={{ color: isNearMaxDD ? theme.danger : theme.text, fontWeight: 700, fontSize: '14px' }}>
-                                  {drawdownRemaining.toFixed(2)}%
-                                </div>
-                                <div style={{ color: theme.textMuted, fontSize: '10px' }}>${(startBal * drawdownRemaining / 100).toFixed(0)} buffer</div>
-                              </div>
-                              
-                              {/* Daily Drawdown */}
-                              {dailyDD > 0 && (
-                                <div style={{ 
-                                  padding: '10px', 
-                                  background: isNearDailyDD ? theme.danger + '20' : theme.cardBg, 
-                                  borderRadius: '8px',
-                                  border: isNearDailyDD ? '1px solid ' + theme.danger : 'none'
-                                }}>
-                                  <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>Daily DD Remaining</div>
-                                  <div style={{ color: isNearDailyDD ? theme.danger : theme.text, fontWeight: 700, fontSize: '14px' }}>
-                                    {dailyDDRemaining?.toFixed(2)}%
-                                  </div>
-                                  <div style={{ color: todaysPnl >= 0 ? theme.success : theme.danger, fontSize: '10px' }}>Today: {todaysPnl >= 0 ? '+' : ''}${todaysPnl.toFixed(0)}</div>
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Warnings */}
-                            {(isNearMaxDD || isNearDailyDD) && (
-                              <div style={{ marginTop: '12px', padding: '10px', background: theme.danger + '20', borderRadius: '8px', borderLeft: '4px solid ' + theme.danger }}>
-                                <span style={{ color: theme.danger, fontSize: '12px', fontWeight: 600 }}>
-                                  ⚠️ {isNearDailyDD ? 'Approaching daily drawdown limit! Consider stopping for today.' : 'Low drawdown buffer! Trade very carefully.'}
-                                </span>
-                              </div>
-                            )}
-                            
-                            {isNearTarget && !hitTarget && (
-                              <div style={{ marginTop: '12px', padding: '10px', background: theme.success + '20', borderRadius: '8px', borderLeft: '4px solid ' + theme.success }}>
-                                <span style={{ color: theme.success, fontSize: '12px', fontWeight: 600 }}>
-                                  🎯 Almost there! {(profitTarget - pnlPercent).toFixed(2)}% to target. Stay disciplined!
-                                </span>
-                              </div>
-                            )}
-                          </>
-                        )}
-                        
-                        {account.type === 'personal' && (
-                          <div style={{ 
-                            padding: '10px', 
-                            background: theme.purple + '20', 
-                            borderRadius: '8px',
-                            textAlign: 'center' as const
-                          }}>
-                            <span style={{ color: theme.purple, fontSize: '12px' }}>💡 Focus on consistent growth. Use the compound calculator above!</span>
-                          </div>
-                        )}
-                        
-                        {/* Quick Update Balance */}
-                        <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <span style={{ color: theme.textMuted, fontSize: '11px' }}>Update balance:</span>
-                          <input 
-                            type="number" 
-                            placeholder={currBal.toString()}
-                            onBlur={(e) => {
-                              if (e.target.value) {
-                                setTradingAccounts(prev => prev.map(a => 
-                                  a.id === account.id ? { ...a, currentBalance: e.target.value } : a
-                                ))
-                                e.target.value = ''
-                              }
-                            }}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter' && (e.target as HTMLInputElement).value) {
-                                setTradingAccounts(prev => prev.map(a => 
-                                  a.id === account.id ? { ...a, currentBalance: (e.target as HTMLInputElement).value } : a
-                                ));
-                                (e.target as HTMLInputElement).value = ''
-                              }
-                            }}
-                            style={{...inputStyle, width: '100px', padding: '4px 8px', fontSize: '12px'}} 
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* TRADING RULES COMPLIANCE */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📋 My Trading Rules</h2>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <span style={{ color: theme.success, fontSize: '14px', fontWeight: 600 }}>
-                    {tradingRules.filter(r => r.enabled).length} active rules
-                  </span>
-                </div>
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-                {tradingRules.map(rule => (
-                  <div key={rule.id} style={{ 
-                    padding: '12px 16px', 
-                    background: darkMode ? '#1e293b' : '#f8fafc', 
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    opacity: rule.enabled ? 1 : 0.5
-                  }}>
-                    <input 
-                      type="checkbox" 
-                      checked={rule.enabled} 
-                      onChange={() => setTradingRules(tradingRules.map(r => r.id === rule.id ? {...r, enabled: !r.enabled} : r))}
-                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ color: theme.text, fontSize: '14px' }}>{rule.rule}</div>
-                      <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>{rule.category}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* PROP FIRM CALCULATOR */}
-            <div style={cardStyle}>
-              <h2 style={{ margin: '0 0 16px 0', color: theme.accent, fontSize: '20px' }}>💱 Prop Firm Calculator</h2>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                {[{ id: 'phase1', label: 'Phase 1', color: theme.warning }, { id: 'phase2', label: 'Phase 2', color: theme.purple }, { id: 'funded', label: 'Funded', color: theme.success }].map(p => (
-                  <button key={p.id} onClick={() => setForexPropPhase(p.id as any)} style={{ padding: '8px 16px', background: forexPropPhase === p.id ? p.color : 'transparent', color: forexPropPhase === p.id ? 'white' : theme.text, border: '1px solid ' + p.color, borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>{p.label}</button>
-                ))}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Account Size</label><input type="number" value={forexProp.accountSize} onChange={e => setForexProp({...forexProp, accountSize: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Profit Target %</label><input type="number" value={forexProp.profitTarget} onChange={e => setForexProp({...forexProp, profitTarget: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Max Drawdown %</label><input type="number" value={forexProp.maxDrawdown} onChange={e => setForexProp({...forexProp, maxDrawdown: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Current Balance</label><input type="number" value={forexProp.currentBalance} onChange={e => setForexProp({...forexProp, currentBalance: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                <div style={{ padding: '16px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Progress</div><div style={{ color: theme.success, fontSize: '24px', fontWeight: 700 }}>{forexPropResults.progressPercent.toFixed(1)}%</div></div>
-                <div style={{ padding: '16px', background: darkMode ? '#2e2a1e' : '#fefce8', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Remaining</div><div style={{ color: theme.warning, fontSize: '24px', fontWeight: 700 }}>${forexPropResults.remainingProfit.toFixed(0)}</div></div>
-                <div style={{ padding: '16px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '12px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>Drawdown Left</div><div style={{ color: theme.danger, fontSize: '24px', fontWeight: 700 }}>${forexPropResults.drawdownRemaining.toFixed(0)}</div></div>
-              </div>
-            </div>
-
-            {/* PERSONAL ACCOUNT COMPOUNDING */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #8b5cf615, #10b98115)', borderRadius: '16px', border: '2px solid ' + theme.purple }}>
-              <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '20px' }}>📈 Personal Account Compounding</h2>
-              <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 20px 0' }}>See the power of consistent, compounded returns</p>
-              
-              {/* Currency Selection */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Currency:</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {['$', '€', '£', '₹', '¥'].map(curr => (
-                    <button key={curr} onClick={() => setTradingCalculator({...tradingCalculator, currency: curr})} style={{ padding: '8px 16px', background: tradingCalculator.currency === curr ? theme.warning : theme.cardBg, color: tradingCalculator.currency === curr ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>{curr}</button>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Main Inputs */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '16px' }}>
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Principal amount:</label>
-                  <div style={{ display: 'flex', alignItems: 'center', background: theme.cardBg, borderRadius: '8px', border: '1px solid ' + theme.border }}>
-                    <span style={{ padding: '10px 12px', color: theme.textMuted, borderRight: '1px solid ' + theme.border }}>{tradingCalculator.currency}</span>
-                    <input type="number" value={tradingCalculator.startingCapital} onChange={e => setTradingCalculator({...tradingCalculator, startingCapital: e.target.value})} style={{ flex: 1, padding: '10px', background: 'transparent', border: 'none', color: theme.text, fontSize: '16px' }} />
-                  </div>
-                </div>
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Interest rate:</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', background: theme.cardBg, borderRadius: '8px', border: '1px solid ' + theme.border, flex: 1 }}>
-                      <input type="number" value={tradingCalculator.returnRate} onChange={e => setTradingCalculator({...tradingCalculator, returnRate: e.target.value})} style={{ flex: 1, padding: '10px', background: 'transparent', border: 'none', color: theme.text, fontSize: '16px' }} />
-                      <span style={{ padding: '10px 12px', color: theme.textMuted }}>%</span>
-                    </div>
-                    <select value={tradingCalculator.returnPeriod} onChange={e => setTradingCalculator({...tradingCalculator, returnPeriod: e.target.value})} style={{ padding: '10px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}>
-                      <option value="daily">daily</option>
-                      <option value="weekly">weekly</option>
-                      <option value="monthly">monthly</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Time Period */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Years:</label>
-                  <input type="number" value={tradingCalculator.years} onChange={e => setTradingCalculator({...tradingCalculator, years: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                </div>
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Months:</label>
-                  <input type="number" value={tradingCalculator.months} onChange={e => setTradingCalculator({...tradingCalculator, months: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                </div>
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Days:</label>
-                  <input type="number" value={tradingCalculator.days} onChange={e => setTradingCalculator({...tradingCalculator, days: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                </div>
-              </div>
-              
-              {/* Include Days */}
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <label style={{ color: theme.textMuted, fontSize: '12px' }}>Include all days of week?</label>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <button onClick={() => setTradingCalculator({...tradingCalculator, includeWeekends: true, includeDays: ['M', 'T', 'W', 'T2', 'F', 'S', 'S2']})} style={{ padding: '6px 16px', background: tradingCalculator.includeWeekends ? theme.cardBg : theme.warning, color: tradingCalculator.includeWeekends ? theme.text : 'white', border: '1px solid ' + theme.border, borderRadius: '4px 0 0 4px', cursor: 'pointer' }}>Yes</button>
-                    <button onClick={() => setTradingCalculator({...tradingCalculator, includeWeekends: false, includeDays: ['M', 'T', 'W', 'T2', 'F']})} style={{ padding: '6px 16px', background: !tradingCalculator.includeWeekends ? theme.warning : theme.cardBg, color: !tradingCalculator.includeWeekends ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '0 4px 4px 0', cursor: 'pointer' }}>No</button>
-                  </div>
-                </div>
-                
-                {!tradingCalculator.includeWeekends && (
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Days to include:</label>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      {[{d: 'M', l: 'M'}, {d: 'T', l: 'T'}, {d: 'W', l: 'W'}, {d: 'T2', l: 'T'}, {d: 'F', l: 'F'}, {d: 'S', l: 'S'}, {d: 'S2', l: 'S'}].map(({d, l}) => (
-                        <button key={d} onClick={() => {
-                          const newDays = tradingCalculator.includeDays.includes(d) 
-                            ? tradingCalculator.includeDays.filter(x => x !== d)
-                            : [...tradingCalculator.includeDays, d]
-                          setTradingCalculator({...tradingCalculator, includeDays: newDays})
-                        }} style={{ width: '36px', height: '36px', background: tradingCalculator.includeDays.includes(d) ? theme.warning : theme.cardBg, color: tradingCalculator.includeDays.includes(d) ? 'white' : theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>{l}</button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {/* Reinvest Rate */}
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Daily reinvest rate:</label>
-                  <select value={tradingCalculator.reinvestRate} onChange={e => setTradingCalculator({...tradingCalculator, reinvestRate: e.target.value})} style={{...inputStyle, width: '100%'}}>
-                    <option value="100">100%</option>
-                    <option value="75">75%</option>
-                    <option value="50">50%</option>
-                    <option value="25">25%</option>
-                    <option value="0">0% (withdraw all)</option>
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Start date? <span style={{ color: theme.accent, cursor: 'pointer' }} onClick={() => setTradingCalculator({...tradingCalculator, startDate: new Date().toISOString().split('T')[0]})}>today</span></label>
-                  <input type="date" value={tradingCalculator.startDate} onChange={e => setTradingCalculator({...tradingCalculator, startDate: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                </div>
-              </div>
-              
-              {/* Additional Contributions */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Additional contributions: <span style={{ color: theme.textMuted }}>(optional)</span></label>
-                <div style={{ display: 'flex', gap: '4px', marginBottom: tradingCalculator.additionalContributions !== 'none' ? '12px' : 0 }}>
-                  {['none', 'deposits', 'withdrawals'].map(opt => (
-                    <button key={opt} onClick={() => setTradingCalculator({...tradingCalculator, additionalContributions: opt})} style={{ padding: '8px 20px', background: tradingCalculator.additionalContributions === opt ? theme.warning : theme.cardBg, color: tradingCalculator.additionalContributions === opt ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '4px', cursor: 'pointer', textTransform: 'capitalize' }}>{opt === 'none' ? 'None' : opt.charAt(0).toUpperCase() + opt.slice(1)}</button>
-                  ))}
-                </div>
-                {tradingCalculator.additionalContributions === 'deposits' && (
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <input type="number" placeholder="Amount" value={tradingCalculator.depositAmount} onChange={e => setTradingCalculator({...tradingCalculator, depositAmount: e.target.value})} style={{...inputStyle, flex: 1}} />
-                    <select value={tradingCalculator.depositFrequency} onChange={e => setTradingCalculator({...tradingCalculator, depositFrequency: e.target.value})} style={inputStyle}>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                  </div>
-                )}
-                {tradingCalculator.additionalContributions === 'withdrawals' && (
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <input type="number" placeholder="Amount" value={tradingCalculator.withdrawAmount} onChange={e => setTradingCalculator({...tradingCalculator, withdrawAmount: e.target.value})} style={{...inputStyle, flex: 1}} />
-                    <select value={tradingCalculator.withdrawFrequency} onChange={e => setTradingCalculator({...tradingCalculator, withdrawFrequency: e.target.value})} style={inputStyle}>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-              
-              {/* Calculate Button */}
-              <button onClick={() => {}} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '16px', marginBottom: '24px' }}>
-                📊 Calculate
-              </button>
-              
-              {/* Results */}
-              {(() => {
-                const result = tradingResults
-                return (
-                  <>
-                    {/* Summary Stats */}
-                    <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', marginBottom: '16px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                        <div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Total days / Business days</div>
-                          <div style={{ color: theme.text, fontSize: '28px', fontWeight: 700 }}>{result.totalCalendarDays} / {result.totalTradingDays}</div>
-                        </div>
-                        <div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Days excluded</div>
-                          <div style={{ color: theme.warning, fontSize: '20px', fontWeight: 600 }}>{tradingCalculator.includeWeekends ? 'None' : 'Sat. Sun.'}</div>
-                        </div>
-                        <div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Daily interest rate</div>
-                          <div style={{ color: theme.warning, fontSize: '20px', fontWeight: 600 }}>{tradingCalculator.returnRate}%</div>
-                        </div>
-                        <div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>End date</div>
-                          <div style={{ color: theme.success, fontSize: '20px', fontWeight: 600 }}>{result.endDate?.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
-                        </div>
-                      </div>
-                      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid ' + theme.border }}>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>Initial balance on {new Date(tradingCalculator.startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
-                        <div style={{ color: theme.success, fontSize: '32px', fontWeight: 700 }}>{tradingCalculator.currency}{parseFloat(tradingCalculator.startingCapital).toLocaleString()}</div>
-                      </div>
-                    </div>
-                    
-                    {/* Final Results */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
-                      <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Future Balance</div>
-                        <div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>{tradingCalculator.currency}{result.futureValue.toLocaleString(undefined, {maximumFractionDigits: 2})}</div>
-                      </div>
-                      <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Total Contributed</div>
-                        <div style={{ color: theme.purple, fontSize: '28px', fontWeight: 700 }}>{tradingCalculator.currency}{result.totalContributed.toLocaleString(undefined, {maximumFractionDigits: 2})}</div>
-                      </div>
-                      <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>Pure Profit</div>
-                        <div style={{ color: theme.warning, fontSize: '28px', fontWeight: 700 }}>{tradingCalculator.currency}{result.profit.toLocaleString(undefined, {maximumFractionDigits: 2})}</div>
-                      </div>
-                    </div>
-                    
-                    {/* Earnings Breakdown */}
-                    {result.breakdown && result.breakdown.length > 0 && (
-                      <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                          <h3 style={{ margin: 0, color: theme.text, fontSize: '16px' }}>Earnings breakdown</h3>
-                          <div style={{ display: 'flex', gap: '4px' }}>
-                            {['daily', 'weekly', 'monthly', 'yearly'].map(view => (
-                              <button key={view} onClick={() => setCompoundView(view as any)} style={{ padding: '6px 12px', background: compoundView === view ? theme.warning : theme.border, color: compoundView === view ? 'white' : theme.text, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', textTransform: 'capitalize' }}>{view}</button>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                              <tr style={{ background: theme.border }}>
-                                <th style={{ padding: '8px 12px', textAlign: 'left', color: theme.text, fontSize: '12px' }}>Date / Day</th>
-                                <th style={{ padding: '8px 12px', textAlign: 'right', color: theme.text, fontSize: '12px' }}>Earnings</th>
-                                <th style={{ padding: '8px 12px', textAlign: 'right', color: theme.warning, fontSize: '12px' }}>Total Earnings</th>
-                                <th style={{ padding: '8px 12px', textAlign: 'right', color: theme.success, fontSize: '12px' }}>Balance</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {result.breakdown.slice(0, compoundView === 'daily' ? 50 : compoundView === 'weekly' ? 20 : 12).map((row: any, idx: number) => (
-                                <tr key={idx} style={{ borderBottom: '1px solid ' + theme.border, opacity: row.excluded ? 0.5 : 1 }}>
-                                  <td style={{ padding: '8px 12px', color: row.excluded ? theme.textMuted : theme.text, fontSize: '13px' }}>
-                                    {row.excluded ? 'Day excluded' : `${row.date?.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}`}
-                                  </td>
-                                  <td style={{ padding: '8px 12px', textAlign: 'right', color: row.excluded ? theme.textMuted : theme.text, fontSize: '13px' }}>{row.excluded ? '-' : `${tradingCalculator.currency}${row.earnings.toLocaleString(undefined, {maximumFractionDigits: 2})}`}</td>
-                                  <td style={{ padding: '8px 12px', textAlign: 'right', color: theme.warning, fontSize: '13px' }}>{tradingCalculator.currency}{row.totalEarnings.toLocaleString(undefined, {maximumFractionDigits: 2})}</td>
-                                  <td style={{ padding: '8px 12px', textAlign: 'right', color: theme.success, fontSize: '13px' }}>{tradingCalculator.currency}{row.balance.toLocaleString(undefined, {maximumFractionDigits: 2})}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
-              
-              <div style={{ marginTop: '16px', padding: '12px', background: theme.warning + '20', borderRadius: '8px', border: '1px solid ' + theme.warning + '40' }}>
-                <p style={{ color: theme.text, margin: 0, fontSize: '12px' }}>
-                  ⚠️ <strong>Note:</strong> This calculator is for illustrative purposes only and does not constitute financial advice. We do not offer investment opportunities, promise returns, or endorse any financial products.
-                </p>
-              </div>
-            </div>
-
-            {/* ==================== TRADING ROADMAP ==================== */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: '16px', border: '2px solid ' + theme.warning }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '28px' }}>🗺️</span>
-                    <div>
-                      <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>Trading Roadmap</h2>
-                      <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Your journey to trading success</p>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {/* Ask Aureus to Build a Plan */}
-                  <button
-                    onClick={() => {
-                      setChatMessages([{
-                        role: 'user',
-                        content: `I want to create a trading roadmap. Here's my situation:\n\n**Experience:** ${tradingMemory.experience || 'Not specified'}\n**Style:** ${tradingMemory.tradingStyle || 'Not specified'}\n**Accounts:** ${tradingAccounts.length > 0 ? tradingAccounts.map(a => `${a.name} (${a.propFirm || 'Personal'})`).join(', ') : 'None yet'}\n**Win Rate:** ${winRate.toFixed(0)}%\n**Total Trades:** ${trades.length}\n\nPlease create a personalized phased roadmap with specific milestones and timelines to help me become a consistently profitable trader and/or get funded.`
-                      }])
-                      sendQuickMessage(`I want to create a trading roadmap. Here's my situation:\n\n**Experience:** ${tradingMemory.experience || 'Not specified'}\n**Style:** ${tradingMemory.tradingStyle || 'Not specified'}\n**Accounts:** ${tradingAccounts.length > 0 ? tradingAccounts.map(a => `${a.name} (${a.propFirm || 'Personal'})`).join(', ') : 'None yet'}\n**Win Rate:** ${winRate.toFixed(0)}%\n**Total Trades:** ${trades.length}\n\nPlease create a personalized phased roadmap with specific milestones and timelines to help me become a consistently profitable trader and/or get funded.`)
-                      setTradingSubTab('today')
-                    }}
-                    style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
-                  >
-                    🤖 Create AI Roadmap
-                  </button>
-                  {tradingRoadmap.length > 0 && (
-                    <button
-                      onClick={() => {
-                        const milestoneSummary = tradingRoadmap.map(m => 
-                          `- ${m.name}: Target $${parseFloat(m.targetAmount || '0').toLocaleString()}, Current $${m.currentAmount?.toLocaleString() || 0}${m.targetDate ? `, Deadline: ${m.targetDate}` : ''}`
-                        ).join('\n')
-                        
-                        const accountSummary = tradingAccounts.map(acc => {
-                          const pnl = parseFloat(acc.currentBalance || '0') - parseFloat(acc.startingBalance || '0')
-                          const pnlPct = parseFloat(acc.startingBalance || '0') > 0 ? (pnl / parseFloat(acc.startingBalance || '0') * 100) : 0
-                          return `- ${acc.name} (${acc.propFirm || 'Personal'}): $${parseFloat(acc.currentBalance || '0').toLocaleString()} (${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%)`
-                        }).join('\n')
-                        
-                        setChatMessages([{
-                          role: 'user',
-                          content: `Please analyze my trading roadmap and create a plan:\n\n**My Milestones:**\n${milestoneSummary}\n\n**My Accounts:**\n${accountSummary}\n\n**My Stats:**\n- Win Rate: ${winRate.toFixed(0)}%\n- Total Trades: ${trades.length}\n\nGive me:\n1. Priority order for my goals\n2. Specific daily/weekly actions\n3. Risk management reminders\n4. Timeline estimates`
-                        }])
-                        sendQuickMessage(`Please analyze my trading roadmap and create a plan:\n\n**My Milestones:**\n${milestoneSummary}\n\n**My Accounts:**\n${accountSummary}\n\n**My Stats:**\n- Win Rate: ${winRate.toFixed(0)}%\n- Total Trades: ${trades.length}\n\nGive me:\n1. Priority order for my goals\n2. Specific daily/weekly actions\n3. Risk management reminders\n4. Timeline estimates`)
-                      }}
-                      style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
-                    >
-                      🤖 Analyze My Progress
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setShowAddTradingMilestone(true)}
-                    style={{ padding: '10px 20px', background: theme.warning, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
-                  >
-                    + Add Milestone
-                  </button>
-                </div>
-              </div>
-              
-              {/* AI-Generated Phased Roadmap */}
-              {tradingRoadmapPhases.length > 0 && (
-                <div style={{ marginBottom: '24px', padding: '20px', background: 'linear-gradient(135deg, #8b5cf620, #6d28d920)', borderRadius: '12px', border: '2px solid #8b5cf6' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <div>
-                      <div style={{ color: theme.text, fontWeight: 700, fontSize: '18px' }}>🎯 {tradingRoadmapGoal.title || 'My Trading Journey'}</div>
-                      {tradingRoadmapGoal.targetDate && (
-                        <div style={{ color: theme.textMuted, fontSize: '13px' }}>Target: {new Date(tradingRoadmapGoal.targetDate).toLocaleDateString()}</div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => {
-                        if (confirm('Clear this roadmap?')) {
-                          setTradingRoadmapPhases([])
-                          setTradingRoadmapGoal({ title: '', targetDate: '', type: 'prop_funded' })
-                        }
-                      }}
-                      style={{ padding: '6px 12px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-                    >
-                      Clear Roadmap
-                    </button>
-                  </div>
-                  
-                  {/* Phases */}
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
-                    {tradingRoadmapPhases.map((phase, phaseIdx) => {
-                      const completedMilestones = phase.milestones?.filter((m: any) => m.completed).length || 0
-                      const totalMilestones = phase.milestones?.length || 0
-                      const phaseProgress = totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0
-                      const isCurrentPhase = phaseIdx === 0 || tradingRoadmapPhases[phaseIdx - 1]?.milestones?.every((m: any) => m.completed)
-                      
-                      return (
-                        <div 
-                          key={phase.id || phaseIdx}
-                          style={{ 
-                            padding: '16px', 
-                            background: phaseProgress === 100 ? theme.success + '20' : isCurrentPhase ? theme.cardBg : theme.cardBg + '60',
-                            borderRadius: '12px',
-                            border: `2px solid ${phaseProgress === 100 ? theme.success : isCurrentPhase ? theme.warning : theme.border}`,
-                            opacity: isCurrentPhase || phaseProgress === 100 ? 1 : 0.6
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              <div style={{
-                                width: '32px', height: '32px', borderRadius: '50%',
-                                background: phaseProgress === 100 ? theme.success : isCurrentPhase ? theme.warning : theme.border,
-                                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontWeight: 700, fontSize: '14px'
-                              }}>
-                                {phaseProgress === 100 ? '✓' : phaseIdx + 1}
-                              </div>
-                              <div>
-                                <div style={{ color: theme.text, fontWeight: 600, fontSize: '15px' }}>{phase.name}</div>
-                                <div style={{ color: theme.textMuted, fontSize: '12px' }}>{phase.duration}</div>
-                              </div>
-                            </div>
-                            <div style={{ 
-                              padding: '4px 10px', 
-                              background: phaseProgress === 100 ? theme.success + '30' : theme.warning + '30',
-                              color: phaseProgress === 100 ? theme.success : theme.warning,
-                              borderRadius: '12px', fontSize: '12px', fontWeight: 600
-                            }}>
-                              {completedMilestones}/{totalMilestones} complete
-                            </div>
-                          </div>
-                          
-                          {/* Progress bar */}
-                          <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden', marginBottom: '12px' }}>
-                            <div style={{ width: phaseProgress + '%', height: '100%', background: phaseProgress === 100 ? theme.success : `linear-gradient(90deg, ${theme.warning}, ${theme.success})`, transition: 'width 0.3s' }} />
-                          </div>
-                          
-                          {/* Milestones */}
-                          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                            {phase.milestones?.map((milestone: any, mIdx: number) => (
-                              <div
-                                key={milestone.id || mIdx}
-                                onClick={() => {
-                                  if (isCurrentPhase || phaseProgress === 100) {
-                                    setTradingRoadmapPhases(prev => prev.map((p, pIdx) => {
-                                      if (pIdx === phaseIdx) {
-                                        return {
-                                          ...p,
-                                          milestones: p.milestones.map((m: any, idx: number) => 
-                                            idx === mIdx ? { ...m, completed: !m.completed } : m
-                                          )
-                                        }
-                                      }
-                                      return p
-                                    }))
-                                  }
-                                }}
-                                style={{
-                                  padding: '10px 14px',
-                                  background: milestone.completed ? theme.success + '20' : (darkMode ? '#1e293b' : '#f8fafc'),
-                                  borderRadius: '8px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '10px',
-                                  cursor: isCurrentPhase || phaseProgress === 100 ? 'pointer' : 'default',
-                                  border: milestone.completed ? `1px solid ${theme.success}40` : '1px solid transparent'
-                                }}
-                              >
-                                <div style={{
-                                  width: '20px', height: '20px', borderRadius: '4px',
-                                  background: milestone.completed ? theme.success : theme.border,
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  color: 'white', fontSize: '12px', fontWeight: 700, flexShrink: 0
-                                }}>
-                                  {milestone.completed ? '✓' : ''}
-                                </div>
-                                <span style={{ 
-                                  color: theme.text, 
-                                  fontSize: '13px',
-                                  textDecoration: milestone.completed ? 'line-through' : 'none',
-                                  opacity: milestone.completed ? 0.7 : 1
-                                }}>
-                                  {milestone.task}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-              
-              {/* Add Milestone Form */}
-              {showAddTradingMilestone && (
-                <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', marginBottom: '20px', border: '1px solid ' + theme.border }}>
-                  <h4 style={{ margin: '0 0 16px 0', color: theme.text }}>✨ Add Trading Milestone</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Milestone Name</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., Pass FTMO Challenge, Hit 100 trades, $10K profit"
-                        value={newTradingMilestone.name}
-                        onChange={e => setNewTradingMilestone({...newTradingMilestone, name: e.target.value})}
-                        style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Target Amount ($)</label>
-                      <input
-                        type="number"
-                        placeholder="e.g., 10000"
-                        value={newTradingMilestone.targetAmount}
-                        onChange={e => setNewTradingMilestone({...newTradingMilestone, targetAmount: e.target.value})}
-                        style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Target Date (optional)</label>
-                      <input
-                        type="date"
-                        value={newTradingMilestone.targetDate}
-                        onChange={e => setNewTradingMilestone({...newTradingMilestone, targetDate: e.target.value})}
-                        style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Category</label>
-                      <select
-                        value={newTradingMilestone.category}
-                        onChange={e => setNewTradingMilestone({...newTradingMilestone, category: e.target.value})}
-                        style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text }}
-                      >
-                        <option value="prop">🎯 Prop Firm</option>
-                        <option value="personal">💰 Personal Account</option>
-                        <option value="skill">📚 Skill Development</option>
-                        <option value="income">💵 Income Goal</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Notes (optional)</label>
-                    <textarea
-                      placeholder="Any additional notes about this milestone..."
-                      value={newTradingMilestone.notes}
-                      onChange={e => setNewTradingMilestone({...newTradingMilestone, notes: e.target.value})}
-                      style={{ width: '100%', padding: '10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text, minHeight: '60px', resize: 'vertical' as const }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={() => {
-                        if (newTradingMilestone.name) {
-                          setTradingRoadmap(prev => [...prev, {
-                            id: Date.now(),
-                            ...newTradingMilestone,
-                            currentAmount: 0,
-                            completed: false,
-                            createdAt: new Date().toISOString()
-                          }])
-                          setNewTradingMilestone({ name: '', targetAmount: '', targetDate: '', category: 'prop', icon: '🎯', notes: '', currentAmount: 0 })
-                          setShowAddTradingMilestone(false)
-                        }
-                      }}
-                      style={{ padding: '10px 20px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
-                    >
-                      Add Milestone
-                    </button>
-                    <button
-                      onClick={() => setShowAddTradingMilestone(false)}
-                      style={{ padding: '10px 20px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer' }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-              
-              {/* Milestones Display */}
-              {tradingRoadmap.length === 0 ? (
-                <div style={{ textAlign: 'center' as const, padding: '40px', color: theme.textMuted }}>
-                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎯</div>
-                  <p style={{ marginBottom: '8px' }}>No trading milestones yet</p>
-                  <p style={{ fontSize: '13px' }}>Add milestones to track your journey: prop challenges, income goals, skill development, etc.</p>
-                </div>
-              ) : (
-                <div style={{ position: 'relative' }}>
-                  {/* Timeline Line */}
-                  <div style={{ position: 'absolute', left: '20px', top: '20px', bottom: '20px', width: '4px', background: `linear-gradient(180deg, ${theme.warning}, ${theme.success})`, borderRadius: '2px' }} />
-                  
-                  {/* Milestones */}
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
-                    {tradingRoadmap.sort((a, b) => {
-                      if (a.completed && !b.completed) return 1
-                      if (!a.completed && b.completed) return -1
-                      if (a.targetDate && b.targetDate) return new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime()
-                      return 0
-                    }).map((milestone, idx) => {
-                      const progress = milestone.targetAmount && parseFloat(milestone.targetAmount) > 0 
-                        ? Math.min((milestone.currentAmount || 0) / parseFloat(milestone.targetAmount) * 100, 100)
-                        : 0
-                      const daysUntil = milestone.targetDate 
-                        ? Math.ceil((new Date(milestone.targetDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-                        : null
-                      const categoryIcons: {[key: string]: string} = { prop: '🎯', personal: '💰', skill: '📚', income: '💵' }
-                      
-                      return (
-                        <div key={milestone.id} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', paddingLeft: '8px' }}>
-                          {/* Timeline Dot */}
-                          <div style={{ 
-                            width: '28px', height: '28px', borderRadius: '50%', 
-                            background: milestone.completed ? theme.success : progress > 0 ? theme.warning : theme.cardBg,
-                            border: '3px solid ' + (milestone.completed ? theme.success : theme.warning),
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: '12px', zIndex: 1, flexShrink: 0
-                          }}>
-                            {milestone.completed ? '✓' : categoryIcons[milestone.category] || '🎯'}
-                          </div>
-                          
-                          {/* Milestone Card */}
-                          <div style={{ 
-                            flex: 1, padding: '16px', 
-                            background: milestone.completed ? theme.success + '20' : theme.cardBg, 
-                            borderRadius: '12px', 
-                            border: '1px solid ' + (milestone.completed ? theme.success : theme.border),
-                            opacity: milestone.completed ? 0.8 : 1
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                              <div>
-                                <div style={{ fontWeight: 600, color: theme.text, fontSize: '15px' }}>{milestone.name}</div>
-                                {milestone.notes && <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{milestone.notes}</div>}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                {daysUntil !== null && !milestone.completed && (
-                                  <span style={{ 
-                                    padding: '4px 8px', 
-                                    background: daysUntil < 7 ? theme.danger + '20' : daysUntil < 30 ? theme.warning + '20' : theme.success + '20',
-                                    color: daysUntil < 7 ? theme.danger : daysUntil < 30 ? theme.warning : theme.success,
-                                    borderRadius: '4px', fontSize: '11px', fontWeight: 600
-                                  }}>
-                                    {daysUntil > 0 ? `${daysUntil} days` : daysUntil === 0 ? 'Today!' : 'Overdue'}
-                                  </span>
-                                )}
-                                <button 
-                                  onClick={() => setTradingRoadmap(prev => prev.filter(m => m.id !== milestone.id))}
-                                  style={{ padding: '4px 8px', background: 'transparent', color: theme.textMuted, border: 'none', cursor: 'pointer', fontSize: '12px' }}
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </div>
-                            
-                            {/* Progress */}
-                            {milestone.targetAmount && parseFloat(milestone.targetAmount) > 0 && (
-                              <div style={{ marginBottom: '8px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: theme.textMuted, marginBottom: '4px' }}>
-                                  <span>${(milestone.currentAmount || 0).toLocaleString()}</span>
-                                  <span>${parseFloat(milestone.targetAmount).toLocaleString()}</span>
-                                </div>
-                                <div style={{ height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
-                                  <div style={{ width: progress + '%', height: '100%', background: milestone.completed ? theme.success : `linear-gradient(90deg, ${theme.warning}, ${theme.success})`, borderRadius: '4px', transition: 'width 0.3s' }} />
-                                </div>
-                                <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '4px' }}>{progress.toFixed(1)}% complete</div>
-                              </div>
-                            )}
-                            
-                            {/* Actions */}
-                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                              {!milestone.completed && (
-                                <>
-                                  <input
-                                    type="number"
-                                    placeholder="Update amount"
-                                    style={{ padding: '6px 10px', background: darkMode ? '#1e293b' : '#f1f5f9', border: '1px solid ' + theme.border, borderRadius: '6px', color: theme.text, fontSize: '12px', width: '120px' }}
-                                    onKeyPress={e => {
-                                      if (e.key === 'Enter') {
-                                        const input = e.target as HTMLInputElement
-                                        const newAmount = parseFloat(input.value)
-                                        if (!isNaN(newAmount)) {
-                                          setTradingRoadmap(prev => prev.map(m => m.id === milestone.id ? { ...m, currentAmount: newAmount } : m))
-                                          input.value = ''
-                                        }
-                                      }
-                                    }}
-                                  />
-                                  <button
-                                    onClick={() => setTradingRoadmap(prev => prev.map(m => m.id === milestone.id ? { ...m, completed: true } : m))}
-                                    style={{ padding: '6px 12px', background: theme.success + '20', color: theme.success, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-                                  >
-                                    ✓ Complete
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-              
-              {/* Smart Suggestions */}
-              {tradingRoadmap.length === 0 && tradingAccounts.length > 0 && (
-                <div style={{ marginTop: '20px', padding: '16px', background: theme.warning + '15', borderRadius: '12px', border: '1px solid ' + theme.warning + '30' }}>
-                  <div style={{ color: theme.text, fontWeight: 600, marginBottom: '12px' }}>💡 Suggested Milestones</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
-                    {tradingAccounts.filter(a => a.type !== 'personal').map(acc => (
-                      <button
-                        key={acc.id}
-                        onClick={() => {
-                          setTradingRoadmap(prev => [...prev, {
-                            id: Date.now(),
-                            name: `Pass ${acc.propFirm || acc.name} Challenge`,
-                            targetAmount: (parseFloat(acc.startingBalance || '0') * parseFloat(acc.profitTarget || '10') / 100).toString(),
-                            category: 'prop',
-                            icon: '🎯',
-                            notes: `Profit target: ${acc.profitTarget}%`,
-                            currentAmount: Math.max(0, parseFloat(acc.currentBalance || '0') - parseFloat(acc.startingBalance || '0')),
-                            targetDate: '',
-                            completed: false,
-                            createdAt: new Date().toISOString()
-                          }])
-                        }}
-                        style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '13px' }}
-                      >
-                        + Pass {acc.propFirm || acc.name}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => {
-                        setTradingRoadmap(prev => [...prev, {
-                          id: Date.now(),
-                          name: 'Complete 100 Trades',
-                          targetAmount: '100',
-                          category: 'skill',
-                          icon: '📚',
-                          notes: 'Build consistency through volume',
-                          currentAmount: trades.length,
-                          targetDate: '',
-                          completed: false,
-                          createdAt: new Date().toISOString()
-                        }])
-                      }}
-                      style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '13px' }}
-                    >
-                      + 100 Trades Milestone
-                    </button>
-                    <button
-                      onClick={() => {
-                        setTradingRoadmap(prev => [...prev, {
-                          id: Date.now(),
-                          name: '$10,000 Total Profit',
-                          targetAmount: '10000',
-                          category: 'income',
-                          icon: '💵',
-                          notes: 'Cumulative trading profits',
-                          currentAmount: trades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0),
-                          targetDate: '',
-                          completed: false,
-                          createdAt: new Date().toISOString()
-                        }])
-                      }}
-                      style={{ padding: '8px 16px', background: theme.cardBg, color: theme.text, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '13px' }}
-                    >
-                      + $10K Profit Goal
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            </div>
-            )}
-            
-          </div>
-        )}
-      </main>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Entry Price</label>
-                    <input placeholder="Entry" type="number" step="0.00001" value={newTrade.entryPrice} onChange={e => setNewTrade({...newTrade, entryPrice: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Exit Price</label>
-                    <input placeholder="Exit" type="number" step="0.00001" value={newTrade.exitPrice} onChange={e => setNewTrade({...newTrade, exitPrice: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>P&L ($) *</label>
-                    <input placeholder="+100 or -50" type="number" value={newTrade.profitLoss} onChange={e => setNewTrade({...newTrade, profitLoss: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Setup Grade</label>
-                    <select value={newTrade.setupGrade} onChange={e => setNewTrade({...newTrade, setupGrade: e.target.value})} style={{...inputStyle, width: '100%'}}>
-                      <option value="A">A - Perfect Setup</option>
-                      <option value="B">B - Good Setup</option>
-                      <option value="C">C - Weak Setup</option>
-                    </select>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Notes</label>
-                    <input placeholder="What did you learn? What was the setup?" value={newTrade.notes} onChange={e => setNewTrade({...newTrade, notes: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
-                  <button onClick={addTrade} disabled={!newTrade.instrument || !newTrade.profitLoss} style={{ ...btnPrimary, opacity: (!newTrade.instrument || !newTrade.profitLoss) ? 0.5 : 1, padding: '10px 24px' }}>+ Log Trade</button>
-                </div>
-                {!newTrade.accountId && tradingAccounts.length > 0 && (
-                  <p style={{ color: theme.warning, fontSize: '11px', margin: '8px 0 0 0' }}>
-                    ⚠️ Select an account to track this trade's P&L against your account balance
-                  </p>
-                )}
-                {tradingAccounts.length === 0 && (
-                  <p style={{ color: theme.warning, fontSize: '11px', margin: '8px 0 0 0' }}>
-                    ⚠️ <span onClick={() => setShowAddAccount(true)} style={{ color: theme.accent, cursor: 'pointer', textDecoration: 'underline' }}>Create an account first</span> to track trades properly
-                  </p>
-                )}
-              </div>
-              
-              {/* Trade List */}
-              <div style={{ maxHeight: '500px', overflowY: 'auto' as const }}>
-                {trades.length === 0 ? (
-                  <div style={{ textAlign: 'center' as const, padding: '40px', color: theme.textMuted }}>
-                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>📓</div>
-                    <p>No trades logged yet. Start journaling to track your performance!</p>
-                  </div>
-                ) : trades.map(trade => {
-                  const linkedAccount = tradingAccounts.find(a => a.id === trade.accountId)
-                  const pnl = parseFloat(trade.profitLoss || '0')
-                  return (
-                    <div key={trade.id} style={{ 
-                      padding: '16px', 
-                      marginBottom: '8px', 
-                      background: pnl >= 0 ? (darkMode ? '#1e3a32' : '#f0fdf4') : (darkMode ? '#3a1e1e' : '#fef2f2'), 
-                      borderRadius: '12px', 
-                      border: '1px solid ' + (pnl >= 0 ? theme.success + '30' : theme.danger + '30')
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' as const }}>
-                          <span style={{ color: theme.textMuted, fontSize: '13px' }}>{trade.date}</span>
-                          <span style={{ color: theme.text, fontWeight: 700, fontSize: '16px' }}>{trade.instrument}</span>
-                          <span style={{ 
-                            padding: '3px 10px', 
-                            borderRadius: '4px', 
-                            fontSize: '11px', 
-                            fontWeight: 600, 
-                            background: trade.direction === 'long' ? theme.success + '20' : theme.danger + '20', 
-                            color: trade.direction === 'long' ? theme.success : theme.danger 
-                          }}>
-                            {trade.direction === 'long' ? '🟢 LONG' : '🔴 SHORT'}
-                          </span>
-                          {trade.setupGrade && (
-                            <span style={{ 
-                              padding: '3px 8px', 
-                              borderRadius: '4px', 
-                              fontSize: '11px', 
-                              fontWeight: 600, 
-                              background: trade.setupGrade === 'A' ? theme.success + '20' : trade.setupGrade === 'B' ? theme.warning + '20' : theme.danger + '20',
-                              color: trade.setupGrade === 'A' ? theme.success : trade.setupGrade === 'B' ? theme.warning : theme.danger
-                            }}>
-                              {trade.setupGrade} Setup
-                            </span>
-                          )}
-                          {linkedAccount && (
-                            <span style={{ padding: '3px 8px', background: theme.purple + '20', color: theme.purple, borderRadius: '4px', fontSize: '11px' }}>
-                              {linkedAccount.name}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ 
-                            color: pnl >= 0 ? theme.success : theme.danger, 
-                            fontSize: '22px', 
-                            fontWeight: 700 
-                          }}>
-                            {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
-                          </span>
-                          <button onClick={() => deleteTrade(trade.id)} style={{ padding: '6px 10px', background: theme.danger, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>🗑️</button>
-                        </div>
-                      </div>
-                      {(trade.entryPrice || trade.exitPrice || trade.notes) && (
-                        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' as const, color: theme.textMuted, fontSize: '12px' }}>
-                          {trade.entryPrice && <span>Entry: {trade.entryPrice}</span>}
-                          {trade.exitPrice && <span>Exit: {trade.exitPrice}</span>}
-                          {trade.notes && <span style={{ fontStyle: 'italic' }}>"{trade.notes}"</span>}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-      
-      {/* Footer Disclaimer */}
-      <footer style={{ padding: '16px 24px', background: theme.cardBg, borderTop: '1px solid ' + theme.border, textAlign: 'center' as const }}>
-        <p style={{ margin: '0 0 8px 0', color: theme.textMuted, fontSize: '11px', lineHeight: 1.5 }}>
-          ⚠️ <strong>Disclaimer:</strong> Aureus is an AI-powered financial assistant for educational and informational purposes only. 
-          This is not financial, tax, or legal advice. AI can make mistakes — always verify information. 
-          Consult qualified professionals before making financial decisions.
-        </p>
-        <p style={{ margin: 0, color: theme.textMuted, fontSize: '10px' }}>
-          © {new Date().getFullYear()} Aureus • Not affiliated with any financial institution • Past performance ≠ future results
-        </p>
-      </footer>
-
-      <style jsx global>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 1; }
-        }
-      `}</style>
-    </div>
-  )
-}
+              </div
