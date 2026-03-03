@@ -1,4 +1,4 @@
-t'
+'use client'
 
 import { useUser } from '@clerk/nextjs'
 import { useState, useEffect, useRef } from 'react'
