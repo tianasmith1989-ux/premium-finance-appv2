@@ -9548,51 +9548,9 @@ Sent from Aureus App
                         </select>
                       )}
                     </div>
-                  </div> 
-                        padding: '8px 16px', 
-                        background: analyticsTab === tab.key ? theme.warning : theme.cardBg, 
-                        color: analyticsTab === tab.key ? 'white' : theme.text, 
-                        border: '1px solid ' + (analyticsTab === tab.key ? theme.warning : theme.border), 
-                        borderRadius: '8px', 
-                        cursor: 'pointer', 
-                        fontSize: '13px', 
-                        fontWeight: 600 
-                      }}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <select 
-                    value={analyticsDateRange} 
-                    onChange={e => setAnalyticsDateRange(e.target.value as any)}
-                    style={{ ...inputStyle, padding: '6px 12px', fontSize: '12px' }}
-                  >
-                    <option value="7d">Last 7 days</option>
-                    <option value="30d">Last 30 days</option>
-                    <option value="90d">Last 90 days</option>
-                    <option value="all">All time</option>
-                  </select>
-                  <select 
-                    value={selectedAnalyticsAccount === 'all' ? 'all' : selectedAnalyticsAccount} 
-                    onChange={e => setSelectedAnalyticsAccount(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    style={{ ...inputStyle, padding: '6px 12px', fontSize: '12px' }}
-                  >
-                    <option value="all">All Accounts</option>
-                    {tradingAccounts.map(acc => (
-                      <option key={acc.id} value={acc.id}>{acc.name}</option>
-                    ))}
-                  </select>
-                  <button 
-                    onClick={() => setShowTradeImport(true)}
-                    style={{ padding: '6px 12px', background: theme.accent, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
-                  >
-                    📥 Import
-                  </button>
-                </div>
-              </div>
-              
+
               {/* OVERVIEW TAB */}
               {analyticsTab === 'overview' && (() => {
                 const analytics = calculateTradingAnalytics(selectedAnalyticsAccount, analyticsDateRange)
@@ -11226,123 +11184,7 @@ Sent from Aureus App
           </div>
         )}
       </main>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Entry Price</label>
-                    <input placeholder="Entry" type="number" step="0.00001" value={newTrade.entryPrice} onChange={e => setNewTrade({...newTrade, entryPrice: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Exit Price</label>
-                    <input placeholder="Exit" type="number" step="0.00001" value={newTrade.exitPrice} onChange={e => setNewTrade({...newTrade, exitPrice: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>P&L ($) *</label>
-                    <input placeholder="+100 or -50" type="number" value={newTrade.profitLoss} onChange={e => setNewTrade({...newTrade, profitLoss: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Setup Grade</label>
-                    <select value={newTrade.setupGrade} onChange={e => setNewTrade({...newTrade, setupGrade: e.target.value})} style={{...inputStyle, width: '100%'}}>
-                      <option value="A">A - Perfect Setup</option>
-                      <option value="B">B - Good Setup</option>
-                      <option value="C">C - Weak Setup</option>
-                    </select>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Notes</label>
-                    <input placeholder="What did you learn? What was the setup?" value={newTrade.notes} onChange={e => setNewTrade({...newTrade, notes: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
-                  <button onClick={addTrade} disabled={!newTrade.instrument || !newTrade.profitLoss} style={{ ...btnPrimary, opacity: (!newTrade.instrument || !newTrade.profitLoss) ? 0.5 : 1, padding: '10px 24px' }}>+ Log Trade</button>
-                </div>
-                {!newTrade.accountId && tradingAccounts.length > 0 && (
-                  <p style={{ color: theme.warning, fontSize: '11px', margin: '8px 0 0 0' }}>
-                    ⚠️ Select an account to track this trade's P&L against your account balance
-                  </p>
-                )}
-                {tradingAccounts.length === 0 && (
-                  <p style={{ color: theme.warning, fontSize: '11px', margin: '8px 0 0 0' }}>
-                    ⚠️ <span onClick={() => setShowAddAccount(true)} style={{ color: theme.accent, cursor: 'pointer', textDecoration: 'underline' }}>Create an account first</span> to track trades properly
-                  </p>
-                )}
-              </div>
-              
-              {/* Trade List */}
-              <div style={{ maxHeight: '500px', overflowY: 'auto' as const }}>
-                {trades.length === 0 ? (
-                  <div style={{ textAlign: 'center' as const, padding: '40px', color: theme.textMuted }}>
-                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>📓</div>
-                    <p>No trades logged yet. Start journaling to track your performance!</p>
-                  </div>
-                ) : trades.map(trade => {
-                  const linkedAccount = tradingAccounts.find(a => a.id === trade.accountId)
-                  const pnl = parseFloat(trade.profitLoss || '0')
-                  return (
-                    <div key={trade.id} style={{ 
-                      padding: '16px', 
-                      marginBottom: '8px', 
-                      background: pnl >= 0 ? (darkMode ? '#1e3a32' : '#f0fdf4') : (darkMode ? '#3a1e1e' : '#fef2f2'), 
-                      borderRadius: '12px', 
-                      border: '1px solid ' + (pnl >= 0 ? theme.success + '30' : theme.danger + '30')
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' as const }}>
-                          <span style={{ color: theme.textMuted, fontSize: '13px' }}>{trade.date}</span>
-                          <span style={{ color: theme.text, fontWeight: 700, fontSize: '16px' }}>{trade.instrument}</span>
-                          <span style={{ 
-                            padding: '3px 10px', 
-                            borderRadius: '4px', 
-                            fontSize: '11px', 
-                            fontWeight: 600, 
-                            background: trade.direction === 'long' ? theme.success + '20' : theme.danger + '20', 
-                            color: trade.direction === 'long' ? theme.success : theme.danger 
-                          }}>
-                            {trade.direction === 'long' ? '🟢 LONG' : '🔴 SHORT'}
-                          </span>
-                          {trade.setupGrade && (
-                            <span style={{ 
-                              padding: '3px 8px', 
-                              borderRadius: '4px', 
-                              fontSize: '11px', 
-                              fontWeight: 600, 
-                              background: trade.setupGrade === 'A' ? theme.success + '20' : trade.setupGrade === 'B' ? theme.warning + '20' : theme.danger + '20',
-                              color: trade.setupGrade === 'A' ? theme.success : trade.setupGrade === 'B' ? theme.warning : theme.danger
-                            }}>
-                              {trade.setupGrade} Setup
-                            </span>
-                          )}
-                          {linkedAccount && (
-                            <span style={{ padding: '3px 8px', background: theme.purple + '20', color: theme.purple, borderRadius: '4px', fontSize: '11px' }}>
-                              {linkedAccount.name}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ 
-                            color: pnl >= 0 ? theme.success : theme.danger, 
-                            fontSize: '22px', 
-                            fontWeight: 700 
-                          }}>
-                            {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
-                          </span>
-                          <button onClick={() => deleteTrade(trade.id)} style={{ padding: '6px 10px', background: theme.danger, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>🗑️</button>
-                        </div>
-                      </div>
-                      {(trade.entryPrice || trade.exitPrice || trade.notes) && (
-                        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' as const, color: theme.textMuted, fontSize: '12px' }}>
-                          {trade.entryPrice && <span>Entry: {trade.entryPrice}</span>}
-                          {trade.exitPrice && <span>Exit: {trade.exitPrice}</span>}
-                          {trade.notes && <span style={{ fontStyle: 'italic' }}>"{trade.notes}"</span>}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-      
+
       {/* Footer Disclaimer */}
       <footer style={{ padding: '16px 24px', background: theme.cardBg, borderTop: '1px solid ' + theme.border, textAlign: 'center' as const }}>
         <p style={{ margin: '0 0 8px 0', color: theme.textMuted, fontSize: '11px', lineHeight: 1.5 }}>
