@@ -340,21 +340,6 @@ export default function Dashboard() {
     }
   }
   
-  // Track wealth history (run on mount and when assets change)
-  useEffect(() => {
-    const today = new Date().toISOString().split('T')[0]
-    const wealth = calculateWealthPosition()
-    
-    setWealthHistory(prev => {
-      // Only add if we don't have today's entry
-      if (prev.length === 0 || prev[prev.length - 1].date !== today) {
-        return [...prev.slice(-365), { date: today, amount: wealth.netWorth }] // Keep 1 year
-      }
-      // Update today's entry
-      return [...prev.slice(0, -1), { date: today, amount: wealth.netWorth }]
-    })
-  }, [assets, liabilities, debts, tradingAccounts])
-  
   // Generate weekly report for trading
   const generateWeeklyReport = () => {
     const now = new Date()
@@ -1422,7 +1407,22 @@ Sent from Aureus App
   })
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
   const [showAddAccount, setShowAddAccount] = useState(false)
-  
+
+  // Track wealth history (run on mount and when assets change)
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0]
+    const wealth = calculateWealthPosition()
+
+    setWealthHistory(prev => {
+      // Only add if we don't have today's entry
+      if (prev.length === 0 || prev[prev.length - 1].date !== today) {
+        return [...prev.slice(-365), { date: today, amount: wealth.netWorth }] // Keep 1 year
+      }
+      // Update today's entry
+      return [...prev.slice(0, -1), { date: today, amount: wealth.netWorth }]
+    })
+  }, [assets, liabilities, debts, tradingAccounts])
+
   // ==================== TRADING RULES ====================
   const [tradingRules, setTradingRules] = useState<any[]>([
     { id: 1, rule: 'Max 3 trades per day', enabled: true, category: 'risk' },
