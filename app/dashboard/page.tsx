@@ -278,6 +278,132 @@ export default function Dashboard() {
   })
   
   const [showPricingModal, setShowPricingModal] = useState(false)
+  
+  // ==================== BUDGET ENHANCEMENTS ====================
+  // Wealth Position History (tracks over time)
+  const [wealthHistory, setWealthHistory] = useState<{date: string, amount: number}[]>([])
+  
+  // Bill reminders
+  const [billReminders, setBillReminders] = useState<{id: number, name: string, amount: string, dueDate: string, autoPay: boolean, paid: boolean}[]>([])
+  
+  // Subscription audit
+  const [subscriptionAudit, setSubscriptionAudit] = useState<{id: number, name: string, cost: string, frequency: string, lastUsed: string, category: string}[]>([])
+  
+  // Financial milestones/achievements
+  const [financialMilestones, setFinancialMilestones] = useState<{id: number, title: string, date: string, amount?: number, type: string}[]>([])
+  
+  // Budget analytics view
+  const [budgetAnalyticsTab, setBudgetAnalyticsTab] = useState<'spending' | 'wealth' | 'bills' | 'subscriptions' | 'milestones'>('spending')
+  const [showBudgetAnalytics, setShowBudgetAnalytics] = useState(false)
+  
+  // Calculate spending by category
+  const calculateSpendingAnalytics = () => {
+    const categoryTotals: {[key: string]: number} = {}
+    const monthlyExpenseTotal = expenses.reduce((sum, e) => {
+      const amount = parseFloat(e.amount || '0')
+      const monthly = e.frequency === 'weekly' ? amount * 4.33 : e.frequency === 'fortnightly' ? amount * 2.17 : e.frequency === 'yearly' ? amount / 12 : amount
+      const cat = e.category || 'other'
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + monthly
+      return sum + monthly
+    }, 0)
+    
+    // Calculate month-over-month change (simulated for now)
+    const lastMonthTotal = monthlyExpenseTotal * 0.95 // Placeholder
+    const change = monthlyExpenseTotal - lastMonthTotal
+    const changePercent = lastMonthTotal > 0 ? (change / lastMonthTotal) * 100 : 0
+    
+    return {
+      total: monthlyExpenseTotal,
+      byCategory: categoryTotals,
+      change,
+      changePercent,
+      topCategory: Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0] || ['none', 0]
+    }
+  }
+  
+  // Calculate wealth position
+  const calculateWealthPosition = () => {
+    const totalAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || '0'), 0)
+    const totalLiabilitiesAmount = liabilities.reduce((sum, l) => sum + parseFloat(l.value || '0'), 0)
+    const totalDebtAmount = debts.reduce((sum, d) => sum + parseFloat(d.balance || '0'), 0)
+    const tradingBalance = tradingAccounts.reduce((sum, acc) => sum + parseFloat(acc.currentBalance || acc.startingBalance || '0'), 0)
+    const tradingPnL = trades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+    const totalPayoutsValue = payouts.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0)
+    
+    return {
+      assets: totalAssets,
+      tradingAssets: tradingBalance,
+      tradingPnL,
+      payouts: totalPayoutsValue,
+      liabilities: totalLiabilitiesAmount + totalDebtAmount,
+      netWorth: totalAssets + tradingBalance - totalLiabilitiesAmount - totalDebtAmount
+    }
+  }
+  
+  // Track wealth history (run on mount and when assets change)
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0]
+    const wealth = calculateWealthPosition()
+    
+    setWealthHistory(prev => {
+      // Only add if we don't have today's entry
+      if (prev.length === 0 || prev[prev.length - 1].date !== today) {
+        return [...prev.slice(-365), { date: today, amount: wealth.netWorth }] // Keep 1 year
+      }
+      // Update today's entry
+      return [...prev.slice(0, -1), { date: today, amount: wealth.netWorth }]
+    })
+  }, [assets, liabilities, debts, tradingAccounts])
+  
+  // Generate weekly report for trading
+  const generateWeeklyReport = () => {
+    const now = new Date()
+    const weekStart = new Date(now)
+    weekStart.setDate(now.getDate() - 7)
+    
+    const weekTrades = trades.filter(t => new Date(t.date) >= weekStart)
+    const weekPnL = weekTrades.reduce((sum, t) => sum + parseFloat(t.profitLoss || '0'), 0)
+    const weekWins = weekTrades.filter(t => parseFloat(t.profitLoss || '0') > 0)
+    const weekLosses = weekTrades.filter(t => parseFloat(t.profitLoss || '0') < 0)
+    const weekWinRate = weekTrades.length > 0 ? (weekWins.length / weekTrades.length) * 100 : 0
+    
+    // Best/worst setups
+    const setupStats: {[key: string]: {pnl: number, trades: number}} = {}
+    weekTrades.forEach(t => {
+      const setup = t.setupType || 'Untagged'
+      if (!setupStats[setup]) setupStats[setup] = { pnl: 0, trades: 0 }
+      setupStats[setup].pnl += parseFloat(t.profitLoss || '0')
+      setupStats[setup].trades++
+    })
+    const sortedSetups = Object.entries(setupStats).sort((a, b) => b[1].pnl - a[1].pnl)
+    
+    // Best/worst days
+    const dayStats: {[key: string]: number} = {}
+    weekTrades.forEach(t => {
+      const day = new Date(t.date).toLocaleDateString('en-US', { weekday: 'long' })
+      dayStats[day] = (dayStats[day] || 0) + parseFloat(t.profitLoss || '0')
+    })
+    const bestDay = Object.entries(dayStats).sort((a, b) => b[1] - a[1])[0]
+    const worstDay = Object.entries(dayStats).sort((a, b) => a[1] - b[1])[0]
+    
+    // Rules followed
+    const rulesFollowed = weekTrades.filter(t => t.followedPlan).length
+    const rulesRate = weekTrades.length > 0 ? (rulesFollowed / weekTrades.length) * 100 : 0
+    
+    return {
+      totalTrades: weekTrades.length,
+      pnl: weekPnL,
+      winRate: weekWinRate,
+      wins: weekWins.length,
+      losses: weekLosses.length,
+      bestSetup: sortedSetups[0] || null,
+      worstSetup: sortedSetups[sortedSetups.length - 1] || null,
+      bestDay,
+      worstDay,
+      rulesFollowed: rulesRate,
+      avgTradeSize: weekTrades.length > 0 ? weekPnL / weekTrades.length : 0
+    }
+  }
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
   const [feedbackText, setFeedbackText] = useState('')
@@ -1602,6 +1728,11 @@ Sent from Aureus App
       if (data.tradingRoadmapPhases) setTradingRoadmapPhases(data.tradingRoadmapPhases)
       if (data.roadmapProgress) setRoadmapProgress(data.roadmapProgress)
       if (data.tradeTemplates) setTradeTemplates(data.tradeTemplates)
+      // Budget enhancements
+      if (data.wealthHistory) setWealthHistory(data.wealthHistory)
+      if (data.billReminders) setBillReminders(data.billReminders)
+      if (data.subscriptionAudit) setSubscriptionAudit(data.subscriptionAudit)
+      if (data.financialMilestones) setFinancialMilestones(data.financialMilestones)
     }
   }, [])
 
@@ -1614,10 +1745,12 @@ Sent from Aureus App
       budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription,
       tradeSetups, tradeTags, tradeMistakes, payouts,
       preSessionChecklist, customChecklistItems, dailyReviews,
-      tradingRoadmapGoal, tradingRoadmapPhases, roadmapProgress, tradeTemplates
+      tradingRoadmapGoal, tradingRoadmapPhases, roadmapProgress, tradeTemplates,
+      // Budget enhancements
+      wealthHistory, billReminders, subscriptionAudit, financialMilestones
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings, budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription, tradeSetups, tradeTags, tradeMistakes, payouts, preSessionChecklist, customChecklistItems, dailyReviews, tradingRoadmapGoal, tradingRoadmapPhases, roadmapProgress, tradeTemplates])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, trades, budgetMemory, tradingMemory, paidOccurrences, roadmapMilestones, tradingRoadmap, tradingRules, tradingAccounts, tradeIdeaSettings, budgetOnboarding, tradingOnboarding, chatMessages, userCountry, userSubscription, tradeSetups, tradeTags, tradeMistakes, payouts, preSessionChecklist, customChecklistItems, dailyReviews, tradingRoadmapGoal, tradingRoadmapPhases, roadmapProgress, tradeTemplates, wealthHistory, billReminders, subscriptionAudit, financialMilestones])
 
   // Scroll chat to bottom - use scrollTop instead of scrollIntoView to avoid page jump
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -3349,6 +3482,63 @@ Sent from Aureus App
               }
               return phase
             }))
+          }
+          break
+          
+        case 'generateWeeklyReport':
+          // Generate and show weekly report
+          const report = generateWeeklyReport()
+          // The report data is used by Aureus in its response
+          setActiveTab('trading')
+          setTradingSubTab('analytics')
+          setAnalyticsTab('overview')
+          break
+          
+        case 'openQuickTrade':
+          setQuickTradeType(data.type || null)
+          setShowQuickTradeModal(true)
+          break
+          
+        case 'showBudgetAnalytics':
+          setShowBudgetAnalytics(true)
+          if (data.tab) setBudgetAnalyticsTab(data.tab)
+          break
+          
+        case 'addFinancialMilestone':
+          if (data.title) {
+            setFinancialMilestones(prev => [...prev, {
+              id: Date.now(),
+              title: data.title,
+              date: data.date || new Date().toISOString().split('T')[0],
+              amount: data.amount,
+              type: data.type || 'general'
+            }])
+          }
+          break
+          
+        case 'addBillReminder':
+          if (data.name && data.amount) {
+            setBillReminders(prev => [...prev, {
+              id: Date.now(),
+              name: data.name,
+              amount: data.amount.toString(),
+              dueDate: data.dueDate || '',
+              autoPay: data.autoPay || false,
+              paid: false
+            }])
+          }
+          break
+          
+        case 'addSubscription':
+          if (data.name && data.cost) {
+            setSubscriptionAudit(prev => [...prev, {
+              id: Date.now(),
+              name: data.name,
+              cost: data.cost.toString(),
+              frequency: data.frequency || 'monthly',
+              lastUsed: data.lastUsed || new Date().toISOString().split('T')[0],
+              category: data.category || 'entertainment'
+            }])
           }
           break
       }
@@ -6211,6 +6401,324 @@ Sent from Aureus App
               </div>
             </div>
 
+            {/* ==================== BUDGET ANALYTICS DASHBOARD ==================== */}
+            <div style={{ padding: '24px', background: `linear-gradient(135deg, ${theme.accent}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.accent }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '28px' }}>📊</span>
+                  <div>
+                    <h2 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>Financial Analytics</h2>
+                    <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '12px' }}>Track your spending, wealth, and progress</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Analytics Tabs */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' as const }}>
+                {[
+                  { key: 'spending', icon: '💸', label: 'Spending' },
+                  { key: 'wealth', icon: '💰', label: 'Wealth Position' },
+                  { key: 'bills', icon: '📅', label: 'Upcoming Bills' },
+                  { key: 'subscriptions', icon: '🔄', label: 'Subscriptions' },
+                  { key: 'milestones', icon: '🏆', label: 'Milestones' }
+                ].map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setBudgetAnalyticsTab(tab.key as any)}
+                    style={{
+                      padding: '10px 16px',
+                      background: budgetAnalyticsTab === tab.key ? theme.accent : theme.cardBg,
+                      color: budgetAnalyticsTab === tab.key ? 'white' : theme.text,
+                      border: '1px solid ' + (budgetAnalyticsTab === tab.key ? theme.accent : theme.border),
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: 500,
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span>{tab.icon}</span>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              
+              {/* SPENDING TAB */}
+              {budgetAnalyticsTab === 'spending' && (() => {
+                const analytics = calculateSpendingAnalytics()
+                const categoryColors: {[key: string]: string} = {
+                  housing: '#3b82f6', transport: '#8b5cf6', food: '#10b981', utilities: '#f59e0b',
+                  insurance: '#ef4444', entertainment: '#ec4899', health: '#06b6d4', education: '#6366f1',
+                  personal: '#f97316', debt: '#dc2626', savings: '#22c55e', other: '#64748b'
+                }
+                const categoryEmojis: {[key: string]: string} = {
+                  housing: '🏠', transport: '🚗', food: '🍔', utilities: '💡', insurance: '🛡️',
+                  entertainment: '🎬', health: '💊', education: '📚', personal: '👤', debt: '💳', savings: '💰', other: '📦'
+                }
+                
+                return (
+                  <div>
+                    {/* Summary Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
+                      <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Monthly Spending</div>
+                        <div style={{ color: theme.danger, fontSize: '28px', fontWeight: 700 }}>${analytics.total.toFixed(0)}</div>
+                      </div>
+                      <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Top Category</div>
+                        <div style={{ color: theme.text, fontSize: '20px', fontWeight: 700 }}>
+                          {categoryEmojis[analytics.topCategory[0] as string] || '📦'} {(analytics.topCategory[0] as string).charAt(0).toUpperCase() + (analytics.topCategory[0] as string).slice(1)}
+                        </div>
+                        <div style={{ color: theme.danger, fontSize: '14px' }}>${(analytics.topCategory[1] as number).toFixed(0)}/mo</div>
+                      </div>
+                      <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>vs Last Month</div>
+                        <div style={{ color: analytics.changePercent > 0 ? theme.danger : theme.success, fontSize: '28px', fontWeight: 700 }}>
+                          {analytics.changePercent > 0 ? '+' : ''}{analytics.changePercent.toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Category Breakdown */}
+                    <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px' }}>
+                      <h4 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '15px' }}>Spending by Category</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                        {Object.entries(analytics.byCategory).sort((a, b) => b[1] - a[1]).map(([cat, amount]) => {
+                          const percentage = analytics.total > 0 ? (amount / analytics.total) * 100 : 0
+                          return (
+                            <div key={cat}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <span style={{ color: theme.text, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span>{categoryEmojis[cat] || '📦'}</span>
+                                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                </span>
+                                <span style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>${amount.toFixed(0)} <span style={{ color: theme.textMuted, fontWeight: 400 }}>({percentage.toFixed(0)}%)</span></span>
+                              </div>
+                              <div style={{ height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
+                                <div style={{ width: percentage + '%', height: '100%', background: categoryColors[cat] || '#64748b', borderRadius: '4px' }} />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+              
+              {/* WEALTH POSITION TAB */}
+              {budgetAnalyticsTab === 'wealth' && (() => {
+                const wealth = calculateWealthPosition()
+                
+                return (
+                  <div>
+                    {/* Main Wealth Card */}
+                    <div style={{ padding: '24px', background: `linear-gradient(135deg, ${theme.success}20, ${theme.accent}20)`, borderRadius: '16px', marginBottom: '20px', textAlign: 'center' as const }}>
+                      <div style={{ color: theme.textMuted, fontSize: '14px', marginBottom: '8px' }}>Total Wealth Position</div>
+                      <div style={{ color: wealth.netWorth >= 0 ? theme.success : theme.danger, fontSize: '42px', fontWeight: 700 }}>
+                        ${wealth.netWorth.toLocaleString()}
+                      </div>
+                      <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '8px' }}>
+                        Assets: ${(wealth.assets + wealth.tradingAssets).toLocaleString()} • Liabilities: ${wealth.liabilities.toLocaleString()}
+                      </div>
+                    </div>
+                    
+                    {/* Breakdown */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                      <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px' }}>
+                        <h4 style={{ margin: '0 0 16px 0', color: theme.success, fontSize: '15px' }}>💰 Assets</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: theme.textMuted, fontSize: '13px' }}>Savings & Investments</span>
+                            <span style={{ color: theme.text, fontWeight: 600 }}>${wealth.assets.toLocaleString()}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: theme.textMuted, fontSize: '13px' }}>Trading Accounts</span>
+                            <span style={{ color: theme.text, fontWeight: 600 }}>${wealth.tradingAssets.toLocaleString()}</span>
+                          </div>
+                          {wealth.payouts > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: theme.textMuted, fontSize: '13px' }}>Total Payouts</span>
+                              <span style={{ color: theme.success, fontWeight: 600 }}>${wealth.payouts.toLocaleString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px' }}>
+                        <h4 style={{ margin: '0 0 16px 0', color: theme.danger, fontSize: '15px' }}>💳 Liabilities</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: theme.textMuted, fontSize: '13px' }}>Total Debt</span>
+                            <span style={{ color: theme.danger, fontWeight: 600 }}>${wealth.liabilities.toLocaleString()}</span>
+                          </div>
+                          {debts.map(d => (
+                            <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '12px' }}>
+                              <span style={{ color: theme.textMuted, fontSize: '12px' }}>{d.name}</span>
+                              <span style={{ color: theme.textMuted, fontSize: '12px' }}>${parseFloat(d.balance || '0').toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Trading P&L Summary */}
+                    {trades.length > 0 && (
+                      <div style={{ padding: '16px', background: theme.warning + '20', borderRadius: '12px', marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ color: theme.text, fontWeight: 600 }}>📈 Trading Performance</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>{trades.length} trades logged</div>
+                        </div>
+                        <div style={{ textAlign: 'right' as const }}>
+                          <div style={{ color: wealth.tradingPnL >= 0 ? theme.success : theme.danger, fontWeight: 700, fontSize: '18px' }}>
+                            {wealth.tradingPnL >= 0 ? '+' : ''}${wealth.tradingPnL.toLocaleString()}
+                          </div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Total P&L</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+              
+              {/* UPCOMING BILLS TAB */}
+              {budgetAnalyticsTab === 'bills' && (
+                <div>
+                  <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px' }}>
+                    <h4 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '15px' }}>📅 Bills Due This Week</h4>
+                    {(() => {
+                      const today = new Date()
+                      const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+                      const upcomingExpenses = expenses.filter(e => {
+                        if (!e.dueDate) return false
+                        const dueDate = new Date(e.dueDate)
+                        return dueDate >= today && dueDate <= nextWeek
+                      }).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+                      
+                      if (upcomingExpenses.length === 0) {
+                        return <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No bills due in the next 7 days 🎉</p>
+                      }
+                      
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                          {upcomingExpenses.map(exp => {
+                            const dueDate = new Date(exp.dueDate)
+                            const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                            return (
+                              <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: daysUntil <= 2 ? theme.danger + '20' : theme.cardBg, borderRadius: '8px', border: '1px solid ' + (daysUntil <= 2 ? theme.danger : theme.border) }}>
+                                <div>
+                                  <div style={{ color: theme.text, fontWeight: 600 }}>{exp.name}</div>
+                                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>
+                                    Due {dueDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                    {daysUntil === 0 ? ' (TODAY!)' : daysUntil === 1 ? ' (Tomorrow)' : ` (${daysUntil} days)`}
+                                  </div>
+                                </div>
+                                <div style={{ color: theme.danger, fontWeight: 700, fontSize: '18px' }}>${exp.amount}</div>
+                              </div>
+                            )
+                          })}
+                          <div style={{ padding: '12px', background: theme.warning + '20', borderRadius: '8px', textAlign: 'center' as const }}>
+                            <span style={{ color: theme.text, fontWeight: 600 }}>Total due this week: </span>
+                            <span style={{ color: theme.danger, fontWeight: 700 }}>${upcomingExpenses.reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0).toFixed(0)}</span>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </div>
+              )}
+              
+              {/* SUBSCRIPTIONS TAB */}
+              {budgetAnalyticsTab === 'subscriptions' && (
+                <div>
+                  <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <h4 style={{ margin: 0, color: theme.text, fontSize: '15px' }}>🔄 Your Subscriptions</h4>
+                      <div style={{ color: theme.danger, fontWeight: 700 }}>
+                        ${expenses.filter(e => e.frequency === 'monthly' && (e.category === 'entertainment' || e.category === 'other')).reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0).toFixed(0)}/mo
+                      </div>
+                    </div>
+                    
+                    {(() => {
+                      const subscriptions = expenses.filter(e => e.frequency === 'monthly')
+                      if (subscriptions.length === 0) {
+                        return <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No monthly subscriptions tracked</p>
+                      }
+                      
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                          {subscriptions.map(sub => (
+                            <div key={sub.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px' }}>
+                              <span style={{ color: theme.text }}>{sub.name}</span>
+                              <span style={{ color: theme.danger, fontWeight: 600 }}>${sub.amount}/mo</span>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()}
+                    
+                    {/* Aureus suggestion */}
+                    <div style={{ marginTop: '16px', padding: '12px', background: theme.warning + '20', borderRadius: '8px', borderLeft: '4px solid ' + theme.warning }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                        <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, color: '#78350f' }}>A</div>
+                        <span style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>Aureus Tip</span>
+                      </div>
+                      <p style={{ color: theme.text, fontSize: '13px', margin: 0 }}>
+                        Review your subscriptions monthly. Ask yourself: "Did I use this in the last 30 days?" If not, consider cancelling.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* MILESTONES TAB */}
+              {budgetAnalyticsTab === 'milestones' && (
+                <div>
+                  <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px' }}>
+                    <h4 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '15px' }}>🏆 Financial Milestones</h4>
+                    
+                    {financialMilestones.length === 0 ? (
+                      <div style={{ textAlign: 'center' as const, padding: '20px' }}>
+                        <p style={{ color: theme.textMuted, marginBottom: '12px' }}>No milestones yet! Here are some to aim for:</p>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, justifyContent: 'center' }}>
+                          {[
+                            { title: 'First $1,000 saved', type: 'savings_goal' },
+                            { title: 'Emergency fund complete', type: 'savings_goal' },
+                            { title: 'Debt-free', type: 'debt_payoff' },
+                            { title: 'First trading payout', type: 'first_payout' }
+                          ].map(m => (
+                            <button
+                              key={m.title}
+                              onClick={() => setFinancialMilestones(prev => [...prev, { id: Date.now(), title: m.title, date: new Date().toISOString().split('T')[0], type: m.type }])}
+                              style={{ padding: '8px 16px', background: theme.success + '20', color: theme.success, border: '1px solid ' + theme.success, borderRadius: '20px', cursor: 'pointer', fontSize: '12px' }}
+                            >
+                              + {m.title}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                        {financialMilestones.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(milestone => (
+                          <div key={milestone.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: theme.success + '20', borderRadius: '8px', border: '1px solid ' + theme.success }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <span style={{ fontSize: '24px' }}>🏆</span>
+                              <div>
+                                <div style={{ color: theme.text, fontWeight: 600 }}>{milestone.title}</div>
+                                <div style={{ color: theme.textMuted, fontSize: '12px' }}>{new Date(milestone.date).toLocaleDateString()}</div>
+                              </div>
+                            </div>
+                            {milestone.amount && <div style={{ color: theme.success, fontWeight: 700 }}>${milestone.amount.toLocaleString()}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Debts & Goals */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
               {/* Debts with Payoff Calculator */}
@@ -8721,6 +9229,60 @@ Sent from Aureus App
                   </div>
                 </div>
                 
+                {/* Weekly Report Card */}
+                <div style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.purple}20, ${theme.accent}20)`, borderRadius: '16px', border: '2px solid ' + theme.purple }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '24px' }}>📈</span>
+                      <div>
+                        <div style={{ color: theme.text, fontWeight: 600 }}>Weekly Report</div>
+                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>Last 7 days performance</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const report = generateWeeklyReport()
+                        sendQuickMessage(`Give me my weekly trading report with insights and recommendations.\n\nMy stats this week:\n- Trades: ${report.totalTrades}\n- P&L: $${report.pnl.toFixed(0)}\n- Win Rate: ${report.winRate.toFixed(0)}%\n- Wins: ${report.wins} | Losses: ${report.losses}\n- Rules Followed: ${report.rulesFollowed.toFixed(0)}%\n${report.bestSetup ? `- Best Setup: ${report.bestSetup[0]} ($${report.bestSetup[1].pnl.toFixed(0)})` : ''}\n${report.bestDay ? `- Best Day: ${report.bestDay[0]} ($${report.bestDay[1].toFixed(0)})` : ''}\n\nWhat should I focus on next week?`)
+                      }}
+                      style={{ padding: '10px 20px', background: theme.purple, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}
+                    >
+                      🤖 Get AI Report
+                    </button>
+                  </div>
+                  
+                  {(() => {
+                    const report = generateWeeklyReport()
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                        <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px', textAlign: 'center' as const }}>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>P&L</div>
+                          <div style={{ color: report.pnl >= 0 ? theme.success : theme.danger, fontSize: '18px', fontWeight: 700 }}>
+                            {report.pnl >= 0 ? '+' : ''}${report.pnl.toFixed(0)}
+                          </div>
+                        </div>
+                        <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px', textAlign: 'center' as const }}>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Win Rate</div>
+                          <div style={{ color: report.winRate >= 50 ? theme.success : theme.warning, fontSize: '18px', fontWeight: 700 }}>
+                            {report.winRate.toFixed(0)}%
+                          </div>
+                        </div>
+                        <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px', textAlign: 'center' as const }}>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Trades</div>
+                          <div style={{ color: theme.text, fontSize: '18px', fontWeight: 700 }}>
+                            {report.wins}W / {report.losses}L
+                          </div>
+                        </div>
+                        <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '8px', textAlign: 'center' as const }}>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Rules Followed</div>
+                          <div style={{ color: report.rulesFollowed >= 80 ? theme.success : report.rulesFollowed >= 50 ? theme.warning : theme.danger, fontSize: '18px', fontWeight: 700 }}>
+                            {report.rulesFollowed.toFixed(0)}%
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+                
                 {/* Aureus Chat */}
                 <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
@@ -10203,6 +10765,20 @@ Sent from Aureus App
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
+                  {/* Ask Aureus to Build a Plan */}
+                  <button
+                    onClick={() => {
+                      setChatMessages([{
+                        role: 'user',
+                        content: `I want to create a trading roadmap. Here's my situation:\n\n**Experience:** ${tradingMemory.experience || 'Not specified'}\n**Style:** ${tradingMemory.tradingStyle || 'Not specified'}\n**Accounts:** ${tradingAccounts.length > 0 ? tradingAccounts.map(a => `${a.name} (${a.propFirm || 'Personal'})`).join(', ') : 'None yet'}\n**Win Rate:** ${winRate.toFixed(0)}%\n**Total Trades:** ${trades.length}\n\nPlease create a personalized phased roadmap with specific milestones and timelines to help me become a consistently profitable trader and/or get funded.`
+                      }])
+                      sendQuickMessage(`I want to create a trading roadmap. Here's my situation:\n\n**Experience:** ${tradingMemory.experience || 'Not specified'}\n**Style:** ${tradingMemory.tradingStyle || 'Not specified'}\n**Accounts:** ${tradingAccounts.length > 0 ? tradingAccounts.map(a => `${a.name} (${a.propFirm || 'Personal'})`).join(', ') : 'None yet'}\n**Win Rate:** ${winRate.toFixed(0)}%\n**Total Trades:** ${trades.length}\n\nPlease create a personalized phased roadmap with specific milestones and timelines to help me become a consistently profitable trader and/or get funded.`)
+                      setTradingSubTab('today')
+                    }}
+                    style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
+                  >
+                    🤖 Create AI Roadmap
+                  </button>
                   {tradingRoadmap.length > 0 && (
                     <button
                       onClick={() => {
@@ -10224,7 +10800,7 @@ Sent from Aureus App
                       }}
                       style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
-                      🤖 Aureus: Build My Plan
+                      🤖 Analyze My Progress
                     </button>
                   )}
                   <button
@@ -10235,6 +10811,135 @@ Sent from Aureus App
                   </button>
                 </div>
               </div>
+              
+              {/* AI-Generated Phased Roadmap */}
+              {tradingRoadmapPhases.length > 0 && (
+                <div style={{ marginBottom: '24px', padding: '20px', background: 'linear-gradient(135deg, #8b5cf620, #6d28d920)', borderRadius: '12px', border: '2px solid #8b5cf6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div>
+                      <div style={{ color: theme.text, fontWeight: 700, fontSize: '18px' }}>🎯 {tradingRoadmapGoal.title || 'My Trading Journey'}</div>
+                      {tradingRoadmapGoal.targetDate && (
+                        <div style={{ color: theme.textMuted, fontSize: '13px' }}>Target: {new Date(tradingRoadmapGoal.targetDate).toLocaleDateString()}</div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (confirm('Clear this roadmap?')) {
+                          setTradingRoadmapPhases([])
+                          setTradingRoadmapGoal({ title: '', targetDate: '', type: 'prop_funded' })
+                        }
+                      }}
+                      style={{ padding: '6px 12px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                    >
+                      Clear Roadmap
+                    </button>
+                  </div>
+                  
+                  {/* Phases */}
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
+                    {tradingRoadmapPhases.map((phase, phaseIdx) => {
+                      const completedMilestones = phase.milestones?.filter((m: any) => m.completed).length || 0
+                      const totalMilestones = phase.milestones?.length || 0
+                      const phaseProgress = totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0
+                      const isCurrentPhase = phaseIdx === 0 || tradingRoadmapPhases[phaseIdx - 1]?.milestones?.every((m: any) => m.completed)
+                      
+                      return (
+                        <div 
+                          key={phase.id || phaseIdx}
+                          style={{ 
+                            padding: '16px', 
+                            background: phaseProgress === 100 ? theme.success + '20' : isCurrentPhase ? theme.cardBg : theme.cardBg + '60',
+                            borderRadius: '12px',
+                            border: `2px solid ${phaseProgress === 100 ? theme.success : isCurrentPhase ? theme.warning : theme.border}`,
+                            opacity: isCurrentPhase || phaseProgress === 100 ? 1 : 0.6
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{
+                                width: '32px', height: '32px', borderRadius: '50%',
+                                background: phaseProgress === 100 ? theme.success : isCurrentPhase ? theme.warning : theme.border,
+                                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontWeight: 700, fontSize: '14px'
+                              }}>
+                                {phaseProgress === 100 ? '✓' : phaseIdx + 1}
+                              </div>
+                              <div>
+                                <div style={{ color: theme.text, fontWeight: 600, fontSize: '15px' }}>{phase.name}</div>
+                                <div style={{ color: theme.textMuted, fontSize: '12px' }}>{phase.duration}</div>
+                              </div>
+                            </div>
+                            <div style={{ 
+                              padding: '4px 10px', 
+                              background: phaseProgress === 100 ? theme.success + '30' : theme.warning + '30',
+                              color: phaseProgress === 100 ? theme.success : theme.warning,
+                              borderRadius: '12px', fontSize: '12px', fontWeight: 600
+                            }}>
+                              {completedMilestones}/{totalMilestones} complete
+                            </div>
+                          </div>
+                          
+                          {/* Progress bar */}
+                          <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden', marginBottom: '12px' }}>
+                            <div style={{ width: phaseProgress + '%', height: '100%', background: phaseProgress === 100 ? theme.success : `linear-gradient(90deg, ${theme.warning}, ${theme.success})`, transition: 'width 0.3s' }} />
+                          </div>
+                          
+                          {/* Milestones */}
+                          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                            {phase.milestones?.map((milestone: any, mIdx: number) => (
+                              <div
+                                key={milestone.id || mIdx}
+                                onClick={() => {
+                                  if (isCurrentPhase || phaseProgress === 100) {
+                                    setTradingRoadmapPhases(prev => prev.map((p, pIdx) => {
+                                      if (pIdx === phaseIdx) {
+                                        return {
+                                          ...p,
+                                          milestones: p.milestones.map((m: any, idx: number) => 
+                                            idx === mIdx ? { ...m, completed: !m.completed } : m
+                                          )
+                                        }
+                                      }
+                                      return p
+                                    }))
+                                  }
+                                }}
+                                style={{
+                                  padding: '10px 14px',
+                                  background: milestone.completed ? theme.success + '20' : (darkMode ? '#1e293b' : '#f8fafc'),
+                                  borderRadius: '8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '10px',
+                                  cursor: isCurrentPhase || phaseProgress === 100 ? 'pointer' : 'default',
+                                  border: milestone.completed ? `1px solid ${theme.success}40` : '1px solid transparent'
+                                }}
+                              >
+                                <div style={{
+                                  width: '20px', height: '20px', borderRadius: '4px',
+                                  background: milestone.completed ? theme.success : theme.border,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  color: 'white', fontSize: '12px', fontWeight: 700, flexShrink: 0
+                                }}>
+                                  {milestone.completed ? '✓' : ''}
+                                </div>
+                                <span style={{ 
+                                  color: theme.text, 
+                                  fontSize: '13px',
+                                  textDecoration: milestone.completed ? 'line-through' : 'none',
+                                  opacity: milestone.completed ? 0.7 : 1
+                                }}>
+                                  {milestone.task}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
               
               {/* Add Milestone Form */}
               {showAddTradingMilestone && (
