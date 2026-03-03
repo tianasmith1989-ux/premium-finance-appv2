@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+
+# build
+.next/
+out/
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+
+# environment
+.env
+.env.local
+.env.production
+.env.development
+
+# misc
+.DS_Store
