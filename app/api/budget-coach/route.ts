@@ -907,6 +907,37 @@ DELETE (just need ID):
 {"type": "deleteDebt", "data": {"id": 789}}
 {"type": "deleteGoal", "data": {"id": 012}}
 
+=== BUDGET ANALYTICS ACTIONS ===
+
+**SHOW ANALYTICS:**
+When user asks about spending, categories, wealth position, bills, or subscriptions:
+- {"type": "showBudgetAnalytics", "data": {"tab": "spending"}} - Shows spending by category
+- {"type": "showBudgetAnalytics", "data": {"tab": "wealth"}} - Shows wealth position breakdown
+- {"type": "showBudgetAnalytics", "data": {"tab": "bills"}} - Shows upcoming bills
+- {"type": "showBudgetAnalytics", "data": {"tab": "subscriptions"}} - Shows subscription audit
+- {"type": "showBudgetAnalytics", "data": {"tab": "milestones"}} - Shows financial milestones
+
+**ADD FINANCIAL MILESTONE (Celebrations!):**
+When user achieves something worth celebrating:
+- {"type": "addFinancialMilestone", "data": {"title": "Paid off credit card!", "amount": 5000, "type": "debt_payoff"}}
+- {"type": "addFinancialMilestone", "data": {"title": "First $1,000 saved", "amount": 1000, "type": "savings_goal"}}
+- {"type": "addFinancialMilestone", "data": {"title": "First trading payout!", "amount": 2000, "type": "first_payout"}}
+- Types: debt_payoff, savings_goal, first_payout, green_month, trading_milestone, general
+
+**ADD BILL REMINDER:**
+When user wants to track a bill:
+- {"type": "addBillReminder", "data": {"name": "Electricity", "amount": "150", "dueDate": "2026-03-15", "autoPay": true}}
+
+**ADD SUBSCRIPTION:**
+When user mentions a subscription:
+- {"type": "addSubscription", "data": {"name": "Netflix", "cost": "15.99", "frequency": "monthly", "category": "entertainment"}}
+
+=== WEALTH POSITION ===
+Note: We say "Wealth Position" NOT "net worth". When users ask about their total wealth:
+- Show: Assets + Trading Accounts - Liabilities - Debts
+- Include trading performance if they trade
+- Use the showBudgetAnalytics action with tab "wealth"
+
 === ADD TO ROADMAP ===
 When user talks about big goals or milestones, add them to the roadmap:
 - "I want to save $10,000 for an emergency fund" → addRoadmapMilestone
