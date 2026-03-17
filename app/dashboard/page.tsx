@@ -336,7 +336,7 @@ export default function Dashboard() {
       tradingPnL,
       payouts: totalPayoutsValue,
       liabilities: totalLiabilitiesAmount + totalDebtAmount,
-      netWorth: totalAssets + tradingBalance - totalLiabilitiesAmount - totalDebtAmount
+      netWorth: totalAssets + tradingBalance - totalLiabilitiesAmount - totalDebtAmount.
     }
   }
   
