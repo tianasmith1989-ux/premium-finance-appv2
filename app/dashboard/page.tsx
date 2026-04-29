@@ -62,8 +62,8 @@ export default function Dashboard() {
       currentStep: 0,
       monthlyIncome: 0, 
       steps: [
-        { title: 'Research accounts', description: 'Compare rates at Up (5%), ING (5.5%), Ubank (5.1%), BOQ (5%)', action: 'I\'ll research savings accounts' },
-        { title: 'Open account', description: 'Most can be opened online in 10 minutes with just your ID', action: 'I\'ve opened my account' },
+        { title: 'Research accounts', description: 'Compare rates at Up (5%), ING (5.5%), Ubank (5.1%), BOQ (5%)', action: "I'll research savings accounts" },
+        { title: 'Open account', description: 'Most can be opened online in 10 minutes with just your ID', action: "I've opened my account" },
         { title: 'Set up auto-transfer', description: 'Transfer your emergency fund or set up regular deposits', action: 'Money is transferred' },
         { title: 'Track your interest', description: 'Watch passive income grow! $10k at 5% = $42/mo', action: 'Complete quest' }
       ],
@@ -83,7 +83,7 @@ export default function Dashboard() {
       currentStep: 0,
       monthlyIncome: 0, 
       steps: [
-        { title: 'Research cards', description: 'Compare: ING Orange (cashback), Bankwest Breeze (rewards), HSBC (points)', action: 'I\'ve researched options' },
+        { title: 'Research cards', description: 'Compare: ING Orange (cashback), Bankwest Breeze (rewards), HSBC (points)', action: "I've researched options" },
         { title: 'Apply for card', description: 'Choose no annual fee cards to start. Approval takes 1-5 days', action: 'Card approved' },
         { title: 'Set as default', description: 'Use for all regular spending - groceries, bills, fuel', action: 'Using the card' },
         { title: 'Redeem rewards', description: 'Cash out monthly or let points accumulate for bigger rewards', action: 'Complete quest' }
@@ -4104,7 +4104,7 @@ Sent from Aureus App
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   // ==================== RENDER: MODE SELECTOR ====================
@@ -4112,7 +4112,6 @@ Sent from Aureus App
     return (
       <div style={{ minHeight: '100vh', background: darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)' : 'linear-gradient(135deg, #f0f9ff 0%, #faf5ff 100%)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ textAlign: 'center' as const, marginBottom: '48px' }}>
-          {/* Gold Coin Logo */}
           <div style={{ 
             width: '80px', 
             height: '80px', 
@@ -4155,7 +4154,7 @@ Sent from Aureus App
         
         <button onClick={() => setDarkMode(!darkMode)} style={{ marginTop: '32px', padding: '12px 24px', background: 'transparent', border: '2px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer' }}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
       </div>
-    )
+    );
   }
 
   // ==================== RENDER: MAIN APP ====================
@@ -11289,3 +11288,5 @@ Sent from Aureus App
       `}</style>
     </div>
   )
+}
+Can You Help Fix My Code While Keeping Features? - Manus
