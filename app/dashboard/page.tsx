@@ -4167,8 +4167,7 @@ Sent from Aureus App
             <div style={{ textAlign: 'center' as const, marginBottom: '32px' }}>
               <h2 style={{ color: theme.text, fontSize: '28px', fontWeight: 800, margin: '0 0 8px 0' }}>Upgrade to Aureus Pro</h2>
               <p style={{ color: theme.textMuted, margin: 0 }}>Unlock unlimited AI coaching and take control of your finances</p>
-            </div>
-            
+            </div>       
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '32px' }}>
               {/* FREE TIER */}
               <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', border: '2px solid ' + theme.border }}>
