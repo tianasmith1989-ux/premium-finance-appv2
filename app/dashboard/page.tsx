@@ -9,7 +9,7 @@ export default function Dashboard() {
   // ==================== APP MODE & NAVIGATION ====================
   const [appMode, setAppMode] = useState<'budget' | null>(null)
   const [showModeSelector, setShowModeSelector] = useState(true)
-  const [activeTab, setActiveTab] = useState<'chat' | 'quickview' | 'dashboard' | 'overview' | 'path'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'academy'>('chat')
   const [darkMode, setDarkMode] = useState(true)
   
   // ==================== TOUR STATE ====================
@@ -25,6 +25,61 @@ export default function Dashboard() {
   
   // ==================== AUTOMATION STATE ====================
   const [showAutomation, setShowAutomation] = useState(false)
+  
+  // ==================== ACADEMY STATE ====================
+  const [activeModuleId, setActiveModuleId] = useState<number | null>(null)
+  const [activeLessonId, setActiveLessonId] = useState<number | null>(null)
+  const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set())
+  const [showModuleContent, setShowModuleContent] = useState(false)
+  
+  const learningModules = [
+    {
+      id: 1,
+      title: "Psychology of Money",
+      icon: "🧠",
+      description: "Understanding why we make bad money decisions and how to fix them",
+      color: "#8b5cf6",
+      lessons: [
+        { id: 1, title: "The Offset Account Trap", content: "Money sitting in an offset account is 'available to spend' in our minds. This is why most people with offset accounts still take 25-30 years to pay off their mortgage. The psychology is simple: if you can see it, you'll spend it.", keyInsight: "Money in offset = temptation. Money in redraw = commitment. Park your savings in the redraw facility and only withdraw what you've budgeted.", action: "Check if your loan has a redraw facility" },
+        { id: 2, title: "Every Dollar Has a Purpose", content: "The most successful wealth builders don't have more money - they have more intentionality. Before every payday, sit down and assign every single dollar a job. Bills, savings, investments, debt payoff, spending money - everything gets a purpose.", keyInsight: "A dollar without a job will find one - usually in the wrong place. Give every dollar a purpose before it hits your account.", action: "Try assigning every dollar from your next pay" },
+        { id: 3, title: "The Reward System Trap", content: "We're wired to seek dopamine hits. Spending money gives us that hit. But debt payoff and saving don't give the same immediate reward. This is why we need to create artificial rewards for good financial behavior.", keyInsight: "Create small celebrations for financial wins. Paid off $1,000? Treat yourself to a $20 dinner. The brain will rewire to seek financial wins.", action: "Plan a reward for your next financial milestone" }
+      ]
+    },
+    {
+      id: 2,
+      title: "Redraw vs Offset Strategy",
+      icon: "🔄",
+      description: "How to use loan structure to pay off your home in 7-10 years",
+      color: "#10b981",
+      lessons: [
+        { id: 4, title: "Interest: The Silent Wealth Killer", content: "On a $500,000 mortgage at 6% over 30 years, you'll pay $579,000 in interest - more than the house itself! But by restructuring how you manage money, you can slash this dramatically without earning an extra dollar.", keyInsight: "Interest is calculated DAILY on your balance. Every day your balance is lower means less interest charged tomorrow.", action: "Calculate how much interest you'll pay over your current loan term" },
+        { id: 5, title: "The Redraw Advantage", content: "Instead of keeping money in an offset account where you can see (and spend) it, park all surplus money directly into your mortgage via redraw. Then, redraw ONLY what you need for budgeted expenses. The remaining money keeps working to reduce your principal.", keyInsight: "A $500K loan with $50K consistently in redraw saves $165,000 in interest and pays off 11 years faster.", action: "Ask your lender about redraw vs offset features" },
+        { id: 6, title: "Structure Over Rate", content: "Here's a truth most brokers won't tell you: A well-structured loan at 6.5% will save you more money than a poorly structured one at 5.5%. The structure (redraw access, extra payment flexibility, fee structure) matters more than the rate.", keyInsight: "DON'T chase the cheapest rate. DO optimize your loan structure for maximum flexibility and extra payments.", action: "Review your current loan structure" }
+      ]
+    },
+    {
+      id: 3,
+      title: "Debt Elimination Blueprint",
+      icon: "💳",
+      description: "Strategies to become completely debt-free faster than you thought possible",
+      color: "#f59e0b",
+      lessons: [
+        { id: 7, title: "The Snowball vs Avalanche Debate", content: "Snowball (smallest debt first) gives psychological wins. Avalanche (highest interest first) saves the most money mathematically. But here's what research shows: Snowball works better for most people because psychology beats math in personal finance.", keyInsight: "Choose the method that you'll STICK WITH. Consistency beats optimization every time.", action: "List all your debts from smallest to largest" },
+        { id: 8, title: "Debt Consolidation: When It Works", content: "Consolidation can simplify payments and lower interest rates. But WARNING: If you don't fix the underlying spending habits, you'll end up with consolidated debt AND new credit card debt. Fix behavior first, then consolidate.", keyInsight: "Consolidation is a tool, not a solution. Without behavior change, it makes things worse.", action: "Track your spending for 30 days before considering consolidation" }
+      ]
+    },
+    {
+      id: 4,
+      title: "Wealth Building Fundamentals",
+      icon: "📈",
+      description: "Beyond debt freedom - building lasting wealth through multiple income streams",
+      color: "#3b82f6",
+      lessons: [
+        { id: 9, title: "The Three Wealth Buckets", content: "Wealth builders have three things: 1) A cash buffer (emergency fund), 2) Growth assets (property, shares, ETFs), and 3) Income-producing assets (rental property, dividend stocks, business). Start with bucket 1, then build 2 and 3 simultaneously.", keyInsight: "Don't put all your wealth-building eggs in one basket. Diversify across all three buckets.", action: "Identify which bucket you need to focus on right now" },
+        { id: 10, title: "Equity Is Your Secret Weapon", content: "Your home equity isn't just a number on paper. It's collateral for building more wealth. Once you have significant equity, you can use it to invest in property or other assets - but ONLY when you understand the risks and have a solid plan.", keyInsight: "Equity = opportunity. But leverage = risk. Never borrow more than you can comfortably service.", action: "Calculate your current home equity" }
+      ]
+    }
+  ]
   
   // ==================== PASSIVE QUEST STATE ====================
   const [activeQuestId, setActiveQuestId] = useState<number | null>(null)
@@ -307,6 +362,7 @@ export default function Dashboard() {
   
   // Motivational Quotes
   const moneyQuotes = [
+    { quote: "Stop buying your kids stuff you never had and start teaching them things you never learnt.", author: "Infinity Group Philosophy" },
     { quote: "The goal isn't more money. The goal is living life on your terms.", author: "Chris Brogan" },
     { quote: "Do not save what is left after spending; spend what is left after saving.", author: "Warren Buffett" },
     { quote: "A budget is telling your money where to go instead of wondering where it went.", author: "Dave Ramsey" },
@@ -316,7 +372,8 @@ export default function Dashboard() {
     { quote: "Don't work for money; make money work for you.", author: "Robert Kiyosaki" },
     { quote: "You must gain control over your money or the lack of it will forever control you.", author: "Dave Ramsey" },
     { quote: "Wealth is the ability to fully experience life.", author: "Henry David Thoreau" },
-    { quote: "An investment in knowledge pays the best interest.", author: "Benjamin Franklin" }
+    { quote: "An investment in knowledge pays the best interest.", author: "Benjamin Franklin" },
+    { quote: "By changing the way they manage their finances, people pay down debts in years rather than decades.", author: "Infinity Group" }
   ]
   const [currentQuote] = useState(() => moneyQuotes[Math.floor(Math.random() * moneyQuotes.length)])
   
@@ -397,6 +454,7 @@ export default function Dashboard() {
       if (data.budgetOnboarding) setBudgetOnboarding(data.budgetOnboarding)
       if (data.chatMessages) setChatMessages(data.chatMessages)
       if (data.userCountry) setUserCountry(data.userCountry)
+      if (data.completedLessons) setCompletedLessons(new Set(data.completedLessons))
     }
   }, [])
 
@@ -404,10 +462,11 @@ export default function Dashboard() {
     const data = {
       incomeStreams, expenses, debts, goals, assets, liabilities,
       budgetMemory, paidOccurrences: Array.from(paidOccurrences),
-      roadmapMilestones, budgetOnboarding, chatMessages, userCountry
+      roadmapMilestones, budgetOnboarding, chatMessages, userCountry,
+      completedLessons: Array.from(completedLessons)
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, roadmapMilestones, budgetOnboarding, chatMessages, userCountry])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, completedLessons])
 
   // Chat scroll
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -428,8 +487,8 @@ export default function Dashboard() {
 
   // ==================== CALCULATIONS ====================
   const convertToMonthly = (amount: number, frequency: string) => {
-    if (frequency === 'weekly') return amount * 4
-    if (frequency === 'fortnightly') return amount * 2
+    if (frequency === 'weekly') return amount * 4.33
+    if (frequency === 'fortnightly') return amount * 2.17
     if (frequency === 'quarterly') return amount / 3
     if (frequency === 'yearly') return amount / 12
     return amount
@@ -489,6 +548,20 @@ export default function Dashboard() {
     ((100 - debtToIncomeRatio * 100) * 0.15)
   )
 
+  // Infinity-Style Calculations
+  const projectedYearsToDebtFreedom = (() => {
+    const extraPayments = monthlySurplus > 0 ? monthlySurplus : 0
+    const totalAnnualPayments = (monthlyDebtPayments * 12) + (extraPayments * 12)
+    return totalAnnualPayments > 0 ? Math.ceil(totalDebtBalance / totalAnnualPayments) : 30
+  })()
+  
+  const interestSavedByEarlyPayoff = (() => {
+    const avgInterestRate = debts.length > 0 ? debts.reduce((sum, d) => sum + parseFloat(d.interestRate || '0'), 0) / debts.length : 0
+    const standardTermYears = 30
+    const yearsOff = Math.max(0, standardTermYears - projectedYearsToDebtFreedom)
+    return Math.round((totalDebtBalance * (avgInterestRate / 100) * yearsOff))
+  })()
+
   // Baby Steps
   const australianBabySteps = [
     { step: 1, title: 'Starter Emergency Fund', desc: 'Save $2,000 for emergencies', target: 2000, icon: '🛡️', aureusAdvice: "This $2,000 is your financial airbag - it stops you going into debt when life throws curveballs.", tips: ["Open a separate savings account", "Set up automatic transfers on payday", "Use a high-interest account", "Don't touch it except for TRUE emergencies"], actionButton: "Let's set up my emergency fund goal" },
@@ -502,7 +575,6 @@ export default function Dashboard() {
 
   const getBabyStep = () => {
     const badDebt = debts.filter(d => parseFloat(d.interestRate || '0') > 5)
-    const allDebt = debts.filter(d => d.name?.toLowerCase() !== 'mortgage' && d.name?.toLowerCase() !== 'hecs' && d.name?.toLowerCase() !== 'help')
     const mortgageDebt = debts.filter(d => d.name?.toLowerCase().includes('mortgage'))
     const monthlyExpenses3 = monthlyExpenses * 3
     
@@ -602,6 +674,26 @@ export default function Dashboard() {
     alert(`✅ Added "${name}" to your roadmap!`)
   }
 
+  // ==================== ACADEMY FUNCTIONS ====================
+  const completeLesson = (moduleId: number, lessonId: number) => {
+    const lessonKey = `${moduleId}-${lessonId}`
+    const newCompleted = new Set(completedLessons)
+    newCompleted.add(lessonKey)
+    setCompletedLessons(newCompleted)
+  }
+
+  const isLessonCompleted = (moduleId: number, lessonId: number) => {
+    return completedLessons.has(`${moduleId}-${lessonId}`)
+  }
+
+  const getModuleProgress = (moduleId: number) => {
+    const module = learningModules.find(m => m.id === moduleId)
+    if (!module) return 0
+    const totalLessons = module.lessons.length
+    const completed = module.lessons.filter(l => isLessonCompleted(moduleId, l.id)).length
+    return Math.round((completed / totalLessons) * 100)
+  }
+
   // ==================== QUEST FUNCTIONS ====================
   const startQuest = (questId: number) => {
     setPassiveQuests(passiveQuests.map(q => q.id === questId ? { ...q, status: 'in_progress', progress: 10 } : q))
@@ -642,9 +734,9 @@ export default function Dashboard() {
     const payAmount = parseFloat(incomeStreams[0]?.amount || '0')
     const convertToPayPeriod = (amount: number, freq: string) => {
       if (freq === payFrequency) return amount
-      if (payFrequency === 'fortnightly') { if (freq === 'weekly') return amount * 2; if (freq === 'monthly') return amount / 2 }
-      if (payFrequency === 'weekly') { if (freq === 'fortnightly') return amount / 2; if (freq === 'monthly') return amount / 4 }
-      if (payFrequency === 'monthly') { if (freq === 'weekly') return amount * 4; if (freq === 'fortnightly') return amount * 2 }
+      if (payFrequency === 'fortnightly') { if (freq === 'weekly') return amount * 2; if (freq === 'monthly') return amount / 2.17 }
+      if (payFrequency === 'weekly') { if (freq === 'fortnightly') return amount / 2; if (freq === 'monthly') return amount / 4.33 }
+      if (payFrequency === 'monthly') { if (freq === 'weekly') return amount * 4.33; if (freq === 'fortnightly') return amount * 2.17 }
       return amount
     }
     const billsTotal = expenses.filter(e => !e.targetDebtId && !e.targetGoalId).reduce((sum, exp) => sum + convertToPayPeriod(parseFloat(exp.amount || '0'), exp.frequency), 0)
@@ -823,7 +915,7 @@ export default function Dashboard() {
           <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 700, margin: '0 0 8px 0' }}>Budget Mode</h2>
           <p style={{ color: 'rgba(255,255,255,0.9)', margin: '0 0 16px 0', fontSize: '14px' }}>Optimize your cash flow, eliminate debt, and build automated revenue streams</p>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-            {['Baby Steps', 'FIRE Path', 'Automation', 'Home Buying'].map(tag => <span key={tag} style={{ padding: '4px 10px', background: 'rgba(255,255,255,0.2)', borderRadius: '12px', fontSize: '11px', color: 'white' }}>{tag}</span>)}
+            {['Baby Steps', 'FIRE Path', 'Academy', 'Home Buying'].map(tag => <span key={tag} style={{ padding: '4px 10px', background: 'rgba(255,255,255,0.2)', borderRadius: '12px', fontSize: '11px', color: 'white' }}>{tag}</span>)}
           </div>
         </button>
         <button onClick={() => setDarkMode(!darkMode)} style={{ marginTop: '32px', padding: '12px 24px', background: 'transparent', border: '2px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer' }}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
@@ -846,6 +938,7 @@ export default function Dashboard() {
           <button onClick={() => setActiveTab('chat')} style={{ padding: '8px 14px', background: activeTab === 'chat' ? theme.accent : 'transparent', color: activeTab === 'chat' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>💬 Aureus</button>
           <button onClick={() => setActiveTab('quickview')} style={{ padding: '8px 14px', background: activeTab === 'quickview' ? theme.accent : 'transparent', color: activeTab === 'quickview' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>⚡ Quick</button>
           <button onClick={() => setActiveTab('dashboard')} style={{ padding: '8px 14px', background: activeTab === 'dashboard' ? theme.accent : 'transparent', color: activeTab === 'dashboard' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>🎛️ Centre</button>
+          <button onClick={() => setActiveTab('academy')} style={{ padding: '8px 14px', background: activeTab === 'academy' ? theme.warning : 'transparent', color: activeTab === 'academy' ? 'white' : theme.warning, border: '1px solid ' + theme.warning, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>🎓 Learn</button>
           <button onClick={() => setActiveTab('path')} style={{ padding: '8px 14px', background: activeTab === 'path' ? theme.accent : 'transparent', color: activeTab === 'path' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>🛤️ Path</button>
           <button onClick={() => setActiveTab('overview')} style={{ padding: '8px 14px', background: activeTab === 'overview' ? theme.accent : 'transparent', color: activeTab === 'overview' ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>📊 Metrics</button>
           <button onClick={() => setDarkMode(!darkMode)} style={{ padding: '8px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>{darkMode ? '☀️' : '🌙'}</button>
@@ -931,6 +1024,34 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* FINANCIAL FREEDOM SCOREBOARD */}
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: '16px' }}>
+              <h3 style={{ color: theme.text, margin: '0 0 20px 0', fontSize: '18px' }}>🏆 Your Financial Freedom Scoreboard</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                <div style={{ textAlign: 'center', padding: '16px', background: theme.cardBg, borderRadius: '12px' }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>📅</div>
+                  <div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>{projectedYearsToDebtFreedom}</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>Years to Debt Freedom</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '16px', background: theme.cardBg, borderRadius: '12px' }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>💰</div>
+                  <div style={{ color: theme.warning, fontSize: '28px', fontWeight: 700 }}>${interestSavedByEarlyPayoff.toLocaleString()}</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>Interest Saved by Early Payoff</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '16px', background: theme.cardBg, borderRadius: '12px' }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎯</div>
+                  <div style={{ color: theme.purple, fontSize: '28px', fontWeight: 700 }}>{((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1) * 100).toFixed(0)}%</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>Financial Independence</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '16px', background: theme.cardBg, borderRadius: '12px' }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>📊</div>
+                  <div style={{ color: theme.accent, fontSize: '28px', fontWeight: 700 }}>{savingsRate.toFixed(0)}%</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>Savings Rate (Target: 20%+)</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Key Metrics */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>Monthly Revenue</div><div style={{ color: theme.success, fontSize: '28px', fontWeight: 700 }}>${monthlyIncome.toFixed(0)}</div></div>
               <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const }}>Operating Costs</div><div style={{ color: theme.danger, fontSize: '28px', fontWeight: 700 }}>${totalOutgoing.toFixed(0)}</div></div>
@@ -945,20 +1066,192 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <div style={{ color: theme.text, fontWeight: 600 }}>🐀 Rat Race Escape</div>
-                <div style={{ color: theme.warning, fontWeight: 700, fontSize: '20px' }}>{monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) * 100).toFixed(0) : 0}%</div>
-              </div>
-              <div style={{ height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: Math.min(((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100, 100) + '%', height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #10b981)' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+              <button onClick={() => setActiveTab('dashboard')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}><div style={{ fontSize: '24px', marginBottom: '8px' }}>🎛️</div><div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Command Centre</div></button>
+              <button onClick={() => setActiveTab('academy')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.warning, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}><div style={{ fontSize: '24px', marginBottom: '8px' }}>🎓</div><div style={{ color: theme.warning, fontWeight: 600, fontSize: '14px' }}>Aureus Academy</div></button>
+              <button onClick={() => setActiveTab('path')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}><div style={{ fontSize: '24px', marginBottom: '8px' }}>🛤️</div><div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Path & Quests</div></button>
+            </div>
+          </div>
+        )}
+
+        {/* ACADEMY TAB - Aureus Academy */}
+        {activeTab === 'academy' && (
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
+            <div style={{ padding: '12px 16px', background: 'linear-gradient(135deg, #f59e0b15, #ef444415)', borderRadius: '12px', border: '1px solid #f59e0b40' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <span style={{ fontSize: '20px' }}>⚠️</span>
+                <div><div style={{ color: theme.text, fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}>Educational Content Only</div><p style={{ margin: 0, color: theme.textMuted, fontSize: '12px', lineHeight: 1.5 }}>This is general financial education, not personal financial advice. Consult qualified professionals before making major financial decisions.</p></div>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-              <button onClick={() => setActiveTab('dashboard')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}><div style={{ fontSize: '24px', marginBottom: '8px' }}>🎛️</div><div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Command Centre</div></button>
-              <button onClick={() => setActiveTab('path')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}><div style={{ fontSize: '24px', marginBottom: '8px' }}>🛤️</div><div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Path & Quests</div></button>
-              <button onClick={() => setActiveTab('overview')} style={{ padding: '16px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}><div style={{ fontSize: '24px', marginBottom: '8px' }}>📊</div><div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Metrics</div></button>
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: '20px', border: '2px solid #f59e0b' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
+                <div style={{ width: '56px', height: '56px', borderRadius: '12px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🎓</div>
+                <div>
+                  <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>Aureus Academy</h2>
+                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Master your financial psychology and strategy before making big money moves</p>
+                </div>
+              </div>
+
+              <div style={{ padding: '16px', background: '#f59e0b15', borderRadius: '12px', marginBottom: '20px', borderLeft: '4px solid #f59e0b' }}>
+                <p style={{ margin: 0, color: theme.text, fontSize: '14px', lineHeight: 1.6 }}>
+                  💡 <strong>Our Philosophy:</strong> "Stop buying your kids stuff you never had, and start teaching them things you never learnt." 
+                  Education comes first. Products come second. Master the psychology, then the strategy.
+                </p>
+              </div>
+
+              {/* Module Grid */}
+              {!showModuleContent && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                  {learningModules.map(module => {
+                    const progress = getModuleProgress(module.id)
+                    return (
+                      <div key={module.id} onClick={() => { setActiveModuleId(module.id); setShowModuleContent(true) }} style={{ 
+                        padding: '20px', 
+                        background: darkMode ? '#1e293b' : '#f8fafc', 
+                        borderRadius: '12px', 
+                        cursor: 'pointer',
+                        border: `1px solid ${theme.border}`,
+                        transition: 'transform 0.2s'
+                      }}>
+                        <div style={{ fontSize: '32px', marginBottom: '12px' }}>{module.icon}</div>
+                        <div style={{ color: module.color, fontWeight: 700, marginBottom: '8px', fontSize: '14px' }}>{module.title}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', lineHeight: 1.5, marginBottom: '12px' }}>{module.description}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: theme.textMuted, fontSize: '11px' }}>{module.lessons.length} lessons</span>
+                          {progress > 0 && <span style={{ color: theme.success, fontSize: '11px', fontWeight: 600 }}>{progress}% complete</span>}
+                        </div>
+                        <div style={{ height: '4px', background: theme.border, borderRadius: '2px', marginTop: '8px', overflow: 'hidden' }}>
+                          <div style={{ width: progress + '%', height: '100%', background: module.color }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Module Content */}
+              {showModuleContent && activeModuleId && (() => {
+                const module = learningModules.find(m => m.id === activeModuleId)
+                if (!module) return null
+                return (
+                  <div>
+                    <button onClick={() => { setShowModuleContent(false); setActiveLessonId(null) }} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.text, cursor: 'pointer', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      ← Back to All Modules
+                    </button>
+                    
+                    <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                        <span style={{ fontSize: '32px' }}>{module.icon}</span>
+                        <div>
+                          <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>{module.title}</h3>
+                          <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>{module.description}</p>
+                        </div>
+                      </div>
+
+                      {!activeLessonId && (
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                          {module.lessons.map(lesson => {
+                            const completed = isLessonCompleted(module.id, lesson.id)
+                            return (
+                              <div key={lesson.id} onClick={() => setActiveLessonId(lesson.id)} style={{ 
+                                padding: '16px', 
+                                background: completed ? theme.success + '10' : (darkMode ? '#1e293b' : '#f8fafc'),
+                                borderRadius: '8px', 
+                                cursor: 'pointer',
+                                border: `1px solid ${completed ? theme.success + '40' : theme.border}`,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: completed ? theme.success : theme.border, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
+                                    {completed ? '✓' : lesson.id}
+                                  </div>
+                                  <span style={{ color: theme.text, fontSize: '14px' }}>{lesson.title}</span>
+                                </div>
+                                {completed && <span style={{ color: theme.success, fontSize: '11px' }}>Complete</span>}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Lesson Content */}
+                      {activeLessonId && (() => {
+                        const lesson = module.lessons.find(l => l.id === activeLessonId)
+                        if (!lesson) return null
+                        const completed = isLessonCompleted(module.id, lesson.id)
+                        return (
+                          <div>
+                            <button onClick={() => setActiveLessonId(null)} style={{ padding: '6px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '6px', color: theme.text, cursor: 'pointer', marginBottom: '16px', fontSize: '12px' }}>
+                              ← Back to lessons
+                            </button>
+                            <div style={{ padding: '24px', background: darkMode ? '#0f172a' : '#f1f5f9', borderRadius: '12px' }}>
+                              <h4 style={{ color: theme.text, margin: '0 0 16px 0', fontSize: '18px' }}>{lesson.title}</h4>
+                              <p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.8, marginBottom: '20px' }}>{lesson.content}</p>
+                              
+                              <div style={{ padding: '16px', background: theme.warning + '15', borderRadius: '8px', borderLeft: '4px solid ' + theme.warning, marginBottom: '20px' }}>
+                                <p style={{ margin: '0 0 4px 0', color: theme.warning, fontSize: '12px', fontWeight: 600 }}>💡 KEY INSIGHT</p>
+                                <p style={{ margin: 0, color: theme.text, fontSize: '14px', lineHeight: 1.6 }}>{lesson.keyInsight}</p>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' as const }}>
+                                <button 
+                                  onClick={() => { completeLesson(module.id, lesson.id); sendQuickMessage(`I just learned about "${lesson.title}" in Aureus Academy. ${lesson.keyInsight} Can you help me apply this to my personal finances?`) }} 
+                                  style={{ padding: '10px 20px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}
+                                >
+                                  {completed ? '✅ Lesson Complete' : '✅ Mark Complete & Ask Aureus'}
+                                </button>
+                                <button 
+                                  onClick={() => sendQuickMessage(`I'm learning about "${lesson.title}" in Aureus Academy. ${lesson.content} Can you explain this in more detail and how it applies to my situation?`)} 
+                                  style={{ padding: '10px 20px', background: theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}
+                                >
+                                  💬 Discuss with Aureus
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* Coaching Quick Actions */}
+            <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px' }}>
+              <h3 style={{ color: theme.text, margin: '0 0 16px 0', fontSize: '16px' }}>🤖 Quick Coaching Sessions</h3>
+              <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '16px' }}>Click any topic to start a coaching conversation with Aureus:</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                {[
+                  { label: '🏦 Pay Off Mortgage in 10 Years', action: "I want to pay off my mortgage in 10 years, not 30. Show me exactly how to structure my finances to make this happen." },
+                  { label: '💡 Every Dollar Has a Purpose', action: "Help me assign every dollar a purpose before my next payday. Walk me through the process." },
+                  { label: '🔄 Redraw vs Offset Strategy', action: "Explain why redraw is better than offset for paying off debt faster, and how I should structure my accounts." },
+                  { label: '🧠 Psychology of Money', action: "I keep spending money that's sitting in my account. Help me understand why and how to fix this." },
+                  { label: '📐 Structure Over Rate', action: "Teach me why loan structure matters more than getting the cheapest interest rate." },
+                  { label: '💰 Build Wealth While Paying Debt', action: "How can I build wealth through investments while still paying off my mortgage and other debts?" }
+                ].map(item => (
+                  <button 
+                    key={item.label}
+                    onClick={() => sendQuickMessage(item.action)}
+                    style={{ 
+                      padding: '14px', 
+                      background: darkMode ? '#1e293b' : '#f8fafc', 
+                      border: '1px solid ' + theme.border, 
+                      borderRadius: '8px', 
+                      cursor: 'pointer', 
+                      textAlign: 'left' as const,
+                      color: theme.text,
+                      fontSize: '13px',
+                      fontWeight: 500
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -1221,6 +1514,32 @@ export default function Dashboard() {
                 {liabilities.map(l => <div key={l.id} style={{ padding: '10px', marginBottom: '8px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.text }}>{l.name}</span><span style={{ color: theme.danger, fontWeight: 700 }}>${parseFloat(l.value).toFixed(0)}</span></div>)}
               </div>
             </div>
+
+            {/* Redraw vs Offset Education */}
+            <div style={{ padding: '20px', background: '#10b98115', borderRadius: '12px', border: '2px solid #10b981' }}>
+              <h4 style={{ color: '#10b981', margin: '0 0 12px 0' }}>🏦 Redraw vs Offset: The Infinity Strategy</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '8px' }}>
+                  <div style={{ color: theme.danger, fontWeight: 700, marginBottom: '8px' }}>❌ Offset Account Trap</div>
+                  <ul style={{ color: theme.textMuted, fontSize: '13px', margin: 0, paddingLeft: '20px' }}>
+                    <li>Money sitting in offset = "available to spend"</li>
+                    <li>Easy access = temptation to dip in</li>
+                    <li>Most people spend what they can see</li>
+                    <li>30-year mortgage becomes reality</li>
+                  </ul>
+                </div>
+                <div style={{ padding: '16px', background: theme.cardBg, borderRadius: '8px' }}>
+                  <div style={{ color: theme.success, fontWeight: 700, marginBottom: '8px' }}>✅ Redraw Strategy</div>
+                  <ul style={{ color: theme.textMuted, fontSize: '13px', margin: 0, paddingLeft: '20px' }}>
+                    <li>Pay ALL income into the mortgage</li>
+                    <li>Redraw ONLY budgeted expenses</li>
+                    <li>Remaining money stays paying down principal</li>
+                    <li>Interest calculated daily on lower balance</li>
+                    <li><strong>Result: 7-10 year mortgage payoff</strong></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1283,7 +1602,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Passport Quests */}
+            {/* Passive Quests */}
             <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', border: '1px solid ' + theme.border }}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>💰 Automated Revenue Strategies</h2>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -1322,24 +1641,12 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Rat Race Escape Tracker */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <div><div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px' }}>RAT RACE ESCAPE TRACKER</div></div>
-                <div style={{ fontSize: '48px', fontWeight: 'bold', color: monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) >= 1 ? theme.success : '#f59e0b') : theme.textMuted }}>{monthlyExpenses > 0 ? (((passiveIncome + totalPassiveQuestIncome) / monthlyExpenses) * 100).toFixed(1) : '0.0'}%</div>
-              </div>
-              <div style={{ height: '12px', background: '#334155', borderRadius: '6px', overflow: 'hidden' }}>
-                <div style={{ width: Math.min(((passiveIncome + totalPassiveQuestIncome) / Math.max(monthlyExpenses, 1)) * 100, 100) + '%', height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #10b981)', borderRadius: '6px' }} />
-              </div>
-            </div>
-
             {/* Home Buying Roadmap */}
             <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
                 <div style={{ width: '56px', height: '56px', borderRadius: '12px', background: 'linear-gradient(135deg, #f59e0b, #10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🏠</div>
                 <div style={{ flex: 1 }}><h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>Australian Home Buying Roadmap</h2><p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Click each phase to expand</p></div>
               </div>
-
               {['phase1', 'phase2', 'phase3', 'phase4', 'phase5'].map(phase => (
                 <div key={phase} style={{ marginBottom: '12px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + theme.border }}>
                   <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === phase ? null : phase)} style={{ width: '100%', padding: '16px 20px', background: homeGuideExpanded === phase ? (darkMode ? '#1a1a2e' : '#f8fafc') : theme.cardBg, border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1461,8 +1768,14 @@ export default function Dashboard() {
       </main>
 
       <footer style={{ padding: '16px 24px', background: theme.cardBg, borderTop: '1px solid ' + theme.border, textAlign: 'center' as const }}>
-        <p style={{ margin: '0 0 8px 0', color: theme.textMuted, fontSize: '11px', lineHeight: 1.5 }}>⚠️ <strong>Disclaimer:</strong> Aureus is an AI-powered financial assistant for educational and informational purposes only. This is not financial, tax, or legal advice. AI can make mistakes — always verify information. Consult qualified professionals before making financial decisions.</p>
-        <p style={{ margin: 0, color: theme.textMuted, fontSize: '10px' }}>© {new Date().getFullYear()} Aureus • Not affiliated with any financial institution • Past performance ≠ future results</p>
+        <p style={{ margin: '0 0 8px 0', color: theme.textMuted, fontSize: '11px', lineHeight: 1.5 }}>
+          ⚠️ <strong>Disclaimer:</strong> Aureus is an AI-powered financial assistant for educational and informational purposes only. 
+          This is not financial, tax, or legal advice. AI can make mistakes — always verify information. 
+          Consult qualified professionals before making financial decisions.
+        </p>
+        <p style={{ margin: 0, color: theme.textMuted, fontSize: '10px' }}>
+          © {new Date().getFullYear()} Aureus • Not affiliated with any financial institution • Education first, products second
+        </p>
       </footer>
 
       <style jsx global>{`
