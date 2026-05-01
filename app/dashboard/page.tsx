@@ -302,8 +302,8 @@ export default function Dashboard() {
     const remainingYears = parseFloat(mortgageAccel.remainingYears || '0')
     const extra = parseFloat(mortgageAccel.extraRepayment || '0')
     const offset = parseFloat(mortgageAccel.offsetBalance || '0')
-    const freq = mortgageAccel.repaymentFrequency === 'fortnightly' ? 26 : 12
-    const freqLabel = mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'
+    const freq = mortgageAccel.repaymentFrequency === 'weekly' ? 52 : mortgageAccel.repaymentFrequency === 'fortnightly' ? 26 : 12
+    const freqLabel = mortgageAccel.repaymentFrequency === 'weekly' ? 'week' : mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'
 
     if (balance <= 0 || annualRate <= 0) return null
 
@@ -1067,6 +1067,7 @@ export default function Dashboard() {
                     <div>
                       <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Repayment Frequency</label>
                       <select value={mortgageAccel.repaymentFrequency} onChange={e => setMortgageAccel({...mortgageAccel, repaymentFrequency: e.target.value})} style={{...inputStyle, width: '100%'}}>
+                        <option value="weekly">Weekly</option>
                         <option value="fortnightly">Fortnightly (recommended)</option>
                         <option value="monthly">Monthly</option>
                       </select>
@@ -1093,11 +1094,11 @@ export default function Dashboard() {
 
                     <div>
                       <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
-                        Your Actual Repayment ($ per {mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'})
+                        Your Actual Repayment ($ per {mortgageAccel.repaymentFrequency === 'weekly' ? 'week' : mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'})
                       </label>
                       <input type="number" value={mortgageAccel.currentRepayment} onChange={e => setMortgageAccel({...mortgageAccel, currentRepayment: e.target.value})} placeholder={mortgageAccel.balance && mortgageAccel.rate && mortgageAccel.remainingYears ? `e.g. ${calcStandardRepayment(parseFloat(mortgageAccel.balance||'0'), parseFloat(mortgageAccel.rate||'0')/100, parseFloat(mortgageAccel.remainingYears||'0'), mortgageAccel.repaymentFrequency === 'fortnightly' ? 26 : 12).toFixed(0)}` : 'e.g. 1385'} style={{...inputStyle, width: '100%'}} />
                       <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>
-                        ⚠️ This must be your {mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnightly' : 'monthly'} amount — not {mortgageAccel.repaymentFrequency === 'fortnightly' ? 'monthly' : 'fortnightly'}. Leave blank to use the calculated standard repayment above.
+                        ⚠️ This must be your {mortgageAccel.repaymentFrequency} amount — not a different frequency. Leave blank to use the calculated standard repayment above.
                       </div>
                     </div>
 
@@ -1114,7 +1115,7 @@ export default function Dashboard() {
                     <div style={{ borderTop: '1px solid ' + theme.border, paddingTop: '16px' }}>
                       <div style={{ color: theme.success, fontWeight: 600, marginBottom: '10px' }}>💪 Acceleration (optional)</div>
                       <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
-                        Extra Repayment ($ per {mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'})
+                        Extra Repayment ($ per {mortgageAccel.repaymentFrequency === 'weekly' ? 'week' : mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'})
                       </label>
                       <input type="number" value={mortgageAccel.extraRepayment} onChange={e => setMortgageAccel({...mortgageAccel, extraRepayment: e.target.value})} placeholder="e.g. 200" style={{...inputStyle, width: '100%'}} />
                       <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '6px' }}>Try $100, $200, $500 — see the years and interest you save</div>
@@ -1137,7 +1138,7 @@ export default function Dashboard() {
 
                       {parseFloat(mortgageAccel.extraRepayment || '0') > 0 && (
                         <div style={{ ...cardStyle, border: '2px solid ' + theme.success }}>
-                          <h4 style={{ margin: '0 0 16px 0', color: theme.success }}>🚀 With ${mortgageAccel.extraRepayment} Extra Per {mortgageAccel.repaymentFrequency === 'fortnightly' ? 'Fortnight' : 'Month'}</h4>
+                          <h4 style={{ margin: '0 0 16px 0', color: theme.success }}>🚀 With ${mortgageAccel.extraRepayment} Extra Per {mortgageAccel.repaymentFrequency === 'weekly' ? 'Week' : mortgageAccel.repaymentFrequency === 'fortnightly' ? 'Fortnight' : 'Month'}</h4>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                             <div style={{ padding: '12px', background: theme.success + '15', borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Years remaining</div><div style={{ color: theme.success, fontSize: '22px', fontWeight: 700 }}>{mortgageResult.withExtra.years.toFixed(1)}</div></div>
                             <div style={{ padding: '12px', background: theme.success + '15', borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Interest saved</div><div style={{ color: theme.success, fontSize: '22px', fontWeight: 700 }}>${Math.round(mortgageResult.withExtra.interestSaved).toLocaleString()}</div></div>
@@ -1166,13 +1167,13 @@ export default function Dashboard() {
                   <h3 style={{ margin: '0 0 8px 0', color: theme.text }}>💡 Offset Account Simulator</h3>
                   <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '20px' }}>Every dollar in your offset account reduces the interest charged on your mortgage — without locking money away.</p>
                   <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
-                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Repayment Frequency</label><select value={mortgageAccel.repaymentFrequency} onChange={e => setMortgageAccel({...mortgageAccel, repaymentFrequency: e.target.value})} style={{...inputStyle, width: '100%'}}><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
+                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Repayment Frequency</label><select value={mortgageAccel.repaymentFrequency} onChange={e => setMortgageAccel({...mortgageAccel, repaymentFrequency: e.target.value})} style={{...inputStyle, width: '100%'}}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
                     <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Mortgage Balance ($)</label><input type="number" value={mortgageAccel.balance} onChange={e => setMortgageAccel({...mortgageAccel, balance: e.target.value})} placeholder="e.g. 500000" style={{...inputStyle, width: '100%'}} /></div>
                     <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Interest Rate (% p.a.)</label><input type="number" step="0.01" value={mortgageAccel.rate} onChange={e => setMortgageAccel({...mortgageAccel, rate: e.target.value})} placeholder="e.g. 5.69" style={{...inputStyle, width: '100%'}} /></div>
                     <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Years Remaining</label><input type="number" value={mortgageAccel.remainingYears} onChange={e => setMortgageAccel({...mortgageAccel, remainingYears: e.target.value})} placeholder="e.g. 25" style={{...inputStyle, width: '100%'}} /></div>
                     <div>
                       <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
-                        Your Repayment ($ per {mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'}) — optional
+                        Your Repayment ($ per {mortgageAccel.repaymentFrequency === 'weekly' ? 'week' : mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'}) — optional
                       </label>
                       <input type="number" value={mortgageAccel.currentRepayment} onChange={e => setMortgageAccel({...mortgageAccel, currentRepayment: e.target.value})} placeholder="Leave blank to auto-calculate from term" style={{...inputStyle, width: '100%'}} />
                     </div>
