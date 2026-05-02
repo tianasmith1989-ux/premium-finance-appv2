@@ -481,7 +481,61 @@ export default function Dashboard() {
   const deleteAsset = (id: number) => setAssets(assets.filter(a => a.id !== id))
   const addLiability = () => { if (!newLiability.name || !newLiability.value) return; setLiabilities([...liabilities, { ...newLiability, id: Date.now() }]); setNewLiability({ name: '', value: '', type: 'loan' }) }
 
-  // ==================== CHAT ====================
+  // ==================== AUTOMATION CALCULATOR ====================
+  const calculateAutomation = () => {
+    const payFrequency = incomeStreams[0]?.frequency || 'fortnightly'
+    const payAmount = parseFloat(incomeStreams[0]?.amount || '0')
+    const convertToPayPeriod = (amount: number, freq: string) => {
+      if (freq === payFrequency) return amount
+      if (payFrequency === 'fortnightly') { if (freq === 'weekly') return amount * 2; if (freq === 'monthly') return amount / 2 }
+      if (payFrequency === 'weekly') { if (freq === 'fortnightly') return amount / 2; if (freq === 'monthly') return amount / 4 }
+      if (payFrequency === 'monthly') { if (freq === 'weekly') return amount * 4; if (freq === 'fortnightly') return amount * 2 }
+      return amount
+    }
+    const billsTotal = expenses.filter(e => !e.targetDebtId && !e.targetGoalId).reduce((sum, exp) => sum + convertToPayPeriod(parseFloat(exp.amount || '0'), exp.frequency), 0)
+    const debtTotal = debts.reduce((sum, debt) => sum + convertToPayPeriod(parseFloat(debt.minPayment || '0'), debt.frequency || 'monthly'), 0)
+    const billsBucket = billsTotal + debtTotal
+    const savingsBucket = goals.reduce((sum, goal) => sum + convertToPayPeriod(parseFloat(goal.paymentAmount || '0'), goal.savingsFrequency || 'monthly'), 0)
+    const spendingBucket = payAmount - billsBucket - savingsBucket
+    return { payFrequency, payAmount, bills: { total: billsBucket, breakdown: expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(e => ({ name: e.name, amount: convertToPayPeriod(parseFloat(e.amount || '0'), e.frequency) })) }, savings: { total: savingsBucket, breakdown: goals.map(g => ({ name: g.name, amount: convertToPayPeriod(parseFloat(g.paymentAmount || '0'), g.savingsFrequency || 'monthly') })) }, spending: spendingBucket }
+  }
+
+  // ==================== AUSTRALIAN HOME DATA ====================
+  const australianHomeData = {
+    stampDuty: {
+      NSW: { firstHome: 'Exempt up to $800k (concession to $1M)', investor: '~4-5.5% of purchase price' },
+      VIC: { firstHome: 'Exempt up to $600k (concession to $750k)', investor: '~5.5% of purchase price' },
+      QLD: { firstHome: 'Concession up to $550k, exempt for new builds', investor: '~3.5-5.75%' },
+      WA:  { firstHome: 'Exempt up to $430k', investor: '~4-5.15%' },
+      SA:  { firstHome: 'Exempt up to $650k (new) or no exemption (existing)', investor: '~4-5.5%' }
+    },
+    firstHomeBuyerGrants: {
+      federal: '$15,000 First Home Owner Grant (new builds only)',
+      NSW: '$10,000 FHOG (new builds up to $600k)',
+      VIC: '$10,000 FHOG (new builds up to $750k)',
+      QLD: '$30,000 FHOG (new builds)',
+      WA:  '$10,000 FHOG (new builds up to $750k)',
+      SA:  '$15,000 FHOG (new builds)'
+    },
+    schemes: [
+      { name: 'First Home Guarantee', description: 'Buy with 5% deposit, no LMI. 35,000 places/year.' },
+      { name: 'Regional First Home Guarantee', description: 'Same but for regional areas. 10,000 places/year.' },
+      { name: 'Family Home Guarantee', description: 'Single parents can buy with 2% deposit.' },
+      { name: 'Help to Buy', description: 'Govt co-owns up to 40% of your home — reduces deposit & repayments.' },
+      { name: 'First Home Super Saver', description: 'Withdraw up to $50k from super for deposit (voluntary contributions only).' }
+    ],
+    lmi: {
+      description: "Lender's Mortgage Insurance — protects the BANK if you default. You pay it.",
+      cost: '1-4% of loan amount if deposit is under 20%',
+      avoid: 'Save 20% deposit, use guarantor, or use First Home Guarantee'
+    }
+  }
+
+  // Separate state for home buying calculator (added here so it's defined before render)
+  const [homeCalcState, setHomeCalcState] = useState('QLD')
+  const [homeCalcFirstHome, setHomeCalcFirstHome] = useState(true)
+  const [homeCalcNewBuild, setHomeCalcNewBuild] = useState(false)
+  const [homeBuyingPrice, setHomeBuyingPrice] = useState('')
   const handleChatMessage = async () => {
     if (!chatInput.trim() || isLoading) return
     const message = chatInput.trim()
@@ -1424,6 +1478,28 @@ export default function Dashboard() {
               <p style={{ margin: 0, color: theme.textMuted, fontSize: '12px' }}>⚠️ General information only. Not financial advice. Consult licensed professionals before major decisions.</p>
             </div>
 
+            {/* Aureus Chat Widget */}
+            <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
+                <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{currentBabyStep.title}</div></div>
+              </div>
+              {chatMessages.length > 0 && (
+                <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
+                  {chatMessages.slice(-6).map((msg, idx) => (
+                    <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                      <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
+                    </div>
+                  ))}
+                  {isLoading && <div style={{ padding: '8px', color: theme.textMuted, fontSize: '13px' }}>Aureus is thinking...</div>}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything about your path..." style={{ ...inputStyle, flex: 1 }} disabled={isLoading} />
+                <button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ ...btnSuccess, opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button>
+              </div>
+            </div>
+
             {/* Baby Steps */}
             <div style={cardStyle}>
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>👶 Australian Baby Steps</h2>
@@ -1444,16 +1520,92 @@ export default function Dashboard() {
 
             {/* FIRE */}
             <div style={{ padding: '24px', background: `linear-gradient(135deg, ${theme.purple}15, ${theme.success}15)`, borderRadius: '16px', border: '2px solid ' + theme.purple }}>
-              <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>🔥 FIRE Number</h2>
+              <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>🔥 Escape the Rat Race — FIRE Path</h2>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div style={cardStyle}><h3 style={{ margin: '0 0 12px 0', color: theme.purple }}>🌴 Freedom Target</h3><div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}><div>Monthly need: <strong>${fiPath.monthlyNeed.toFixed(0)}</strong></div><div>Passive income: <strong style={{ color: theme.success }}>${passiveIncome.toFixed(0)}</strong></div><div>Coverage: <strong style={{ color: theme.purple }}>{passiveCoverage.toFixed(1)}%</strong></div></div></div>
-                <div style={cardStyle}><h3 style={{ margin: '0 0 12px 0', color: theme.success }}>🔥 FIRE Number</h3><div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}><div>Target: <strong>${fiPath.fireNumber.toLocaleString()}</strong></div><div>Investments: <strong style={{ color: theme.success }}>${fiPath.currentInvestments.toLocaleString()}</strong></div><div>Years to FI: <strong style={{ color: theme.purple }}>{fiPath.yearsToFI >= 999 ? '∞' : fiPath.yearsToFI}</strong></div></div></div>
+                <div style={cardStyle}>
+                  <h3 style={{ margin: '0 0 12px 0', color: theme.purple }}>🌴 Freedom Target</h3>
+                  <div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}>
+                    <div>Monthly need: <strong>${fiPath.monthlyNeed.toFixed(0)}</strong></div>
+                    <div>Passive income: <strong style={{ color: theme.success }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</strong></div>
+                    <div>Passive gap: <strong style={{ color: theme.danger }}>${Math.max(fiPath.passiveGap - totalPassiveQuestIncome, 0).toFixed(0)}</strong></div>
+                    <div>Coverage: <strong style={{ color: theme.purple }}>{((passiveIncome + totalPassiveQuestIncome) / Math.max(fiPath.monthlyNeed, 1) * 100).toFixed(1)}%</strong></div>
+                  </div>
+                </div>
+                <div style={cardStyle}>
+                  <h3 style={{ margin: '0 0 12px 0', color: theme.success }}>🔥 FIRE Number</h3>
+                  <div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}>
+                    <div>25× annual expenses: <strong>${fiPath.fireNumber.toLocaleString()}</strong></div>
+                    <div>Investments + Super: <strong style={{ color: theme.success }}>${fiPath.currentInvestments.toLocaleString()}</strong></div>
+                    <div>Progress: <strong style={{ color: theme.purple }}>{fiPath.fireNumber > 0 ? (fiPath.currentInvestments / fiPath.fireNumber * 100).toFixed(1) : 0}%</strong></div>
+                    <div>Est. years to FI: <strong style={{ color: theme.purple }}>{fiPath.yearsToFI >= 999 ? '∞' : fiPath.yearsToFI}</strong></div>
+                  </div>
+                </div>
               </div>
             </div>
 
+            {/* Set & Forget Automation */}
+            {incomeStreams.length > 0 && (
+              <div style={{ padding: '24px', background: 'linear-gradient(135deg, #3b82f615, #8b5cf615)', borderRadius: '16px', border: '2px solid ' + theme.accent }}>
+                <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>🤖 Set & Forget Automation</h2>
+                <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>Split each pay into three accounts automatically. Bills pay themselves, savings grow on autopilot, and you spend guilt-free.</p>
+                {(() => {
+                  const auto = calculateAutomation()
+                  return (
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
+                        <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                          <div style={{ fontSize: '32px', marginBottom: '8px' }}>💳</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Bills Account</div>
+                          <div style={{ color: theme.warning, fontSize: '28px', fontWeight: 'bold' }}>${auto.bills.total.toFixed(0)}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>per {auto.payFrequency}</div>
+                          <div style={{ marginTop: '10px' }}>
+                            {auto.bills.breakdown.slice(0, 3).map((b: any, i: number) => (
+                              <div key={i} style={{ fontSize: '11px', color: theme.textMuted, display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                                <span>{b.name}</span><span>${b.amount.toFixed(0)}</span>
+                              </div>
+                            ))}
+                            {auto.bills.breakdown.length > 3 && <div style={{ fontSize: '11px', color: theme.accent }}>+{auto.bills.breakdown.length - 3} more</div>}
+                          </div>
+                        </div>
+                        <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                          <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎯</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Savings Account</div>
+                          <div style={{ color: theme.purple, fontSize: '28px', fontWeight: 'bold' }}>${auto.savings.total.toFixed(0)}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>per {auto.payFrequency}</div>
+                          <div style={{ marginTop: '10px' }}>
+                            {auto.savings.breakdown.slice(0, 3).map((s: any, i: number) => (
+                              <div key={i} style={{ fontSize: '11px', color: theme.textMuted, display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                                <span>{s.name}</span><span>${s.amount.toFixed(0)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
+                          <div style={{ fontSize: '32px', marginBottom: '8px' }}>💵</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Spending Money</div>
+                          <div style={{ color: auto.spending >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 'bold' }}>${auto.spending.toFixed(0)}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>per {auto.payFrequency}</div>
+                          <div style={{ marginTop: '10px', fontSize: '12px', color: auto.spending >= 0 ? theme.success : theme.danger }}>
+                            {auto.spending >= 0 ? '✓ Guilt-free spending money' : '⚠️ Over budget — review bills'}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ padding: '12px 16px', background: theme.cardBg, borderRadius: '10px' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>💡 How to set it up</div>
+                        <div style={{ color: theme.text, fontSize: '13px', lineHeight: 1.6 }}>
+                          On payday, auto-transfer <strong style={{ color: theme.warning }}>${auto.bills.total.toFixed(0)}</strong> to a dedicated bills account and <strong style={{ color: theme.purple }}>${auto.savings.total.toFixed(0)}</strong> to savings. Keep <strong style={{ color: theme.success }}>${auto.spending.toFixed(0)}</strong> in your everyday account and spend freely — it's already budgeted.
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
+
             {/* Passive Income Quests */}
             <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', border: '1px solid ' + theme.border }}>
-              <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>💡 Passive Income Strategies</h2>
+              <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>💰 Automated Revenue Strategies</h2>
+              <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>Step-by-step guides to build passive income streams alongside your main job.</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {passiveQuests.map(quest => {
                   const isExp = activeQuestId === quest.id
@@ -1461,27 +1613,33 @@ export default function Dashboard() {
                     <div key={quest.id} style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                          <div style={{ fontSize: '28px' }}>{quest.icon}</div>
-                          <div><div style={{ fontWeight: 600, color: theme.text }}>{quest.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{quest.description}</div></div>
+                          <div style={{ width: '44px', height: '44px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>{quest.icon}</div>
+                          <div><div style={{ fontWeight: 600, color: theme.text, fontSize: '15px' }}>{quest.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{quest.description}</div></div>
                         </div>
-                        <span style={{ padding: '3px 8px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '11px', fontWeight: 600, flexShrink: 0 }}>{quest.potentialIncome}</span>
+                        <span style={{ padding: '3px 8px', background: quest.status === 'completed' ? theme.success + '30' : theme.cardBg, color: quest.status === 'completed' ? theme.success : theme.textMuted, borderRadius: '4px', fontSize: '11px', fontWeight: 600, flexShrink: 0, border: '1px solid ' + theme.border }}>{quest.status === 'completed' ? '✓ DONE' : quest.potentialIncome}</span>
                       </div>
-                      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
-                        <span style={{ padding: '2px 8px', background: theme.bg, color: theme.textMuted, borderRadius: '4px', fontSize: '11px' }}>⏱ {quest.timeToSetup}</span>
-                        <span style={{ padding: '2px 8px', background: theme.bg, color: theme.textMuted, borderRadius: '4px', fontSize: '11px' }}>{quest.difficulty}</span>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                        <span style={{ padding: '3px 8px', background: darkMode ? '#334155' : '#e2e8f0', color: theme.textMuted, borderRadius: '4px', fontSize: '11px' }}>⏱ {quest.timeToSetup}</span>
+                        <span style={{ padding: '3px 8px', background: darkMode ? '#334155' : '#e2e8f0', color: theme.textMuted, borderRadius: '4px', fontSize: '11px' }}>{'★'.repeat(quest.difficulty === 'Easy' ? 1 : quest.difficulty === 'Medium' ? 2 : quest.difficulty === 'Hard' ? 3 : 4)} {quest.difficulty}</span>
                       </div>
-                      <button onClick={() => setActiveQuestId(isExp ? null : quest.id)} style={{ background: 'none', border: 'none', color: theme.accent, fontSize: '13px', cursor: 'pointer' }}>▼ {isExp ? 'Hide' : 'Show'} guide</button>
+                      <button onClick={() => setActiveQuestId(isExp ? null : quest.id)} style={{ background: 'none', border: 'none', color: theme.accent, fontSize: '13px', cursor: 'pointer', padding: 0 }}>▼ {isExp ? 'Hide' : 'Expand'} step-by-step guide</button>
                       {isExp && (
-                        <div style={{ marginTop: '12px', padding: '14px', background: theme.bg, borderRadius: '8px' }}>
-                          <div style={{ background: theme.success + '15', padding: '10px', borderRadius: '8px', marginBottom: '12px', borderLeft: '3px solid ' + theme.success }}>
+                        <div style={{ marginTop: '14px', padding: '16px', background: darkMode ? '#0f172a' : '#f1f5f9', borderRadius: '8px' }}>
+                          <div style={{ background: theme.success + '15', padding: '12px', borderRadius: '8px', marginBottom: '14px', borderLeft: '3px solid ' + theme.success }}>
                             <p style={{ margin: 0, color: theme.text, fontSize: '13px', lineHeight: 1.6 }}>💡 {quest.aureusAdvice}</p>
                           </div>
-                          {quest.steps?.map((step: any, i: number) => (
-                            <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                              <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: theme.border, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', color: 'white', flexShrink: 0 }}>{i + 1}</div>
-                              <div><div style={{ color: theme.text, fontSize: '13px', fontWeight: 500 }}>{step.title}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{step.description}</div></div>
-                            </div>
-                          ))}
+                          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
+                            {quest.steps?.map((step: any, idx: number) => (
+                              <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '10px', background: theme.cardBg, borderRadius: '8px' }}>
+                                <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: theme.accent, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold', flexShrink: 0 }}>{idx + 1}</div>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontWeight: 600, color: theme.text, fontSize: '13px', marginBottom: '2px' }}>{step.title}</div>
+                                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>{step.description}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <button onClick={() => { setChatInput(`Tell me more about getting started with ${quest.name}`); setActiveTab('chat') }} style={{ ...btnPrimary, width: '100%', marginTop: '12px', fontSize: '13px', padding: '10px' }}>💬 Ask Aureus about this strategy</button>
                         </div>
                       )}
                     </div>
@@ -1490,26 +1648,195 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Rat Race Escape Tracker */}
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div>
+                  <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px' }}>🐀 RAT RACE ESCAPE TRACKER</div>
+                  <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>Passive income as % of monthly expenses</div>
+                </div>
+                <div style={{ fontSize: '48px', fontWeight: 'bold', color: (passiveIncome + totalPassiveQuestIncome) >= fiPath.monthlyNeed ? theme.success : '#f59e0b' }}>
+                  {fiPath.monthlyNeed > 0 ? (((passiveIncome + totalPassiveQuestIncome) / fiPath.monthlyNeed) * 100).toFixed(1) : '0.0'}%
+                </div>
+              </div>
+              <div style={{ height: '14px', background: '#334155', borderRadius: '7px', overflow: 'hidden', marginBottom: '12px' }}>
+                <div style={{ width: Math.min(((passiveIncome + totalPassiveQuestIncome) / Math.max(fiPath.monthlyNeed, 1)) * 100, 100) + '%', height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #10b981)', borderRadius: '7px', transition: 'width 0.5s ease' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+                {[
+                  { pct: 25, label: '25% — Side income', color: '#94a3b8' },
+                  { pct: 50, label: '50% — Half covered', color: '#f59e0b' },
+                  { pct: 75, label: '75% — Almost free', color: '#8b5cf6' },
+                  { pct: 100, label: '100% — Rat race escaped! 🎉', color: '#10b981' },
+                ].map(milestone => {
+                  const current = fiPath.monthlyNeed > 0 ? ((passiveIncome + totalPassiveQuestIncome) / fiPath.monthlyNeed) * 100 : 0
+                  const reached = current >= milestone.pct
+                  return (
+                    <div key={milestone.pct} style={{ padding: '10px', background: reached ? milestone.color + '20' : '#1e293b', borderRadius: '8px', border: '1px solid ' + (reached ? milestone.color : '#334155'), textAlign: 'center' as const }}>
+                      <div style={{ color: reached ? milestone.color : '#64748b', fontWeight: 700, fontSize: '14px' }}>{milestone.pct}%</div>
+                      <div style={{ color: reached ? milestone.color : '#64748b', fontSize: '10px', marginTop: '2px' }}>{reached ? '✓ ' : ''}{milestone.label.split('—')[1]?.trim()}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Australian Home Buying Roadmap */}
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                <div style={{ width: '56px', height: '56px', borderRadius: '12px', background: 'linear-gradient(135deg, #f59e0b, #10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🏠</div>
+                <div style={{ flex: 1 }}>
+                  <h2 style={{ margin: 0, color: '#f1f5f9', fontSize: '22px' }}>Australian Home Buying Roadmap</h2>
+                  <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '13px' }}>Click each phase to expand · Not financial advice — consult a licensed broker</p>
+                </div>
+              </div>
+
+              {[
+                {
+                  id: 'phase1', num: '1', icon: '💰', title: 'Get Financially Ready',
+                  color: theme.warning,
+                  items: [
+                    'Complete Baby Steps 1–3 first (emergency fund + kill bad debt)',
+                    'Save your deposit: 5% minimum, 20% avoids LMI',
+                    "Check your credit score — free via Credit Savvy or Finder",
+                    "Stop applying for new credit 6+ months before applying",
+                    "Consistent income for 12+ months helps your application",
+                    "Reduce existing debt and BNPL balances to boost borrowing power"
+                  ]
+                },
+                {
+                  id: 'phase2', num: '2', icon: '🧾', title: 'Understand the True Costs',
+                  color: theme.purple,
+                  items: [
+                    "Stamp duty: 0% (first home QLD new builds) up to 5.5% (investors)",
+                    "LMI: $8k–$30k if deposit under 20% — added to your loan",
+                    "Conveyancer / solicitor: ~$1,500–$2,500",
+                    "Building & pest inspection: ~$500–$800",
+                    "Lender fees (application, valuation): ~$500–$1,500",
+                    "Moving costs + immediate repairs: budget $3k–$10k",
+                    "Total 'hidden' costs: budget 3–5% of purchase price on top of deposit"
+                  ]
+                },
+                {
+                  id: 'phase3', num: '3', icon: '🏛️', title: 'Government Schemes & Grants',
+                  color: theme.accent,
+                  items: [
+                    "First Home Guarantee: 5% deposit, no LMI — 35,000 places/yr",
+                    "Regional First Home Guarantee: same deal for regional areas",
+                    "Family Home Guarantee: single parents — 2% deposit",
+                    "QLD FHOG: $30,000 grant for new builds",
+                    "NSW FHOG: $10,000 for new builds under $600k",
+                    "First Home Super Saver Scheme: up to $50k from super for deposit",
+                    "Check your state revenue office for current stamp duty concessions"
+                  ]
+                },
+                {
+                  id: 'phase4', num: '4', icon: '🏦', title: 'Get Pre-Approved',
+                  color: theme.success,
+                  items: [
+                    "Pre-approval shows sellers you're serious — valid 90 days typically",
+                    "Use a mortgage broker: access 40+ lenders, free to you (paid by bank)",
+                    "Bring: 3 months payslips, 3 months bank statements, tax returns, ID",
+                    "Understand the difference: variable rate (flexible) vs fixed (certainty)",
+                    "Ask about offset accounts — critical for accelerating payoff",
+                    "Compare comparison rates, not just advertised rates",
+                    "Get pre-approval BEFORE falling in love with a property"
+                  ]
+                },
+                {
+                  id: 'phase5', num: '5', icon: '🎯', title: 'Buy Smart & Pay It Off Fast',
+                  color: theme.danger,
+                  items: [
+                    "Research suburbs: price trends, yield, infrastructure, school catchments",
+                    "Buy slightly below your max borrowing capacity — buffer for rate rises",
+                    "Switch to fortnightly repayments immediately — saves 3–4 years",
+                    "Open an offset account and park all savings there from day one",
+                    "Direct tax returns, bonuses, and windfalls straight to mortgage",
+                    "Review your rate every 2 years — don't pay the loyalty tax",
+                    "Use the Mortgage Accelerator tab to see exactly what extra payments save you"
+                  ]
+                }
+              ].map(phase => (
+                <div key={phase.id} style={{ marginBottom: '10px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + (homeGuideExpanded === phase.id ? phase.color : '#334155') }}>
+                  <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === phase.id ? null : phase.id)} style={{ width: '100%', padding: '16px 20px', background: homeGuideExpanded === phase.id ? phase.color + '20' : '#1e293b', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: phase.color + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>{phase.icon}</div>
+                      <div style={{ textAlign: 'left' as const }}>
+                        <div style={{ color: phase.color, fontWeight: 700, fontSize: '15px' }}>Phase {phase.num}: {phase.title}</div>
+                        <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>{phase.items.length} key steps</div>
+                      </div>
+                    </div>
+                    <span style={{ color: phase.color, fontSize: '18px' }}>{homeGuideExpanded === phase.id ? '▼' : '▶'}</span>
+                  </button>
+                  {homeGuideExpanded === phase.id && (
+                    <div style={{ padding: '0 20px 20px 20px', background: '#0f172a' }}>
+                      <div style={{ height: '1px', background: '#334155', marginBottom: '16px' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                        {phase.items.map((item, i) => (
+                          <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '10px 12px', background: '#1e293b', borderRadius: '8px' }}>
+                            <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: phase.color + '30', color: phase.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0 }}>{i + 1}</div>
+                            <div style={{ color: '#e2e8f0', fontSize: '13px', lineHeight: 1.5 }}>{item}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {phase.id === 'phase5' && (
+                        <button onClick={() => setActiveTab('mortgage')} style={{ ...btnSuccess, width: '100%', marginTop: '14px', padding: '12px' }}>🚀 Open Mortgage Accelerator →</button>
+                      )}
+                      {phase.id === 'phase3' && (
+                        <div style={{ marginTop: '14px', padding: '14px', background: '#1e293b', borderRadius: '10px', border: '1px solid #334155' }}>
+                          <div style={{ color: '#94a3b8', fontWeight: 600, fontSize: '12px', marginBottom: '10px' }}>📊 QLD Stamp Duty Quick Reference</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            {Object.entries(australianHomeData.stampDuty).map(([state, data]: [string, any]) => (
+                              <div key={state} style={{ padding: '8px', background: '#0f172a', borderRadius: '6px' }}>
+                                <div style={{ color: theme.accent, fontWeight: 700, fontSize: '12px', marginBottom: '4px' }}>{state}</div>
+                                <div style={{ color: '#64748b', fontSize: '11px' }}>First home: {data.firstHome}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
             {/* Roadmap */}
             <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: '16px', border: '2px solid ' + theme.purple }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🗺️ My Roadmap</h2>
+                <div>
+                  <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🗺️ My Personal Roadmap</h2>
+                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Your milestones, your timeline</p>
+                </div>
                 <button onClick={() => setShowAddMilestone(true)} style={{ ...btnPurple, padding: '10px 18px' }}>+ Milestone</button>
               </div>
               {roadmapMilestones.length === 0 ? (
                 <div style={{ textAlign: 'center' as const, padding: '40px', color: theme.textMuted }}>
                   <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎯</div>
                   <div style={{ color: theme.text, fontWeight: 600, marginBottom: '8px' }}>No milestones yet</div>
-                  <div>Add your first milestone to start mapping your journey</div>
+                  <div style={{ fontSize: '14px', lineHeight: 1.6 }}>Add milestones like "Pay off credit card", "Save $20k deposit", "Mortgage-free by 2032"</div>
+                  <button onClick={() => setShowAddMilestone(true)} style={{ ...btnPurple, marginTop: '16px' }}>Add First Milestone</button>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
                   {roadmapMilestones.map(m => {
                     const pct = m.targetAmount > 0 ? (m.currentAmount / parseFloat(m.targetAmount)) * 100 : 0
                     return (
-                      <div key={m.id} style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
-                        <div style={{ flex: 1 }}><h4 style={{ margin: '0 0 4px 0', color: theme.text }}>{m.name}</h4><div style={{ height: '6px', background: '#334155', borderRadius: '3px', overflow: 'hidden', marginTop: '8px' }}><div style={{ width: Math.min(pct, 100) + '%', height: '100%', background: `linear-gradient(90deg, ${theme.purple}, ${theme.success})` }} /></div></div>
-                        <div style={{ textAlign: 'right' as const, flexShrink: 0 }}><div style={{ color: theme.purple, fontWeight: 700 }}>${parseFloat(m.targetAmount).toLocaleString()}</div><button onClick={() => setRoadmapMilestones(roadmapMilestones.filter(x => x.id !== m.id))} style={{ padding: '3px 8px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', marginTop: '4px' }}>×</button></div>
+                      <div key={m.id} style={{ padding: '16px 20px', background: theme.cardBg, borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <h4 style={{ margin: 0, color: theme.text }}>{m.icon || '🎯'} {m.name}</h4>
+                            {m.targetDate && <span style={{ color: theme.textMuted, fontSize: '12px' }}>📅 {new Date(m.targetDate).toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}</span>}
+                          </div>
+                          <div style={{ height: '8px', background: '#334155', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ width: Math.min(pct, 100) + '%', height: '100%', background: `linear-gradient(90deg, ${theme.purple}, ${theme.success})`, transition: 'width 0.5s ease' }} />
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                            <span style={{ color: theme.textMuted, fontSize: '11px' }}>${m.currentAmount.toLocaleString()} saved</span>
+                            <span style={{ color: theme.purple, fontSize: '11px', fontWeight: 600 }}>Target: ${parseFloat(m.targetAmount).toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <button onClick={() => setRoadmapMilestones(roadmapMilestones.filter(x => x.id !== m.id))} style={{ padding: '4px 8px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', flexShrink: 0 }}>🗑️</button>
                       </div>
                     )
                   })}
