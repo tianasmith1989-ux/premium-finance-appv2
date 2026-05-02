@@ -601,6 +601,8 @@ export default function Dashboard() {
     setCelebrationWin(`"${name}" added to your roadmap! 🗺️`)
     setTimeout(() => setCelebrationWin(null), 3000)
   }
+
+  const handleChatMessage = async () => {
     if (!chatInput.trim() || isLoading) return
     const message = chatInput.trim()
     setChatMessages(prev => [...prev, { role: 'user', content: message }])
