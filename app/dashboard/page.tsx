@@ -557,13 +557,20 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'question',
-          question: `Create a 7-day action plan for this goal: "${milestone.name}"${milestone.targetAmount ? ` (target: $${milestone.targetAmount})` : ''}${milestone.notes ? `. Context: ${milestone.notes}` : ''}.
+          question: `You are Aureus, an AI financial coach built into a budgeting app called Aureus. The user is already using Aureus to track their budget, income, expenses, debts, and goals — so NEVER suggest they download a budgeting app, spreadsheet, or any other tracking tool. They already have one.
+
+Important financial context for Australian users:
+- The $2,000 Starter Emergency Fund (Baby Step 1) is a buffer for UNEXPECTED emergencies like car breakdowns, medical bills, vet bills, or appliance failures — it is NOT meant to cover a month of living expenses. Do not describe it that way.
+- Baby Step 3 (3-6 months of expenses) is the full emergency fund — different goal.
+
+Create a 7-day action plan for this goal: "${milestone.name}"${milestone.targetAmount ? ` (target: $${milestone.targetAmount})` : ''}${milestone.notes ? `. Context: ${milestone.notes}` : ''}.
 
 Rules:
 - Output ONLY the 7 steps, nothing else. No intro sentence, no summary, no preamble.
 - Format each line as: Day 1: [action]
 - Each action must be specific, concrete, and doable in under 30 minutes
 - One sentence per step
+- Never suggest downloading another app or creating a spreadsheet — the user is already in Aureus
 - Start directly with "Day 1:"`,
           financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities },
           memory: budgetMemory,
