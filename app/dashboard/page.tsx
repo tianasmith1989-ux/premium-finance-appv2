@@ -557,7 +557,14 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'question',
-          question: `Create a practical 7-day action plan to make progress on this goal: "${milestone.name}" (target: $${milestone.targetAmount}${milestone.notes ? ', context: ' + milestone.notes : ''}). Format as exactly 7 steps labelled Day 1: through Day 7:, each a specific concrete task doable in under 30 minutes. One sentence each.`,
+          question: `Create a 7-day action plan for this goal: "${milestone.name}"${milestone.targetAmount ? ` (target: $${milestone.targetAmount})` : ''}${milestone.notes ? `. Context: ${milestone.notes}` : ''}.
+
+Rules:
+- Output ONLY the 7 steps, nothing else. No intro sentence, no summary, no preamble.
+- Format each line as: Day 1: [action]
+- Each action must be specific, concrete, and doable in under 30 minutes
+- One sentence per step
+- Start directly with "Day 1:"`,
           financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
@@ -566,12 +573,31 @@ export default function Dashboard() {
       const data = await response.json()
       const rawText: string = data.message || data.advice || data.raw || ''
       const lines = rawText.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
-      const dayLines = lines.filter((l: string) => /^(day\s*\d+|step\s*\d+|\d+[).])/i.test(l))
-      const parsed = (dayLines.length >= 3 ? dayLines : lines).slice(0, 7).map((l: string, i: number) => ({
+
+      // Strip markdown bold/italic from a string
+      const stripMd = (s: string) => s
+        .replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold**
+        .replace(/\*([^*]+)\*/g, '$1')       // *italic*
+        .replace(/^#+\s*/, '')               // headings
+        .trim()
+
+      // Filter to only lines that start with Day N / Step N / number - skip intro prose
+      const dayLines = lines.filter((l: string) => /^(day\s*\d+|step\s*\d+|\d+[).\-:])/i.test(l))
+      const sourceLines = dayLines.length >= 5 ? dayLines : lines.filter((l: string) => {
+        // also skip obvious intro/outro lines
+        const stripped = stripMd(l).toLowerCase()
+        return !stripped.startsWith("here's") && !stripped.startsWith("here is") &&
+               !stripped.startsWith("below") && !stripped.startsWith("sure") &&
+               !stripped.startsWith("great") && !stripped.startsWith("absolutely") &&
+               !stripped.startsWith("of course") && l.length > 20
+      })
+
+      const parsed = sourceLines.slice(0, 7).map((l: string, i: number) => ({
         id: Date.now() + i,
-        text: l.replace(/^(day\s*\d+[:.]?\s*|step\s*\d+[:.]?\s*|\d+[).]\s*)/i, '').trim(),
+        // Strip the "Day N:" / "1." / "Step N:" prefix AND any markdown from the text
+        text: stripMd(l.replace(/^(day\s*\d+[:.\-]?\s*|step\s*\d+[:.\-]?\s*|\d+[).\-]\s*)/i, '').trim()),
         done: false
-      }))
+      })).filter((s: any) => s.text.length > 10) // skip any empty/too-short results
       setRoadmapMilestones(prev => prev.map(m =>
         m.id === milestoneId ? { ...m, weeklyPlan: parsed, planGeneratedAt: new Date().toISOString() } : m
       ))
