@@ -571,6 +571,7 @@ Rules:
 - Each action must be specific, concrete, and doable in under 30 minutes
 - One sentence per step
 - Never suggest downloading another app or creating a spreadsheet — the user is already in Aureus
+- Day 5 MUST always be: "Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders."
 - Start directly with "Day 1:"`,
           financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities },
           memory: budgetMemory,
@@ -1106,7 +1107,7 @@ Rules:
                   ))}
                 </div>
               </div>
-              <div style={cardStyle}>
+              <div style={cardStyle} data-section="goals">
                 <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🎯 Goals</h3>
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
                   <input placeholder="Goal name" value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '80px'}} />
@@ -1703,21 +1704,68 @@ Rules:
                               {m.planGeneratedAt && <span style={{ fontWeight: 400, marginLeft: '8px' }}>Generated {new Date(m.planGeneratedAt).toLocaleDateString('en-AU')}</span>}
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                              {planSteps.map((step: any, idx: number) => (
+                              {planSteps.map((step: any, idx: number) => {
+                                // Detect if this step is an Aureus-specific action
+                                const isAddGoalStep = step.type === 'add_goal' || /add.*goal|savings goal.*aureus|aureus.*goal|calendar.*reminder|track.*aureus/i.test(step.text)
+                                const isReviewStep = step.type === 'review_spending' || /review.*aureus|spending.*aureus|aureus.*spending|check.*aureus/i.test(step.text)
+
+                                return (
                                 <div
                                   key={step.id}
-                                  onClick={() => togglePlanStep(m.id, step.id)}
-                                  style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: step.done ? theme.success + '15' : theme.bg, borderRadius: '10px', cursor: 'pointer', border: '1px solid ' + (step.done ? theme.success + '40' : theme.border), transition: 'all 0.2s' }}
+                                  style={{ background: step.done ? theme.success + '15' : theme.bg, borderRadius: '10px', border: '1px solid ' + (step.done ? theme.success + '40' : isAddGoalStep ? theme.purple + '60' : theme.border), overflow: 'hidden' }}
                                 >
-                                  <div style={{ width: '24px', height: '24px', borderRadius: '6px', border: '2px solid ' + (step.done ? theme.success : theme.border), background: step.done ? theme.success : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
-                                    {step.done && <span style={{ color: 'white', fontSize: '14px', fontWeight: 700 }}>✓</span>}
+                                  {/* Clickable row */}
+                                  <div
+                                    onClick={() => togglePlanStep(m.id, step.id)}
+                                    style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', cursor: 'pointer' }}
+                                  >
+                                    <div style={{ width: '24px', height: '24px', borderRadius: '6px', border: '2px solid ' + (step.done ? theme.success : theme.border), background: step.done ? theme.success : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                                      {step.done && <span style={{ color: 'white', fontSize: '14px', fontWeight: 700 }}>✓</span>}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                        <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 600 }}>DAY {idx + 1}</span>
+                                        {isAddGoalStep && !step.done && <span style={{ padding: '1px 6px', background: theme.purple + '30', color: theme.purple, borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>ACTION IN AUREUS</span>}
+                                      </div>
+                                      <div style={{ color: step.done ? theme.textMuted : theme.text, fontSize: '14px', lineHeight: 1.5, textDecoration: step.done ? 'line-through' : 'none' }}>{step.text}</div>
+                                    </div>
                                   </div>
-                                  <div style={{ flex: 1 }}>
-                                    <div style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>DAY {idx + 1}</div>
-                                    <div style={{ color: step.done ? theme.textMuted : theme.text, fontSize: '14px', lineHeight: 1.5, textDecoration: step.done ? 'line-through' : 'none' }}>{step.text}</div>
-                                  </div>
+                                  {/* Inline action button for Aureus-specific steps */}
+                                  {isAddGoalStep && !step.done && (
+                                    <div style={{ padding: '0 14px 12px 50px', display: 'flex', gap: '8px' }}>
+                                      <button
+                                        onClick={e => {
+                                          e.stopPropagation()
+                                          // Pre-fill the goal form with milestone data
+                                          setNewGoal({
+                                            name: m.name,
+                                            target: m.targetAmount || '',
+                                            saved: m.currentAmount?.toString() || '0',
+                                            deadline: m.targetDate || '',
+                                            savingsFrequency: 'weekly',
+                                            startDate: new Date().toISOString().split('T')[0],
+                                            paymentAmount: m.targetAmount && m.targetDate
+                                              ? Math.ceil(parseFloat(m.targetAmount) / Math.max(1, Math.ceil((new Date(m.targetDate).getTime() - Date.now()) / (7 * 86400000)))).toString()
+                                              : ''
+                                          })
+                                          setActiveTab('dashboard')
+                                          // Mark step done
+                                          togglePlanStep(m.id, step.id)
+                                          // Small delay then scroll to goals section
+                                          setTimeout(() => {
+                                            const el = document.querySelector('[data-section="goals"]')
+                                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                          }, 300)
+                                        }}
+                                        style={{ padding: '7px 14px', background: theme.purple, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
+                                      >
+                                        🎯 Add to Goals & Calendar →
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
-                              ))}
+                                )
+                              })}
                             </div>
                             {donePct === 100 && (
                               <div style={{ marginTop: '12px', padding: '12px 16px', background: theme.success + '20', borderRadius: '10px', textAlign: 'center' as const, color: theme.success, fontWeight: 600 }}>
