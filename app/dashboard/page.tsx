@@ -138,6 +138,19 @@ export default function Dashboard() {
   const [showDocUpload, setShowDocUpload] = useState(false)
   const docInputRef = useRef<HTMLInputElement>(null)
 
+  // Goal Setup Modal (triggered from roadmap weekly plan)
+  const [showGoalSetup, setShowGoalSetup] = useState(false)
+  const [goalSetupMilestone, setGoalSetupMilestone] = useState<any>(null)
+  const [goalSetupStepId, setGoalSetupStepId] = useState<number | null>(null)
+  const [goalSetupForm, setGoalSetupForm] = useState({
+    name: '', target: '', saved: '0', paymentAmount: '',
+    savingsFrequency: 'weekly', startDate: new Date().toISOString().split('T')[0],
+    deadline: '', addToCalendar: true, addCheckIn: true
+  })
+
+  // Per-milestone check-in questions added when a goal is set up from roadmap
+  const [milestoneCheckIns, setMilestoneCheckIns] = useState<{id: number, milestoneId: number, question: string, milestoneName: string}[]>([])
+
   // Country
   const [userCountry, setUserCountry] = useState<'AU' | 'US' | 'UK' | 'NZ' | 'CA'>('AU')
 
@@ -256,6 +269,7 @@ export default function Dashboard() {
       if (data.paidOccurrences) setPaidOccurrences(new Set(data.paidOccurrences))
       if (data.roadmapMilestones) setRoadmapMilestones(data.roadmapMilestones)
       if (data.documents) setDocuments(data.documents)
+      if (data.milestoneCheckIns) setMilestoneCheckIns(data.milestoneCheckIns)
       if (data.moneyPersonality) setMoneyPersonality(data.moneyPersonality)
       if (data.identityStatements) setIdentityStatements(data.identityStatements)
       if (data.deepWhyAnswers) setDeepWhyAnswers(data.deepWhyAnswers)
@@ -292,14 +306,14 @@ export default function Dashboard() {
       incomeStreams, expenses, debts, goals, assets, liabilities,
       budgetMemory, paidOccurrences: Array.from(paidOccurrences),
       roadmapMilestones, budgetOnboarding, chatMessages, userCountry,
-      wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents,
+      wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns,
       moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete,
       fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights,
       insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog,
       annualReviews, superData, netWorthHistory, personalityAnswers
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
 
   // Chat scroll
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -1065,9 +1079,27 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
       answers: moneyDateAnswers,
       win: moneyDateAnswers[4] || '',
       intention: moneyDateAnswers[5] || '',
-      stressLevel: moneyDateAnswers[3] || '3'
+      stressLevel: moneyDateAnswers[3] || '3',
+      milestoneAnswers: milestoneCheckIns.map((ci, i) => ({
+        milestoneName: ci.milestoneName,
+        answer: moneyDateAnswers[100 + i] || ''
+      })).filter(a => a.answer)
     }
     setMoneyDateLog(prev => [entry, ...prev])
+
+    // Log wins from milestone check-ins
+    milestoneCheckIns.forEach((ci, i) => {
+      const answer = moneyDateAnswers[100 + i]
+      if (answer === 'yes' || answer === 'Yes') {
+        setWins(prev => [...prev, {
+          id: Date.now() + i + 1,
+          title: `Made progress on: ${ci.milestoneName}`,
+          desc: 'Confirmed in your weekly Money Date check-in',
+          icon: '🎯', auto: true, date: new Date().toISOString()
+        }])
+      }
+    })
+
     if (moneyDateAnswers[4]) {
       setWins(prev => [...prev, { id: Date.now(), title: moneyDateAnswers[4], desc: 'From your Money Date', icon: '💰', auto: false, date: new Date().toISOString() }])
     }
@@ -2258,34 +2290,35 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                   </div>
                                   {/* Inline action button for Aureus-specific steps */}
                                   {isAddGoalStep && !step.done && (
-                                    <div style={{ padding: '0 14px 12px 50px', display: 'flex', gap: '8px' }}>
+                                    <div style={{ padding: '0 14px 12px 50px' }}>
                                       <button
                                         onClick={e => {
                                           e.stopPropagation()
-                                          // Pre-fill the goal form with milestone data
-                                          setNewGoal({
+                                          // Pre-fill form with milestone data
+                                          const weeks = m.targetDate
+                                            ? Math.max(1, Math.ceil((new Date(m.targetDate).getTime() - Date.now()) / (7 * 86400000)))
+                                            : 26
+                                          const suggestedPayment = m.targetAmount
+                                            ? Math.ceil(parseFloat(m.targetAmount) / weeks).toString()
+                                            : ''
+                                          setGoalSetupMilestone(m)
+                                          setGoalSetupStepId(step.id)
+                                          setGoalSetupForm({
                                             name: m.name,
                                             target: m.targetAmount || '',
                                             saved: m.currentAmount?.toString() || '0',
-                                            deadline: m.targetDate || '',
+                                            paymentAmount: suggestedPayment,
                                             savingsFrequency: 'weekly',
                                             startDate: new Date().toISOString().split('T')[0],
-                                            paymentAmount: m.targetAmount && m.targetDate
-                                              ? Math.ceil(parseFloat(m.targetAmount) / Math.max(1, Math.ceil((new Date(m.targetDate).getTime() - Date.now()) / (7 * 86400000)))).toString()
-                                              : ''
+                                            deadline: m.targetDate || '',
+                                            addToCalendar: true,
+                                            addCheckIn: true
                                           })
-                                          setActiveTab('dashboard')
-                                          // Mark step done
-                                          togglePlanStep(m.id, step.id)
-                                          // Small delay then scroll to goals section
-                                          setTimeout(() => {
-                                            const el = document.querySelector('[data-section="goals"]')
-                                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                                          }, 300)
+                                          setShowGoalSetup(true)
                                         }}
-                                        style={{ padding: '7px 14px', background: theme.purple, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
+                                        style={{ padding: '8px 16px', background: theme.purple, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
                                       >
-                                        🎯 Add to Goals & Calendar →
+                                        🎯 Set up in Goals & Calendar →
                                       </button>
                                     </div>
                                   )}
@@ -3397,67 +3430,100 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
       {showMoneyDate && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '500px', width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div>
-                <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>💰 Money Date</h3>
-                <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>Question {moneyDateStep + 1} of {moneyDateQuestions.length}</div>
-              </div>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                {moneyDateQuestions.map((_, i) => <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i <= moneyDateStep ? theme.success : theme.border }} />)}
-              </div>
-            </div>
+            {/* Build full question list: standard + milestone check-ins */}
+            {(() => {
+              const allQuestions = [
+                ...moneyDateQuestions,
+                ...milestoneCheckIns.map((ci, i) => ({
+                  q: `Did you make a savings contribution toward "${ci.milestoneName}" this week?`,
+                  type: 'yesno',
+                  isMilestone: true,
+                  milestoneIndex: i,
+                  answerKey: 100 + i
+                }))
+              ]
+              const totalSteps = allQuestions.length
+              const currentQ = allQuestions[moneyDateStep] as any
+              const answerKey = currentQ.answerKey !== undefined ? currentQ.answerKey : moneyDateStep
 
-            <div style={{ padding: '20px', background: theme.bg, borderRadius: '12px', marginBottom: '20px' }}>
-              <p style={{ color: theme.text, fontSize: '16px', fontWeight: 500, margin: 0 }}>{moneyDateQuestions[moneyDateStep].q}</p>
-            </div>
+              return (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>💰 Money Date</h3>
+                      <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>
+                        {currentQ.isMilestone ? '🎯 Goal check-in' : `Question ${moneyDateStep + 1} of ${totalSteps}`}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {allQuestions.map((_, i) => (
+                        <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i <= moneyDateStep ? (i >= moneyDateQuestions.length ? theme.purple : theme.success) : theme.border }} />
+                      ))}
+                    </div>
+                  </div>
 
-            {moneyDateQuestions[moneyDateStep].type === 'yesno' && (
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-                {['Yes', 'No'].map(opt => (
-                  <button key={opt} onClick={() => setMoneyDateAnswers(p => ({ ...p, [moneyDateStep]: opt }))}
-                    style={{ flex: 1, padding: '14px', background: moneyDateAnswers[moneyDateStep] === opt ? theme.success : theme.bg, color: moneyDateAnswers[moneyDateStep] === opt ? 'white' : theme.text, border: '2px solid ' + (moneyDateAnswers[moneyDateStep] === opt ? theme.success : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}>{opt === 'Yes' ? '👍 Yes' : '👎 No'}</button>
-                ))}
-              </div>
-            )}
+                  <div style={{ padding: '20px', background: currentQ.isMilestone ? theme.purple + '15' : theme.bg, borderRadius: '12px', marginBottom: '20px', border: currentQ.isMilestone ? '1px solid ' + theme.purple + '40' : 'none' }}>
+                    {currentQ.isMilestone && <div style={{ color: theme.purple, fontSize: '11px', fontWeight: 700, marginBottom: '6px' }}>🎯 GOAL PROGRESS CHECK</div>}
+                    <p style={{ color: theme.text, fontSize: '16px', fontWeight: 500, margin: 0 }}>{currentQ.q}</p>
+                  </div>
 
-            {moneyDateQuestions[moneyDateStep].type === 'scale3' && (
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                {(moneyDateQuestions[moneyDateStep].options || []).map((opt: string) => (
-                  <button key={opt} onClick={() => setMoneyDateAnswers(p => ({ ...p, [moneyDateStep]: opt }))}
-                    style={{ flex: 1, padding: '12px', background: moneyDateAnswers[moneyDateStep] === opt ? theme.accent : theme.bg, color: moneyDateAnswers[moneyDateStep] === opt ? 'white' : theme.text, border: '2px solid ' + (moneyDateAnswers[moneyDateStep] === opt ? theme.accent : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>{opt}</button>
-                ))}
-              </div>
-            )}
+                  {currentQ.type === 'yesno' && (
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+                      {['Yes', 'No'].map(opt => (
+                        <button key={opt} onClick={() => setMoneyDateAnswers(p => ({ ...p, [answerKey]: opt }))}
+                          style={{ flex: 1, padding: '14px', background: moneyDateAnswers[answerKey] === opt ? (opt === 'Yes' ? theme.success : theme.danger) : theme.bg, color: moneyDateAnswers[answerKey] === opt ? 'white' : theme.text, border: '2px solid ' + (moneyDateAnswers[answerKey] === opt ? (opt === 'Yes' ? theme.success : theme.danger) : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}>
+                          {opt === 'Yes' ? '👍 Yes' : '👎 No'}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
-            {moneyDateQuestions[moneyDateStep].type === 'scale' && (
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                {['1', '2', '3', '4', '5'].map(n => (
-                  <button key={n} onClick={() => setMoneyDateAnswers(p => ({ ...p, [moneyDateStep]: n }))}
-                    style={{ flex: 1, padding: '14px', background: moneyDateAnswers[moneyDateStep] === n ? theme.accent : theme.bg, color: moneyDateAnswers[moneyDateStep] === n ? 'white' : theme.text, border: '2px solid ' + (moneyDateAnswers[moneyDateStep] === n ? theme.accent : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '18px', fontWeight: 700 }}>{n}</button>
-                ))}
-              </div>
-            )}
+                  {currentQ.type === 'scale3' && (
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                      {(currentQ.options || []).map((opt: string) => (
+                        <button key={opt} onClick={() => setMoneyDateAnswers(p => ({ ...p, [answerKey]: opt }))}
+                          style={{ flex: 1, padding: '12px', background: moneyDateAnswers[answerKey] === opt ? theme.accent : theme.bg, color: moneyDateAnswers[answerKey] === opt ? 'white' : theme.text, border: '2px solid ' + (moneyDateAnswers[answerKey] === opt ? theme.accent : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>{opt}</button>
+                      ))}
+                    </div>
+                  )}
 
-            {moneyDateQuestions[moneyDateStep].type === 'text' && (
-              <div style={{ marginBottom: '20px' }}>
-                <input
-                  value={moneyDateAnswers[moneyDateStep] || ''}
-                  onChange={e => setMoneyDateAnswers(p => ({ ...p, [moneyDateStep]: e.target.value }))}
-                  placeholder={(moneyDateQuestions[moneyDateStep] as any).placeholder || ''}
-                  style={{ ...inputStyle, width: '100%', padding: '14px 16px' }}
-                />
-              </div>
-            )}
+                  {currentQ.type === 'scale' && (
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                      {['1', '2', '3', '4', '5'].map(n => (
+                        <button key={n} onClick={() => setMoneyDateAnswers(p => ({ ...p, [answerKey]: n }))}
+                          style={{ flex: 1, padding: '14px', background: moneyDateAnswers[answerKey] === n ? theme.accent : theme.bg, color: moneyDateAnswers[answerKey] === n ? 'white' : theme.text, border: '2px solid ' + (moneyDateAnswers[answerKey] === n ? theme.accent : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '18px', fontWeight: 700 }}>{n}</button>
+                      ))}
+                    </div>
+                  )}
 
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {moneyDateStep > 0 && <button onClick={() => setMoneyDateStep(s => s - 1)} style={{ ...btnPrimary, background: theme.textMuted }}>← Back</button>}
-              {moneyDateStep < moneyDateQuestions.length - 1 ? (
-                <button onClick={() => { if (moneyDateAnswers[moneyDateStep] !== undefined) setMoneyDateStep(s => s + 1) }} disabled={moneyDateAnswers[moneyDateStep] === undefined} style={{ ...btnPrimary, flex: 1, opacity: moneyDateAnswers[moneyDateStep] === undefined ? 0.5 : 1 }}>Next →</button>
-              ) : (
-                <button onClick={submitMoneyDate} style={{ ...btnSuccess, flex: 1, fontSize: '15px' }}>✅ Complete Money Date</button>
-              )}
-            </div>
-            <button onClick={() => { setShowMoneyDate(false); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', width: '100%', marginTop: '10px', fontSize: '13px' }}>Cancel</button>
+                  {currentQ.type === 'text' && (
+                    <div style={{ marginBottom: '20px' }}>
+                      <input
+                        value={moneyDateAnswers[answerKey] || ''}
+                        onChange={e => setMoneyDateAnswers(p => ({ ...p, [answerKey]: e.target.value }))}
+                        placeholder={currentQ.placeholder || ''}
+                        style={{ ...inputStyle, width: '100%', padding: '14px 16px' }}
+                      />
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    {moneyDateStep > 0 && <button onClick={() => setMoneyDateStep(s => s - 1)} style={{ ...btnPrimary, background: theme.textMuted }}>← Back</button>}
+                    {moneyDateStep < totalSteps - 1 ? (
+                      <button
+                        onClick={() => { if (moneyDateAnswers[answerKey] !== undefined) setMoneyDateStep(s => s + 1) }}
+                        disabled={moneyDateAnswers[answerKey] === undefined}
+                        style={{ ...btnPrimary, flex: 1, opacity: moneyDateAnswers[answerKey] === undefined ? 0.5 : 1 }}>
+                        Next →
+                      </button>
+                    ) : (
+                      <button onClick={submitMoneyDate} style={{ ...btnSuccess, flex: 1, fontSize: '15px' }}>✅ Complete Money Date</button>
+                    )}
+                  </div>
+                  <button onClick={() => { setShowMoneyDate(false); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', width: '100%', marginTop: '10px', fontSize: '13px' }}>Cancel</button>
+                </>
+              )
+            })()}
           </div>
         </div>
       )}
@@ -3535,6 +3601,183 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               )}
             </div>
             <button onClick={() => { setShowFearAudit(false); setFearAuditStep(0) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', width: '100%', marginTop: '10px', fontSize: '13px' }}>Save & exit</button>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== GOAL SETUP MODAL (from Roadmap) ==================== */}
+      {showGoalSetup && goalSetupMilestone && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowGoalSetup(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+              <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>🎯 Add to Goals & Calendar</h3>
+              <button onClick={() => setShowGoalSetup(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '22px', cursor: 'pointer' }}>×</button>
+            </div>
+            <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 20px 0' }}>
+              Set up <strong style={{ color: theme.text }}>{goalSetupMilestone.name}</strong> as a tracked savings goal with calendar reminders.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
+
+              {/* Goal name */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Goal name</label>
+                <input value={goalSetupForm.name} onChange={e => setGoalSetupForm(f => ({ ...f, name: e.target.value }))} style={{ ...inputStyle, width: '100%' }} />
+              </div>
+
+              {/* Target and saved */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Target amount ($)</label>
+                  <input type="number" value={goalSetupForm.target} onChange={e => setGoalSetupForm(f => ({ ...f, target: e.target.value }))} placeholder="e.g. 2000" style={{ ...inputStyle, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Already saved ($)</label>
+                  <input type="number" value={goalSetupForm.saved} onChange={e => setGoalSetupForm(f => ({ ...f, saved: e.target.value }))} placeholder="0" style={{ ...inputStyle, width: '100%' }} />
+                </div>
+              </div>
+
+              {/* Payment amount and frequency */}
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                  How much will you save per period?
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ position: 'relative' as const, flex: 1 }}>
+                    <span style={{ position: 'absolute' as const, left: '12px', top: '50%', transform: 'translateY(-50%)', color: theme.textMuted, fontSize: '14px' }}>$</span>
+                    <input
+                      type="number"
+                      value={goalSetupForm.paymentAmount}
+                      onChange={e => setGoalSetupForm(f => ({ ...f, paymentAmount: e.target.value }))}
+                      placeholder="e.g. 77"
+                      style={{ ...inputStyle, width: '100%', paddingLeft: '28px' }}
+                    />
+                  </div>
+                  <select value={goalSetupForm.savingsFrequency} onChange={e => setGoalSetupForm(f => ({ ...f, savingsFrequency: e.target.value }))} style={{ ...inputStyle, flexShrink: 0 }}>
+                    <option value="weekly">Weekly</option>
+                    <option value="fortnightly">Fortnightly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+                {/* Auto-calculated time to reach target */}
+                {goalSetupForm.target && goalSetupForm.paymentAmount && (() => {
+                  const remaining = parseFloat(goalSetupForm.target) - parseFloat(goalSetupForm.saved || '0')
+                  const periodsNeeded = Math.ceil(remaining / parseFloat(goalSetupForm.paymentAmount))
+                  const freqDays = goalSetupForm.savingsFrequency === 'weekly' ? 7 : goalSetupForm.savingsFrequency === 'fortnightly' ? 14 : 30
+                  const targetDate = new Date(Date.now() + periodsNeeded * freqDays * 86400000)
+                  return (
+                    <div style={{ marginTop: '6px', padding: '8px 10px', background: theme.success + '15', borderRadius: '6px', color: theme.success, fontSize: '12px' }}>
+                      ✅ At ${goalSetupForm.paymentAmount}/{goalSetupForm.savingsFrequency}, you'll reach ${goalSetupForm.target} by <strong>{targetDate.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}</strong>
+                      {!goalSetupForm.deadline && <button onClick={() => setGoalSetupForm(f => ({ ...f, deadline: targetDate.toISOString().split('T')[0] }))} style={{ background: 'none', border: 'none', color: theme.accent, cursor: 'pointer', fontSize: '12px', marginLeft: '6px' }}>Use this date →</button>}
+                    </div>
+                  )
+                })()}
+              </div>
+
+              {/* Dates */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Start date</label>
+                  <input type="date" value={goalSetupForm.startDate} onChange={e => setGoalSetupForm(f => ({ ...f, startDate: e.target.value }))} style={{ ...inputStyle, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Target completion date</label>
+                  <input type="date" value={goalSetupForm.deadline} onChange={e => setGoalSetupForm(f => ({ ...f, deadline: e.target.value }))} style={{ ...inputStyle, width: '100%' }} />
+                </div>
+              </div>
+
+              {/* Options */}
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', padding: '14px', background: theme.bg, borderRadius: '10px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={goalSetupForm.addToCalendar}
+                    onChange={e => setGoalSetupForm(f => ({ ...f, addToCalendar: e.target.checked }))}
+                    style={{ width: '16px', height: '16px', accentColor: theme.success }}
+                  />
+                  <div>
+                    <div style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>📅 Add payment reminders to calendar</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px' }}>Your savings payments will appear on the Budget calendar</div>
+                  </div>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={goalSetupForm.addCheckIn}
+                    onChange={e => setGoalSetupForm(f => ({ ...f, addCheckIn: e.target.checked }))}
+                    style={{ width: '16px', height: '16px', accentColor: theme.purple }}
+                  />
+                  <div>
+                    <div style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>🔄 Add to weekly Money Date check-in</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px' }}>Each week you'll be asked if you made a contribution — a "Yes" counts as a win automatically</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Preview */}
+            {goalSetupForm.paymentAmount && goalSetupForm.savingsFrequency && (
+              <div style={{ margin: '16px 0', padding: '14px 16px', background: theme.purple + '15', borderRadius: '10px', border: '1px solid ' + theme.purple + '30' }}>
+                <div style={{ color: theme.purple, fontWeight: 700, fontSize: '12px', marginBottom: '8px' }}>SUMMARY</div>
+                <div style={{ color: theme.text, fontSize: '13px', lineHeight: 1.8 }}>
+                  <div>💰 Save <strong>${goalSetupForm.paymentAmount}</strong> {goalSetupForm.savingsFrequency} starting <strong>{goalSetupForm.startDate && new Date(goalSetupForm.startDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</strong></div>
+                  {goalSetupForm.deadline && <div>🏁 Goal date: <strong>{new Date(goalSetupForm.deadline).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}</strong></div>}
+                  {goalSetupForm.addToCalendar && <div>📅 Payments will show on your calendar</div>}
+                  {goalSetupForm.addCheckIn && <div>🔄 Weekly check-in question will be added</div>}
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                if (!goalSetupForm.name || !goalSetupForm.target) return
+
+                // Add to goals
+                const newGoalEntry = {
+                  id: Date.now(),
+                  name: goalSetupForm.name,
+                  target: goalSetupForm.target,
+                  saved: goalSetupForm.saved,
+                  deadline: goalSetupForm.deadline,
+                  savingsFrequency: goalSetupForm.savingsFrequency,
+                  startDate: goalSetupForm.startDate,
+                  paymentAmount: goalSetupForm.paymentAmount,
+                  addedToCalendar: goalSetupForm.addToCalendar
+                }
+                setGoals(prev => [...prev, newGoalEntry])
+
+                // Add to Money Date check-ins
+                if (goalSetupForm.addCheckIn) {
+                  setMilestoneCheckIns(prev => [...prev, {
+                    id: Date.now() + 1,
+                    milestoneId: goalSetupMilestone.id,
+                    milestoneName: goalSetupForm.name,
+                    question: `Did you make a savings contribution toward "${goalSetupForm.name}" this week?`
+                  }])
+                }
+
+                // Mark the weekly plan step as done
+                if (goalSetupStepId !== null) {
+                  togglePlanStep(goalSetupMilestone.id, goalSetupStepId)
+                }
+
+                // Update milestone currentAmount if saved > 0
+                if (parseFloat(goalSetupForm.saved) > 0) {
+                  setRoadmapMilestones(prev => prev.map(m =>
+                    m.id === goalSetupMilestone.id ? { ...m, currentAmount: parseFloat(goalSetupForm.saved) } : m
+                  ))
+                }
+
+                setShowGoalSetup(false)
+                setGoalSetupMilestone(null)
+                setCelebrationWin(`"${goalSetupForm.name}" added to your goals! 🎯`)
+                setTimeout(() => setCelebrationWin(null), 3000)
+              }}
+              disabled={!goalSetupForm.name || !goalSetupForm.target || !goalSetupForm.paymentAmount}
+              style={{ ...btnSuccess, width: '100%', padding: '14px', fontSize: '15px', opacity: (!goalSetupForm.name || !goalSetupForm.target || !goalSetupForm.paymentAmount) ? 0.5 : 1 }}
+            >
+              ✅ Add to Goals & Calendar
+            </button>
           </div>
         </div>
       )}
