@@ -662,7 +662,7 @@ Rules:
 - One sentence per step
 - Never suggest downloading another app or creating a spreadsheet — the user is already in Aureus
 - Day 5 MUST always be: "Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders."
-- Start directly with "Day 1:"`,
+- Start directly with "Day 1:"${getPersonalityCoachingContext()}`,
           financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
@@ -736,7 +736,7 @@ Rules:
       const response = await fetch('/api/budget-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'question', question: message, financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones }, memory: budgetMemory, countryConfig: currentCountryConfig })
+        body: JSON.stringify(buildApiBody(message))
       })
       const data = await response.json()
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
@@ -744,7 +744,39 @@ Rules:
     setIsLoading(false)
   }
 
-  // ==================== FINANCIAL LITERACY CONTENT ====================
+  // ==================== PERSONALITY-AWARE COACHING ====================
+  const getPersonalityCoachingContext = () => {
+    if (!moneyPersonality || !personalityProfiles[moneyPersonality]) return ''
+    const profile = personalityProfiles[moneyPersonality]
+
+    const coachingStyles: {[key: string]: string} = {
+      planner: `The user is a Strategic Planner. They respond best to: data, systems, and optimisation language. They like specifics and numbers. Don't over-explain basics — get to the strategy. Challenge them to find inefficiencies in their already-good plan. Use language like "optimise", "system", "leverage". Avoid vague reassurances — they want actionable precision.`,
+
+      avoider: `The user is an Avoider. They may feel shame or anxiety about money. Be warm, non-judgemental, and break everything into tiny concrete steps. Never overwhelm with too many options. Celebrate every small action. Use language like "just one thing", "this week", "that's all". Acknowledge that avoidance is normal and they're already doing the brave thing by being here.`,
+
+      spender: `The user is a Lifestyle Spender. Don't lecture about spending — it creates defensiveness and they'll disengage. Instead, help them find the spending that doesn't actually bring them joy and redirect it. Frame everything around choice and freedom, not deprivation. Use language like "what actually matters to you", "conscious spending", "intentional". Help them see that cutting the right things means more of what they actually love.`,
+
+      worrier: `The user is an Anxious Achiever. They need data and reassurance in equal measure. Lead with their actual numbers before giving advice — show them what the data says. Normalise their situation. Be calm and factual. Use language like "here's what the numbers show", "you're actually in a stronger position than", "the data says". Avoid language that amplifies uncertainty or uses words like "risk", "danger", "problem".`,
+
+      hoarder: `The user is a Safety Seeker. They have strong savings discipline but may be leaving money on the table by keeping too much cash. Help them understand that offset accounts and strategic debt reduction ARE a form of safety — not risk. Frame investing and mortgage acceleration as "putting safety to work". Use language like "protected", "secure", "guaranteed return". Don't push them — guide them gently toward deploying money more effectively.`,
+
+      warrior: `The user is a Financial Warrior. They're resilient and action-oriented but can be reactive without a system. Match their energy — be direct and decisive. Help them build a system that works when things are calm, not just when they're on fire. Use language like "battle plan", "lock it in", "this is your system now". Celebrate their resilience while giving them the structure to make it stick.`
+    }
+
+    return `\n\nUSER'S MONEY PERSONALITY: ${profile.label} (${moneyPersonality})
+Coaching approach for this user: ${coachingStyles[moneyPersonality] || ''}
+Their identity statements: ${identityStatements.filter(s => s.trim()).map(s => `"${s}"`).join(', ') || 'not set yet'}
+Their deep why: ${deepWhyAnswers[0] ? `"${deepWhyAnswers[0]}"` : 'not completed yet'}
+Always reference who they said they're becoming when relevant. Coach them as their personality type — not generically.`
+  }
+
+  const buildApiBody = (question: string, extraContext?: string) => ({
+    mode: 'question',
+    question: question + (extraContext || '') + getPersonalityCoachingContext(),
+    financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones },
+    memory: budgetMemory,
+    countryConfig: currentCountryConfig
+  })
   const literacyTopics = [
     {
       id: 'mortgage-interest',
@@ -898,7 +930,7 @@ Financial snapshot:
 - Mortgage data: ${mortgageAccel.balance ? `$${mortgageAccel.balance} at ${mortgageAccel.rate}%` : 'not entered'}
 - Money personality: ${moneyPersonality || 'not assessed'}
 
-Format each insight as a single line starting with an emoji, then the insight. No headers, no lists within insights. Be direct and specific. Focus on: patterns worth noting, risks, quick wins, mortgage acceleration opportunities, and behavioural observations. Maximum 5 insights.`,
+Format each insight as a single line starting with an emoji, then the insight. No headers, no lists within insights. Be direct and specific. Focus on: patterns worth noting, risks, quick wins, mortgage acceleration opportunities, and behavioural observations. Tailor the tone to their money personality. Maximum 5 insights.${getPersonalityCoachingContext()}`,
           financialData: { income: incomeStreams, expenses, debts, goals, assets },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
@@ -924,7 +956,7 @@ Format each insight as a single line starting with an emoji, then the insight. N
           mode: 'question',
           question: `You are Aureus. Based on this user's financial situation, identify THE SINGLE highest-leverage financial action they could take this week. Not a list — one specific action with a specific number or step. Format: start with the action verb, be specific, include the estimated impact in brackets at the end. Maximum 2 sentences.
 
-Income: $${monthlyIncome.toFixed(0)}/mo | Expenses: $${monthlyExpenses.toFixed(0)}/mo | Surplus: $${monthlySurplus.toFixed(0)}/mo | Debt: $${totalDebtBalance.toFixed(0)} | Baby Step: ${currentBabyStep.step} | Mortgage: ${mortgageAccel.balance ? `$${mortgageAccel.balance} @ ${mortgageAccel.rate}%` : 'not entered'} | Emergency fund: ${emergencyMonths.toFixed(1)} months`,
+Income: $${monthlyIncome.toFixed(0)}/mo | Expenses: $${monthlyExpenses.toFixed(0)}/mo | Surplus: $${monthlySurplus.toFixed(0)}/mo | Debt: $${totalDebtBalance.toFixed(0)} | Baby Step: ${currentBabyStep.step} | Mortgage: ${mortgageAccel.balance ? `$${mortgageAccel.balance} @ ${mortgageAccel.rate}%` : 'not entered'} | Emergency fund: ${emergencyMonths.toFixed(1)} months${getPersonalityCoachingContext()}`,
           financialData: { income: incomeStreams, expenses, debts, goals, assets },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
@@ -954,7 +986,7 @@ Monthly income: $${monthlyIncome.toFixed(0)}
 Monthly total expenses: $${monthlyExpenses.toFixed(0)}
 Savings rate: ${savingsRate.toFixed(1)}%
 
-Each insight: one sentence, starts with an emoji, references actual numbers from their data. Focus on: category concentration, income ratios, opportunities to redirect to mortgage.`,
+Each insight: one sentence, starts with an emoji, references actual numbers from their data. Focus on: category concentration, income ratios, opportunities to redirect to mortgage. Tailor tone to their money personality.${getPersonalityCoachingContext()}`,
           financialData: { income: incomeStreams, expenses },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
@@ -1198,6 +1230,22 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               </button>
             )}
 
+            {/* PERSONALITY QUIZ PROMPT — shown until completed */}
+            {!moneyPersonality && (
+              <div style={{ padding: '20px', background: 'linear-gradient(135deg, #8b5cf620, #3b82f615)', borderRadius: '14px', border: '2px solid ' + theme.purple + '50' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: theme.purple + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', flexShrink: 0 }}>🧠</div>
+                  <div>
+                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Aureus doesn't know you yet</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px' }}>Take the money personality quiz so Aureus can coach you the way YOU need to be coached — not generically.</div>
+                  </div>
+                </div>
+                <button onClick={() => { setShowOnboarding(true); setOnboardingStep(1) }} style={{ ...btnPurple, width: '100%', padding: '12px' }}>
+                  🧠 Take the 8-question quiz (5 min) →
+                </button>
+              </div>
+            )}
+
             {/* QUOTE */}
             <div style={{ background: theme.cardBg, borderRadius: '12px', padding: '16px 20px', borderLeft: '4px solid ' + theme.purple }}>
               <p style={{ color: theme.text, fontSize: '14px', fontStyle: 'italic', margin: 0 }}>"{currentQuote.quote}"</p>
@@ -1357,13 +1405,48 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               </div>
               <div ref={chatContainerRef} style={{ flex: 1, overflowY: 'auto' as const, marginBottom: '16px', padding: '8px' }}>
                 {chatMessages.length === 0 && (
-                  <div style={{ textAlign: 'center' as const, padding: '40px 20px', color: theme.textMuted }}>
-                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>👋</div>
-                    <div style={{ fontSize: '16px', marginBottom: '8px', color: theme.text }}>G'day! I'm Aureus.</div>
-                    <div style={{ fontSize: '14px', lineHeight: 1.6 }}>Ask me anything — about your budget, mortgage strategy, Baby Steps, how offset accounts work, or anything else on your mind.</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px', justifyContent: 'center', marginTop: '20px' }}>
-                      {['How do I pay my mortgage off faster?', 'Should I use an offset account?', 'Explain fortnightly payments', 'Am I on track financially?'].map(q => (
-                        <button key={q} onClick={() => { setChatInput(q); handleChatMessage() }} style={{ padding: '8px 14px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '20px', color: theme.text, cursor: 'pointer', fontSize: '13px' }}>{q}</button>
+                  <div style={{ padding: '20px 10px' }}>
+                    {/* Personality quiz CTA - most prominent when not done */}
+                    {!moneyPersonality ? (
+                      <div style={{ marginBottom: '24px', padding: '24px', background: 'linear-gradient(135deg, #8b5cf615, #3b82f615)', borderRadius: '16px', border: '2px solid ' + theme.purple + '50', textAlign: 'center' as const }}>
+                        <div style={{ fontSize: '44px', marginBottom: '12px' }}>🧠</div>
+                        <div style={{ color: theme.text, fontWeight: 700, fontSize: '17px', marginBottom: '8px' }}>First, let me get to know you.</div>
+                        <div style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, marginBottom: '16px' }}>
+                          Aureus coaches everyone differently. Before I start giving advice, I need to understand how <em>you</em> think about money — your personality, your why, and your identity.
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' as const, marginBottom: '16px' }}>
+                          {['🎯 Personalised coaching', '❤️ Understand your why', '⚡ 5 minutes'].map(tag => (
+                            <span key={tag} style={{ padding: '4px 10px', background: theme.purple + '20', color: theme.purple, borderRadius: '12px', fontSize: '12px', fontWeight: 600 }}>{tag}</span>
+                          ))}
+                        </div>
+                        <button onClick={() => { setShowOnboarding(true); setOnboardingStep(0) }} style={{ ...btnPurple, padding: '14px 32px', fontSize: '15px', width: '100%' }}>
+                          Start my money personality quiz →
+                        </button>
+                        <button onClick={() => setChatMessages([{ role: 'assistant', content: "G'day! I'm Aureus — your AI financial coach. I specialise in helping Australians pay their mortgage off faster and build real wealth. What's on your mind?" }])} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', marginTop: '10px', fontSize: '13px' }}>
+                          Skip and just chat
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ marginBottom: '20px', padding: '16px', background: personalityProfiles[moneyPersonality]?.color + '15', borderRadius: '12px', border: '1px solid ' + personalityProfiles[moneyPersonality]?.color + '40', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <span style={{ fontSize: '32px' }}>{personalityProfiles[moneyPersonality]?.emoji}</span>
+                        <div>
+                          <div style={{ color: personalityProfiles[moneyPersonality]?.color, fontWeight: 700, fontSize: '14px' }}>{personalityProfiles[moneyPersonality]?.label}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Aureus is coaching you as a {personalityProfiles[moneyPersonality]?.label.toLowerCase()} — responses are tailored to how you think.</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Starter questions */}
+                    <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px', textAlign: 'center' as const }}>Or jump straight in:</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px', justifyContent: 'center' }}>
+                      {[
+                        'How do I pay my mortgage off faster?',
+                        'Should I use an offset account?',
+                        'Am I on track financially?',
+                        'How does salary sacrifice work?',
+                        'What should I focus on this week?'
+                      ].map(q => (
+                        <button key={q} onClick={() => { setChatInput(q); setTimeout(() => handleChatMessage(), 50) }} style={{ padding: '8px 14px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '20px', color: theme.text, cursor: 'pointer', fontSize: '13px' }}>{q}</button>
                       ))}
                     </div>
                   </div>
@@ -2013,7 +2096,19 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                 <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
-                <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{currentBabyStep.title} · Ask me to build your weekly plan</div></div>
+                <div>
+                  <div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div>
+                  <div style={{ color: theme.textMuted, fontSize: '11px' }}>
+                    {moneyPersonality && personalityProfiles[moneyPersonality]
+                      ? `Coaching you as a ${personalityProfiles[moneyPersonality].label} · ${currentBabyStep.title}`
+                      : `${currentBabyStep.title} · Ask me to build your weekly plan`}
+                  </div>
+                </div>
+                {!moneyPersonality && (
+                  <button onClick={() => { setShowOnboarding(true); setOnboardingStep(1) }} style={{ marginLeft: 'auto', padding: '5px 10px', background: theme.purple + '20', color: theme.purple, border: '1px solid ' + theme.purple + '40', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, flexShrink: 0 }}>
+                    🧠 Take quiz
+                  </button>
+                )}
               </div>
               {chatMessages.length > 0 && (
                 <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
@@ -3180,7 +3275,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     onClick={() => {
                       const result = calculatePersonality()
                       setMoneyPersonality(result)
-                      setOnboardingStep(2)
+                      setOnboardingStep(1.5)
                     }}
                     disabled={Object.keys(personalityAnswers).length < 8}
                     style={{ ...btnSuccess, flex: 1, opacity: Object.keys(personalityAnswers).length < 8 ? 0.5 : 1 }}>
