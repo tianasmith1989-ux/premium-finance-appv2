@@ -559,17 +559,50 @@ export default function Dashboard() {
     goals.filter(g => g.paymentAmount && g.startDate && g.addedToCalendar).forEach(goal => {
       if (shouldShowItem(goal.startDate, goal.savingsFrequency || 'monthly', day, month, year)) {
         const id = `goal-${goal.id}-${year}-${month}-${day}`
-        items.push({ ...goal, amount: goal.paymentAmount, name: `💜 ${goal.name}`, itemId: id, itemType: 'goal', isPaid: paidOccurrences.has(id) })
+        items.push({ ...goal, amount: goal.paymentAmount, name: `💜 ${goal.name}`, goalId: goal.id, itemId: id, itemType: 'goal', isPaid: paidOccurrences.has(id) })
       }
     })
     return items
   }
 
-  const togglePaid = (itemId: string) => {
+  const togglePaid = (itemId: string, item?: any) => {
     const newPaid = new Set(paidOccurrences)
-    if (newPaid.has(itemId)) newPaid.delete(itemId)
-    else newPaid.add(itemId)
+    const wasAlreadyPaid = newPaid.has(itemId)
+
+    if (wasAlreadyPaid) {
+      newPaid.delete(itemId)
+    } else {
+      newPaid.add(itemId)
+    }
     setPaidOccurrences(newPaid)
+
+    // If this is a goal payment, update the goal's saved amount
+    if (item?.itemType === 'goal' && item?.paymentAmount) {
+      const paymentAmount = parseFloat(item.paymentAmount || '0')
+      if (paymentAmount <= 0) return
+
+      // Update the goal's saved amount using goalId (most reliable)
+      const matchId = item.goalId || item.id
+      setGoals(prev => prev.map(g => {
+        if (g.id !== matchId) return g
+        const currentSaved = parseFloat(g.saved || '0')
+        const newSaved = wasAlreadyPaid
+          ? Math.max(0, currentSaved - paymentAmount)
+          : currentSaved + paymentAmount
+        return { ...g, saved: newSaved.toFixed(2) }
+      }))
+
+      // Sync to linked roadmap milestone — match by goal name (strip emoji prefix)
+      const cleanName = (item.name || '').replace('💜 ', '').trim()
+      setRoadmapMilestones(prev => prev.map(m => {
+        if (m.name.trim() !== cleanName) return m
+        const current = parseFloat(m.currentAmount || '0')
+        const updated = wasAlreadyPaid
+          ? Math.max(0, current - paymentAmount)
+          : current + paymentAmount
+        return { ...m, currentAmount: updated }
+      }))
+    }
   }
 
   // ==================== EDIT FUNCTIONS ====================
@@ -3211,8 +3244,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             <h3 style={{ margin: '0 0 16px 0', color: theme.text }}>{calendarMonth.toLocaleDateString('en-AU', { month: 'long' })} {expandedDay.day}</h3>
             {expandedDay.items.map(item => (
               <div key={item.itemId} style={{ padding: '12px', marginBottom: '8px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'goal' ? '#ede9fe' : item.itemType === 'expense' ? '#dbeafe' : '#fee2e2', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: item.isPaid ? 0.6 : 1 }}>
-                <div><div style={{ fontWeight: 600, color: '#1e293b' }}>{item.name}</div><div style={{ fontSize: '12px', color: '#64748b' }}>${item.amount}</div></div>
-                <button onClick={() => togglePaid(item.itemId)} style={{ padding: '8px 16px', background: item.isPaid ? '#6b7280' : theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{item.isPaid ? '✓ Done' : 'Mark Done'}</button>
+                <div><div style={{ fontWeight: 600, color: '#1e293b' }}>{item.name}</div><div style={{ fontSize: '12px', color: '#64748b' }}>${item.amount}{item.itemType === 'goal' && !item.isPaid ? <span style={{ color: '#8b5cf6', marginLeft: '6px' }}>→ adds to progress</span> : null}</div></div>
+                <button onClick={() => togglePaid(item.itemId, item)} style={{ padding: '8px 16px', background: item.isPaid ? '#6b7280' : theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{item.isPaid ? '✓ Done' : 'Mark Done'}</button>
               </div>
             ))}
           </div>
