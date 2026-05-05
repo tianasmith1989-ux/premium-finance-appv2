@@ -555,6 +555,13 @@ export default function Dashboard() {
     incomeStreams.forEach(inc => { if (shouldShowItem(inc.startDate, inc.frequency, day, month, year)) { const id = `inc-${inc.id}-${year}-${month}-${day}`; items.push({ ...inc, itemId: id, itemType: 'income', isPaid: paidOccurrences.has(id) }) } })
     expenses.filter(e => !e.targetDebtId && !e.targetGoalId).forEach(exp => { if (shouldShowItem(exp.dueDate, exp.frequency, day, month, year)) { const id = `exp-${exp.id}-${year}-${month}-${day}`; items.push({ ...exp, itemId: id, itemType: 'expense', isPaid: paidOccurrences.has(id) }) } })
     debts.forEach(debt => { if (shouldShowItem(debt.paymentDate, debt.frequency || 'monthly', day, month, year)) { const id = `debt-${debt.id}-${year}-${month}-${day}`; items.push({ ...debt, amount: debt.minPayment, itemId: id, itemType: 'debt', isPaid: paidOccurrences.has(id) }) } })
+    // Goals with calendar enabled
+    goals.filter(g => g.paymentAmount && g.startDate && g.addedToCalendar).forEach(goal => {
+      if (shouldShowItem(goal.startDate, goal.savingsFrequency || 'monthly', day, month, year)) {
+        const id = `goal-${goal.id}-${year}-${month}-${day}`
+        items.push({ ...goal, amount: goal.paymentAmount, name: `💜 ${goal.name}`, itemId: id, itemType: 'goal', isPaid: paidOccurrences.has(id) })
+      }
+    })
     return items
   }
 
@@ -791,6 +798,36 @@ Always reference who they said they're becoming when relevant. Coach them as the
     memory: budgetMemory,
     countryConfig: currentCountryConfig
   })
+
+  // ==================== FREQUENCY-AWARE MILESTONE CHECK-INS ====================
+  const getDueMilestoneCheckIns = () => {
+    const now = new Date()
+    const fortnightNum = Math.floor(now.getTime() / (14 * 24 * 60 * 60 * 1000))
+
+    return milestoneCheckIns.filter(ci => {
+      const linkedGoal = goals.find(g => g.name === ci.milestoneName)
+      const freq = linkedGoal?.savingsFrequency || 'weekly'
+
+      if (freq === 'weekly') return true
+
+      if (freq === 'fortnightly') {
+        // Only ask on alternate weeks — check if last money date was more than 10 days ago
+        if (moneyDateLog.length === 0) return true
+        const daysSinceLast = (now.getTime() - new Date(moneyDateLog[0].date).getTime()) / 86400000
+        return daysSinceLast >= 10
+      }
+
+      if (freq === 'monthly') {
+        // Only ask if last Money Date was in a different calendar month
+        if (moneyDateLog.length === 0) return true
+        const lastDate = new Date(moneyDateLog[0].date)
+        return lastDate.getMonth() !== now.getMonth() || lastDate.getFullYear() !== now.getFullYear()
+      }
+
+      return true
+    })
+  }
+
   const literacyTopics = [
     {
       id: 'mortgage-interest',
@@ -1087,8 +1124,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
     }
     setMoneyDateLog(prev => [entry, ...prev])
 
-    // Log wins from milestone check-ins
-    milestoneCheckIns.forEach((ci, i) => {
+    // Log wins from milestone check-ins (only due ones)
+    getDueMilestoneCheckIns().forEach((ci, i) => {
       const answer = moneyDateAnswers[100 + i]
       if (answer === 'yes' || answer === 'Yes') {
         setWins(prev => [...prev, {
@@ -1620,7 +1657,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   return (
                     <div key={day} onClick={() => items.length > 0 && setExpandedDay({ day, items })} style={{ minHeight: '70px', padding: '4px', background: isToday ? theme.accent + '20' : darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px', border: isToday ? '2px solid ' + theme.accent : '1px solid ' + theme.border, cursor: items.length > 0 ? 'pointer' : 'default' }}>
                       <div style={{ fontWeight: 600, color: theme.text, marginBottom: '2px', fontSize: '12px' }}>{day}</div>
-                      {items.slice(0, 2).map(item => <div key={item.itemId} style={{ fontSize: '9px', padding: '1px 4px', marginBottom: '2px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'expense' ? '#dbeafe' : '#fee2e2', color: '#1e293b', borderRadius: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, opacity: item.isPaid ? 0.5 : 1 }}>{item.name}</div>)}
+                      {items.slice(0, 2).map(item => <div key={item.itemId} style={{ fontSize: '9px', padding: '1px 4px', marginBottom: '2px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'goal' ? '#ede9fe' : item.itemType === 'expense' ? '#dbeafe' : '#fee2e2', color: '#1e293b', borderRadius: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, opacity: item.isPaid ? 0.5 : 1 }}>{item.name}</div>)}
                       {items.length > 2 && <div style={{ fontSize: '9px', color: theme.accent }}>+{items.length - 2}</div>}
                     </div>
                   )
@@ -2945,6 +2982,24 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   Start Money Date →
                 </button>
               </div>
+              {milestoneCheckIns.length > 0 && (
+                <div style={{ padding: '10px 14px', background: theme.purple + '15', borderRadius: '8px', marginBottom: '16px', border: '1px solid ' + theme.purple + '30' }}>
+                  <div style={{ color: theme.purple, fontWeight: 600, fontSize: '12px', marginBottom: '4px' }}>🎯 Goal check-ins included this session: {getDueMilestoneCheckIns().length} of {milestoneCheckIns.length}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '2px' }}>
+                    {milestoneCheckIns.map(ci => {
+                      const linkedGoal = goals.find(g => g.name === ci.milestoneName)
+                      const freq = linkedGoal?.savingsFrequency || 'weekly'
+                      const due = getDueMilestoneCheckIns().some(d => d.id === ci.id)
+                      return (
+                        <div key={ci.id} style={{ color: theme.textMuted, fontSize: '11px', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{ci.milestoneName}</span>
+                          <span style={{ color: due ? theme.success : theme.textMuted }}>{due ? '✓ due this session' : `${freq} — not due yet`}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
               {streak > 0 && (
                 <div style={{ padding: '12px 16px', background: theme.warning + '15', borderRadius: '10px', border: '1px solid ' + theme.warning + '30', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <span style={{ fontSize: '24px' }}>🔥</span>
@@ -3155,7 +3210,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '24px', maxWidth: '500px', width: '90%', maxHeight: '80vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 16px 0', color: theme.text }}>{calendarMonth.toLocaleDateString('en-AU', { month: 'long' })} {expandedDay.day}</h3>
             {expandedDay.items.map(item => (
-              <div key={item.itemId} style={{ padding: '12px', marginBottom: '8px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'expense' ? '#dbeafe' : '#fee2e2', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: item.isPaid ? 0.6 : 1 }}>
+              <div key={item.itemId} style={{ padding: '12px', marginBottom: '8px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'goal' ? '#ede9fe' : item.itemType === 'expense' ? '#dbeafe' : '#fee2e2', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: item.isPaid ? 0.6 : 1 }}>
                 <div><div style={{ fontWeight: 600, color: '#1e293b' }}>{item.name}</div><div style={{ fontSize: '12px', color: '#64748b' }}>${item.amount}</div></div>
                 <button onClick={() => togglePaid(item.itemId)} style={{ padding: '8px 16px', background: item.isPaid ? '#6b7280' : theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{item.isPaid ? '✓ Done' : 'Mark Done'}</button>
               </div>
@@ -3434,7 +3489,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             {(() => {
               const allQuestions = [
                 ...moneyDateQuestions,
-                ...milestoneCheckIns.map((ci, i) => ({
+                ...getDueMilestoneCheckIns().map((ci, i) => ({
                   q: `Did you make a savings contribution toward "${ci.milestoneName}" this week?`,
                   type: 'yesno',
                   isMilestone: true,
