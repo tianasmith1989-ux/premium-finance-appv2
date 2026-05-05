@@ -59,6 +59,20 @@ export default function Dashboard() {
   const [moneyDateStep, setMoneyDateStep] = useState(0)
   const [moneyDateAnswers, setMoneyDateAnswers] = useState<{[key: number]: string}>({})
 
+  // Check-in Schedule
+  const [checkInSchedule, setCheckInSchedule] = useState({
+    moneyDateDay: 'sunday',        // day of week for weekly money date
+    moneyDateTime: '19:00',        // time for weekly money date
+    dailyEnabled: true,
+    dailyTime: '08:00',            // suggested daily check-in time
+    showScheduleSetup: false
+  })
+  const [lastDailyCheckIn, setLastDailyCheckIn] = useState<string | null>(null)
+  const [showDailyCheckIn, setShowDailyCheckIn] = useState(false)
+  const [dailyCheckInAnswers, setDailyCheckInAnswers] = useState<{[key: number]: string}>({})
+  const [dailyCheckInStep, setDailyCheckInStep] = useState(0)
+  const [dailyCheckInLog, setDailyCheckInLog] = useState<any[]>([])
+
   // ==================== ANNUAL REVIEW ====================
   const [annualReviews, setAnnualReviews] = useState<any[]>([])
   const [showAnnualReview, setShowAnnualReview] = useState(false)
@@ -270,6 +284,9 @@ export default function Dashboard() {
       if (data.roadmapMilestones) setRoadmapMilestones(data.roadmapMilestones)
       if (data.documents) setDocuments(data.documents)
       if (data.milestoneCheckIns) setMilestoneCheckIns(data.milestoneCheckIns)
+      if (data.checkInSchedule) setCheckInSchedule(prev => ({ ...prev, ...data.checkInSchedule }))
+      if (data.lastDailyCheckIn) setLastDailyCheckIn(data.lastDailyCheckIn)
+      if (data.dailyCheckInLog) setDailyCheckInLog(data.dailyCheckInLog)
       if (data.moneyPersonality) setMoneyPersonality(data.moneyPersonality)
       if (data.identityStatements) setIdentityStatements(data.identityStatements)
       if (data.deepWhyAnswers) setDeepWhyAnswers(data.deepWhyAnswers)
@@ -307,13 +324,14 @@ export default function Dashboard() {
       budgetMemory, paidOccurrences: Array.from(paidOccurrences),
       roadmapMilestones, budgetOnboarding, chatMessages, userCountry,
       wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns,
+      checkInSchedule, lastDailyCheckIn, dailyCheckInLog,
       moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete,
       fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights,
       insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog,
       annualReviews, superData, netWorthHistory, personalityAnswers
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
 
   // Chat scroll
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -832,7 +850,60 @@ Always reference who they said they're becoming when relevant. Coach them as the
     countryConfig: currentCountryConfig
   })
 
-  // ==================== FREQUENCY-AWARE MILESTONE CHECK-INS ====================
+  // ==================== CHECK-IN SCHEDULE & DUE DETECTION ====================
+  const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
+
+  const isMoneyDateDue = () => {
+    const now = new Date()
+    const todayName = dayNames[now.getDay()]
+    if (todayName !== checkInSchedule.moneyDateDay) return false
+    // Due if not done today already
+    const today = now.toISOString().split('T')[0]
+    if (moneyDateLog.length > 0 && new Date(moneyDateLog[0].date).toISOString().split('T')[0] === today) return false
+    // Check if past the scheduled time
+    const [h, m] = checkInSchedule.moneyDateTime.split(':').map(Number)
+    return now.getHours() >= h || (now.getHours() === h && now.getMinutes() >= m)
+  }
+
+  const isDailyCheckInDue = () => {
+    if (!checkInSchedule.dailyEnabled) return false
+    const today = new Date().toISOString().split('T')[0]
+    if (lastDailyCheckIn === today) return false
+    // Available any time after midnight (daily is at user's leisure)
+    return true
+  }
+
+  const dailyCheckInQuestions = [
+    { q: "How are you feeling about your finances today?", type: 'scale3', options: ['Stressed', 'Neutral', 'Confident'] },
+    { q: "Did you make a deliberate money decision today — big or small?", type: 'yesno' },
+    { q: "One word to describe your money mindset today:", type: 'text', placeholder: "e.g. focused, distracted, motivated, anxious..." }
+  ]
+
+  const submitDailyCheckIn = () => {
+    const today = new Date().toISOString().split('T')[0]
+    const entry = { id: Date.now(), date: new Date().toISOString(), answers: dailyCheckInAnswers }
+    setDailyCheckInLog(prev => [entry, ...prev.slice(0, 29)]) // keep last 30
+    setLastDailyCheckIn(today)
+
+    // Auto-win for consistent daily check-ins
+    const recentDays = dailyCheckInLog.slice(0, 6)
+    if (recentDays.length >= 6) {
+      const allThisWeek = recentDays.every(e => {
+        const d = new Date(e.date)
+        const now = new Date()
+        return (now.getTime() - d.getTime()) < 7 * 86400000
+      })
+      if (allThisWeek && !wins.some(w => w.title === '7-day daily check-in streak')) {
+        setWins(prev => [...prev, { id: Date.now(), title: '7-day daily check-in streak', desc: "7 days of daily financial awareness. That's the habit that changes everything.", icon: '🔥', auto: true, date: new Date().toISOString() }])
+      }
+    }
+
+    setShowDailyCheckIn(false)
+    setDailyCheckInStep(0)
+    setDailyCheckInAnswers({})
+    setCelebrationWin('Daily check-in done ✅')
+    setTimeout(() => setCelebrationWin(null), 2500)
+  }
   const getDueMilestoneCheckIns = () => {
     const now = new Date()
     const fortnightNum = Math.floor(now.getTime() / (14 * 24 * 60 * 60 * 1000))
@@ -1282,6 +1353,17 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             </div>
             <span style={{ color: theme.text, fontWeight: 700, fontSize: '20px' }}>Aureus</span>
             {streak > 0 && <span style={{ padding: '3px 10px', background: '#f59e0b20', color: '#f59e0b', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>🔥 {streak}-week streak</span>}
+            {/* Due badges */}
+            {isMoneyDateDue() && (
+              <button onClick={() => { setShowMoneyDate(true); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ padding: '3px 10px', background: theme.success + '20', color: theme.success, border: '1px solid ' + theme.success + '50', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', animation: 'pulse 2s infinite' }}>
+                💰 Money Date due
+              </button>
+            )}
+            {isDailyCheckInDue() && (
+              <button onClick={() => { setShowDailyCheckIn(true); setDailyCheckInStep(0); setDailyCheckInAnswers({}) }} style={{ padding: '3px 10px', background: theme.accent + '20', color: theme.accent, border: '1px solid ' + theme.accent + '50', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                ✅ Daily check-in
+              </button>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button onClick={() => setDarkMode(!darkMode)} style={{ padding: '7px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>{darkMode ? '☀️' : '🌙'}</button>
@@ -1330,6 +1412,49 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               <button onClick={() => { setEditingWhy(true); setWhyDraft('') }} style={{ padding: '16px 20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '2px dashed ' + theme.border, cursor: 'pointer', textAlign: 'left' as const }}>
                 <div style={{ color: theme.textMuted, fontSize: '13px' }}>💬 <strong>Set your why</strong> — What are you working toward? (e.g. "Be mortgage-free before my kids finish school")</div>
               </button>
+            )}
+
+            {/* DAILY CHECK-IN CARD */}
+            <div style={{ padding: '16px 20px', background: isDailyCheckInDue() ? `linear-gradient(135deg, ${theme.accent}20, ${theme.accent}05)` : theme.cardBg, borderRadius: '14px', border: '1px solid ' + (isDailyCheckInDue() ? theme.accent + '60' : theme.border) }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px' }}>✅ Daily Check-in</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>
+                    {lastDailyCheckIn === new Date().toISOString().split('T')[0]
+                      ? '✓ Done today'
+                      : isDailyCheckInDue() ? 'Ready for you now' : `Available any time · last done ${lastDailyCheckIn ? new Date(lastDailyCheckIn).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) : 'never'}`}
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setShowDailyCheckIn(true); setDailyCheckInStep(0); setDailyCheckInAnswers({}) }}
+                  disabled={lastDailyCheckIn === new Date().toISOString().split('T')[0]}
+                  style={{ padding: '8px 16px', background: lastDailyCheckIn === new Date().toISOString().split('T')[0] ? theme.border : theme.accent, color: lastDailyCheckIn === new Date().toISOString().split('T')[0] ? theme.textMuted : 'white', border: 'none', borderRadius: '8px', cursor: lastDailyCheckIn === new Date().toISOString().split('T')[0] ? 'default' : 'pointer', fontSize: '13px', fontWeight: 600 }}>
+                  {lastDailyCheckIn === new Date().toISOString().split('T')[0] ? '✓ Done' : 'Start →'}
+                </button>
+              </div>
+              {dailyCheckInLog.length > 0 && (
+                <div style={{ marginTop: '10px', display: 'flex', gap: '4px' }}>
+                  {Array.from({ length: 7 }).map((_, i) => {
+                    const d = new Date(Date.now() - i * 86400000).toISOString().split('T')[0]
+                    const done = dailyCheckInLog.some(e => new Date(e.date).toISOString().split('T')[0] === d)
+                    return <div key={i} title={d} style={{ width: '12px', height: '12px', borderRadius: '3px', background: done ? theme.accent : theme.border }} />
+                  })}
+                  <span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '6px' }}>last 7 days</span>
+                </div>
+              )}
+            </div>
+
+            {/* MONEY DATE SCHEDULE BANNER */}
+            {isMoneyDateDue() && (
+              <div style={{ padding: '16px 20px', background: `linear-gradient(135deg, ${theme.success}20, ${theme.success}05)`, borderRadius: '14px', border: '2px solid ' + theme.success + '60', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ color: theme.success, fontWeight: 700, fontSize: '14px' }}>💰 Money Date is due!</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>Your scheduled {checkInSchedule.moneyDateDay} check-in is waiting</div>
+                </div>
+                <button onClick={() => { setShowMoneyDate(true); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ padding: '10px 18px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
+                  Start now →
+                </button>
+              </div>
             )}
 
             {/* PERSONALITY QUIZ PROMPT — shown until completed */}
@@ -3006,54 +3131,150 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
             {/* MONEY DATE */}
             <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                 <div>
                   <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>💰 Money Date</h3>
-                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>A 10-minute weekly ritual. Consistent money dates are the single biggest predictor of financial progress.</p>
+                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Your weekly financial ritual — the single biggest predictor of financial progress.</p>
                 </div>
-                <button onClick={() => setShowMoneyDate(true)} style={{ ...btnSuccess, padding: '10px 18px' }}>
-                  Start Money Date →
-                </button>
+                <button onClick={() => { setShowMoneyDate(true); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ ...btnSuccess, padding: '10px 18px' }}>Start →</button>
               </div>
-              {milestoneCheckIns.length > 0 && (
-                <div style={{ padding: '10px 14px', background: theme.purple + '15', borderRadius: '8px', marginBottom: '16px', border: '1px solid ' + theme.purple + '30' }}>
-                  <div style={{ color: theme.purple, fontWeight: 600, fontSize: '12px', marginBottom: '4px' }}>🎯 Goal check-ins included this session: {getDueMilestoneCheckIns().length} of {milestoneCheckIns.length}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '2px' }}>
-                    {milestoneCheckIns.map(ci => {
-                      const linkedGoal = goals.find(g => g.name === ci.milestoneName)
-                      const freq = linkedGoal?.savingsFrequency || 'weekly'
-                      const due = getDueMilestoneCheckIns().some(d => d.id === ci.id)
-                      return (
-                        <div key={ci.id} style={{ color: theme.textMuted, fontSize: '11px', display: 'flex', justifyContent: 'space-between' }}>
-                          <span>{ci.milestoneName}</span>
-                          <span style={{ color: due ? theme.success : theme.textMuted }}>{due ? '✓ due this session' : `${freq} — not due yet`}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
+
+              {/* Schedule Setup */}
+              <div style={{ padding: '16px', background: theme.bg, borderRadius: '12px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>📅 Your Schedule</div>
+                  <button onClick={() => setCheckInSchedule(s => ({ ...s, showScheduleSetup: !s.showScheduleSetup }))} style={{ padding: '4px 10px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '6px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>
+                    {checkInSchedule.showScheduleSetup ? 'Done' : 'Edit'}
+                  </button>
                 </div>
-              )}
+                {checkInSchedule.showScheduleSetup ? (
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
+                    <div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px', fontWeight: 600 }}>💰 WEEKLY MONEY DATE</div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
+                        {['sunday','monday','tuesday','wednesday','thursday','friday','saturday'].map(day => (
+                          <button key={day} onClick={() => setCheckInSchedule(s => ({ ...s, moneyDateDay: day }))}
+                            style={{ padding: '6px 12px', background: checkInSchedule.moneyDateDay === day ? theme.success : theme.cardBg, color: checkInSchedule.moneyDateDay === day ? 'white' : theme.textMuted, border: '1px solid ' + (checkInSchedule.moneyDateDay === day ? theme.success : theme.border), borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, textTransform: 'capitalize' as const }}>
+                            {day.slice(0,3)}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <label style={{ color: theme.textMuted, fontSize: '12px', flexShrink: 0 }}>At time:</label>
+                        <input type="time" value={checkInSchedule.moneyDateTime} onChange={e => setCheckInSchedule(s => ({ ...s, moneyDateTime: e.target.value }))} style={{ ...inputStyle, width: '130px' }} />
+                        <span style={{ color: theme.textMuted, fontSize: '11px' }}>shown as badge when due</span>
+                      </div>
+                    </div>
+                    <div style={{ borderTop: '1px solid ' + theme.border, paddingTop: '14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>✅ DAILY CHECK-IN</div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={checkInSchedule.dailyEnabled} onChange={e => setCheckInSchedule(s => ({ ...s, dailyEnabled: e.target.checked }))} style={{ accentColor: theme.accent }} />
+                          <span style={{ color: theme.text, fontSize: '12px' }}>{checkInSchedule.dailyEnabled ? 'Enabled' : 'Disabled'}</span>
+                        </label>
+                      </div>
+                      {checkInSchedule.dailyEnabled && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <label style={{ color: theme.textMuted, fontSize: '12px', flexShrink: 0 }}>Preferred time:</label>
+                          <input type="time" value={checkInSchedule.dailyTime} onChange={e => setCheckInSchedule(s => ({ ...s, dailyTime: e.target.value }))} style={{ ...inputStyle, width: '130px' }} />
+                          <span style={{ color: theme.textMuted, fontSize: '11px' }}>do it anytime — this is just your preference</span>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ padding: '10px 12px', background: theme.accent + '15', borderRadius: '8px', color: theme.textMuted, fontSize: '12px', lineHeight: 1.5 }}>
+                      💡 Aureus shows a "due" badge in the header when your scheduled check-in day arrives. Add Aureus to your phone home screen for the best mobile experience.
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '24px' }}>
+                    <div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '2px' }}>MONEY DATE</div>
+                      <div style={{ color: theme.text, fontWeight: 600, textTransform: 'capitalize' as const }}>{checkInSchedule.moneyDateDay}s at {checkInSchedule.moneyDateTime}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '2px' }}>DAILY CHECK-IN</div>
+                      <div style={{ color: theme.text, fontWeight: 600 }}>{checkInSchedule.dailyEnabled ? `Enabled · preferred ${checkInSchedule.dailyTime}` : 'Disabled'}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {streak > 0 && (
                 <div style={{ padding: '12px 16px', background: theme.warning + '15', borderRadius: '10px', border: '1px solid ' + theme.warning + '30', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <span style={{ fontSize: '24px' }}>🔥</span>
-                  <div><div style={{ color: theme.warning, fontWeight: 700 }}>{streak}-week streak!</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>Last check-in: {lastCheckIn && new Date(lastCheckIn).toLocaleDateString('en-AU')}</div></div>
+                  <div><div style={{ color: theme.warning, fontWeight: 700 }}>{streak}-week streak!</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>Last: {lastCheckIn && new Date(lastCheckIn).toLocaleDateString('en-AU')}</div></div>
                 </div>
               )}
+
+              {milestoneCheckIns.length > 0 && (
+                <div style={{ padding: '10px 14px', background: theme.purple + '15', borderRadius: '8px', marginBottom: '16px', border: '1px solid ' + theme.purple + '30' }}>
+                  <div style={{ color: theme.purple, fontWeight: 600, fontSize: '12px', marginBottom: '6px' }}>🎯 Goal check-ins this session: {getDueMilestoneCheckIns().length} of {milestoneCheckIns.length}</div>
+                  {milestoneCheckIns.map(ci => {
+                    const linkedGoal = goals.find(g => g.name === ci.milestoneName)
+                    const freq = linkedGoal?.savingsFrequency || 'weekly'
+                    const due = getDueMilestoneCheckIns().some(d => d.id === ci.id)
+                    return (
+                      <div key={ci.id} style={{ color: theme.textMuted, fontSize: '11px', display: 'flex', justifyContent: 'space-between', marginTop: '3px' }}>
+                        <span>{ci.milestoneName}</span>
+                        <span style={{ color: due ? theme.success : theme.textMuted }}>{due ? '✓ due now' : `${freq} — not due`}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
               {moneyDateLog.length > 0 && (
                 <div>
-                  <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, marginBottom: '12px' }}>Recent Money Dates</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, marginBottom: '10px' }}>Recent</div>
                   {moneyDateLog.slice(0, 3).map((entry: any) => (
-                    <div key={entry.id} style={{ padding: '12px 14px', background: theme.bg, borderRadius: '10px', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <div key={entry.id} style={{ padding: '10px 14px', background: theme.bg, borderRadius: '10px', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                         <span style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{new Date(entry.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-                        <span style={{ color: parseInt(entry.stressLevel) <= 2 ? theme.success : parseInt(entry.stressLevel) >= 4 ? theme.danger : theme.warning, fontSize: '12px' }}>Stress: {entry.stressLevel}/5</span>
+                        <span style={{ color: parseInt(entry.stressLevel) <= 2 ? theme.success : parseInt(entry.stressLevel) >= 4 ? theme.danger : theme.warning, fontSize: '12px' }}>Stress {entry.stressLevel}/5</span>
                       </div>
                       {entry.win && <div style={{ color: theme.success, fontSize: '12px' }}>⭐ {entry.win}</div>}
-                      {entry.intention && <div style={{ color: theme.accent, fontSize: '12px', marginTop: '4px' }}>→ {entry.intention}</div>}
+                      {entry.intention && <div style={{ color: theme.accent, fontSize: '12px', marginTop: '2px' }}>→ {entry.intention}</div>}
                     </div>
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* DAILY CHECK-IN CARD */}
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                <div>
+                  <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>✅ Daily Check-in</h3>
+                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>3 questions. Do it anytime — builds the habit of daily financial awareness.</p>
+                </div>
+                <button onClick={() => { setShowDailyCheckIn(true); setDailyCheckInStep(0); setDailyCheckInAnswers({}) }}
+                  disabled={lastDailyCheckIn === new Date().toISOString().split('T')[0]}
+                  style={{ ...btnPrimary, padding: '10px 18px', opacity: lastDailyCheckIn === new Date().toISOString().split('T')[0] ? 0.5 : 1, cursor: lastDailyCheckIn === new Date().toISOString().split('T')[0] ? 'default' : 'pointer' }}>
+                  {lastDailyCheckIn === new Date().toISOString().split('T')[0] ? '✓ Done today' : 'Check in →'}
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', alignItems: 'center' }}>
+                {Array.from({ length: 7 }).map((_, i) => {
+                  const d = new Date(Date.now() - i * 86400000)
+                  const dateStr = d.toISOString().split('T')[0]
+                  const done = dailyCheckInLog.some(e => new Date(e.date).toISOString().split('T')[0] === dateStr)
+                  return (
+                    <div key={i} style={{ flex: 1, textAlign: 'center' as const }}>
+                      <div style={{ borderRadius: '6px', background: done ? theme.accent : theme.bg, border: '1px solid ' + (done ? theme.accent : theme.border), padding: '6px 0', marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ color: done ? 'white' : theme.textMuted, fontSize: '12px' }}>{done ? '✓' : '·'}</span>
+                      </div>
+                      <div style={{ color: theme.textMuted, fontSize: '10px' }}>{d.toLocaleDateString('en-AU', { weekday: 'short' })}</div>
+                    </div>
+                  )
+                })}
+                <div style={{ color: theme.textMuted, fontSize: '11px', paddingLeft: '4px' }}>7 days</div>
+              </div>
+              {dailyCheckInLog.slice(0,3).map((entry: any) => (
+                <div key={entry.id} style={{ padding: '8px 12px', background: theme.bg, borderRadius: '8px', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: theme.text, fontSize: '13px' }}>{new Date(entry.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                  <span style={{ color: entry.answers[0] === 'Confident' ? theme.success : entry.answers[0] === 'Stressed' ? theme.danger : theme.textMuted, fontSize: '12px', fontWeight: 600 }}>{entry.answers[0] || '—'}</span>
+                </div>
+              ))}
             </div>
 
             {/* ANNUAL MONEY REVIEW */}
@@ -3866,6 +4087,73 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             >
               ✅ Add to Goals & Calendar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== DAILY CHECK-IN MODAL ==================== */}
+      {showDailyCheckIn && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '440px', width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>✅ Daily Check-in</h3>
+                <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>Question {dailyCheckInStep + 1} of {dailyCheckInQuestions.length}</div>
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {dailyCheckInQuestions.map((_, i) => <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i <= dailyCheckInStep ? theme.accent : theme.border }} />)}
+              </div>
+            </div>
+
+            <div style={{ padding: '20px', background: theme.bg, borderRadius: '12px', marginBottom: '20px' }}>
+              <p style={{ color: theme.text, fontSize: '16px', fontWeight: 500, margin: 0 }}>{dailyCheckInQuestions[dailyCheckInStep].q}</p>
+            </div>
+
+            {dailyCheckInQuestions[dailyCheckInStep].type === 'scale3' && (
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                {(dailyCheckInQuestions[dailyCheckInStep].options || []).map((opt: string) => (
+                  <button key={opt} onClick={() => setDailyCheckInAnswers(p => ({ ...p, [dailyCheckInStep]: opt }))}
+                    style={{ flex: 1, padding: '14px 8px', background: dailyCheckInAnswers[dailyCheckInStep] === opt ? theme.accent : theme.bg, color: dailyCheckInAnswers[dailyCheckInStep] === opt ? 'white' : theme.text, border: '2px solid ' + (dailyCheckInAnswers[dailyCheckInStep] === opt ? theme.accent : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>{opt}</button>
+                ))}
+              </div>
+            )}
+
+            {dailyCheckInQuestions[dailyCheckInStep].type === 'yesno' && (
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+                {['Yes', 'No'].map(opt => (
+                  <button key={opt} onClick={() => setDailyCheckInAnswers(p => ({ ...p, [dailyCheckInStep]: opt }))}
+                    style={{ flex: 1, padding: '14px', background: dailyCheckInAnswers[dailyCheckInStep] === opt ? (opt === 'Yes' ? theme.success : theme.danger) : theme.bg, color: dailyCheckInAnswers[dailyCheckInStep] === opt ? 'white' : theme.text, border: '2px solid ' + (dailyCheckInAnswers[dailyCheckInStep] === opt ? (opt === 'Yes' ? theme.success : theme.danger) : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}>
+                    {opt === 'Yes' ? '👍 Yes' : '👎 No'}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {dailyCheckInQuestions[dailyCheckInStep].type === 'text' && (
+              <div style={{ marginBottom: '20px' }}>
+                <input
+                  value={dailyCheckInAnswers[dailyCheckInStep] || ''}
+                  onChange={e => setDailyCheckInAnswers(p => ({ ...p, [dailyCheckInStep]: e.target.value }))}
+                  placeholder={(dailyCheckInQuestions[dailyCheckInStep] as any).placeholder || ''}
+                  style={{ ...inputStyle, width: '100%', padding: '14px 16px' }}
+                />
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {dailyCheckInStep > 0 && <button onClick={() => setDailyCheckInStep(s => s - 1)} style={{ ...btnPrimary, background: theme.textMuted }}>← Back</button>}
+              {dailyCheckInStep < dailyCheckInQuestions.length - 1 ? (
+                <button
+                  onClick={() => { if (dailyCheckInAnswers[dailyCheckInStep] !== undefined) setDailyCheckInStep(s => s + 1) }}
+                  disabled={dailyCheckInAnswers[dailyCheckInStep] === undefined}
+                  style={{ ...btnPrimary, flex: 1, opacity: dailyCheckInAnswers[dailyCheckInStep] === undefined ? 0.5 : 1 }}>
+                  Next →
+                </button>
+              ) : (
+                <button onClick={submitDailyCheckIn} style={{ ...btnSuccess, flex: 1, fontSize: '15px' }}>✅ Done</button>
+              )}
+            </div>
+            <button onClick={() => { setShowDailyCheckIn(false); setDailyCheckInStep(0); setDailyCheckInAnswers({}) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', width: '100%', marginTop: '10px', fontSize: '13px' }}>Cancel</button>
           </div>
         </div>
       )}
