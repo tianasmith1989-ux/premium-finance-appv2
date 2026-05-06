@@ -44,6 +44,20 @@ export default function Dashboard() {
   const [oneDecisionDate, setOneDecisionDate] = useState<string | null>(null)
   const [loadingOneDecision, setLoadingOneDecision] = useState(false)
 
+  // ==================== COACH TRIGGER ENGINE ====================
+  // Persistent "what to do next" — always visible, auto-updated when state changes
+  const [coachNextAction, setCoachNextAction] = useState<{
+    message: string
+    action: string
+    tab: string
+    icon: string
+    urgency: 'high' | 'medium' | 'low'
+    triggeredBy: string
+  } | null>(null)
+  const [dismissedTriggers, setDismissedTriggers] = useState<string[]>([])
+  const [lastAppOpen, setLastAppOpen] = useState<string | null>(null)
+  const [coachMessageQueue, setCoachMessageQueue] = useState<string[]>([])
+
   // ==================== LATTE FACTOR ====================
   const [latteItems, setLatteItems] = useState<any[]>([
     { id: 1, name: 'Daily coffee', amount: '6', frequency: 'daily', emoji: '☕' },
@@ -282,6 +296,9 @@ export default function Dashboard() {
       if (data.budgetMemory) setBudgetMemory(data.budgetMemory)
       if (data.paidOccurrences) setPaidOccurrences(new Set(data.paidOccurrences))
       if (data.roadmapMilestones) setRoadmapMilestones(data.roadmapMilestones)
+      if (data.coachNextAction) setCoachNextAction(data.coachNextAction)
+      if (data.dismissedTriggers) setDismissedTriggers(data.dismissedTriggers)
+      if (data.lastAppOpen) setLastAppOpen(data.lastAppOpen)
       if (data.documents) setDocuments(data.documents)
       if (data.milestoneCheckIns) setMilestoneCheckIns(data.milestoneCheckIns)
       if (data.checkInSchedule) setCheckInSchedule(prev => ({ ...prev, ...data.checkInSchedule }))
@@ -325,13 +342,14 @@ export default function Dashboard() {
       roadmapMilestones, budgetOnboarding, chatMessages, userCountry,
       wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns,
       checkInSchedule, lastDailyCheckIn, dailyCheckInLog,
+      coachNextAction, dismissedTriggers, lastAppOpen,
       moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete,
       fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights,
       insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog,
       annualReviews, superData, netWorthHistory, personalityAnswers
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, coachNextAction, dismissedTriggers, lastAppOpen, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
 
   // Chat scroll
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -851,7 +869,217 @@ Always reference who they said they're becoming when relevant. Coach them as the
     countryConfig: currentCountryConfig
   })
 
-  // ==================== CHECK-IN SCHEDULE & DUE DETECTION ====================
+  // ==================== COACH TRIGGER ENGINE ====================
+  // Fires whenever meaningful financial state changes.
+  // Priority order: highest urgency triggers win.
+  // Each trigger has a unique ID so it won't re-fire once dismissed.
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0]
+
+    // Track app opens for re-engagement
+    if (lastAppOpen !== today) {
+      setLastAppOpen(today)
+    }
+
+    const daysSinceCheckIn = lastCheckIn
+      ? Math.floor((Date.now() - new Date(lastCheckIn).getTime()) / 86400000)
+      : 999
+    const daysSinceDailyCheckIn = lastDailyCheckIn
+      ? Math.floor((Date.now() - new Date(lastDailyCheckIn).getTime()) / 86400000)
+      : 999
+
+    // Evaluate triggers in priority order — first match wins
+    const triggers = [
+
+      // ── ONBOARDING ──────────────────────────────────────────────
+      {
+        id: 'no_income',
+        condition: incomeStreams.length === 0 && onboardingComplete,
+        urgency: 'high' as const,
+        icon: '💰',
+        message: "You haven't added your income yet. I can't coach you without knowing your numbers.",
+        action: "Add my income now →",
+        tab: 'dashboard'
+      },
+      {
+        id: 'no_expenses',
+        condition: incomeStreams.length > 0 && expenses.length === 0,
+        urgency: 'high' as const,
+        icon: '💸',
+        message: `Good — I can see you earn $${monthlyIncome.toFixed(0)}/mo. Now add your bills and expenses so I can find your real surplus.`,
+        action: "Add my expenses →",
+        tab: 'dashboard'
+      },
+      {
+        id: 'no_mortgage',
+        condition: incomeStreams.length > 0 && expenses.length > 0 && !mortgageAccel.balance,
+        urgency: 'high' as const,
+        icon: '🏠',
+        message: "Your budget is set up. Next: enter your mortgage details so I can calculate your mortgage-free date and show you exactly how much you can save.",
+        action: "Enter mortgage details →",
+        tab: 'mortgage'
+      },
+      {
+        id: 'no_personality',
+        condition: !moneyPersonality && onboardingComplete && incomeStreams.length > 0,
+        urgency: 'medium' as const,
+        icon: '🧠',
+        message: "I'm giving you generic advice right now. Take the 8-question money personality quiz and I'll coach you the way YOU specifically need to be coached.",
+        action: "Take the quiz →",
+        tab: 'insights'
+      },
+
+      // ── BABY STEP TRANSITIONS ────────────────────────────────────
+      {
+        id: 'baby_step_1_done',
+        condition: emergencyFund >= 2000 && !dismissedTriggers.includes('baby_step_1_done') && currentBabyStep.step >= 2,
+        urgency: 'high' as const,
+        icon: '🛡️',
+        message: `Your $2,000 emergency fund is in place — Baby Step 1 is DONE. 🎉 You're now on Baby Step 2: kill bad debt. List every credit card, personal loan, and BNPL balance in the Debts section.`,
+        action: "Start Baby Step 2 →",
+        tab: 'dashboard'
+      },
+      {
+        id: 'bad_debt_done',
+        condition: debts.filter(d => parseFloat(d.interestRate || '0') > 5 && !d.name?.toLowerCase().includes('mortgage')).length === 0 && debts.length > 0 && currentBabyStep.step >= 3,
+        urgency: 'high' as const,
+        icon: '💳',
+        message: "All bad debt cleared! That's Baby Step 2 done. Now build your full 3-6 month emergency fund — that's the buffer that makes everything else possible.",
+        action: "Set up emergency fund goal →",
+        tab: 'path'
+      },
+      {
+        id: 'emergency_fund_done',
+        condition: emergencyMonths >= 3 && currentBabyStep.step >= 4 && !dismissedTriggers.includes('emergency_fund_done'),
+        urgency: 'high' as const,
+        icon: '🏦',
+        message: `${emergencyMonths.toFixed(1)} months of expenses saved — Baby Step 3 is DONE. Now it's time to invest 15% of your income. Let's look at super salary sacrifice and ETFs.`,
+        action: "Start investing →",
+        tab: 'path'
+      },
+
+      // ── MORTGAGE ────────────────────────────────────────────────
+      {
+        id: 'mortgage_no_extra',
+        condition: !!mortgageAccel.balance && !mortgageAccel.extraRepayment && monthlySurplus > 200,
+        urgency: 'high' as const,
+        icon: '🚀',
+        message: `You have $${monthlySurplus.toFixed(0)} surplus per month and your mortgage is entered but you haven't set any extra repayments. Even $${Math.floor(monthlySurplus * 0.3).toFixed(0)} extra per month could save you years.`,
+        action: "See the impact →",
+        tab: 'mortgage'
+      },
+      {
+        id: 'mortgage_rate_check',
+        condition: !!mortgageAccel.balance && parseFloat(mortgageAccel.rate || '0') > 6.5,
+        urgency: 'medium' as const,
+        icon: '📉',
+        message: `Your mortgage rate is ${mortgageAccel.rate}% — that's above the current market average. A rate review or refinance could save you thousands. This is worth a 15-minute call to your broker.`,
+        action: "Learn about refinancing →",
+        tab: 'learn'
+      },
+
+      // ── SURPLUS & SAVINGS ────────────────────────────────────────
+      {
+        id: 'surplus_not_allocated',
+        condition: monthlySurplus > 300 && goals.length === 0 && debts.length === 0,
+        urgency: 'high' as const,
+        icon: '⚡',
+        message: `You have $${monthlySurplus.toFixed(0)}/month in surplus with no goals or debts set up. That money is going nowhere. Let's put it to work — add a goal or set an extra mortgage repayment.`,
+        action: "Allocate my surplus →",
+        tab: 'path'
+      },
+      {
+        id: 'low_savings_rate',
+        condition: monthlyIncome > 0 && savingsRate < 10 && monthlyIncome > 3000,
+        urgency: 'medium' as const,
+        icon: '📊',
+        message: `Your savings rate is ${savingsRate.toFixed(1)}% — the financial independence benchmark is 20%+. Let's find where the gap is and build a plan to close it.`,
+        action: "Review my budget →",
+        tab: 'dashboard'
+      },
+
+      // ── CHECK-IN & ACCOUNTABILITY ────────────────────────────────
+      {
+        id: 'check_in_overdue',
+        condition: daysSinceCheckIn >= 8 && moneyDateLog.length > 0,
+        urgency: 'medium' as const,
+        icon: '🔥',
+        message: `It's been ${daysSinceCheckIn} days since your last Money Date. Your streak is at risk. A 10-minute check-in keeps momentum going — even a quick one counts.`,
+        action: "Do Money Date now →",
+        tab: 'review'
+      },
+      {
+        id: 'daily_checkin_nudge',
+        condition: daysSinceDailyCheckIn >= 3 && dailyCheckInLog.length > 0,
+        urgency: 'low' as const,
+        icon: '✅',
+        message: `You haven't done a daily check-in in ${daysSinceDailyCheckIn} days. 3 questions, 60 seconds — it's the habit that keeps you financially aware.`,
+        action: "Quick check-in →",
+        tab: 'review'
+      },
+
+      // ── ROADMAP & GOALS ──────────────────────────────────────────
+      {
+        id: 'no_roadmap',
+        condition: roadmapMilestones.length === 0 && onboardingComplete && incomeStreams.length > 0,
+        urgency: 'medium' as const,
+        icon: '🗺️',
+        message: "Your roadmap is empty. Add your top 3 financial milestones — paying off debt, building your emergency fund, your mortgage-free date — and I'll build a weekly plan for each.",
+        action: "Build my roadmap →",
+        tab: 'path'
+      },
+      {
+        id: 'goal_nearly_complete',
+        condition: goals.some(g => {
+          const pct = (parseFloat(g.saved || '0') / parseFloat(g.target || '1')) * 100
+          return pct >= 80 && pct < 100
+        }),
+        urgency: 'medium' as const,
+        icon: '🎯',
+        message: `One of your goals is over 80% complete! You're in the home stretch — consider increasing your payment frequency to finish it off.`,
+        action: "View my goals →",
+        tab: 'dashboard'
+      },
+
+      // ── POSITIVE MOMENTUM ────────────────────────────────────────
+      {
+        id: 'first_surplus',
+        condition: monthlySurplus > 0 && incomeStreams.length > 0 && expenses.length > 0 && wins.length < 3,
+        urgency: 'low' as const,
+        icon: '🟢',
+        message: `Your numbers are in and you have a $${monthlySurplus.toFixed(0)}/month surplus. This is your starting point — every dollar of that surplus directed intentionally changes your financial future.`,
+        action: "See what to do with it →",
+        tab: 'insights'
+      }
+    ]
+
+    // Find highest priority unfired, non-dismissed trigger
+    const priorityOrder = ['high', 'medium', 'low']
+    for (const priority of priorityOrder) {
+      const match = triggers.find(t =>
+        t.urgency === priority &&
+        t.condition &&
+        !dismissedTriggers.includes(t.id)
+      )
+      if (match) {
+        // Only update if it's a different trigger than current
+        if (!coachNextAction || coachNextAction.triggeredBy !== match.id) {
+          setCoachNextAction({
+            message: match.message,
+            action: match.action,
+            tab: match.tab,
+            icon: match.icon,
+            urgency: match.urgency,
+            triggeredBy: match.id
+          })
+        }
+        return
+      }
+    }
+
+    // All triggers dismissed or no conditions met — clear the card
+    setCoachNextAction(null)
+  }, [incomeStreams, expenses, debts, goals, assets, monthlySurplus, monthlyIncome, savingsRate, emergencyFund, emergencyMonths, mortgageAccel, moneyPersonality, roadmapMilestones, wins, streak, lastCheckIn, lastDailyCheckIn, moneyDateLog, dailyCheckInLog, onboardingComplete, currentBabyStep, dismissedTriggers])
   const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
 
   const isMoneyDateDue = () => {
@@ -1354,6 +1582,16 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             </div>
             <span style={{ color: theme.text, fontWeight: 700, fontSize: '20px' }}>Aureus</span>
             {streak > 0 && <span style={{ padding: '3px 10px', background: '#f59e0b20', color: '#f59e0b', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>🔥 {streak}-week streak</span>}
+            {/* Coach next action — compact header badge */}
+            {coachNextAction && activeTab !== 'quickview' && (
+              <button
+                onClick={() => setActiveTab('quickview')}
+                style={{ padding: '3px 10px', background: coachNextAction.urgency === 'high' ? theme.warning + '20' : theme.accent + '20', color: coachNextAction.urgency === 'high' ? theme.warning : theme.accent, border: '1px solid ' + (coachNextAction.urgency === 'high' ? theme.warning + '50' : theme.accent + '40'), borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}
+                title={coachNextAction.message}
+              >
+                {coachNextAction.icon} {coachNextAction.urgency === 'high' ? 'Action needed' : 'Aureus recommends'}
+              </button>
+            )}
             {/* Due badges */}
             {isMoneyDateDue() && (
               <button onClick={() => { setShowMoneyDate(true); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ padding: '3px 10px', background: theme.success + '20', color: theme.success, border: '1px solid ' + theme.success + '50', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', animation: 'pulse 2s infinite' }}>
@@ -1413,6 +1651,38 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               <button onClick={() => { setEditingWhy(true); setWhyDraft('') }} style={{ padding: '16px 20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '2px dashed ' + theme.border, cursor: 'pointer', textAlign: 'left' as const }}>
                 <div style={{ color: theme.textMuted, fontSize: '13px' }}>💬 <strong>Set your why</strong> — What are you working toward? (e.g. "Be mortgage-free before my kids finish school")</div>
               </button>
+            )}
+
+            {/* ===== AUREUS COACH CARD — WHAT TO DO NEXT ===== */}
+            {coachNextAction && (
+              <div style={{
+                padding: '18px 20px',
+                background: coachNextAction.urgency === 'high'
+                  ? `linear-gradient(135deg, ${theme.warning}25, ${theme.orange}10)`
+                  : coachNextAction.urgency === 'medium'
+                  ? `linear-gradient(135deg, ${theme.accent}20, ${theme.purple}10)`
+                  : `linear-gradient(135deg, ${theme.success}15, ${theme.teal}10)`,
+                borderRadius: '14px',
+                border: '2px solid ' + (
+                  coachNextAction.urgency === 'high' ? theme.warning + '80'
+                  : coachNextAction.urgency === 'medium' ? theme.accent + '60'
+                  : theme.success + '50'
+                )
+              }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f', flexShrink: 0 }}>A</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                      <div style={{ color: coachNextAction.urgency === 'high' ? theme.warning : coachNextAction.urgency === 'medium' ? theme.accent : theme.success, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>
+                        {coachNextAction.urgency === 'high' ? '⚡ NEXT ACTION' : coachNextAction.urgency === 'medium' ? '🎯 AUREUS RECOMMENDS' : "💡 WHEN YOU'RE READY"}
+                      </div>
+                      <button onClick={() => { setDismissedTriggers(prev => [...prev, coachNextAction.triggeredBy]); setCoachNextAction(null) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '0 0 0 8px' }}>×</button>
+                    </div>
+                    <p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.65, margin: '0 0 12px 0' }}>{coachNextAction.message}</p>
+                    <button onClick={() => setActiveTab(coachNextAction.tab as any)} style={{ padding: '9px 18px', background: coachNextAction.urgency === 'high' ? theme.warning : coachNextAction.urgency === 'medium' ? theme.accent : theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>{coachNextAction.action}</button>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* DAILY CHECK-IN CARD */}
@@ -1634,6 +1904,20 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               <div ref={chatContainerRef} style={{ flex: 1, overflowY: 'auto' as const, marginBottom: '16px', padding: '8px' }}>
                 {chatMessages.length === 0 && (
                   <div style={{ padding: '20px 10px' }}>
+                    {/* Coach card in chat — always front-and-centre */}
+                    {coachNextAction && chatMessages.length === 0 && (
+                      <div style={{ marginBottom: '20px', padding: '16px 18px', background: coachNextAction.urgency === 'high' ? theme.warning + '15' : theme.accent + '15', borderRadius: '12px', border: '1px solid ' + (coachNextAction.urgency === 'high' ? theme.warning + '50' : theme.accent + '40') }}>
+                        <div style={{ color: coachNextAction.urgency === 'high' ? theme.warning : theme.accent, fontSize: '11px', fontWeight: 700, marginBottom: '6px', letterSpacing: '1px' }}>
+                          {coachNextAction.urgency === 'high' ? '⚡ I\'VE BEEN THINKING ABOUT YOUR SITUATION...' : '🎯 HERE\'S WHAT I\'D FOCUS ON NEXT'}
+                        </div>
+                        <p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.65, margin: '0 0 10px 0' }}>{coachNextAction.message}</p>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={() => setActiveTab(coachNextAction.tab as any)} style={{ padding: '8px 16px', background: coachNextAction.urgency === 'high' ? theme.warning : theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>{coachNextAction.action}</button>
+                          <button onClick={() => { setChatInput(`Tell me more about: ${coachNextAction.message.split('.')[0]}`) }} style={{ padding: '8px 14px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>Ask Aureus about this</button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Personality quiz CTA - most prominent when not done */}
                     {!moneyPersonality ? (
                       <div style={{ marginBottom: '24px', padding: '24px', background: 'linear-gradient(135deg, #8b5cf615, #3b82f615)', borderRadius: '16px', border: '2px solid ' + theme.purple + '50', textAlign: 'center' as const }}>
