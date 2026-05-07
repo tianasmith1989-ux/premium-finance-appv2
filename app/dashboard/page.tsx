@@ -9,6 +9,17 @@ export default function Dashboard() {
   // ==================== APP MODE & NAVIGATION ====================
   const [appMode, setAppMode] = useState<'budget' | null>(null)
   const [showModeSelector, setShowModeSelector] = useState(true)
+
+  // ==================== MISSION SYSTEM ====================
+  const [missionPhase, setMissionPhase] = useState<1 | 2 | 3>(1)
+  const [missionStep, setMissionStep] = useState<0 | 1 | 2 | 3 | 4>(0)
+  // 0 = not started, 1 = personality, 2 = income, 3 = expenses, 4 = mortgage
+  const [missionComplete, setMissionComplete] = useState(false)
+  const [missionP2Step, setMissionP2Step] = useState<'analyse' | 'propose' | 'confirm' | 'plan'>('analyse')
+  const [missionP2Loading, setMissionP2Loading] = useState(false)
+  const [missionP2Proposals, setMissionP2Proposals] = useState<any[]>([])
+  const [missionP2Confirmed, setMissionP2Confirmed] = useState<boolean[]>([])
+  const [missionNavLocked, setMissionNavLocked] = useState(true) // locks nav during phase 1
   const [activeTab, setActiveTab] = useState<'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'learn' | 'wins' | 'mortgage' | 'insights' | 'grow' | 'review'>('chat')
   const [darkMode, setDarkMode] = useState(true)
 
@@ -311,6 +322,19 @@ export default function Dashboard() {
       if (data.fearAuditAnswers) setFearAuditAnswers(data.fearAuditAnswers)
       if (data.fearAuditComplete) setFearAuditComplete(data.fearAuditComplete)
       if (data.onboardingComplete) setOnboardingComplete(data.onboardingComplete)
+      if (data.missionPhase) setMissionPhase(data.missionPhase)
+      if (data.missionStep !== undefined) setMissionStep(data.missionStep)
+      if (data.missionComplete) setMissionComplete(data.missionComplete)
+      if (data.missionNavLocked !== undefined) setMissionNavLocked(data.missionNavLocked)
+      if (data.missionP2Proposals) setMissionP2Proposals(data.missionP2Proposals)
+      if (data.missionP2Confirmed) setMissionP2Confirmed(data.missionP2Confirmed)
+      if (data.missionP2Step) setMissionP2Step(data.missionP2Step)
+      // New users start at mission step 1
+      if (!data.missionComplete && !data.missionPhase) {
+        setMissionPhase(1)
+        setMissionStep(1)
+        setMissionNavLocked(true)
+      }
       if (data.proactiveInsights) setProactiveInsights(data.proactiveInsights)
       if (data.insightsGeneratedAt) setInsightsGeneratedAt(data.insightsGeneratedAt)
       if (data.oneDecision) setOneDecision(data.oneDecision)
@@ -343,13 +367,15 @@ export default function Dashboard() {
       wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns,
       checkInSchedule, lastDailyCheckIn, dailyCheckInLog,
       coachNextAction, dismissedTriggers, lastAppOpen,
+      missionPhase, missionStep, missionComplete, missionNavLocked,
+      missionP2Proposals, missionP2Confirmed, missionP2Step,
       moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete,
       fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights,
       insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog,
       annualReviews, superData, netWorthHistory, personalityAnswers
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, coachNextAction, dismissedTriggers, lastAppOpen, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, coachNextAction, dismissedTriggers, lastAppOpen, missionPhase, missionStep, missionComplete, missionNavLocked, missionP2Proposals, missionP2Confirmed, missionP2Step, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
 
   // Chat scroll
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -1161,6 +1187,101 @@ Always reference who they said they're becoming when relevant. Coach them as the
     })
   }
 
+  // ==================== MISSION PHASE 2 — ROADMAP BUILDER ====================
+  const advanceMission = (toStep?: number | null, toPhase?: number) => {
+    if (toPhase === 2) {
+      setMissionPhase(2)
+      setMissionStep(0 as any)
+      setMissionNavLocked(false)
+      setMissionP2Step('analyse')
+    } else if (toPhase === 3 || missionComplete) {
+      setMissionPhase(3)
+      setMissionComplete(true)
+      setMissionNavLocked(false)
+      setOnboardingComplete(true)
+    } else {
+      setMissionStep((toStep ?? missionStep + 1) as any)
+    }
+  }
+
+  const generateRoadmapProposals = async () => {
+    setMissionP2Loading(true)
+    setMissionP2Step('propose')
+    try {
+      const response = await fetch('/api/budget-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'question',
+          question: `You are Aureus. A new user has just set up their financial profile. Based on their data, propose exactly 3 roadmap milestones that will have the biggest impact on their financial life. Be specific with numbers.
+
+Their data:
+- Monthly income: $${monthlyIncome.toFixed(0)}
+- Monthly expenses: $${monthlyExpenses.toFixed(0)}  
+- Monthly surplus: $${monthlySurplus.toFixed(0)}
+- Emergency fund: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months)
+- Total debt: $${totalDebtBalance.toFixed(0)}
+- Mortgage: ${mortgageAccel.balance ? `$${mortgageAccel.balance} at ${mortgageAccel.rate}%` : 'not entered'}
+- Baby Step: ${currentBabyStep.step} — ${currentBabyStep.title}
+- Money personality: ${moneyPersonality ? personalityProfiles[moneyPersonality]?.label : 'not assessed'}
+
+Respond in this EXACT JSON format, no other text:
+[
+  {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 1},
+  {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 2},
+  {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 3}
+]`,
+          financialData: { income: incomeStreams, expenses, debts, goals, assets },
+          memory: budgetMemory,
+          countryConfig: currentCountryConfig
+        })
+      })
+      const data = await response.json()
+      const raw: string = data.message || data.advice || data.raw || ''
+      const jsonMatch = raw.match(/\[[\s\S]*\]/)
+      if (jsonMatch) {
+        const proposals = JSON.parse(jsonMatch[0])
+        setMissionP2Proposals(proposals)
+        setMissionP2Confirmed(proposals.map(() => true))
+      }
+    } catch { /* use fallback */ 
+      const fallback = [
+        { name: emergencyFund < 2000 ? 'Build $2,000 Emergency Fund' : emergencyMonths < 3 ? `Build ${(monthlyExpenses * 3).toFixed(0)} Emergency Fund` : 'Starter Safety Net', icon: '🛡️', target: emergencyFund < 2000 ? 2000 : Math.round(monthlyExpenses * 3), notes: 'Your financial airbag — prevents going into debt when life throws surprises.', priority: 1 },
+        { name: totalDebtBalance > 0 ? `Pay Off $${totalDebtBalance.toFixed(0)} in Debt` : mortgageAccel.balance ? 'Accelerate Mortgage Payoff' : 'Build Investment Portfolio', icon: totalDebtBalance > 0 ? '💳' : '🚀', target: totalDebtBalance > 0 ? Math.round(totalDebtBalance) : 0, notes: totalDebtBalance > 0 ? 'Every dollar of bad debt costs you in interest. Clear this fast.' : 'Extra repayments now save you years later.', priority: 2 },
+        { name: mortgageAccel.balance ? `Be Mortgage-Free by ${new Date().getFullYear() + 10}` : 'Reach 3-Month Emergency Fund', icon: '🏠', target: 0, notes: 'The finish line that changes everything about how you live.', priority: 3 }
+      ]
+      setMissionP2Proposals(fallback)
+      setMissionP2Confirmed(fallback.map(() => true))
+    }
+    setMissionP2Loading(false)
+  }
+
+  const confirmMissionRoadmap = async () => {
+    // Add confirmed proposals to roadmap
+    const toAdd = missionP2Proposals.filter((_, i) => missionP2Confirmed[i])
+    toAdd.forEach((p, i) => {
+      setRoadmapMilestones(prev => [...prev, {
+        id: Date.now() + i,
+        name: p.name, icon: p.icon,
+        targetAmount: p.target?.toString() || '0',
+        currentAmount: 0, targetDate: '', notes: p.notes,
+        category: 'savings', completed: false,
+        createdAt: new Date().toISOString(), weeklyPlan: null
+      }])
+    })
+    setMissionP2Step('plan')
+    // Auto-generate weekly plan for first milestone after a beat
+    setTimeout(async () => {
+      const first = toAdd[0]
+      if (first) {
+        const newId = Date.now()
+        await generateWeeklyPlan(newId)
+      }
+      advanceMission(null, 3)
+      setActiveTab('path')
+    }, 1200)
+  }
+
   const literacyTopics = [
     {
       id: 'mortgage-interest',
@@ -1538,23 +1659,60 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
   ]
   if (showModeSelector) {
     return (
-      <div style={{ minHeight: '100vh', background: darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)' : 'linear-gradient(135deg, #f0f9ff 0%, #faf5ff 100%)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-        <div style={{ textAlign: 'center' as const, marginBottom: '48px' }}>
-          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 32px rgba(245, 158, 11, 0.4)', border: '4px solid #fcd34d', margin: '0 auto 24px auto' }}>
+      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div style={{ maxWidth: '480px', width: '100%', textAlign: 'center' as const }}>
+          {/* Logo */}
+          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 32px rgba(245,158,11,0.4)', border: '4px solid #fcd34d', margin: '0 auto 24px' }}>
             <span style={{ color: '#78350f', fontWeight: 800, fontSize: '40px' }}>A</span>
           </div>
-          <h1 style={{ fontSize: '42px', fontWeight: 800, color: darkMode ? '#f1f5f9' : '#1e293b', margin: '0 0 12px 0' }}>Welcome to Aureus</h1>
-          <p style={{ fontSize: '18px', color: darkMode ? '#94a3b8' : '#64748b', margin: 0 }}>Your AI financial coach — helping Aussie families get debt-free faster</p>
-        </div>
-        <button onClick={() => { setAppMode('budget'); setShowModeSelector(false); setActiveTab('quickview') }} style={{ padding: '32px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '24px', border: 'none', cursor: 'pointer', textAlign: 'left' as const, maxWidth: '420px', width: '100%', boxShadow: '0 8px 32px rgba(16, 185, 129, 0.3)' }}>
-          <div style={{ fontSize: '48px', marginBottom: '12px' }}>💰</div>
-          <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 700, margin: '0 0 8px 0' }}>Budget & Wealth Mode</h2>
-          <p style={{ color: 'rgba(255,255,255,0.9)', margin: '0 0 16px 0', fontSize: '14px', lineHeight: 1.6 }}>Budget coaching, mortgage acceleration, debt elimination, FIRE planning, and financial literacy — all in one place.</p>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-            {['Baby Steps', 'Mortgage Accelerator', 'FIRE Path', 'Wins & Streaks', 'Learn Hub'].map(tag => <span key={tag} style={{ padding: '4px 10px', background: 'rgba(255,255,255,0.2)', borderRadius: '12px', fontSize: '11px', color: 'white' }}>{tag}</span>)}
+          <h1 style={{ fontSize: '38px', fontWeight: 800, color: '#f1f5f9', margin: '0 0 12px 0' }}>Meet Aureus</h1>
+          <p style={{ fontSize: '18px', color: '#94a3b8', margin: '0 0 8px 0', lineHeight: 1.5 }}>Your AI financial coach. I'll help you pay your mortgage off years early, eliminate debt, and build real wealth.</p>
+          <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 36px 0' }}>I won't just give you tools — I'll tell you exactly what to do, in the right order, one step at a time.</p>
+
+          {/* What to expect */}
+          <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '20px', marginBottom: '28px', textAlign: 'left' as const, border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 700, letterSpacing: '2px', marginBottom: '16px' }}>WHAT HAPPENS NEXT</div>
+            {[
+              { step: '1', icon: '🧠', text: 'I learn how you think about money (5 min quiz)' },
+              { step: '2', icon: '💰', text: 'You enter your income, bills, and mortgage' },
+              { step: '3', icon: '🗺️', text: 'I build your personalised financial roadmap' },
+              { step: '4', icon: '📋', text: 'I generate your first week-by-week action plan' },
+            ].map(item => (
+              <div key={item.step} style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#1e3a5f', border: '2px solid #3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>{item.icon}</div>
+                <div style={{ color: '#e2e8f0', fontSize: '14px' }}>{item.text}</div>
+              </div>
+            ))}
           </div>
-        </button>
-        <button onClick={() => setDarkMode(!darkMode)} style={{ marginTop: '32px', padding: '12px 24px', background: 'transparent', border: '2px solid ' + (darkMode ? '#334155' : '#e2e8f0'), borderRadius: '12px', color: darkMode ? '#94a3b8' : '#64748b', cursor: 'pointer' }}>{darkMode ? '☀️ Light mode' : '🌙 Dark mode'}</button>
+
+          <button
+            onClick={() => {
+              setAppMode('budget')
+              setShowModeSelector(false)
+              setMissionPhase(1)
+              setMissionStep(1)
+              setMissionNavLocked(true)
+              setActiveTab('chat')
+            }}
+            style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '16px', color: 'white', fontSize: '18px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 24px rgba(16,185,129,0.3)', marginBottom: '12px' }}
+          >
+            Let's get started →
+          </button>
+          <button
+            onClick={() => {
+              setAppMode('budget')
+              setShowModeSelector(false)
+              setMissionComplete(true)
+              setMissionNavLocked(false)
+              setOnboardingComplete(true)
+              setActiveTab('quickview')
+            }}
+            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '14px', padding: '8px' }}
+          >
+            I've used Aureus before — skip setup
+          </button>
+          <button onClick={() => setDarkMode(!darkMode)} style={{ marginTop: '16px', padding: '8px 20px', background: 'transparent', border: '1px solid #334155', borderRadius: '8px', color: '#64748b', cursor: 'pointer', fontSize: '13px' }}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
+        </div>
       </div>
     )
   }
@@ -1565,7 +1723,426 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
 
-      {/* WIN CELEBRATION TOAST */}
+      {/* ═══════════════════════════════════════════════════
+          MISSION OVERLAY — Phase 1 (setup) & Phase 2 (roadmap)
+          Covers full screen, guides user step by step
+      ═══════════════════════════════════════════════════ */}
+      {!missionComplete && missionPhase === 1 && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: darkMode ? '#0f172a' : '#f8fafc', zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
+
+          {/* Mission header */}
+          <div style={{ padding: '16px 24px', background: darkMode ? '#1e293b' : 'white', borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#78350f', fontSize: '16px' }}>A</div>
+              <div>
+                <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Aureus Setup</div>
+                <div style={{ color: theme.textMuted, fontSize: '11px' }}>Step {missionStep} of 4</div>
+              </div>
+            </div>
+            {/* Progress bar */}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              {[1,2,3,4].map(s => (
+                <div key={s} style={{ width: s === missionStep ? '24px' : '8px', height: '8px', borderRadius: '4px', background: s < missionStep ? theme.success : s === missionStep ? theme.accent : theme.border, transition: 'all 0.3s' }} />
+              ))}
+            </div>
+          </div>
+
+          {/* STEP 1 — Personality + Why */}
+          {missionStep === 1 && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
+              <div style={{ fontSize: '56px', marginBottom: '16px' }}>🧠</div>
+              <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>First — let me understand you.</h2>
+              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 32px 0' }}>
+                I coach everyone differently. Before I give you a single piece of advice, I need to know how you think about money — your personality, your fears, and what you're really working toward.
+              </p>
+
+              {!moneyPersonality ? (
+                <div style={{ width: '100%' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px', marginBottom: '28px' }}>
+                    {personalityQuiz.map((question, qi) => (
+                      <div key={qi} style={{ padding: '18px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                        <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px', marginBottom: '12px' }}>{qi + 1}. {question.q}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
+                          {question.options.map((opt, oi) => (
+                            <button key={oi} onClick={() => setPersonalityAnswers(prev => ({ ...prev, [qi]: opt.type }))}
+                              style={{ padding: '10px 14px', background: personalityAnswers[qi] === opt.type ? theme.accent + '30' : theme.bg, border: '2px solid ' + (personalityAnswers[qi] === opt.type ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', color: theme.text, fontSize: '13px', textAlign: 'left' as const }}>
+                              {personalityAnswers[qi] === opt.type ? '● ' : '○ '}{opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => { const result = calculatePersonality(); setMoneyPersonality(result) }}
+                    disabled={Object.keys(personalityAnswers).length < 8}
+                    style={{ width: '100%', padding: '16px', background: Object.keys(personalityAnswers).length < 8 ? theme.border : theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: Object.keys(personalityAnswers).length < 8 ? 'default' : 'pointer', fontSize: '16px', fontWeight: 700, opacity: Object.keys(personalityAnswers).length < 8 ? 0.6 : 1 }}>
+                    {Object.keys(personalityAnswers).length < 8 ? `Answer ${8 - Object.keys(personalityAnswers).length} more` : 'See my result →'}
+                  </button>
+                </div>
+              ) : (
+                // Personality result + deep why
+                <div style={{ width: '100%' }}>
+                  <div style={{ padding: '20px', background: personalityProfiles[moneyPersonality].color + '20', borderRadius: '16px', border: '2px solid ' + personalityProfiles[moneyPersonality].color + '40', marginBottom: '24px', textAlign: 'center' as const }}>
+                    <div style={{ fontSize: '48px', marginBottom: '8px' }}>{personalityProfiles[moneyPersonality].emoji}</div>
+                    <div style={{ color: personalityProfiles[moneyPersonality].color, fontWeight: 800, fontSize: '20px', marginBottom: '8px' }}>{personalityProfiles[moneyPersonality].label}</div>
+                    <p style={{ color: theme.textMuted, fontSize: '13px', margin: 0, lineHeight: 1.6 }}>{personalityProfiles[moneyPersonality].aureusFocus}</p>
+                  </div>
+
+                  <div style={{ marginBottom: '24px' }}>
+                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '6px' }}>❤️ Now — tell me why.</div>
+                    <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '14px' }}>What are you actually working toward? This is what I'll remind you of when motivation dips.</p>
+                    <textarea
+                      value={whyStatement}
+                      onChange={e => setWhyStatement(e.target.value)}
+                      placeholder="e.g. I want to be mortgage-free before my kids start high school so I can work less and be more present..."
+                      style={{ ...inputStyle, width: '100%', minHeight: '90px', resize: 'vertical' as const }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '24px' }}>
+                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '6px' }}>⚡ Who are you becoming?</div>
+                    <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>Write one identity statement. Not what you want to have — who you are becoming.</p>
+                    <input
+                      value={identityStatements[0] || ''}
+                      onChange={e => setIdentityStatements([e.target.value])}
+                      placeholder="I am someone who..."
+                      style={{ ...inputStyle, width: '100%' }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => advanceMission(2)}
+                    style={{ width: '100%', padding: '16px', background: theme.success, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
+                    Perfect. Now let's set up your numbers →
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 2 — Income */}
+          {missionStep === 2 && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '560px', margin: '0 auto', width: '100%' }}>
+              <div style={{ fontSize: '56px', marginBottom: '16px' }}>💰</div>
+              <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>How much do you earn?</h2>
+              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 28px 0' }}>
+                I can't show you your surplus, your mortgage-free date, or your financial health score until I know your income. This is step one.
+              </p>
+
+              {/* Existing income streams */}
+              {incomeStreams.length > 0 && (
+                <div style={{ width: '100%', marginBottom: '16px' }}>
+                  {incomeStreams.map(inc => (
+                    <div key={inc.id} style={{ padding: '12px 16px', background: theme.success + '15', borderRadius: '10px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.success + '30' }}>
+                      <div><div style={{ color: theme.text, fontWeight: 600 }}>{inc.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${inc.amount} {inc.frequency}</div></div>
+                      <button onClick={() => setIncomeStreams(prev => prev.filter(i => i.id !== inc.id))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '16px' }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add income form */}
+              <div style={{ width: '100%', padding: '20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border, marginBottom: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Income source (e.g. "Salary — JB Hi-Fi")</label>
+                    <input placeholder="e.g. Salary" value={newIncome.name} onChange={e => setNewIncome({...newIncome, name: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Take-home amount ($)</label>
+                      <input type="number" placeholder="e.g. 2800" value={newIncome.amount} onChange={e => setNewIncome({...newIncome, amount: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Paid</label>
+                      <select value={newIncome.frequency} onChange={e => setNewIncome({...newIncome, frequency: e.target.value})} style={{...inputStyle, width: '100%'}}>
+                        <option value="weekly">Weekly</option>
+                        <option value="fortnightly">Fortnightly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button onClick={() => { if (newIncome.name && newIncome.amount) { setIncomeStreams(prev => [...prev, { ...newIncome, id: Date.now(), type: 'active', startDate: new Date().toISOString().split('T')[0] }]); setNewIncome({ name: '', amount: '', frequency: 'fortnightly', type: 'active', startDate: new Date().toISOString().split('T')[0] }) } }} style={{ ...btnSuccess, padding: '12px' }}>
+                    + Add income source
+                  </button>
+                </div>
+              </div>
+
+              {incomeStreams.length > 0 && (
+                <div style={{ width: '100%' }}>
+                  <div style={{ padding: '14px 16px', background: theme.success + '15', borderRadius: '10px', marginBottom: '16px', border: '1px solid ' + theme.success + '30' }}>
+                    <div style={{ color: theme.success, fontWeight: 700 }}>Monthly income: ${monthlyIncome.toFixed(0)}</div>
+                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>Looking good. Add more sources if you have them, or continue.</div>
+                  </div>
+                  <button onClick={() => advanceMission(3)} style={{ width: '100%', padding: '16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
+                    That's my income. Next: my bills →
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 3 — Expenses */}
+          {missionStep === 3 && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '560px', margin: '0 auto', width: '100%' }}>
+              <div style={{ fontSize: '56px', marginBottom: '16px' }}>💸</div>
+              <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>What are your regular bills?</h2>
+              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 8px 0' }}>
+                Add your main recurring expenses. You don't need to be perfect — rough numbers get us started.
+              </p>
+              <p style={{ color: theme.textMuted, fontSize: '13px', textAlign: 'center' as const, margin: '0 0 24px 0' }}>
+                Income: <strong style={{ color: theme.success }}>${monthlyIncome.toFixed(0)}/mo</strong>
+              </p>
+
+              {/* Quick presets */}
+              <div style={{ width: '100%', marginBottom: '16px' }}>
+                <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>QUICK ADD</div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
+                  {presetBills.map(p => (
+                    <button key={p.name} onClick={() => { const amt = prompt(`${p.name} — enter amount ($):`, (p as any).amount || ''); if (amt) setExpenses(prev => [...prev, { id: Date.now(), name: p.name, amount: amt, frequency: p.frequency, category: p.category, dueDate: new Date().toISOString().split('T')[0] }]) }}
+                      style={{ padding: '5px 12px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '12px', color: theme.textMuted }}>
+                      + {p.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Existing expenses */}
+              {expenses.filter(e => !e.targetDebtId && !e.targetGoalId).length > 0 && (
+                <div style={{ width: '100%', marginBottom: '16px' }}>
+                  {expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(exp => (
+                    <div key={exp.id} style={{ padding: '10px 14px', background: theme.danger + '10', borderRadius: '8px', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.border }}>
+                      <div><div style={{ color: theme.text, fontSize: '14px' }}>{exp.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${exp.amount} {exp.frequency}</div></div>
+                      <button onClick={() => setExpenses(prev => prev.filter(e => e.id !== exp.id))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '16px' }}>×</button>
+                    </div>
+                  ))}
+                  <div style={{ padding: '10px 14px', background: theme.cardBg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                    <span style={{ color: theme.textMuted, fontSize: '13px' }}>Total expenses</span>
+                    <span style={{ color: theme.danger, fontWeight: 700 }}>${monthlyExpenses.toFixed(0)}/mo</span>
+                  </div>
+                  {monthlySurplus > 0 && (
+                    <div style={{ padding: '10px 14px', background: theme.success + '15', borderRadius: '8px', marginTop: '6px', border: '1px solid ' + theme.success + '30', display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: theme.success, fontWeight: 600, fontSize: '13px' }}>Your surplus</span>
+                      <span style={{ color: theme.success, fontWeight: 700 }}>${monthlySurplus.toFixed(0)}/mo</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Custom expense */}
+              <div style={{ width: '100%', padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, marginBottom: '20px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                  <input placeholder="Bill name" value={newExpense.name} onChange={e => setNewExpense({...newExpense, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
+                  <input type="number" placeholder="$" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{...inputStyle, width: '80px'}} />
+                  <select value={newExpense.frequency} onChange={e => setNewExpense({...newExpense, frequency: e.target.value})} style={inputStyle}>
+                    <option value="weekly">Weekly</option>
+                    <option value="fortnightly">Fortnightly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                  <button onClick={() => { if (newExpense.name && newExpense.amount) { setExpenses(prev => [...prev, { ...newExpense, id: Date.now(), dueDate: new Date().toISOString().split('T')[0] }]); setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: new Date().toISOString().split('T')[0] }) } }} style={btnDanger}>+</button>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                <button onClick={() => advanceMission(3)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
+                  Skip for now
+                </button>
+                <button onClick={() => advanceMission(4)} style={{ flex: 1, padding: '16px', background: expenses.length > 0 ? theme.accent : theme.border, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
+                  {expenses.length > 0 ? 'Next: my mortgage →' : 'Continue without expenses →'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4 — Mortgage */}
+          {missionStep === 4 && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '560px', margin: '0 auto', width: '100%' }}>
+              <div style={{ fontSize: '56px', marginBottom: '16px' }}>🏠</div>
+              <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>Tell me about your mortgage.</h2>
+              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 8px 0' }}>
+                This is where the magic happens. I'll calculate your exact mortgage-free date and show you how to cut years off it.
+              </p>
+              {monthlySurplus > 0 && (
+                <div style={{ padding: '10px 16px', background: theme.success + '15', borderRadius: '8px', marginBottom: '20px', border: '1px solid ' + theme.success + '30', textAlign: 'center' as const }}>
+                  <span style={{ color: theme.success, fontSize: '13px' }}>You have <strong>${monthlySurplus.toFixed(0)}/month</strong> surplus that could be going onto your mortgage right now.</span>
+                </div>
+              )}
+
+              <div style={{ width: '100%', padding: '20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border, marginBottom: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Repayment frequency</label>
+                    <select value={mortgageAccel.repaymentFrequency} onChange={e => setMortgageAccel({...mortgageAccel, repaymentFrequency: e.target.value})} style={{...inputStyle, width: '100%'}}>
+                      <option value="weekly">Weekly</option>
+                      <option value="fortnightly">Fortnightly (most common in AU)</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Remaining balance ($)</label>
+                    <input type="number" placeholder="e.g. 420000" value={mortgageAccel.balance} onChange={e => setMortgageAccel({...mortgageAccel, balance: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Interest rate (% p.a.)</label>
+                      <input type="number" step="0.01" placeholder="e.g. 6.14" value={mortgageAccel.rate} onChange={e => setMortgageAccel({...mortgageAccel, rate: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Years remaining</label>
+                      <input type="number" placeholder="e.g. 25" value={mortgageAccel.remainingYears} onChange={e => setMortgageAccel({...mortgageAccel, remainingYears: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Live mortgage-free date preview */}
+              {mortgageAccel.balance && mortgageAccel.rate && mortgageAccel.remainingYears && (() => {
+                const res = calculateMortgagePayoff()
+                if (!res) return null
+                const freq = mortgageAccel.repaymentFrequency
+                const suggestedExtra = monthlySurplus > 0
+                  ? (freq === 'weekly' ? Math.floor(monthlySurplus * 0.3 / 4.33) : freq === 'fortnightly' ? Math.floor(monthlySurplus * 0.3 / 2) : Math.floor(monthlySurplus * 0.3))
+                  : 0
+                const extraResult = suggestedExtra > 0 ? (() => {
+                  const r2 = parseFloat(mortgageAccel.rate) / 100 / (freq === 'weekly' ? 52 : freq === 'fortnightly' ? 26 : 12)
+                  const pmt2 = res.repaymentUsed + suggestedExtra
+                  const bal2 = parseFloat(mortgageAccel.balance)
+                  if (pmt2 <= bal2 * r2) return null
+                  const periods2 = Math.log(pmt2 / (pmt2 - bal2 * r2)) / Math.log(1 + r2)
+                  const freqN = freq === 'weekly' ? 52 : freq === 'fortnightly' ? 26 : 12
+                  const yrs2 = periods2 / freqN
+                  return { yearsSaved: res.standard.years - yrs2, freeYear: new Date().getFullYear() + Math.ceil(yrs2), interestSaved: res.standard.interest - (pmt2 * periods2 - bal2) }
+                })() : null
+                return (
+                  <div style={{ width: '100%', marginBottom: '20px' }}>
+                    <div style={{ padding: '20px', background: 'linear-gradient(135deg, #0f2027, #203a43)', borderRadius: '14px', textAlign: 'center' as const, border: '1px solid #334155' }}>
+                      <div style={{ color: '#94a3b8', fontSize: '11px', letterSpacing: '2px', marginBottom: '8px' }}>🏠 YOUR MORTGAGE-FREE DATE</div>
+                      <div style={{ color: '#ef4444', fontSize: '40px', fontWeight: 800, marginBottom: '4px' }}>{res.standard.freeYear}</div>
+                      <div style={{ color: '#64748b', fontSize: '12px', marginBottom: suggestedExtra > 0 ? '16px' : '0' }}>at current pace · ${Math.round(res.standard.interest / 1000)}k in interest</div>
+                      {extraResult && suggestedExtra > 0 && (
+                        <div style={{ padding: '12px', background: 'rgba(16,185,129,0.15)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.3)' }}>
+                          <div style={{ color: '#10b981', fontSize: '13px', marginBottom: '4px' }}>💡 With just ${suggestedExtra} extra per {freq === 'weekly' ? 'week' : freq === 'fortnightly' ? 'fortnight' : 'month'}:</div>
+                          <div style={{ color: '#10b981', fontWeight: 700, fontSize: '18px' }}>Mortgage-free by {extraResult.freeYear} — {extraResult.yearsSaved.toFixed(1)} years earlier, ${Math.round(extraResult.interestSaved / 1000)}k saved</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                <button onClick={() => advanceMission(null, 2)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
+                  Skip — I'll add this later
+                </button>
+                <button
+                  onClick={() => advanceMission(null, 2)}
+                  style={{ flex: 1, padding: '16px', background: mortgageAccel.balance ? theme.success : theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
+                  {mortgageAccel.balance ? "I can see my date. Build my roadmap →" : "Build my roadmap →"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════
+          MISSION PHASE 2 — ROADMAP BUILDER
+      ═══════════════════════════════════════════════════ */}
+      {!missionComplete && missionPhase === 2 && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: darkMode ? '#0f172a' : '#f8fafc', zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
+          <div style={{ padding: '16px 24px', background: darkMode ? '#1e293b' : 'white', borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', gap: '12px', position: 'sticky' as const, top: 0, zIndex: 1 }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#78350f', fontSize: '16px' }}>A</div>
+            <div><div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Building your roadmap</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>Almost there</div></div>
+          </div>
+
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
+
+            {missionP2Step === 'analyse' && (
+              <div style={{ textAlign: 'center' as const, width: '100%' }}>
+                <div style={{ fontSize: '56px', marginBottom: '20px' }}>🔍</div>
+                <h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 12px 0' }}>Let me analyse your situation.</h2>
+                <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '14px', marginBottom: '24px', textAlign: 'left' as const, border: '1px solid ' + theme.border }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    {[
+                      { label: 'Monthly income', value: `$${monthlyIncome.toFixed(0)}`, color: theme.success },
+                      { label: 'Monthly expenses', value: `$${monthlyExpenses.toFixed(0)}`, color: theme.danger },
+                      { label: 'Monthly surplus', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus > 0 ? theme.success : theme.danger },
+                      { label: 'Baby Step', value: `Step ${currentBabyStep.step}`, color: theme.accent },
+                      ...(mortgageAccel.balance ? [{ label: 'Mortgage balance', value: `$${parseInt(mortgageAccel.balance).toLocaleString()}`, color: theme.warning }] : []),
+                      ...(totalDebtBalance > 0 ? [{ label: 'Total debt', value: `$${totalDebtBalance.toFixed(0)}`, color: theme.danger }] : []),
+                    ].map(item => (
+                      <div key={item.label} style={{ padding: '12px', background: theme.bg, borderRadius: '8px' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px' }}>{item.label}</div>
+                        <div style={{ color: item.color, fontWeight: 700, fontSize: '18px' }}>{item.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {moneyPersonality && personalityProfiles[moneyPersonality] && (
+                  <div style={{ padding: '14px 16px', background: personalityProfiles[moneyPersonality].color + '15', borderRadius: '10px', marginBottom: '24px', border: '1px solid ' + personalityProfiles[moneyPersonality].color + '30', textAlign: 'left' as const }}>
+                    <span style={{ fontSize: '20px' }}>{personalityProfiles[moneyPersonality].emoji}</span>
+                    <span style={{ color: personalityProfiles[moneyPersonality].color, fontWeight: 600, fontSize: '13px', marginLeft: '8px' }}>Coaching you as a {personalityProfiles[moneyPersonality].label}</span>
+                    <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{personalityProfiles[moneyPersonality].aureusFocus}</div>
+                  </div>
+                )}
+                <button
+                  onClick={generateRoadmapProposals}
+                  disabled={missionP2Loading}
+                  style={{ width: '100%', padding: '16px', background: missionP2Loading ? theme.border : theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: missionP2Loading ? 'default' : 'pointer', fontSize: '16px', fontWeight: 700 }}>
+                  {missionP2Loading ? '⏳ Aureus is thinking...' : '🗺️ Build my personalised roadmap →'}
+                </button>
+              </div>
+            )}
+
+            {missionP2Step === 'propose' && missionP2Proposals.length > 0 && (
+              <div style={{ width: '100%' }}>
+                <div style={{ textAlign: 'center' as const, marginBottom: '24px' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>🗺️</div>
+                  <h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 8px 0' }}>Here's your roadmap.</h2>
+                  <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>Based on your numbers and your {moneyPersonality && personalityProfiles[moneyPersonality]?.label.toLowerCase()} personality, these are the 3 milestones I'd prioritise. Untick any you don't want.</p>
+                </div>
+
+                {missionP2Proposals.map((p, i) => (
+                  <div key={i} style={{ padding: '18px', background: missionP2Confirmed[i] ? theme.accent + '15' : theme.cardBg, borderRadius: '14px', marginBottom: '12px', border: '2px solid ' + (missionP2Confirmed[i] ? theme.accent + '60' : theme.border) }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                      <input type="checkbox" checked={missionP2Confirmed[i] || false} onChange={e => setMissionP2Confirmed(prev => { const n = [...prev]; n[i] = e.target.checked; return n })} style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: theme.accent, flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '22px' }}>{p.icon}</span>
+                          <span style={{ color: theme.text, fontWeight: 700, fontSize: '16px' }}>{p.name}</span>
+                          {p.target > 0 && <span style={{ color: theme.accent, fontSize: '13px' }}>${p.target.toLocaleString()}</span>}
+                        </div>
+                        <div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.5 }}>{p.notes}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  onClick={confirmMissionRoadmap}
+                  disabled={!missionP2Confirmed.some(Boolean)}
+                  style={{ width: '100%', padding: '16px', background: missionP2Confirmed.some(Boolean) ? theme.success : theme.border, color: 'white', border: 'none', borderRadius: '12px', cursor: missionP2Confirmed.some(Boolean) ? 'pointer' : 'default', fontSize: '16px', fontWeight: 700, marginTop: '8px' }}>
+                  {missionP2Loading ? '⏳ Generating your first weekly plan...' : `Add ${missionP2Confirmed.filter(Boolean).length} milestone${missionP2Confirmed.filter(Boolean).length !== 1 ? 's' : ''} & generate my first action plan →`}
+                </button>
+              </div>
+            )}
+
+            {missionP2Step === 'plan' && (
+              <div style={{ textAlign: 'center' as const, padding: '40px 0' }}>
+                <div style={{ fontSize: '64px', marginBottom: '20px' }}>🎉</div>
+                <h2 style={{ color: theme.success, fontSize: '26px', margin: '0 0 12px 0' }}>You're set up!</h2>
+                <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, marginBottom: '24px' }}>Your roadmap is built. Your first weekly action plan is ready. Aureus is now fully personalised to how you think about money.<br/><br/>I'll tell you exactly what to do next — every day.</p>
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', alignItems: 'center' }}>
+                  <div style={{ padding: '8px 16px', background: theme.success + '20', color: theme.success, borderRadius: '8px', fontSize: '13px' }}>✓ {missionP2Confirmed.filter(Boolean).length} milestones added to roadmap</div>
+                  <div style={{ padding: '8px 16px', background: theme.accent + '20', color: theme.accent, borderRadius: '8px', fontSize: '13px' }}>✓ First weekly plan generated</div>
+                  <div style={{ padding: '8px 16px', background: theme.purple + '20', color: theme.purple, borderRadius: '8px', fontSize: '13px' }}>✓ Coaching personalised to your {moneyPersonality && personalityProfiles[moneyPersonality]?.label}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {celebrationWin && (
         <div style={{ position: 'fixed' as const, top: '20px', right: '20px', zIndex: 9999, padding: '16px 20px', background: 'linear-gradient(135deg, #10b981, #059669)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(16,185,129,0.4)', color: 'white', maxWidth: '320px', animation: 'slideIn 0.3s ease' }}>
           <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>🏆 New Win Unlocked!</div>
@@ -1626,10 +2203,20 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             { id: 'learn', label: '🎓 Learn' },
             { id: 'wins', label: `🏆 Wins${wins.length > 0 ? ` (${wins.length})` : ''}` },
           ].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{ padding: '7px 14px', background: activeTab === tab.id ? theme.accent : 'transparent', color: activeTab === tab.id ? 'white' : theme.text, border: '1px solid ' + (activeTab === tab.id ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 500, whiteSpace: 'nowrap' as const, flexShrink: 0 }}>
+            <button key={tab.id}
+              onClick={() => { if (missionNavLocked) return; setActiveTab(tab.id as any) }}
+              style={{ padding: '7px 14px', background: activeTab === tab.id ? theme.accent : 'transparent', color: activeTab === tab.id ? 'white' : missionNavLocked ? theme.textMuted + '60' : theme.text, border: '1px solid ' + (activeTab === tab.id ? theme.accent : theme.border), borderRadius: '8px', cursor: missionNavLocked ? 'default' : 'pointer', fontSize: '12px', fontWeight: 500, whiteSpace: 'nowrap' as const, flexShrink: 0, opacity: missionNavLocked ? 0.4 : 1 }}>
               {tab.label}
             </button>
           ))}
+          {/* Phase 1 locked nav banner */}
+          {missionNavLocked && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', background: theme.accent + '20', borderRadius: '8px', border: '1px solid ' + theme.accent + '40', flexShrink: 0 }}>
+              <span style={{ fontSize: '12px' }}>🔒</span>
+              <span style={{ color: theme.accent, fontSize: '11px', fontWeight: 600 }}>Complete setup to unlock all tabs</span>
+              <button onClick={() => { setMissionComplete(true); setMissionNavLocked(false); setOnboardingComplete(true) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', padding: 0 }}>skip</button>
+            </div>
+          )}
         </div>
       </header>
 
