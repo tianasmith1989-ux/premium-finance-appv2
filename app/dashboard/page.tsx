@@ -1206,7 +1206,7 @@ Always reference who they said they're becoming when relevant. Coach them as the
 
   const generateRoadmapProposals = async () => {
     setMissionP2Loading(true)
-    setMissionP2Step('propose')
+    // Stay on 'analyse' step while loading — don't switch to 'propose' until data is ready
     try {
       const response = await fetch('/api/budget-coach', {
         method: 'POST',
@@ -1243,43 +1243,115 @@ Respond in this EXACT JSON format, no other text:
         const proposals = JSON.parse(jsonMatch[0])
         setMissionP2Proposals(proposals)
         setMissionP2Confirmed(proposals.map(() => true))
+        setMissionP2Step('propose') // only switch once data is ready
+      } else {
+        throw new Error('No JSON in response')
       }
-    } catch { /* use fallback */ 
+    } catch {
+      // Fallback proposals based on user's actual data
       const fallback = [
-        { name: emergencyFund < 2000 ? 'Build $2,000 Emergency Fund' : emergencyMonths < 3 ? `Build ${(monthlyExpenses * 3).toFixed(0)} Emergency Fund` : 'Starter Safety Net', icon: '🛡️', target: emergencyFund < 2000 ? 2000 : Math.round(monthlyExpenses * 3), notes: 'Your financial airbag — prevents going into debt when life throws surprises.', priority: 1 },
-        { name: totalDebtBalance > 0 ? `Pay Off $${totalDebtBalance.toFixed(0)} in Debt` : mortgageAccel.balance ? 'Accelerate Mortgage Payoff' : 'Build Investment Portfolio', icon: totalDebtBalance > 0 ? '💳' : '🚀', target: totalDebtBalance > 0 ? Math.round(totalDebtBalance) : 0, notes: totalDebtBalance > 0 ? 'Every dollar of bad debt costs you in interest. Clear this fast.' : 'Extra repayments now save you years later.', priority: 2 },
-        { name: mortgageAccel.balance ? `Be Mortgage-Free by ${new Date().getFullYear() + 10}` : 'Reach 3-Month Emergency Fund', icon: '🏠', target: 0, notes: 'The finish line that changes everything about how you live.', priority: 3 }
+        {
+          name: emergencyFund < 2000 ? 'Build $2,000 Emergency Fund' : emergencyMonths < 3 ? `Build ${Math.round(monthlyExpenses * 3)} Emergency Fund` : 'Starter Safety Net',
+          icon: '🛡️',
+          target: emergencyFund < 2000 ? 2000 : Math.round(monthlyExpenses * 3),
+          notes: 'Your financial airbag — prevents going into debt when life throws surprises. This is the foundation everything else is built on.',
+          priority: 1
+        },
+        {
+          name: totalDebtBalance > 0 ? `Pay Off $${totalDebtBalance.toFixed(0)} Bad Debt` : mortgageAccel.balance ? `Accelerate Mortgage Payoff` : 'Build 3-Month Emergency Fund',
+          icon: totalDebtBalance > 0 ? '💳' : '🚀',
+          target: totalDebtBalance > 0 ? Math.round(totalDebtBalance) : 0,
+          notes: totalDebtBalance > 0 ? `Every dollar of bad debt is costing you in interest. Clearing this is a guaranteed return equal to your interest rate.` : `Extra repayments early in your mortgage save 3-4× that amount in interest.`,
+          priority: 2
+        },
+        {
+          name: mortgageAccel.balance ? `Be Mortgage-Free by ${new Date().getFullYear() + 8}` : 'Reach Financial Independence',
+          icon: '🏠',
+          target: 0,
+          notes: 'The ultimate finish line. When your mortgage is gone, every dollar you were paying the bank goes back into your life.',
+          priority: 3
+        }
       ]
       setMissionP2Proposals(fallback)
       setMissionP2Confirmed(fallback.map(() => true))
+      setMissionP2Step('propose')
     }
     setMissionP2Loading(false)
   }
 
   const confirmMissionRoadmap = async () => {
-    // Add confirmed proposals to roadmap
-    const toAdd = missionP2Proposals.filter((_, i) => missionP2Confirmed[i])
-    toAdd.forEach((p, i) => {
-      setRoadmapMilestones(prev => [...prev, {
-        id: Date.now() + i,
-        name: p.name, icon: p.icon,
-        targetAmount: p.target?.toString() || '0',
-        currentAmount: 0, targetDate: '', notes: p.notes,
-        category: 'savings', completed: false,
-        createdAt: new Date().toISOString(), weeklyPlan: null
-      }])
-    })
+    setMissionP2Loading(true)
     setMissionP2Step('plan')
-    // Auto-generate weekly plan for first milestone after a beat
-    setTimeout(async () => {
-      const first = toAdd[0]
-      if (first) {
-        const newId = Date.now()
-        await generateWeeklyPlan(newId)
-      }
+
+    const toAdd = missionP2Proposals.filter((_, i) => missionP2Confirmed[i])
+    const now = Date.now()
+    const newMilestones = toAdd.map((p, i) => ({
+      id: now + i,
+      name: p.name, icon: p.icon,
+      targetAmount: p.target?.toString() || '0',
+      currentAmount: 0, targetDate: '', notes: p.notes,
+      category: 'savings', completed: false,
+      createdAt: new Date().toISOString(), weeklyPlan: null
+    }))
+
+    // Add all milestones to roadmap
+    setRoadmapMilestones(prev => [...prev, ...newMilestones])
+
+    // Generate weekly plan for the first milestone
+    if (newMilestones.length > 0) {
+      try {
+        const first = newMilestones[0]
+        const isDebtMilestone = /debt|credit card|bnpl|loan|pay off|kill bad/i.test(first.name)
+        const response = await fetch('/api/budget-coach', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'question',
+            question: `You are Aureus. Create a 7-day action plan for this goal: "${first.name}"${first.targetAmount !== '0' ? ` (target: $${first.targetAmount})` : ''}. Context: ${first.notes}
+
+Rules:
+- Output ONLY the 7 steps, nothing else. No intro sentence, no summary, no preamble.
+- Format each line as: Day 1: [action]
+- Each action must be specific, concrete, and doable in under 30 minutes
+- One sentence per step
+- Never suggest downloading another app — the user is in Aureus
+- Day 5 MUST always be: "${isDebtMilestone ? 'Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically.' : 'Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders.'}"
+- Start directly with "Day 1:"${getPersonalityCoachingContext()}`,
+            financialData: { income: incomeStreams, expenses, debts, goals, assets },
+            memory: budgetMemory,
+            countryConfig: currentCountryConfig
+          })
+        })
+        const data = await response.json()
+        const rawText: string = data.message || data.advice || data.raw || ''
+        const stripMd = (s: string) => s.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1').replace(/^#+\s*/, '').trim()
+        const lines = rawText.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
+        const dayLines = lines.filter((l: string) => /^(day\s*\d+|step\s*\d+|\d+[).\-:])/i.test(l))
+        const sourceLines = dayLines.length >= 5 ? dayLines : lines.filter((l: string) => {
+          const s = stripMd(l).toLowerCase()
+          return !s.startsWith("here's") && !s.startsWith("here is") && !s.startsWith("below") && !s.startsWith("sure") && l.length > 20
+        })
+        const parsed = sourceLines.slice(0, 7).map((l: string, i: number) => ({
+          id: now + 100 + i,
+          text: stripMd(l.replace(/^(day\s*\d+[:.\-]?\s*|step\s*\d+[:.\-]?\s*|\d+[).\-]\s*)/i, '').trim()),
+          done: false
+        })).filter((s: any) => s.text.length > 10)
+
+        if (parsed.length > 0) {
+          setRoadmapMilestones(prev => prev.map(m =>
+            m.id === first.id ? { ...m, weeklyPlan: parsed, planGeneratedAt: new Date().toISOString() } : m
+          ))
+        }
+      } catch { /* weekly plan generation is best-effort */ }
+    }
+
+    setMissionP2Loading(false)
+
+    // Transition to phase 3 after a beat so user sees the success screen
+    setTimeout(() => {
       advanceMission(null, 3)
       setActiveTab('path')
-    }, 1200)
+    }, 2500)
   }
 
   const literacyTopics = [
@@ -2060,38 +2132,68 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
             {missionP2Step === 'analyse' && (
               <div style={{ textAlign: 'center' as const, width: '100%' }}>
-                <div style={{ fontSize: '56px', marginBottom: '20px' }}>🔍</div>
-                <h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 12px 0' }}>Let me analyse your situation.</h2>
-                <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '14px', marginBottom: '24px', textAlign: 'left' as const, border: '1px solid ' + theme.border }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    {[
-                      { label: 'Monthly income', value: `$${monthlyIncome.toFixed(0)}`, color: theme.success },
-                      { label: 'Monthly expenses', value: `$${monthlyExpenses.toFixed(0)}`, color: theme.danger },
-                      { label: 'Monthly surplus', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus > 0 ? theme.success : theme.danger },
-                      { label: 'Baby Step', value: `Step ${currentBabyStep.step}`, color: theme.accent },
-                      ...(mortgageAccel.balance ? [{ label: 'Mortgage balance', value: `$${parseInt(mortgageAccel.balance).toLocaleString()}`, color: theme.warning }] : []),
-                      ...(totalDebtBalance > 0 ? [{ label: 'Total debt', value: `$${totalDebtBalance.toFixed(0)}`, color: theme.danger }] : []),
-                    ].map(item => (
-                      <div key={item.label} style={{ padding: '12px', background: theme.bg, borderRadius: '8px' }}>
-                        <div style={{ color: theme.textMuted, fontSize: '11px' }}>{item.label}</div>
-                        <div style={{ color: item.color, fontWeight: 700, fontSize: '18px' }}>{item.value}</div>
+                {missionP2Loading ? (
+                  // Loading state — shown while API call is in progress
+                  <div style={{ padding: '60px 20px' }}>
+                    <div style={{ fontSize: '64px', marginBottom: '24px', animation: 'pulse 1.5s infinite' }}>🧠</div>
+                    <h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 12px 0' }}>Aureus is analysing your situation...</h2>
+                    <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 32px 0' }}>Looking at your income, surplus, mortgage, and personality to build the right roadmap for you specifically.</p>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', maxWidth: '320px', margin: '0 auto' }}>
+                      {[
+                        { icon: '💰', text: `Income: $${monthlyIncome.toFixed(0)}/mo`, color: theme.success },
+                        { icon: '📊', text: `Surplus: $${monthlySurplus.toFixed(0)}/mo`, color: monthlySurplus > 0 ? theme.success : theme.danger },
+                        { icon: '🏠', text: mortgageAccel.balance ? `Mortgage: $${parseInt(mortgageAccel.balance).toLocaleString()}` : 'No mortgage entered', color: theme.accent },
+                        { icon: '🧠', text: moneyPersonality ? personalityProfiles[moneyPersonality]?.label : 'Personality: not assessed', color: moneyPersonality ? personalityProfiles[moneyPersonality]?.color : theme.textMuted },
+                      ].map((item, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                          <span style={{ fontSize: '18px' }}>{item.icon}</span>
+                          <span style={{ color: item.color, fontSize: '14px', fontWeight: 500 }}>{item.text}</span>
+                          <span style={{ marginLeft: 'auto', color: theme.success, fontSize: '12px' }}>✓</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: '32px', display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                      {[0,1,2].map(i => (
+                        <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.accent, animation: `pulse 1s infinite ${i * 0.3}s` }} />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  // Ready state — user presses button to trigger analysis
+                  <>
+                    <div style={{ fontSize: '56px', marginBottom: '20px' }}>🔍</div>
+                    <h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 12px 0' }}>Let me analyse your situation.</h2>
+                    <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '14px', marginBottom: '24px', textAlign: 'left' as const, border: '1px solid ' + theme.border }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        {[
+                          { label: 'Monthly income', value: `$${monthlyIncome.toFixed(0)}`, color: theme.success },
+                          { label: 'Monthly expenses', value: `$${monthlyExpenses.toFixed(0)}`, color: theme.danger },
+                          { label: 'Monthly surplus', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus > 0 ? theme.success : theme.danger },
+                          { label: 'Baby Step', value: `Step ${currentBabyStep.step}`, color: theme.accent },
+                          ...(mortgageAccel.balance ? [{ label: 'Mortgage balance', value: `$${parseInt(mortgageAccel.balance).toLocaleString()}`, color: theme.warning }] : []),
+                          ...(totalDebtBalance > 0 ? [{ label: 'Total debt', value: `$${totalDebtBalance.toFixed(0)}`, color: theme.danger }] : []),
+                        ].map(item => (
+                          <div key={item.label} style={{ padding: '12px', background: theme.bg, borderRadius: '8px' }}>
+                            <div style={{ color: theme.textMuted, fontSize: '11px' }}>{item.label}</div>
+                            <div style={{ color: item.color, fontWeight: 700, fontSize: '18px' }}>{item.value}</div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-                {moneyPersonality && personalityProfiles[moneyPersonality] && (
-                  <div style={{ padding: '14px 16px', background: personalityProfiles[moneyPersonality].color + '15', borderRadius: '10px', marginBottom: '24px', border: '1px solid ' + personalityProfiles[moneyPersonality].color + '30', textAlign: 'left' as const }}>
-                    <span style={{ fontSize: '20px' }}>{personalityProfiles[moneyPersonality].emoji}</span>
-                    <span style={{ color: personalityProfiles[moneyPersonality].color, fontWeight: 600, fontSize: '13px', marginLeft: '8px' }}>Coaching you as a {personalityProfiles[moneyPersonality].label}</span>
-                    <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{personalityProfiles[moneyPersonality].aureusFocus}</div>
-                  </div>
+                    </div>
+                    {moneyPersonality && personalityProfiles[moneyPersonality] && (
+                      <div style={{ padding: '14px 16px', background: personalityProfiles[moneyPersonality].color + '15', borderRadius: '10px', marginBottom: '24px', border: '1px solid ' + personalityProfiles[moneyPersonality].color + '30', textAlign: 'left' as const }}>
+                        <span style={{ fontSize: '20px' }}>{personalityProfiles[moneyPersonality].emoji}</span>
+                        <span style={{ color: personalityProfiles[moneyPersonality].color, fontWeight: 600, fontSize: '13px', marginLeft: '8px' }}>Coaching you as a {personalityProfiles[moneyPersonality].label}</span>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{personalityProfiles[moneyPersonality].aureusFocus}</div>
+                      </div>
+                    )}
+                    <button
+                      onClick={generateRoadmapProposals}
+                      style={{ width: '100%', padding: '16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
+                      🗺️ Build my personalised roadmap →
+                    </button>
+                  </>
                 )}
-                <button
-                  onClick={generateRoadmapProposals}
-                  disabled={missionP2Loading}
-                  style={{ width: '100%', padding: '16px', background: missionP2Loading ? theme.border : theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: missionP2Loading ? 'default' : 'pointer', fontSize: '16px', fontWeight: 700 }}>
-                  {missionP2Loading ? '⏳ Aureus is thinking...' : '🗺️ Build my personalised roadmap →'}
-                </button>
               </div>
             )}
 
@@ -2130,14 +2232,30 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
             {missionP2Step === 'plan' && (
               <div style={{ textAlign: 'center' as const, padding: '40px 0' }}>
-                <div style={{ fontSize: '64px', marginBottom: '20px' }}>🎉</div>
-                <h2 style={{ color: theme.success, fontSize: '26px', margin: '0 0 12px 0' }}>You're set up!</h2>
-                <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, marginBottom: '24px' }}>Your roadmap is built. Your first weekly action plan is ready. Aureus is now fully personalised to how you think about money.<br/><br/>I'll tell you exactly what to do next — every day.</p>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', alignItems: 'center' }}>
-                  <div style={{ padding: '8px 16px', background: theme.success + '20', color: theme.success, borderRadius: '8px', fontSize: '13px' }}>✓ {missionP2Confirmed.filter(Boolean).length} milestones added to roadmap</div>
-                  <div style={{ padding: '8px 16px', background: theme.accent + '20', color: theme.accent, borderRadius: '8px', fontSize: '13px' }}>✓ First weekly plan generated</div>
-                  <div style={{ padding: '8px 16px', background: theme.purple + '20', color: theme.purple, borderRadius: '8px', fontSize: '13px' }}>✓ Coaching personalised to your {moneyPersonality && personalityProfiles[moneyPersonality]?.label}</div>
-                </div>
+                {missionP2Loading ? (
+                  <>
+                    <div style={{ fontSize: '64px', marginBottom: '20px', animation: 'pulse 1.5s infinite' }}>📋</div>
+                    <h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 12px 0' }}>Generating your first action plan...</h2>
+                    <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6 }}>Aureus is building a personalised 7-day plan for your first milestone. One moment.</p>
+                    <div style={{ marginTop: '24px', display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                      {[0,1,2].map(i => <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.accent, animation: `pulse 1s infinite ${i * 0.3}s` }} />)}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: '64px', marginBottom: '20px' }}>🎉</div>
+                    <h2 style={{ color: theme.success, fontSize: '26px', margin: '0 0 12px 0' }}>You're set up!</h2>
+                    <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, marginBottom: '24px' }}>
+                      Your roadmap is built and your first weekly action plan is ready.<br/>Aureus is now fully personalised to you.<br/><br/>I'll tell you exactly what to do next — every day.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', alignItems: 'center', marginBottom: '28px' }}>
+                      <div style={{ padding: '8px 16px', background: theme.success + '20', color: theme.success, borderRadius: '8px', fontSize: '13px' }}>✓ {missionP2Confirmed.filter(Boolean).length} milestones added to your roadmap</div>
+                      <div style={{ padding: '8px 16px', background: theme.accent + '20', color: theme.accent, borderRadius: '8px', fontSize: '13px' }}>✓ First weekly action plan generated</div>
+                      <div style={{ padding: '8px 16px', background: theme.purple + '20', color: theme.purple, borderRadius: '8px', fontSize: '13px' }}>✓ Coaching personalised to your {moneyPersonality && personalityProfiles[moneyPersonality]?.label}</div>
+                    </div>
+                    <p style={{ color: theme.textMuted, fontSize: '13px' }}>Taking you to your roadmap now...</p>
+                  </>
+                )}
               </div>
             )}
           </div>
