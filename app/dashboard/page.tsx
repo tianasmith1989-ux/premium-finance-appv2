@@ -2002,20 +2002,14 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     </div>
                     <div>
                       <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Paid</label>
-                      <select value={newIncome.frequency} onChange={e => setNewIncome({...newIncome, frequency: e.target.value, startDate: e.target.value === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : e.target.value === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(new Date().getDate())})} style={{...inputStyle, width: '100%'}}>
+                      <select value={newIncome.frequency} onChange={e => setNewIncome({...newIncome, frequency: e.target.value})} style={{...inputStyle, width: '100%'}}>
                         <option value="weekly">Weekly</option>
                         <option value="fortnightly">Fortnightly</option>
                         <option value="monthly">Monthly</option>
                       </select>
                     </div>
                   </div>
-                  <SmartDatePicker
-                    frequency={newIncome.frequency}
-                    value={newIncome.startDate}
-                    onChange={v => setNewIncome({...newIncome, startDate: v})}
-                    label={newIncome.frequency === 'weekly' ? 'Which day do you get paid?' : newIncome.frequency === 'fortnightly' ? 'Which day is payday?' : 'Which day of the month?'}
-                  />
-                  <button onClick={() => { if (newIncome.name && newIncome.amount) { setIncomeStreams(prev => [...prev, { ...newIncome, id: Date.now(), type: 'active' }]); setNewIncome({ name: '', amount: '', frequency: 'fortnightly', type: 'active', startDate: new Date().toISOString().split('T')[0] }) } }} style={{ ...btnSuccess, padding: '12px' }}>
+                  <button onClick={() => { if (newIncome.name && newIncome.amount) { setIncomeStreams(prev => [...prev, { ...newIncome, id: Date.now(), type: 'active', startDate: new Date().toISOString().split('T')[0] }]); setNewIncome({ name: '', amount: '', frequency: 'fortnightly', type: 'active', startDate: new Date().toISOString().split('T')[0] }) } }} style={{ ...btnSuccess, padding: '12px' }}>
                     + Add income source
                   </button>
                 </div>
@@ -2087,20 +2081,12 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
                   <input placeholder="Bill name" value={newExpense.name} onChange={e => setNewExpense({...newExpense, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
                   <input type="number" placeholder="$" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{...inputStyle, width: '80px'}} />
-                  <select value={newExpense.frequency} onChange={e => setNewExpense({...newExpense, frequency: e.target.value, dueDate: e.target.value === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : e.target.value === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(1)})} style={inputStyle}>
+                  <select value={newExpense.frequency} onChange={e => setNewExpense({...newExpense, frequency: e.target.value})} style={inputStyle}>
                     <option value="weekly">Weekly</option>
                     <option value="fortnightly">Fortnightly</option>
                     <option value="monthly">Monthly</option>
                   </select>
-                  <button onClick={() => { if (newExpense.name && newExpense.amount) { setExpenses(prev => [...prev, { ...newExpense, id: Date.now() }]); setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: new Date().toISOString().split('T')[0] }) } }} style={btnDanger}>+</button>
-                </div>
-                <div style={{ marginTop: '12px' }}>
-                  <SmartDatePicker
-                    frequency={newExpense.frequency}
-                    value={newExpense.dueDate}
-                    onChange={v => setNewExpense({...newExpense, dueDate: v})}
-                    label={newExpense.frequency === 'weekly' ? 'Which day is it due?' : newExpense.frequency === 'fortnightly' ? 'Which day?' : 'Which day of the month is it due?'}
-                  />
+                  <button onClick={() => { if (newExpense.name && newExpense.amount) { setExpenses(prev => [...prev, { ...newExpense, id: Date.now(), dueDate: new Date().toISOString().split('T')[0] }]); setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: new Date().toISOString().split('T')[0] }) } }} style={btnDanger}>+</button>
                 </div>
               </div>
 
@@ -2837,22 +2823,14 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
                           <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} style={{...inputStyle, flex: 1, minWidth: '80px'}} />
                           <input type="number" value={editingItem.data.amount} onChange={e => updateEditField('amount', e.target.value)} style={{...inputStyle, width: '80px'}} />
-                          <select value={editingItem.data.frequency} onChange={e => {
-                            const freq = e.target.value;
-                            const newDate = freq === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : freq === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(new Date().getDate());
-                            setEditingItem({ ...editingItem, data: { ...editingItem.data, frequency: freq, startDate: newDate } });
-                          }} style={inputStyle}>
-                            <option value="weekly">Weekly</option>
-                            <option value="fortnightly">Fortnightly</option>
-                            <option value="monthly">Monthly</option>
-                          </select>
+                          <select value={editingItem.data.frequency} onChange={e => updateEditField('frequency', e.target.value)} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select>
                         </div>
                         <div style={{ marginBottom: '8px' }}>
                           <SmartDatePicker
                             frequency={editingItem.data.frequency}
                             value={editingItem.data.startDate || ''}
                             onChange={v => updateEditField('startDate', v)}
-                            label={editingItem.data.frequency === 'weekly' ? 'Which day do you get paid?' : editingItem.data.frequency === 'fortnightly' ? 'Which day is payday?' : 'Which day of the month?'}
+                            label="Pay day"
                           />
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}><button onClick={saveEdit} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Save</button><button onClick={cancelEdit} style={{...btnDanger, padding: '6px 12px', fontSize: '12px'}}>Cancel</button></div>
@@ -2919,23 +2897,14 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
                           <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} style={{...inputStyle, flex: 1, minWidth: '80px'}} />
                           <input type="number" value={editingItem.data.amount} onChange={e => updateEditField('amount', e.target.value)} style={{...inputStyle, width: '80px'}} />
-                          <select value={editingItem.data.frequency} onChange={e => {
-                            const freq = e.target.value;
-                            const newDate = freq === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : freq === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(1);
-                            setEditingItem({ ...editingItem, data: { ...editingItem.data, frequency: freq, dueDate: newDate } });
-                          }} style={inputStyle}>
-                            <option value="weekly">Weekly</option>
-                            <option value="fortnightly">Fortnightly</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="quarterly">Quarterly</option>
-                          </select>
+                          <select value={editingItem.data.frequency} onChange={e => updateEditField('frequency', e.target.value)} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option></select>
                         </div>
                         <div style={{ marginBottom: '8px' }}>
                           <SmartDatePicker
                             frequency={editingItem.data.frequency}
                             value={editingItem.data.dueDate || ''}
                             onChange={v => updateEditField('dueDate', v)}
-                            label={editingItem.data.frequency === 'weekly' ? 'Which day is it due?' : editingItem.data.frequency === 'fortnightly' ? 'Which day?' : 'Which day of the month is it due?'}
+                            label="Due day"
                           />
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}><button onClick={saveEdit} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Save</button><button onClick={cancelEdit} style={{...btnDanger, padding: '6px 12px', fontSize: '12px'}}>Cancel</button></div>
@@ -3018,9 +2987,54 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   {debts.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No debts — 🎉</p> : debts.map(debt => (
                     <div key={debt.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#3a2e1e' : '#fefce8', borderRadius: '10px', border: '1px solid ' + theme.border }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <div><div style={{ color: theme.text, fontWeight: 600 }}>{debt.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{debt.interestRate}% · ${debt.minPayment}/{debt.frequency || 'monthly'}</div></div>
-                        <div style={{ textAlign: 'right' as const }}><div style={{ color: theme.warning, fontWeight: 700 }}>${parseFloat(debt.balance).toFixed(0)}</div><button onClick={() => deleteDebt(debt.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px', marginTop: '4px' }}>×</button></div>
+                        <div>
+                          <div style={{ color: theme.text, fontWeight: 600 }}>{debt.name}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>
+                            {debt.interestRate}% · ${debt.minPayment}/{debt.frequency || 'monthly'}
+                            {debt.paymentDate && (() => {
+                              const d = new Date(debt.paymentDate + 'T12:00:00')
+                              const freq = debt.frequency || 'monthly'
+                              if (freq === 'weekly' || freq === 'fortnightly') return ` · every ${DOW_FULL[d.getDay()]}`
+                              if (freq === 'monthly') { const dom = d.getDate(); return ` · due ${dom}${dom===1?'st':dom===2?'nd':dom===3?'rd':'th'}` }
+                              return ''
+                            })()}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' as const, display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '4px' }}>
+                          <div style={{ color: theme.warning, fontWeight: 700 }}>${parseFloat(debt.balance).toFixed(0)}</div>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button onClick={() => startEdit('debt', debt)} style={{ padding: '2px 6px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>✏️</button>
+                            <button onClick={() => deleteDebt(debt.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button>
+                          </div>
+                        </div>
                       </div>
+                      {/* Inline edit for debt */}
+                      {editingItem?.type === 'debt' && editingItem.id === debt.id && (
+                        <div style={{ marginTop: '10px', padding: '12px', background: theme.bg, borderRadius: '8px', border: '1px solid ' + theme.border }}>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
+                            <input value={editingItem.data.balance} onChange={e => updateEditField('balance', e.target.value)} placeholder="Balance" type="number" style={{...inputStyle, width: '90px'}} />
+                            <input value={editingItem.data.interestRate} onChange={e => updateEditField('interestRate', e.target.value)} placeholder="Rate %" type="number" style={{...inputStyle, width: '70px'}} />
+                            <input value={editingItem.data.minPayment} onChange={e => updateEditField('minPayment', e.target.value)} placeholder="Payment" type="number" style={{...inputStyle, width: '80px'}} />
+                            <select value={editingItem.data.frequency || 'monthly'} onChange={e => updateEditField('frequency', e.target.value)} style={inputStyle}>
+                              <option value="weekly">Weekly</option>
+                              <option value="fortnightly">Fortnightly</option>
+                              <option value="monthly">Monthly</option>
+                            </select>
+                          </div>
+                          <div style={{ marginBottom: '8px' }}>
+                            <SmartDatePicker
+                              frequency={editingItem.data.frequency || 'monthly'}
+                              value={editingItem.data.paymentDate || ''}
+                              onChange={v => updateEditField('paymentDate', v)}
+                              label="Payment due day"
+                            />
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={saveEdit} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Save</button>
+                            <button onClick={cancelEdit} style={{...btnDanger, padding: '6px 12px', fontSize: '12px'}}>Cancel</button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -5184,13 +5198,17 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               {/* Dates */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Start date</label>
-                  <input type="date" value={goalSetupForm.startDate} onChange={e => setGoalSetupForm(f => ({ ...f, startDate: e.target.value }))} style={{ ...inputStyle, width: '100%' }} />
-                </div>
-                <div>
                   <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Target completion date</label>
                   <input type="date" value={goalSetupForm.deadline} onChange={e => setGoalSetupForm(f => ({ ...f, deadline: e.target.value }))} style={{ ...inputStyle, width: '100%' }} />
                 </div>
+              </div>
+              <div>
+                <SmartDatePicker
+                  frequency={goalSetupForm.savingsFrequency}
+                  value={goalSetupForm.startDate}
+                  onChange={v => setGoalSetupForm(f => ({ ...f, startDate: v }))}
+                  label={`First payment day (${goalSetupForm.savingsFrequency})`}
+                />
               </div>
 
               {/* Options */}
