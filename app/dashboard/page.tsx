@@ -293,6 +293,234 @@ export default function Dashboard() {
     { name: 'Petrol', category: 'transport', frequency: 'weekly' },
   ]
 
+  // ==================== SMART DATE HELPERS ====================
+  
+  // Get the next occurrence of a specific day-of-month (1-31) for any frequency
+  const getNextDateForDayOfMonth = (dayOfMonth: number, frequency: string, fromDate?: Date): string => {
+    const from = fromDate ? new Date(fromDate) : new Date()
+    from.setHours(0, 0, 0, 0)
+    
+    if (frequency === 'monthly') {
+      let target = new Date(from.getFullYear(), from.getMonth(), dayOfMonth)
+      if (target < from) {
+        target = new Date(from.getFullYear(), from.getMonth() + 1, dayOfMonth)
+      }
+      return target.toISOString().split('T')[0]
+    }
+    
+    if (frequency === 'fortnightly') {
+      let target = new Date(from.getFullYear(), from.getMonth(), dayOfMonth)
+      if (target < from) {
+        target = new Date(from.getFullYear(), from.getMonth() + 1, dayOfMonth)
+      }
+      return target.toISOString().split('T')[0]
+    }
+    
+    if (frequency === 'weekly') {
+      let target = new Date(from.getFullYear(), from.getMonth(), dayOfMonth)
+      if (target < from) {
+        target = new Date(from.getFullYear(), from.getMonth() + 1, dayOfMonth)
+      }
+      return target.toISOString().split('T')[0]
+    }
+    
+    if (frequency === 'quarterly') {
+      let target = new Date(from.getFullYear(), from.getMonth(), dayOfMonth)
+      if (target < from) {
+        target = new Date(from.getFullYear(), from.getMonth() + 3, dayOfMonth)
+      }
+      return target.toISOString().split('T')[0]
+    }
+    
+    if (frequency === 'yearly') {
+      let target = new Date(from.getFullYear(), from.getMonth(), dayOfMonth)
+      if (target < from) {
+        target = new Date(from.getFullYear() + 1, from.getMonth(), dayOfMonth)
+      }
+      return target.toISOString().split('T')[0]
+    }
+    
+    return dateForDayOfMonth(dayOfMonth)
+  }
+
+  // Get the next date for a specific day-of-week (0-6, Sunday=0 to Saturday=6)
+  const getNextDateForDayOfWeek = (dayOfWeek: number, frequency: string, fromDate?: Date): string => {
+    const from = fromDate ? new Date(fromDate) : new Date()
+    from.setHours(0, 0, 0, 0)
+    
+    let diff = dayOfWeek - from.getDay()
+    if (diff <= 0) diff += 7
+    
+    const target = new Date(from)
+    target.setDate(from.getDate() + diff)
+    
+    return target.toISOString().split('T')[0]
+  }
+
+  // Always returns the NEXT upcoming occurrence of the given day of week
+  const dateForDayOfWeek = (dayOfWeek: number): string => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    let diff = dayOfWeek - d.getDay()
+    if (diff <= 0) diff += 7
+    d.setDate(d.getDate() + diff)
+    return d.toISOString().split('T')[0]
+  }
+
+  // Returns the next upcoming occurrence of this day-of-month
+  const dateForDayOfMonth = (dayOfMonth: number): string => {
+    const now = new Date()
+    const d = new Date(now.getFullYear(), now.getMonth(), dayOfMonth)
+    if (d <= now) d.setMonth(d.getMonth() + 1)
+    return d.toISOString().split('T')[0]
+  }
+
+  // Parse a stored YYYY-MM-DD date and get its day-of-week safely
+  const getDayOfWeekFromDate = (dateStr: string): number => {
+    if (!dateStr) return new Date().getDay()
+    try {
+      return new Date(dateStr + 'T12:00:00').getDay()
+    } catch { return new Date().getDay() }
+  }
+
+  // Parse day-of-month from YYYY-MM-DD
+  const getDayOfMonthFromDate = (dateStr: string): number => {
+    if (!dateStr) return 1
+    try {
+      return parseInt(dateStr.split('-')[2]) || 1
+    } catch { return 1 }
+  }
+
+  const DOW_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+  const DOW_FULL  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+  const ordinal = (n: number) => n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`
+
+  const SmartDatePicker = ({
+    frequency, value, onChange, label
+  }: {
+    frequency: string
+    value: string
+    onChange: (v: string) => void
+    label?: string
+  }) => {
+    // --- ONCE: plain date input ---
+    if (frequency === 'once') {
+      return (
+        <div>
+          {label && <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>{label}</label>}
+          <input 
+            type="date" 
+            value={value || ''} 
+            onChange={e => onChange(e.target.value)}
+            style={{ ...inputStyle, width: '100%' }} 
+          />
+        </div>
+      )
+    }
+
+    // --- WEEKLY / FORTNIGHTLY: day-of-week buttons ---
+    if (frequency === 'weekly' || frequency === 'fortnightly') {
+      const accentColor = frequency === 'weekly' ? theme.accent : theme.purple
+      const selectedDow = value ? getDayOfWeekFromDate(value) : new Date().getDay()
+
+      return (
+        <div>
+          {label && <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px' }}>{label}</label>}
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' as const }}>
+            {DOW_SHORT.map((d, i) => {
+              const isSelected = selectedDow === i
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => {
+                    const newDate = getNextDateForDayOfWeek(i, frequency)
+                    onChange(newDate)
+                  }}
+                  style={{
+                    padding: '8px 11px',
+                    background: isSelected ? accentColor : theme.bg,
+                    color: isSelected ? 'white' : theme.textMuted,
+                    border: '2px solid ' + (isSelected ? accentColor : theme.border),
+                    borderRadius: '7px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: isSelected ? 700 : 400,
+                    transition: 'all 0.15s'
+                  }}>
+                  {d}
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '6px' }}>
+            {value && selectedDow !== undefined
+              ? `${frequency === 'fortnightly' ? 'Every second ' : 'Every '}${DOW_FULL[selectedDow]} · next: ${new Date(value + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`
+              : `Pick a day above`}
+          </div>
+        </div>
+      )
+    }
+
+    // --- MONTHLY / QUARTERLY / YEARLY: day-of-month buttons ---
+    if (frequency === 'monthly' || frequency === 'quarterly' || frequency === 'yearly') {
+      const selectedDom = value ? getDayOfMonthFromDate(value) : new Date().getDate()
+
+      return (
+        <div>
+          {label && <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px' }}>{label}</label>}
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' as const, alignItems: 'center' }}>
+            {[1, 5, 7, 10, 14, 15, 20, 21, 25, 28].map(d => {
+              const isSelected = selectedDom === d
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => {
+                    const newDate = getNextDateForDayOfMonth(d, frequency)
+                    onChange(newDate)
+                  }}
+                  style={{
+                    padding: '8px 10px',
+                    background: isSelected ? theme.warning : theme.bg,
+                    color: isSelected ? 'white' : theme.textMuted,
+                    border: '2px solid ' + (isSelected ? theme.warning : theme.border),
+                    borderRadius: '7px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: isSelected ? 700 : 400,
+                    transition: 'all 0.15s'
+                  }}>
+                  {d}
+                </button>
+              )
+            })}
+            <span style={{ color: theme.textMuted, fontSize: '11px', margin: '0 2px' }}>or</span>
+            <input
+              type="number" min="1" max="31"
+              value={selectedDom}
+              onChange={e => {
+                const d = parseInt(e.target.value)
+                if (d >= 1 && d <= 31) {
+                  const newDate = getNextDateForDayOfMonth(d, frequency)
+                  onChange(newDate)
+                }
+              }}
+              style={{ ...inputStyle, width: '58px', padding: '7px 8px', fontSize: '13px' }}
+            />
+          </div>
+          <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '6px' }}>
+            {value && selectedDom
+              ? `${frequency === 'monthly' ? 'Every month' : frequency === 'quarterly' ? 'Quarterly' : 'Yearly'} on the ${ordinal(selectedDom)} · next: ${new Date(value + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`
+              : `Pick a day above`}
+          </div>
+        </div>
+      )
+    }
+
+    return null
+  }
+
   // ==================== LOCAL STORAGE ====================
   useEffect(() => {
     const saved = localStorage.getItem('aureus_data')
@@ -1354,163 +1582,6 @@ Rules:
     }, 2500)
   }
 
-  // ==================== SMART DATE HELPERS ====================
-  const dateForDayOfWeek = (dayOfWeek: number): string => {
-    const d = new Date()
-    const diff = (dayOfWeek - d.getDay() + 7) % 7
-    d.setDate(d.getDate() + (diff === 0 ? 0 : diff))
-    return d.toISOString().split('T')[0]
-  }
-
-  const dateForDayOfMonth = (dayOfMonth: number): string => {
-    const d = new Date()
-    d.setDate(dayOfMonth)
-    if (d < new Date()) d.setMonth(d.getMonth() + 1)
-    return d.toISOString().split('T')[0]
-  }
-
-  const DOW_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-  const DOW_FULL  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-
-  const SmartDatePicker = ({ frequency, value, onChange, label }: { frequency: string, value: string, onChange: (v: string) => void, label?: string }) => {
-    if (frequency === 'once') return (
-      <div>
-        {label && <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>{label}</label>}
-        <input type="date" value={value} onChange={e => onChange(e.target.value)} style={{ ...inputStyle, width: '100%' }} />
-      </div>
-    )
-    if (frequency === 'weekly' || frequency === 'fortnightly') {
-      const accentColor = frequency === 'weekly' ? theme.accent : theme.purple
-      const selectedDay = value ? new Date(value + 'T12:00:00').getDay() : new Date().getDay()
-      return (
-        <div>
-          {label && <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px' }}>{label}</label>}
-          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' as const }}>
-            {DOW_SHORT.map((d, i) => (
-              <button key={d} type="button" onClick={() => onChange(dateForDayOfWeek(i))}
-                style={{ padding: '7px 10px', background: selectedDay === i ? accentColor : theme.cardBg, color: selectedDay === i ? 'white' : theme.textMuted, border: '1px solid ' + (selectedDay === i ? accentColor : theme.border), borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: selectedDay === i ? 700 : 400 }}>
-                {d}
-              </button>
-            ))}
-          </div>
-          <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '5px' }}>
-            Every {frequency === 'fortnightly' ? 'second ' : ''}{DOW_FULL[selectedDay]}
-          </div>
-        </div>
-      )
-    }
-    if (frequency === 'monthly' || frequency === 'quarterly' || frequency === 'yearly') {
-      const selectedDom = value ? parseInt(value.split('-')[2]) : new Date().getDate()
-      const suffix = (n: number) => n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'
-      return (
-        <div>
-          {label && <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px' }}>{label}</label>}
-          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' as const, alignItems: 'center' }}>
-            {[1,5,7,10,14,15,20,21,25,28].map(d => (
-              <button key={d} type="button" onClick={() => onChange(dateForDayOfMonth(d))}
-                style={{ padding: '7px 10px', background: selectedDom === d ? theme.warning : theme.cardBg, color: selectedDom === d ? 'white' : theme.textMuted, border: '1px solid ' + (selectedDom === d ? theme.warning : theme.border), borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: selectedDom === d ? 700 : 400 }}>
-                {d}
-              </button>
-            ))}
-            <span style={{ color: theme.textMuted, fontSize: '11px' }}>or</span>
-            <input type="number" min="1" max="31" value={selectedDom}
-              onChange={e => { const d = parseInt(e.target.value); if (d >= 1 && d <= 31) onChange(dateForDayOfMonth(d)) }}
-              style={{ ...inputStyle, width: '56px', padding: '6px 8px', fontSize: '12px' }} />
-          </div>
-          <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '5px' }}>
-            {frequency === 'monthly' ? `Every month on the ${selectedDom}${suffix(selectedDom)}`
-              : frequency === 'quarterly' ? `Quarterly — starts ${selectedDom}${suffix(selectedDom)}`
-              : `Yearly on the ${selectedDom}${suffix(selectedDom)}`}
-          </div>
-        </div>
-      )
-    }
-    return null
-  }
-
-  const literacyTopics = [
-    {
-      id: 'mortgage-interest',
-      icon: '🏠',
-      title: 'How Mortgage Interest Actually Works',
-      tagline: 'Why your early repayments matter most',
-      content: `In your first year of a 30-year $600k mortgage at 6%, roughly 90% of each repayment goes to interest — not your actual debt. This is called amortisation.\n\nYear 1 example ($600k, 6%, monthly repayments of ~$3,597):\n• Interest paid: ~$35,700\n• Principal paid: ~$7,450\n\nThis flips over time — but by then you've already paid most of the interest. That's why extra repayments in the first 5 years save you dramatically more than the same payments made in year 20.`,
-      keyNumbers: ['90% of early repayments = interest, not principal', 'Avg Aussie pays $580k interest on a $600k loan', 'Every $1 extra in year 1 saves ~$3 in year 30'],
-      mistake: 'Most people wait until they\'re "comfortable" before making extra payments. The earlier you start, the more you save — even $50/fortnight makes a real difference.',
-      cta: 'How much interest am I paying?'
-    },
-    {
-      id: 'offset-accounts',
-      icon: '💡',
-      title: 'Offset Accounts: The Secret Weapon',
-      tagline: 'Your savings account that fights your mortgage',
-      content: `An offset account is a transaction account linked to your mortgage. Every dollar sitting in it reduces the balance your interest is calculated on — without locking that money away.\n\nExample:\n• Mortgage: $500,000\n• Offset balance: $50,000\n• You only pay interest on: $450,000\n\nAt 6%, that $50k in offset saves you $3,000/year in interest — completely passively. No extra repayments needed.\n\nBest banks with free offset (AU): ANZ, Commonwealth Bank, Westpac, NAB, Macquarie.`,
-      keyNumbers: ['$50k in offset at 6% saves $3,000/year', 'Unlike redraw, offset money is always accessible', '100% offset accounts beat high-interest savings accounts'],
-      mistake: 'Keeping your savings in a separate account instead of offset. Even if your mortgage rate is 6% and your savings account pays 5.5%, offset wins because there\'s no tax on offset savings.',
-      cta: 'Calculate my offset savings'
-    },
-    {
-      id: 'redraw-vs-offset',
-      icon: '🔄',
-      title: 'Redraw vs Offset: Which is Better?',
-      tagline: 'Two tools with an important difference',
-      content: `Both reduce your interest — but the key difference is accessibility.\n\nRedraw facility:\n• Extra payments go INTO the loan\n• Lower effective balance = less interest\n• To access the money, you apply to redraw\n• Banks can reduce or remove redraw access\n\nOffset account:\n• Money sits BESIDE the loan in a transaction account\n• Just as effective at reducing interest\n• Access it anytime, like a normal account\n• Better for emergency fund storage\n\nFor homeowners who might need the money: Offset wins. For investors (where extra repayments may have tax implications): consult your accountant.`,
-      keyNumbers: ['Both save the same interest mathematically', 'Offset = full liquidity, Redraw = less liquid', 'Banks have been known to freeze redraw during hardship'],
-      mistake: 'Treating redraw as an emergency fund. If the bank freezes access during financial hardship (which has happened), you could be stuck.',
-      cta: 'Which should I use?'
-    },
-    {
-      id: 'lmi-lvr',
-      icon: '📊',
-      title: 'LMI & LVR Explained Simply',
-      tagline: 'The numbers that decide your loan',
-      content: `LVR (Loan to Value Ratio) is the percentage of the property value you\'re borrowing.\n\nLVR = Loan ÷ Property Value × 100\n\nExample: $480k loan on a $600k property = 80% LVR\n\nLMI (Lender\'s Mortgage Insurance) kicks in when your LVR exceeds 80% (i.e., deposit under 20%). It protects the BANK — you pay for it.\n\nCost of LMI:\n• 85% LVR (15% deposit): ~$8,000–12,000\n• 90% LVR (10% deposit): ~$15,000–20,000\n• 95% LVR (5% deposit): ~$20,000–30,000\n\nHow to avoid LMI:\n1. Save 20% deposit\n2. Use a guarantor\n3. First Home Guarantee (5% deposit, no LMI — limited places)`,
-      keyNumbers: ['LMI costs 1–4% of the loan amount', '80% LVR = the magic number to avoid LMI', 'LMI is a one-off cost, often added to your loan'],
-      mistake: 'Adding LMI to your loan instead of paying it upfront. If you add $15k LMI to a 6% mortgage, it costs you ~$28k by the time you pay it off.',
-      cta: 'Calculate my LMI cost'
-    },
-    {
-      id: 'extra-vs-invest',
-      icon: '⚖️',
-      title: 'Extra Mortgage Repayments vs Investing',
-      tagline: 'The question every homeowner asks',
-      content: `This is the great Australian financial debate. Here\'s an honest look:\n\nCase for extra repayments:\n• Guaranteed return equal to your mortgage rate (~6%)\n• Risk-free — markets can drop, mortgage savings can\'t\n• Psychological peace of mortgage freedom\n• After paying off, you redirect all payments to investments\n\nCase for investing:\n• ASX historical average: ~7–10% p.a. (but NOT guaranteed)\n• Super has tax advantages (15% tax vs your marginal rate)\n• Time in market beats timing the market\n\nThe maths says: if investments return more than your mortgage rate after tax, invest. But the guaranteed, risk-free nature of mortgage savings is underrated.\n\nThe Infinity Group approach: kill the mortgage aggressively first, then redirect those payments to wealth building. It works because the discipline and momentum carry over.`,
-      keyNumbers: ['Mortgage rate 6% = guaranteed 6% return on extra payments', 'Super salary sacrifice saves 15–32% in tax depending on your bracket', '$500/month extra = 8+ years cut from a 30-year mortgage'],
-      mistake: 'Investing in low-return assets while paying 20%+ interest on a credit card. Always kill high-interest debt before investing.',
-      cta: 'Help me decide for my situation'
-    },
-    {
-      id: 'super-basics',
-      icon: '🦺',
-      title: 'Super: Your Forced Savings System',
-      tagline: 'Make the most of Australia\'s retirement safety net',
-      content: `Superannuation is compulsory retirement savings. Your employer contributes 11.5% of your salary (rising to 12% from July 2025).\n\nConcessional (pre-tax) contributions:\n• Cap: $30,000/year (including employer SG)\n• Taxed at just 15% going in (vs your marginal rate up to 47%)\n• Salary sacrifice: ask HR to direct extra pre-tax pay into super\n\nExample of salary sacrifice:\nEarning $80k, top tax rate 34.5% (inc Medicare)\n• Salary sacrifice $5,000/year to super\n• Tax saving: ~$975/year vs paying income tax\n• Super gets ~$4,250 instead of you getting ~$3,275 after tax\n\nFinding lost super: myGov → ATO → Super → search for lost accounts. Australians have $17.5 billion in lost super.`,
-      keyNumbers: ['11.5% employer SG rate in 2024–25', '$30,000 concessional contribution cap', '$17.5 billion sitting in lost/unclaimed super'],
-      mistake: 'Ignoring your super until 50. Someone who puts $5k/year extra from age 30 vs age 45 ends up with roughly double the balance at retirement due to compounding.',
-      cta: 'Optimise my super strategy'
-    },
-    {
-      id: 'fortnightly-hack',
-      icon: '📅',
-      title: 'Fortnightly Payments: The Simple Hack',
-      tagline: 'Make 13 months of payments in 12 months',
-      content: `This is one of the simplest and most powerful mortgage hacks.\n\nIf you pay monthly: 12 payments per year\nIf you pay fortnightly: 26 payments per year = 13 months of payments\n\nThe result? You make one full extra monthly payment per year — without it feeling like extra.\n\nOn a $600,000 mortgage at 6% over 30 years:\n• Monthly payments: pays off in 30 years, ~$680k in interest\n• Fortnightly payments: pays off in ~26 years, ~$565k in interest\n\nYears saved: ~4 years\nInterest saved: ~$115,000\n\nHow to do it: Call your bank or update your loan settings online. It takes 5 minutes.`,
-      keyNumbers: ['26 fortnightly payments = 13 monthly payments in a year', '~4 years saved on a typical 30-year loan', '~$115,000 saved in interest on a $600k loan at 6%'],
-      mistake: 'Halving your monthly payment and paying it fortnightly — if the bank doesn\'t process it correctly, you don\'t get the benefit. Confirm with your lender that it\'s set up as "26 fortnightly payments" not "24 semi-monthly payments".',
-      cta: 'How much does this save me?'
-    },
-    {
-      id: 'emergency-fund',
-      icon: '🛡️',
-      title: 'Emergency Fund Strategy',
-      tagline: 'Your financial airbag — don\'t leave home without it',
-      content: `An emergency fund is 3–6 months of living expenses kept in cash. Not invested. Not tied up. Just ready.\n\nWhy 3–6 months of EXPENSES, not income:\n• You only need to cover your bills during an emergency, not save\n• Expenses are usually 60–80% of income for most people\n\nWhere to keep it (Australia):\n• ING Savings Maximiser: ~5.5% (with conditions)\n• Ubank: ~5.1%\n• Macquarie Savings: ~5.25%\n• Do NOT invest it — you need instant access, not growth\n\nWhen to use it:\n✅ Job loss, medical emergency, car breakdown, urgent repairs\n❌ Holiday sale, "investment opportunity", planned expenses\n\nThe discipline rule: treat your emergency fund like a fire extinguisher. You don\'t use it because things are inconvenient — only when things are actually on fire.`,
-      keyNumbers: ['3 months expenses = stable employment, no dependants', '6 months = self-employed, variable income, or dependants', 'Keep it in a high-interest savings account at 5%+'],
-      mistake: 'Using your offset account as your emergency fund. That works fine — BUT make sure you also have a card or line of credit as backup if the bank ever restricts offset access during a dispute.',
-      cta: 'Calculate my emergency fund target'
-    }
-  ]
-
   // ==================== MONEY PERSONALITY QUIZ ====================
   const personalityQuiz = [
     { q: "When a big bill arrives unexpectedly, your first reaction is:", options: [{ label: "Panic — I close the letter and deal with it later", type: "avoider" }, { label: "Frustration — but I sort it out that day", type: "warrior" }, { label: "I check my emergency fund and handle it calmly", type: "planner" }, { label: "I put it on the card and worry about it next month", type: "spender" }] },
@@ -2002,16 +2073,38 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     </div>
                     <div>
                       <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Paid</label>
-                      <select value={newIncome.frequency} onChange={e => setNewIncome({...newIncome, frequency: e.target.value})} style={{...inputStyle, width: '100%'}}>
+                      <select 
+                        value={newIncome.frequency} 
+                        onChange={e => {
+                          const newFreq = e.target.value
+                          let newStartDate = newIncome.startDate
+                          if (newFreq === 'weekly') {
+                            newStartDate = getNextDateForDayOfWeek(new Date().getDay(), newFreq)
+                          } else if (newFreq === 'fortnightly') {
+                            newStartDate = getNextDateForDayOfWeek(new Date().getDay(), newFreq)
+                          } else if (newFreq === 'monthly') {
+                            newStartDate = getNextDateForDayOfMonth(new Date().getDate(), newFreq)
+                          } else if (newFreq === 'yearly') {
+                            newStartDate = getNextDateForDayOfMonth(new Date().getDate(), newFreq)
+                          }
+                          setNewIncome({...newIncome, frequency: newFreq, startDate: newStartDate})
+                        }} 
+                        style={{...inputStyle, width: '100%'}}
+                      >
                         <option value="weekly">Weekly</option>
                         <option value="fortnightly">Fortnightly</option>
                         <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
                       </select>
                     </div>
                   </div>
-                  <button onClick={() => { if (newIncome.name && newIncome.amount) { setIncomeStreams(prev => [...prev, { ...newIncome, id: Date.now(), type: 'active', startDate: new Date().toISOString().split('T')[0] }]); setNewIncome({ name: '', amount: '', frequency: 'fortnightly', type: 'active', startDate: new Date().toISOString().split('T')[0] }) } }} style={{ ...btnSuccess, padding: '12px' }}>
-                    + Add income source
-                  </button>
+                  <SmartDatePicker
+                    frequency={newIncome.frequency}
+                    value={newIncome.startDate}
+                    onChange={v => setNewIncome({...newIncome, startDate: v})}
+                    label={newIncome.frequency === 'weekly' ? 'Which day do you get paid?' : newIncome.frequency === 'fortnightly' ? 'Which day is payday?' : 'Which day of the month?'}
+                  />
+                  <button onClick={addIncome} style={{...btnSuccess, alignSelf: 'flex-start' as const, padding: '8px 16px'}}>+ Add income</button>
                 </div>
               </div>
 
@@ -2081,13 +2174,38 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
                   <input placeholder="Bill name" value={newExpense.name} onChange={e => setNewExpense({...newExpense, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
                   <input type="number" placeholder="$" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{...inputStyle, width: '80px'}} />
-                  <select value={newExpense.frequency} onChange={e => setNewExpense({...newExpense, frequency: e.target.value})} style={inputStyle}>
+                  <select 
+                    value={newExpense.frequency} 
+                    onChange={e => {
+                      const newFreq = e.target.value
+                      let newDueDate = newExpense.dueDate
+                      if (newFreq === 'weekly') {
+                        newDueDate = getNextDateForDayOfWeek(new Date().getDay(), newFreq)
+                      } else if (newFreq === 'fortnightly') {
+                        newDueDate = getNextDateForDayOfWeek(new Date().getDay(), newFreq)
+                      } else if (newFreq === 'monthly' || newFreq === 'quarterly' || newFreq === 'yearly') {
+                        newDueDate = getNextDateForDayOfMonth(1, newFreq)
+                      }
+                      setNewExpense({...newExpense, frequency: newFreq, dueDate: newDueDate})
+                    }} 
+                    style={inputStyle}
+                  >
                     <option value="weekly">Weekly</option>
                     <option value="fortnightly">Fortnightly</option>
                     <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
                   </select>
-                  <button onClick={() => { if (newExpense.name && newExpense.amount) { setExpenses(prev => [...prev, { ...newExpense, id: Date.now(), dueDate: new Date().toISOString().split('T')[0] }]); setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: new Date().toISOString().split('T')[0] }) } }} style={btnDanger}>+</button>
+                  <button onClick={() => { if (newExpense.name && newExpense.amount) { setExpenses(prev => [...prev, { ...newExpense, id: Date.now(), dueDate: newExpense.dueDate }]); setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: new Date().toISOString().split('T')[0] }) } }} style={btnDanger}>+</button>
                 </div>
+                {newExpense.frequency !== 'once' && (
+                  <SmartDatePicker
+                    frequency={newExpense.frequency}
+                    value={newExpense.dueDate}
+                    onChange={v => setNewExpense({...newExpense, dueDate: v})}
+                    label={newExpense.frequency === 'weekly' ? 'Which day is it due?' : newExpense.frequency === 'fortnightly' ? 'Which day?' : 'Which day of the month is it due?'}
+                  />
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
@@ -2421,7 +2539,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             {whyStatement ? (
               <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #f59e0b15, #10b98115)', borderRadius: '12px', border: '2px solid #f59e0b40', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Why I\'m Doing This</div>
+                  <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Why I'm Doing This</div>
                   <div style={{ color: theme.text, fontSize: '15px', fontStyle: 'italic' }}>"{whyStatement}"</div>
                 </div>
                 <button onClick={() => { setEditingWhy(true); setWhyDraft(whyStatement) }} style={{ padding: '6px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>Edit</button>
@@ -2800,7 +2918,22 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
                     <input placeholder="Source name" value={newIncome.name} onChange={e => setNewIncome({...newIncome, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
                     <input placeholder="Amount" type="number" value={newIncome.amount} onChange={e => setNewIncome({...newIncome, amount: e.target.value})} style={{...inputStyle, width: '90px'}} />
-                    <select value={newIncome.frequency} onChange={e => setNewIncome({...newIncome, frequency: e.target.value, startDate: e.target.value === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : e.target.value === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(new Date().getDate())})} style={inputStyle}>
+                    <select 
+                      value={newIncome.frequency} 
+                      onChange={e => {
+                        const newFreq = e.target.value
+                        let newStartDate = newIncome.startDate
+                        if (newFreq === 'weekly') {
+                          newStartDate = getNextDateForDayOfWeek(new Date().getDay(), newFreq)
+                        } else if (newFreq === 'fortnightly') {
+                          newStartDate = getNextDateForDayOfWeek(new Date().getDay(), newFreq)
+                        } else if (newFreq === 'monthly' || newFreq === 'yearly') {
+                          newStartDate = getNextDateForDayOfMonth(new Date().getDate(), newFreq)
+                        }
+                        setNewIncome({...newIncome, frequency: newFreq, startDate: newStartDate})
+                      }} 
+                      style={inputStyle}
+                    >
                       <option value="weekly">Weekly</option>
                       <option value="fortnightly">Fortnightly</option>
                       <option value="monthly">Monthly</option>
@@ -2874,7 +3007,22 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
                     <input placeholder="Expense name" value={newExpense.name} onChange={e => setNewExpense({...newExpense, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
                     <input placeholder="Amount" type="number" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{...inputStyle, width: '90px'}} />
-                    <select value={newExpense.frequency} onChange={e => setNewExpense({...newExpense, frequency: e.target.value, dueDate: e.target.value === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : e.target.value === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(1)})} style={inputStyle}>
+                    <select 
+                      value={newExpense.frequency} 
+                      onChange={e => {
+                        const newFreq = e.target.value
+                        let newDueDate = newExpense.dueDate
+                        if (newFreq === 'weekly') {
+                          newDueDate = getNextDateForDayOfWeek(new Date().getDay(), newFreq)
+                        } else if (newFreq === 'fortnightly') {
+                          newDueDate = getNextDateForDayOfWeek(new Date().getDay(), newFreq)
+                        } else if (newFreq === 'monthly' || newFreq === 'quarterly' || newFreq === 'yearly') {
+                          newDueDate = getNextDateForDayOfMonth(1, newFreq)
+                        }
+                        setNewExpense({...newExpense, frequency: newFreq, dueDate: newDueDate})
+                      }} 
+                      style={inputStyle}
+                    >
                       <option value="weekly">Weekly</option>
                       <option value="fortnightly">Fortnightly</option>
                       <option value="monthly">Monthly</option>
@@ -2969,7 +3117,22 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     <input placeholder="Balance" type="number" value={newDebt.balance} onChange={e => setNewDebt({...newDebt, balance: e.target.value})} style={{...inputStyle, width: '80px'}} />
                     <input placeholder="Rate %" type="number" value={newDebt.interestRate} onChange={e => setNewDebt({...newDebt, interestRate: e.target.value})} style={{...inputStyle, width: '60px'}} />
                     <input placeholder="Payment" type="number" value={newDebt.minPayment} onChange={e => setNewDebt({...newDebt, minPayment: e.target.value})} style={{...inputStyle, width: '75px'}} />
-                    <select value={newDebt.frequency} onChange={e => setNewDebt({...newDebt, frequency: e.target.value, paymentDate: e.target.value === 'weekly' ? dateForDayOfWeek(1) : e.target.value === 'fortnightly' ? dateForDayOfWeek(1) : dateForDayOfMonth(1)})} style={inputStyle}>
+                    <select 
+                      value={newDebt.frequency} 
+                      onChange={e => {
+                        const newFreq = e.target.value
+                        let newPaymentDate = newDebt.paymentDate
+                        if (newFreq === 'weekly') {
+                          newPaymentDate = getNextDateForDayOfWeek(1, newFreq) // Monday
+                        } else if (newFreq === 'fortnightly') {
+                          newPaymentDate = getNextDateForDayOfWeek(1, newFreq)
+                        } else if (newFreq === 'monthly') {
+                          newPaymentDate = getNextDateForDayOfMonth(1, newFreq)
+                        }
+                        setNewDebt({...newDebt, frequency: newFreq, paymentDate: newPaymentDate})
+                      }} 
+                      style={inputStyle}
+                    >
                       <option value="weekly">Weekly</option>
                       <option value="fortnightly">Fortnightly</option>
                       <option value="monthly">Monthly</option>
@@ -3653,7 +3816,6 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                 const isDebtMilestone = /debt|credit card|bnpl|loan|pay off|kill bad/i.test(m.name) || /debt|credit card|bnpl|loan/i.test(m.notes || '')
                                 const isAddGoalStep = step.type === 'add_goal' || /add.*goal|savings goal.*aureus|aureus.*goal|calendar.*reminder|track.*aureus/i.test(step.text)
                                 const isAddDebtStep = isDebtMilestone && isAddGoalStep
-                                const isReviewStep = step.type === 'review_spending' || /review.*aureus|spending.*aureus|aureus.*spending|check.*aureus/i.test(step.text)
                                 const isActionStep = isAddGoalStep // true for either debt or goal action
 
                                 return (
@@ -5496,3 +5658,87 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
     </div>
   )
 }
+
+// ==================== LITERACY TOPICS ====================
+const literacyTopics = [
+  {
+    id: 'mortgage-interest',
+    icon: '🏠',
+    title: 'How Mortgage Interest Actually Works',
+    tagline: 'Why your early repayments matter most',
+    content: `In your first year of a 30-year $600k mortgage at 6%, roughly 90% of each repayment goes to interest — not your actual debt. This is called amortisation.\n\nYear 1 example ($600k, 6%, monthly repayments of ~$3,597):\n• Interest paid: ~$35,700\n• Principal paid: ~$7,450\n\nThis flips over time — but by then you've already paid most of the interest. That's why extra repayments in the first 5 years save you dramatically more than the same payments made in year 20.`,
+    keyNumbers: ['90% of early repayments = interest, not principal', 'Avg Aussie pays $580k interest on a $600k loan', 'Every $1 extra in year 1 saves ~$3 in year 30'],
+    mistake: 'Most people wait until they\'re "comfortable" before making extra payments. The earlier you start, the more you save — even $50/fortnight makes a real difference.',
+    cta: 'How much interest am I paying?'
+  },
+  {
+    id: 'offset-accounts',
+    icon: '💡',
+    title: 'Offset Accounts: The Secret Weapon',
+    tagline: 'Your savings account that fights your mortgage',
+    content: `An offset account is a transaction account linked to your mortgage. Every dollar sitting in it reduces the balance your interest is calculated on — without locking that money away.\n\nExample:\n• Mortgage: $500,000\n• Offset balance: $50,000\n• You only pay interest on: $450,000\n\nAt 6%, that $50k in offset saves you $3,000/year in interest — completely passively. No extra repayments needed.\n\nBest banks with free offset (AU): ANZ, Commonwealth Bank, Westpac, NAB, Macquarie.`,
+    keyNumbers: ['$50k in offset at 6% saves $3,000/year', 'Unlike redraw, offset money is always accessible', '100% offset accounts beat high-interest savings accounts'],
+    mistake: 'Keeping your savings in a separate account instead of offset. Even if your mortgage rate is 6% and your savings account pays 5.5%, offset wins because there\'s no tax on offset savings.',
+    cta: 'Calculate my offset savings'
+  },
+  {
+    id: 'redraw-vs-offset',
+    icon: '🔄',
+    title: 'Redraw vs Offset: Which is Better?',
+    tagline: 'Two tools with an important difference',
+    content: `Both reduce your interest — but the key difference is accessibility.\n\nRedraw facility:\n• Extra payments go INTO the loan\n• Lower effective balance = less interest\n• To access the money, you apply to redraw\n• Banks can reduce or remove redraw access\n\nOffset account:\n• Money sits BESIDE the loan in a transaction account\n• Just as effective at reducing interest\n• Access it anytime, like a normal account\n• Better for emergency fund storage\n\nFor homeowners who might need the money: Offset wins. For investors (where extra repayments may have tax implications): consult your accountant.`,
+    keyNumbers: ['Both save the same interest mathematically', 'Offset = full liquidity, Redraw = less liquid', 'Banks have been known to freeze redraw during hardship'],
+    mistake: 'Treating redraw as an emergency fund. If the bank freezes access during financial hardship (which has happened), you could be stuck.',
+    cta: 'Which should I use?'
+  },
+  {
+    id: 'lmi-lvr',
+    icon: '📊',
+    title: 'LMI & LVR Explained Simply',
+    tagline: 'The numbers that decide your loan',
+    content: `LVR (Loan to Value Ratio) is the percentage of the property value you\'re borrowing.\n\nLVR = Loan ÷ Property Value × 100\n\nExample: $480k loan on a $600k property = 80% LVR\n\nLMI (Lender\'s Mortgage Insurance) kicks in when your LVR exceeds 80% (i.e., deposit under 20%). It protects the BANK — you pay for it.\n\nCost of LMI:\n• 85% LVR (15% deposit): ~$8,000–12,000\n• 90% LVR (10% deposit): ~$15,000–20,000\n• 95% LVR (5% deposit): ~$20,000–30,000\n\nHow to avoid LMI:\n1. Save 20% deposit\n2. Use a guarantor\n3. First Home Guarantee (5% deposit, no LMI — limited places)`,
+    keyNumbers: ['LMI costs 1–4% of the loan amount', '80% LVR = the magic number to avoid LMI', 'LMI is a one-off cost, often added to your loan'],
+    mistake: 'Adding LMI to your loan instead of paying it upfront. If you add $15k LMI to a 6% mortgage, it costs you ~$28k by the time you pay it off.',
+    cta: 'Calculate my LMI cost'
+  },
+  {
+    id: 'extra-vs-invest',
+    icon: '⚖️',
+    title: 'Extra Mortgage Repayments vs Investing',
+    tagline: 'The question every homeowner asks',
+    content: `This is the great Australian financial debate. Here\'s an honest look:\n\nCase for extra repayments:\n• Guaranteed return equal to your mortgage rate (~6%)\n• Risk-free — markets can drop, mortgage savings can\'t\n• Psychological peace of mortgage freedom\n• After paying off, you redirect all payments to investments\n\nCase for investing:\n• ASX historical average: ~7–10% p.a. (but NOT guaranteed)\n• Super has tax advantages (15% tax vs your marginal rate)\n• Time in market beats timing the market\n\nThe maths says: if investments return more than your mortgage rate after tax, invest. But the guaranteed, risk-free nature of mortgage savings is underrated.\n\nThe Infinity Group approach: kill the mortgage aggressively first, then redirect those payments to wealth building. It works because the discipline and momentum carry over.`,
+    keyNumbers: ['Mortgage rate 6% = guaranteed 6% return on extra payments', 'Super salary sacrifice saves 15–32% in tax depending on your bracket', '$500/month extra = 8+ years cut from a 30-year mortgage'],
+    mistake: 'Investing in low-return assets while paying 20%+ interest on a credit card. Always kill high-interest debt before investing.',
+    cta: 'Help me decide for my situation'
+  },
+  {
+    id: 'super-basics',
+    icon: '🦺',
+    title: 'Super: Your Forced Savings System',
+    tagline: 'Make the most of Australia\'s retirement safety net',
+    content: `Superannuation is compulsory retirement savings. Your employer contributes 11.5% of your salary (rising to 12% from July 2025).\n\nConcessional (pre-tax) contributions:\n• Cap: $30,000/year (including employer SG)\n• Taxed at just 15% going in (vs your marginal rate up to 47%)\n• Salary sacrifice: ask HR to direct extra pre-tax pay into super\n\nExample of salary sacrifice:\nEarning $80k, top tax rate 34.5% (inc Medicare)\n• Salary sacrifice $5,000/year to super\n• Tax saving: ~$975/year vs paying income tax\n• Super gets ~$4,250 instead of you getting ~$3,275 after tax\n\nFinding lost super: myGov → ATO → Super → search for lost accounts. Australians have $17.5 billion in lost super.`,
+    keyNumbers: ['11.5% employer SG rate in 2024–25', '$30,000 concessional contribution cap', '$17.5 billion sitting in lost/unclaimed super'],
+    mistake: 'Ignoring your super until 50. Someone who puts $5k/year extra from age 30 vs age 45 ends up with roughly double the balance at retirement due to compounding.',
+    cta: 'Optimise my super strategy'
+  },
+  {
+    id: 'fortnightly-hack',
+    icon: '📅',
+    title: 'Fortnightly Payments: The Simple Hack',
+    tagline: 'Make 13 months of payments in 12 months',
+    content: `This is one of the simplest and most powerful mortgage hacks.\n\nIf you pay monthly: 12 payments per year\nIf you pay fortnightly: 26 payments per year = 13 months of payments\n\nThe result? You make one full extra monthly payment per year — without it feeling like extra.\n\nOn a $600,000 mortgage at 6% over 30 years:\n• Monthly payments: pays off in 30 years, ~$680k in interest\n• Fortnightly payments: pays off in ~26 years, ~$565k in interest\n\nYears saved: ~4 years\nInterest saved: ~$115,000\n\nHow to do it: Call your bank or update your loan settings online. It takes 5 minutes.`,
+    keyNumbers: ['26 fortnightly payments = 13 monthly payments in a year', '~4 years saved on a typical 30-year loan', '~$115,000 saved in interest on a $600k loan at 6%'],
+    mistake: 'Halving your monthly payment and paying it fortnightly — if the bank doesn\'t process it correctly, you don\'t get the benefit. Confirm with your lender that it\'s set up as "26 fortnightly payments" not "24 semi-monthly payments".',
+    cta: 'How much does this save me?'
+  },
+  {
+    id: 'emergency-fund',
+    icon: '🛡️',
+    title: 'Emergency Fund Strategy',
+    tagline: 'Your financial airbag — don\'t leave home without it',
+    content: `An emergency fund is 3–6 months of living expenses kept in cash. Not invested. Not tied up. Just ready.\n\nWhy 3–6 months of EXPENSES, not income:\n• You only need to cover your bills during an emergency, not save\n• Expenses are usually 60–80% of income for most people\n\nWhere to keep it (Australia):\n• ING Savings Maximiser: ~5.5% (with conditions)\n• Ubank: ~5.1%\n• Macquarie Savings: ~5.25%\n• Do NOT invest it — you need instant access, not growth\n\nWhen to use it:\n✅ Job loss, medical emergency, car breakdown, urgent repairs\n❌ Holiday sale, "investment opportunity", planned expenses\n\nThe discipline rule: treat your emergency fund like a fire extinguisher. You don\'t use it because things are inconvenient — only when things are actually on fire.`,
+    keyNumbers: ['3 months expenses = stable employment, no dependants', '6 months = self-employed, variable income, or dependants', 'Keep it in a high-interest savings account at 5%+'],
+    mistake: 'Using your offset account as your emergency fund. That works fine — BUT make sure you also have a card or line of credit as backup if the bank ever restricts offset access during a dispute.',
+    cta: 'Calculate my emergency fund target'
+  }
+]
