@@ -13,13 +13,12 @@ export default function Dashboard() {
   // ==================== MISSION SYSTEM ====================
   const [missionPhase, setMissionPhase] = useState<1 | 2 | 3>(1)
   const [missionStep, setMissionStep] = useState<0 | 1 | 2 | 3 | 4>(0)
-  // 0 = not started, 1 = personality, 2 = income, 3 = expenses, 4 = mortgage
   const [missionComplete, setMissionComplete] = useState(false)
   const [missionP2Step, setMissionP2Step] = useState<'analyse' | 'propose' | 'confirm' | 'plan'>('analyse')
   const [missionP2Loading, setMissionP2Loading] = useState(false)
   const [missionP2Proposals, setMissionP2Proposals] = useState<any[]>([])
   const [missionP2Confirmed, setMissionP2Confirmed] = useState<boolean[]>([])
-  const [missionNavLocked, setMissionNavLocked] = useState(true) // locks nav during phase 1
+  const [missionNavLocked, setMissionNavLocked] = useState(true)
   const [activeTab, setActiveTab] = useState<'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'learn' | 'wins' | 'mortgage' | 'insights' | 'grow' | 'review'>('chat')
   const [darkMode, setDarkMode] = useState(true)
 
@@ -56,7 +55,6 @@ export default function Dashboard() {
   const [loadingOneDecision, setLoadingOneDecision] = useState(false)
 
   // ==================== COACH TRIGGER ENGINE ====================
-  // Persistent "what to do next" — always visible, auto-updated when state changes
   const [coachNextAction, setCoachNextAction] = useState<{
     message: string
     action: string
@@ -86,10 +84,10 @@ export default function Dashboard() {
 
   // Check-in Schedule
   const [checkInSchedule, setCheckInSchedule] = useState({
-    moneyDateDay: 'sunday',        // day of week for weekly money date
-    moneyDateTime: '19:00',        // time for weekly money date
+    moneyDateDay: 'sunday',
+    moneyDateTime: '19:00',
     dailyEnabled: true,
-    dailyTime: '08:00',            // suggested daily check-in time
+    dailyTime: '08:00',
     showScheduleSetup: false
   })
   const [lastDailyCheckIn, setLastDailyCheckIn] = useState<string | null>(null)
@@ -238,7 +236,6 @@ export default function Dashboard() {
     remainingYears: '',
     currentRepayment: '',
     repaymentFrequency: 'fortnightly',
-    startDate: new Date().toISOString().split('T')[0],
     extraRepayment: '',
     offsetBalance: ''
   })
@@ -293,8 +290,280 @@ export default function Dashboard() {
     { name: 'Groceries', category: 'food', frequency: 'weekly' },
     { name: 'Petrol', category: 'transport', frequency: 'weekly' },
   ]
+    // ==================== SMART DATE HELPERS (FIXED) ====================
+  
+  // Get the next date for a specific day-of-week (0-6, Sunday=0 to Saturday=6)
+  const getNextDateForDayOfWeek = (dayOfWeek: number): string => {
+    const from = new Date()
+    from.setHours(0, 0, 0, 0)
+    
+    let diff = dayOfWeek - from.getDay()
+    if (diff <= 0) diff += 7
+    
+    const target = new Date(from)
+    target.setDate(from.getDate() + diff)
+    
+    return target.toISOString().split('T')[0]
+  }
 
-  // ==================== LOCAL STORAGE ====================
+  // For fortnightly: get the next payment date based on anchor day of month
+  const getFortnightlyDateFromAnchor = (anchorDayOfMonth: number): string => {
+    const from = new Date()
+    from.setHours(0, 0, 0, 0)
+    
+    let target = new Date(from.getFullYear(), from.getMonth(), anchorDayOfMonth)
+    
+    if (target < from) {
+      target = new Date(from.getFullYear(), from.getMonth() + 1, anchorDayOfMonth)
+    }
+    
+    // Handle invalid dates (e.g., 31st in Feb)
+    if (target.getMonth() !== (from.getMonth() + (target < from ? 1 : 0)) % 12) {
+      target = new Date(from.getFullYear(), from.getMonth() + 1, 1)
+    }
+    
+    return target.toISOString().split('T')[0]
+  }
+
+  // For monthly/quarterly/yearly: get next date for a specific day of month
+  const getNextDateForDayOfMonth = (dayOfMonth: number, frequency: string): string => {
+    const from = new Date()
+    from.setHours(0, 0, 0, 0)
+    
+    let target = new Date(from.getFullYear(), from.getMonth(), dayOfMonth)
+    
+    if (target < from) {
+      if (frequency === 'monthly') {
+        target = new Date(from.getFullYear(), from.getMonth() + 1, dayOfMonth)
+      } else if (frequency === 'quarterly') {
+        target = new Date(from.getFullYear(), from.getMonth() + 3, dayOfMonth)
+      } else if (frequency === 'yearly') {
+        target = new Date(from.getFullYear() + 1, from.getMonth(), dayOfMonth)
+      } else {
+        target = new Date(from.getFullYear(), from.getMonth() + 1, dayOfMonth)
+      }
+    }
+    
+    // Handle invalid dates
+    if (target.getMonth() !== (from.getMonth() + (target < from ? (frequency === 'monthly' ? 1 : frequency === 'quarterly' ? 3 : frequency === 'yearly' ? 12 : 1) : 0)) % 12) {
+      target = new Date(from.getFullYear(), from.getMonth() + 1, 1)
+    }
+    
+    return target.toISOString().split('T')[0]
+  }
+
+  const getDayOfWeekFromDate = (dateStr: string): number => {
+    if (!dateStr) return new Date().getDay()
+    try {
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return new Date().getDay()
+      return d.getDay()
+    } catch { return new Date().getDay() }
+  }
+
+  const getDayOfMonthFromDate = (dateStr: string): number => {
+    if (!dateStr) return 1
+    try {
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return 1
+      return d.getDate()
+    } catch { return 1 }
+  }
+
+  const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const DOW_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const ordinal = (n: number) => {
+    if (n === 1 || n === 21 || n === 31) return `${n}st`
+    if (n === 2 || n === 22) return `${n}nd`
+    if (n === 3 || n === 23) return `${n}rd`
+    return `${n}th`
+  }
+
+  const SmartDatePicker = ({
+    frequency, value, onChange, label
+  }: {
+    frequency: string
+    value: string
+    onChange: (v: string) => void
+    label?: string
+  }) => {
+    // --- ONCE: plain date input ---
+    if (frequency === 'once') {
+      return (
+        <div>
+          {label && <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>{label}</label>}
+          <input 
+            type="date" 
+            value={value || ''} 
+            onChange={e => onChange(e.target.value)}
+            style={{ ...inputStyle, width: '100%' }} 
+          />
+        </div>
+      )
+    }
+
+    // --- WEEKLY: day-of-week buttons ---
+    if (frequency === 'weekly') {
+      const selectedDow = value ? getDayOfWeekFromDate(value) : new Date().getDay()
+
+      return (
+        <div>
+          {label && <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px' }}>{label}</label>}
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' as const }}>
+            {DOW_SHORT.map((d, i) => {
+              const isSelected = selectedDow === i
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => {
+                    const newDate = getNextDateForDayOfWeek(i)
+                    onChange(newDate)
+                  }}
+                  style={{
+                    padding: '8px 11px',
+                    background: isSelected ? theme.accent : theme.bg,
+                    color: isSelected ? 'white' : theme.textMuted,
+                    border: '2px solid ' + (isSelected ? theme.accent : theme.border),
+                    borderRadius: '7px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: isSelected ? 700 : 400,
+                    transition: 'all 0.15s'
+                  }}>
+                  {d}
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '6px' }}>
+            {value && selectedDow !== undefined
+              ? `Every ${DOW_FULL[selectedDow]} · next: ${new Date(value).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`
+              : `Pick a day above`}
+          </div>
+        </div>
+      )
+    }
+
+    // --- FORTNIGHTLY: day-of-month picker ---
+    if (frequency === 'fortnightly') {
+      const selectedDom = value ? getDayOfMonthFromDate(value) : 1
+
+      return (
+        <div>
+          {label && <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px' }}>{label}</label>}
+          <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '8px', background: theme.purple + '15', padding: '6px 10px', borderRadius: '6px' }}>
+            💡 Pick the day of the month you get paid. Example: pick "1" → paid on 1st and 15th
+          </div>
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' as const, alignItems: 'center' }}>
+            {[1, 2, 5, 7, 10, 14, 15, 20, 21, 25, 28].map(d => {
+              const isSelected = selectedDom === d
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => {
+                    const newDate = getFortnightlyDateFromAnchor(d)
+                    onChange(newDate)
+                  }}
+                  style={{
+                    padding: '8px 10px',
+                    background: isSelected ? theme.purple : theme.bg,
+                    color: isSelected ? 'white' : theme.textMuted,
+                    border: '2px solid ' + (isSelected ? theme.purple : theme.border),
+                    borderRadius: '7px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: isSelected ? 700 : 400,
+                    transition: 'all 0.15s'
+                  }}>
+                  {d}
+                </button>
+              )
+            })}
+            <span style={{ color: theme.textMuted, fontSize: '11px', margin: '0 2px' }}>or</span>
+            <input
+              type="number" min="1" max="31"
+              value={selectedDom}
+              onChange={e => {
+                const d = parseInt(e.target.value)
+                if (d >= 1 && d <= 31) {
+                  const newDate = getFortnightlyDateFromAnchor(d)
+                  onChange(newDate)
+                }
+              }}
+              style={{ ...inputStyle, width: '65px', padding: '7px 8px', fontSize: '13px' }}
+            />
+          </div>
+          <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '6px' }}>
+            {value && selectedDom
+              ? `Every second ${ordinal(selectedDom)} · next: ${new Date(value).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`
+              : `Pick a day above`}
+          </div>
+        </div>
+      )
+    }
+
+    // --- MONTHLY / QUARTERLY / YEARLY: day-of-month buttons ---
+    if (frequency === 'monthly' || frequency === 'quarterly' || frequency === 'yearly') {
+      const selectedDom = value ? getDayOfMonthFromDate(value) : 1
+      const freqLabel = frequency === 'monthly' ? 'Every month' : frequency === 'quarterly' ? 'Every 3 months' : 'Every year'
+
+      return (
+        <div>
+          {label && <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px' }}>{label}</label>}
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' as const, alignItems: 'center' }}>
+            {[1, 2, 5, 7, 10, 14, 15, 20, 21, 25, 28].map(d => {
+              const isSelected = selectedDom === d
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => {
+                    const newDate = getNextDateForDayOfMonth(d, frequency)
+                    onChange(newDate)
+                  }}
+                  style={{
+                    padding: '8px 10px',
+                    background: isSelected ? theme.warning : theme.bg,
+                    color: isSelected ? 'white' : theme.textMuted,
+                    border: '2px solid ' + (isSelected ? theme.warning : theme.border),
+                    borderRadius: '7px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: isSelected ? 700 : 400,
+                    transition: 'all 0.15s'
+                  }}>
+                  {d}
+                </button>
+              )
+            })}
+            <span style={{ color: theme.textMuted, fontSize: '11px', margin: '0 2px' }}>or</span>
+            <input
+              type="number" min="1" max="31"
+              value={selectedDom}
+              onChange={e => {
+                const d = parseInt(e.target.value)
+                if (d >= 1 && d <= 31) {
+                  const newDate = getNextDateForDayOfMonth(d, frequency)
+                  onChange(newDate)
+                }
+              }}
+              style={{ ...inputStyle, width: '65px', padding: '7px 8px', fontSize: '13px' }}
+            />
+          </div>
+          <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '6px' }}>
+            {value && selectedDom
+              ? `${freqLabel} on the ${ordinal(selectedDom)} · next: ${new Date(value).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`
+              : `Pick a day of the month`}
+          </div>
+        </div>
+      )
+    }
+
+    return null
+  }
+    // ==================== LOCAL STORAGE ====================
   useEffect(() => {
     const saved = localStorage.getItem('aureus_data')
     if (saved) {
@@ -330,7 +599,6 @@ export default function Dashboard() {
       if (data.missionP2Proposals) setMissionP2Proposals(data.missionP2Proposals)
       if (data.missionP2Confirmed) setMissionP2Confirmed(data.missionP2Confirmed)
       if (data.missionP2Step) setMissionP2Step(data.missionP2Step)
-      // New users start at mission step 1
       if (!data.missionComplete && !data.missionPhase) {
         setMissionPhase(1)
         setMissionStep(1)
@@ -346,12 +614,10 @@ export default function Dashboard() {
       if (data.superData) setSuperData(data.superData)
       if (data.netWorthHistory) setNetWorthHistory(data.netWorthHistory)
       if (data.personalityAnswers) setPersonalityAnswers(data.personalityAnswers)
-      // Show onboarding for new users
       if (!data.onboardingComplete) setShowOnboarding(true)
       if (data.budgetOnboarding) setBudgetOnboarding(data.budgetOnboarding)
       if (data.chatMessages) setChatMessages(data.chatMessages)
       if (data.userCountry) setUserCountry(data.userCountry)
-      // New fields
       if (data.wins) setWins(data.wins)
       if (data.streak !== undefined) setStreak(data.streak)
       if (data.lastCheckIn) setLastCheckIn(data.lastCheckIn)
@@ -461,9 +727,7 @@ export default function Dashboard() {
     yearsToFI: monthlySurplus > 0 ? Math.ceil(((totalOutgoing * 12) * 25) / (monthlySurplus * 12)) : 999
   }
 
-  // ==================== NEW: MORTGAGE ACCELERATOR CALCULATION ====================
-
-  // Helper: calculate the standard repayment for a given balance, rate, term, freq
+  // ==================== MORTGAGE ACCELERATOR CALCULATION ====================
   const calcStandardRepayment = (bal: number, annualRate: number, years: number, freq: number): number => {
     if (bal <= 0 || annualRate <= 0 || years <= 0) return 0
     const r = annualRate / freq
@@ -483,19 +747,15 @@ export default function Dashboard() {
 
     if (balance <= 0 || annualRate <= 0) return null
 
-    // Derive repayment: use entered value if provided, else calculate from term
     let repayment = parseFloat(mortgageAccel.currentRepayment || '0')
     const derivedRepayment = remainingYears > 0 ? calcStandardRepayment(balance, annualRate, remainingYears, freq) : 0
 
-    // If no manual repayment entered but we have a term, use derived
     if (repayment <= 0 && derivedRepayment > 0) repayment = derivedRepayment
     if (repayment <= 0) return null
 
     const periodRate = annualRate / freq
     const effectiveBalance = Math.max(balance - offset, 0)
 
-    // Sanity check: flag if repayment seems implausibly high
-    // (more than 3x the minimum for a 30yr loan = probably entered monthly as fortnightly)
     const minFortnightly30yr = calcStandardRepayment(balance, annualRate, 30, freq)
     const repaymentSeemsHigh = repayment > minFortnightly30yr * 2.5
 
@@ -535,7 +795,7 @@ export default function Dashboard() {
     }
   }
 
-  // ==================== NEW: AUTO WIN DETECTION ====================
+  // ==================== AUTO WIN DETECTION ====================
   const detectAutoWins = useCallback(() => {
     const newWinsList: any[] = []
     const existingTitles = wins.map(w => w.title)
@@ -618,19 +878,7 @@ export default function Dashboard() {
     incomeStreams.forEach(inc => { if (shouldShowItem(inc.startDate, inc.frequency, day, month, year)) { const id = `inc-${inc.id}-${year}-${month}-${day}`; items.push({ ...inc, itemId: id, itemType: 'income', isPaid: paidOccurrences.has(id) }) } })
     expenses.filter(e => !e.targetDebtId && !e.targetGoalId).forEach(exp => { if (shouldShowItem(exp.dueDate, exp.frequency, day, month, year)) { const id = `exp-${exp.id}-${year}-${month}-${day}`; items.push({ ...exp, itemId: id, itemType: 'expense', isPaid: paidOccurrences.has(id) }) } })
     debts.forEach(debt => { if (shouldShowItem(debt.paymentDate, debt.frequency || 'monthly', day, month, year)) { const id = `debt-${debt.id}-${year}-${month}-${day}`; items.push({ ...debt, amount: debt.minPayment, itemId: id, itemType: 'debt', isPaid: paidOccurrences.has(id) }) } })
-    // Mortgage repayments on calendar
-    if (mortgageAccel.balance && mortgageAccel.rate && mortgageAccel.startDate) {
-      if (shouldShowItem(mortgageAccel.startDate, mortgageAccel.repaymentFrequency, day, month, year)) {
-        const id = `mortgage-${year}-${month}-${day}`
-        const freq = mortgageAccel.repaymentFrequency
-        const r = parseFloat(mortgageAccel.rate) / 100 / (freq === 'weekly' ? 52 : freq === 'fortnightly' ? 26 : 12)
-        const n = parseInt(mortgageAccel.remainingYears) * (freq === 'weekly' ? 52 : freq === 'fortnightly' ? 26 : 12)
-        const pmt = (parseFloat(mortgageAccel.balance) * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1)
-        items.push({ name: '🏠 Mortgage Repayment', amount: pmt.toFixed(0), itemId: id, itemType: 'expense', isPaid: paidOccurrences.has(id) })
-      }
-    }
-    // Goals with calendar enabled
-    goals.filter(g => g.paymentAmount && g.startDate).forEach(goal => {
+    goals.filter(g => g.paymentAmount && g.startDate && g.addedToCalendar).forEach(goal => {
       if (shouldShowItem(goal.startDate, goal.savingsFrequency || 'monthly', day, month, year)) {
         const id = `goal-${goal.id}-${year}-${month}-${day}`
         items.push({ ...goal, amount: goal.paymentAmount, name: `💜 ${goal.name}`, goalId: goal.id, itemId: id, itemType: 'goal', isPaid: paidOccurrences.has(id) })
@@ -650,12 +898,10 @@ export default function Dashboard() {
     }
     setPaidOccurrences(newPaid)
 
-    // If this is a goal payment, update the goal's saved amount
     if (item?.itemType === 'goal' && item?.paymentAmount) {
       const paymentAmount = parseFloat(item.paymentAmount || '0')
       if (paymentAmount <= 0) return
 
-      // Update the goal's saved amount using goalId (most reliable)
       const matchId = item.goalId || item.id
       setGoals(prev => prev.map(g => {
         if (g.id !== matchId) return g
@@ -666,7 +912,6 @@ export default function Dashboard() {
         return { ...g, saved: newSaved.toFixed(2) }
       }))
 
-      // Sync to linked roadmap milestone — match by goal name (strip emoji prefix)
       const cleanName = (item.name || '').replace('💜 ', '').trim()
       setRoadmapMilestones(prev => prev.map(m => {
         if (m.name.trim() !== cleanName) return m
@@ -688,8 +933,8 @@ export default function Dashboard() {
     switch (type) {
       case 'income': setIncomeStreams(prev => prev.map(item => item.id === id ? { ...item, ...data } : item)); break
       case 'expense': setExpenses(prev => prev.map(item => item.id === id ? { ...item, ...data } : item)); break
-      case 'debt': setDebts(prev => prev.map(item => item.id === id ? { ...item, ...data } : item)); break;
-      case 'goal': setGoals(prev => prev.map(item => item.id === id ? { ...item, ...data } : item)); break;
+      case 'debt': setDebts(prev => prev.map(item => item.id === id ? { ...item, ...data } : item)); break
+      case 'goal': setGoals(prev => prev.map(item => item.id === id ? { ...item, ...data } : item)); break
     }
     setEditingItem(null)
   }
@@ -707,8 +952,7 @@ export default function Dashboard() {
   const addAsset = () => { if (!newAsset.name || !newAsset.value) return; setAssets([...assets, { ...newAsset, id: Date.now() }]); setNewAsset({ name: '', value: '', type: 'savings' }) }
   const deleteAsset = (id: number) => setAssets(assets.filter(a => a.id !== id))
   const addLiability = () => { if (!newLiability.name || !newLiability.value) return; setLiabilities([...liabilities, { ...newLiability, id: Date.now() }]); setNewLiability({ name: '', value: '', type: 'loan' }) }
-
-  // ==================== AUTOMATION CALCULATOR ====================
+    // ==================== AUTOMATION CALCULATOR ====================
   const calculateAutomation = () => {
     const payFrequency = incomeStreams[0]?.frequency || 'fortnightly'
     const payAmount = parseFloat(incomeStreams[0]?.amount || '0')
@@ -758,7 +1002,6 @@ export default function Dashboard() {
     }
   }
 
-  // Separate state for home buying calculator (added here so it's defined before render)
   const [homeCalcState, setHomeCalcState] = useState('QLD')
   const [homeCalcFirstHome, setHomeCalcFirstHome] = useState(true)
   const [homeCalcNewBuild, setHomeCalcNewBuild] = useState(false)
@@ -801,17 +1044,14 @@ Rules:
       const rawText: string = data.message || data.advice || data.raw || ''
       const lines = rawText.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
 
-      // Strip markdown bold/italic from a string
       const stripMd = (s: string) => s
-        .replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold**
-        .replace(/\*([^*]+)\*/g, '$1')       // *italic*
-        .replace(/^#+\s*/, '')               // headings
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/\*([^*]+)\*/g, '$1')
+        .replace(/^#+\s*/, '')
         .trim()
 
-      // Filter to only lines that start with Day N / Step N / number - skip intro prose
       const dayLines = lines.filter((l: string) => /^(day\s*\d+|step\s*\d+|\d+[).\-:])/i.test(l))
       const sourceLines = dayLines.length >= 5 ? dayLines : lines.filter((l: string) => {
-        // also skip obvious intro/outro lines
         const stripped = stripMd(l).toLowerCase()
         return !stripped.startsWith("here's") && !stripped.startsWith("here is") &&
                !stripped.startsWith("below") && !stripped.startsWith("sure") &&
@@ -821,10 +1061,9 @@ Rules:
 
       const parsed = sourceLines.slice(0, 7).map((l: string, i: number) => ({
         id: Date.now() + i,
-        // Strip the "Day N:" / "1." / "Step N:" prefix AND any markdown from the text
         text: stripMd(l.replace(/^(day\s*\d+[:.\-]?\s*|step\s*\d+[:.\-]?\s*|\d+[).\-]\s*)/i, '').trim()),
         done: false
-      })).filter((s: any) => s.text.length > 10) // skip any empty/too-short results
+      })).filter((s: any) => s.text.length > 10)
       setRoadmapMilestones(prev => prev.map(m =>
         m.id === milestoneId ? { ...m, weeklyPlan: parsed, planGeneratedAt: new Date().toISOString() } : m
       ))
@@ -880,15 +1119,10 @@ Rules:
 
     const coachingStyles: {[key: string]: string} = {
       planner: `The user is a Strategic Planner. They respond best to: data, systems, and optimisation language. They like specifics and numbers. Don't over-explain basics — get to the strategy. Challenge them to find inefficiencies in their already-good plan. Use language like "optimise", "system", "leverage". Avoid vague reassurances — they want actionable precision.`,
-
       avoider: `The user is an Avoider. They may feel shame or anxiety about money. Be warm, non-judgemental, and break everything into tiny concrete steps. Never overwhelm with too many options. Celebrate every small action. Use language like "just one thing", "this week", "that's all". Acknowledge that avoidance is normal and they're already doing the brave thing by being here.`,
-
       spender: `The user is a Lifestyle Spender. Don't lecture about spending — it creates defensiveness and they'll disengage. Instead, help them find the spending that doesn't actually bring them joy and redirect it. Frame everything around choice and freedom, not deprivation. Use language like "what actually matters to you", "conscious spending", "intentional". Help them see that cutting the right things means more of what they actually love.`,
-
       worrier: `The user is an Anxious Achiever. They need data and reassurance in equal measure. Lead with their actual numbers before giving advice — show them what the data says. Normalise their situation. Be calm and factual. Use language like "here's what the numbers show", "you're actually in a stronger position than", "the data says". Avoid language that amplifies uncertainty or uses words like "risk", "danger", "problem".`,
-
       hoarder: `The user is a Safety Seeker. They have strong savings discipline but may be leaving money on the table by keeping too much cash. Help them understand that offset accounts and strategic debt reduction ARE a form of safety — not risk. Frame investing and mortgage acceleration as "putting safety to work". Use language like "protected", "secure", "guaranteed return". Don't push them — guide them gently toward deploying money more effectively.`,
-
       warrior: `The user is a Financial Warrior. They're resilient and action-oriented but can be reactive without a system. Match their energy — be direct and decisive. Help them build a system that works when things are calm, not just when they're on fire. Use language like "battle plan", "lock it in", "this is your system now". Celebrate their resilience while giving them the structure to make it stick.`
     }
 
@@ -908,13 +1142,9 @@ Always reference who they said they're becoming when relevant. Coach them as the
   })
 
   // ==================== COACH TRIGGER ENGINE ====================
-  // Fires whenever meaningful financial state changes.
-  // Priority order: highest urgency triggers win.
-  // Each trigger has a unique ID so it won't re-fire once dismissed.
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0]
 
-    // Track app opens for re-engagement
     if (lastAppOpen !== today) {
       setLastAppOpen(today)
     }
@@ -926,181 +1156,29 @@ Always reference who they said they're becoming when relevant. Coach them as the
       ? Math.floor((Date.now() - new Date(lastDailyCheckIn).getTime()) / 86400000)
       : 999
 
-    // Evaluate triggers in priority order — first match wins
     const triggers = [
-
-      // ── ONBOARDING ──────────────────────────────────────────────
-      {
-        id: 'no_income',
-        condition: incomeStreams.length === 0 && onboardingComplete,
-        urgency: 'high' as const,
-        icon: '💰',
-        message: "You haven't added your income yet. I can't coach you without knowing your numbers.",
-        action: "Add my income now →",
-        tab: 'dashboard'
-      },
-      {
-        id: 'no_expenses',
-        condition: incomeStreams.length > 0 && expenses.length === 0,
-        urgency: 'high' as const,
-        icon: '💸',
-        message: `Good — I can see you earn $${monthlyIncome.toFixed(0)}/mo. Now add your bills and expenses so I can find your real surplus.`,
-        action: "Add my expenses →",
-        tab: 'dashboard'
-      },
-      {
-        id: 'no_mortgage',
-        condition: incomeStreams.length > 0 && expenses.length > 0 && !mortgageAccel.balance,
-        urgency: 'high' as const,
-        icon: '🏠',
-        message: "Your budget is set up. Next: enter your mortgage details so I can calculate your mortgage-free date and show you exactly how much you can save.",
-        action: "Enter mortgage details →",
-        tab: 'mortgage'
-      },
-      {
-        id: 'no_personality',
-        condition: !moneyPersonality && onboardingComplete && incomeStreams.length > 0,
-        urgency: 'medium' as const,
-        icon: '🧠',
-        message: "I'm giving you generic advice right now. Take the 8-question money personality quiz and I'll coach you the way YOU specifically need to be coached.",
-        action: "Take the quiz →",
-        tab: 'insights'
-      },
-
-      // ── BABY STEP TRANSITIONS ────────────────────────────────────
-      {
-        id: 'baby_step_1_done',
-        condition: emergencyFund >= 2000 && !dismissedTriggers.includes('baby_step_1_done') && currentBabyStep.step >= 2,
-        urgency: 'high' as const,
-        icon: '🛡️',
-        message: `Your $2,000 emergency fund is in place — Baby Step 1 is DONE. 🎉 You're now on Baby Step 2: kill bad debt. List every credit card, personal loan, and BNPL balance in the Debts section.`,
-        action: "Start Baby Step 2 →",
-        tab: 'dashboard'
-      },
-      {
-        id: 'bad_debt_done',
-        condition: debts.filter(d => parseFloat(d.interestRate || '0') > 5 && !d.name?.toLowerCase().includes('mortgage')).length === 0 && debts.length > 0 && currentBabyStep.step >= 3,
-        urgency: 'high' as const,
-        icon: '💳',
-        message: "All bad debt cleared! That's Baby Step 2 done. Now build your full 3-6 month emergency fund — that's the buffer that makes everything else possible.",
-        action: "Set up emergency fund goal →",
-        tab: 'path'
-      },
-      {
-        id: 'emergency_fund_done',
-        condition: emergencyMonths >= 3 && currentBabyStep.step >= 4 && !dismissedTriggers.includes('emergency_fund_done'),
-        urgency: 'high' as const,
-        icon: '🏦',
-        message: `${emergencyMonths.toFixed(1)} months of expenses saved — Baby Step 3 is DONE. Now it's time to invest 15% of your income. Let's look at super salary sacrifice and ETFs.`,
-        action: "Start investing →",
-        tab: 'path'
-      },
-
-      // ── MORTGAGE ────────────────────────────────────────────────
-      {
-        id: 'mortgage_no_extra',
-        condition: !!mortgageAccel.balance && !mortgageAccel.extraRepayment && monthlySurplus > 200,
-        urgency: 'high' as const,
-        icon: '🚀',
-        message: `You have $${monthlySurplus.toFixed(0)} surplus per month and your mortgage is entered but you haven't set any extra repayments. Even $${Math.floor(monthlySurplus * 0.3).toFixed(0)} extra per month could save you years.`,
-        action: "See the impact →",
-        tab: 'mortgage'
-      },
-      {
-        id: 'mortgage_rate_check',
-        condition: !!mortgageAccel.balance && parseFloat(mortgageAccel.rate || '0') > 6.5,
-        urgency: 'medium' as const,
-        icon: '📉',
-        message: `Your mortgage rate is ${mortgageAccel.rate}% — that's above the current market average. A rate review or refinance could save you thousands. This is worth a 15-minute call to your broker.`,
-        action: "Learn about refinancing →",
-        tab: 'learn'
-      },
-
-      // ── SURPLUS & SAVINGS ────────────────────────────────────────
-      {
-        id: 'surplus_not_allocated',
-        condition: monthlySurplus > 300 && goals.length === 0 && debts.length === 0,
-        urgency: 'high' as const,
-        icon: '⚡',
-        message: `You have $${monthlySurplus.toFixed(0)}/month in surplus with no goals or debts set up. That money is going nowhere. Let's put it to work — add a goal or set an extra mortgage repayment.`,
-        action: "Allocate my surplus →",
-        tab: 'path'
-      },
-      {
-        id: 'low_savings_rate',
-        condition: monthlyIncome > 0 && savingsRate < 10 && monthlyIncome > 3000,
-        urgency: 'medium' as const,
-        icon: '📊',
-        message: `Your savings rate is ${savingsRate.toFixed(1)}% — the financial independence benchmark is 20%+. Let's find where the gap is and build a plan to close it.`,
-        action: "Review my budget →",
-        tab: 'dashboard'
-      },
-
-      // ── CHECK-IN & ACCOUNTABILITY ────────────────────────────────
-      {
-        id: 'check_in_overdue',
-        condition: daysSinceCheckIn >= 8 && moneyDateLog.length > 0,
-        urgency: 'medium' as const,
-        icon: '🔥',
-        message: `It's been ${daysSinceCheckIn} days since your last Money Date. Your streak is at risk. A 10-minute check-in keeps momentum going — even a quick one counts.`,
-        action: "Do Money Date now →",
-        tab: 'review'
-      },
-      {
-        id: 'daily_checkin_nudge',
-        condition: daysSinceDailyCheckIn >= 3 && dailyCheckInLog.length > 0,
-        urgency: 'low' as const,
-        icon: '✅',
-        message: `You haven't done a daily check-in in ${daysSinceDailyCheckIn} days. 3 questions, 60 seconds — it's the habit that keeps you financially aware.`,
-        action: "Quick check-in →",
-        tab: 'review'
-      },
-
-      // ── ROADMAP & GOALS ──────────────────────────────────────────
-      {
-        id: 'no_roadmap',
-        condition: roadmapMilestones.length === 0 && onboardingComplete && incomeStreams.length > 0,
-        urgency: 'medium' as const,
-        icon: '🗺️',
-        message: "Your roadmap is empty. Add your top 3 financial milestones — paying off debt, building your emergency fund, your mortgage-free date — and I'll build a weekly plan for each.",
-        action: "Build my roadmap →",
-        tab: 'path'
-      },
-      {
-        id: 'goal_nearly_complete',
-        condition: goals.some(g => {
-          const pct = (parseFloat(g.saved || '0') / parseFloat(g.target || '1')) * 100
-          return pct >= 80 && pct < 100
-        }),
-        urgency: 'medium' as const,
-        icon: '🎯',
-        message: `One of your goals is over 80% complete! You're in the home stretch — consider increasing your payment frequency to finish it off.`,
-        action: "View my goals →",
-        tab: 'dashboard'
-      },
-
-      // ── POSITIVE MOMENTUM ────────────────────────────────────────
-      {
-        id: 'first_surplus',
-        condition: monthlySurplus > 0 && incomeStreams.length > 0 && expenses.length > 0 && wins.length < 3,
-        urgency: 'low' as const,
-        icon: '🟢',
-        message: `Your numbers are in and you have a $${monthlySurplus.toFixed(0)}/month surplus. This is your starting point — every dollar of that surplus directed intentionally changes your financial future.`,
-        action: "See what to do with it →",
-        tab: 'insights'
-      }
+      { id: 'no_income', condition: incomeStreams.length === 0 && onboardingComplete, urgency: 'high' as const, icon: '💰', message: "You haven't added your income yet. I can't coach you without knowing your numbers.", action: "Add my income now →", tab: 'dashboard' },
+      { id: 'no_expenses', condition: incomeStreams.length > 0 && expenses.length === 0, urgency: 'high' as const, icon: '💸', message: `Good — I can see you earn $${monthlyIncome.toFixed(0)}/mo. Now add your bills and expenses so I can find your real surplus.`, action: "Add my expenses →", tab: 'dashboard' },
+      { id: 'no_mortgage', condition: incomeStreams.length > 0 && expenses.length > 0 && !mortgageAccel.balance, urgency: 'high' as const, icon: '🏠', message: "Your budget is set up. Next: enter your mortgage details so I can calculate your mortgage-free date and show you exactly how much you can save.", action: "Enter mortgage details →", tab: 'mortgage' },
+      { id: 'no_personality', condition: !moneyPersonality && onboardingComplete && incomeStreams.length > 0, urgency: 'medium' as const, icon: '🧠', message: "I'm giving you generic advice right now. Take the 8-question money personality quiz and I'll coach you the way YOU specifically need to be coached.", action: "Take the quiz →", tab: 'insights' },
+      { id: 'baby_step_1_done', condition: emergencyFund >= 2000 && !dismissedTriggers.includes('baby_step_1_done') && currentBabyStep.step >= 2, urgency: 'high' as const, icon: '🛡️', message: `Your $2,000 emergency fund is in place — Baby Step 1 is DONE. 🎉 You're now on Baby Step 2: kill bad debt. List every credit card, personal loan, and BNPL balance in the Debts section.`, action: "Start Baby Step 2 →", tab: 'dashboard' },
+      { id: 'bad_debt_done', condition: debts.filter(d => parseFloat(d.interestRate || '0') > 5 && !d.name?.toLowerCase().includes('mortgage')).length === 0 && debts.length > 0 && currentBabyStep.step >= 3, urgency: 'high' as const, icon: '💳', message: "All bad debt cleared! That's Baby Step 2 done. Now build your full 3-6 month emergency fund — that's the buffer that makes everything else possible.", action: "Set up emergency fund goal →", tab: 'path' },
+      { id: 'emergency_fund_done', condition: emergencyMonths >= 3 && currentBabyStep.step >= 4 && !dismissedTriggers.includes('emergency_fund_done'), urgency: 'high' as const, icon: '🏦', message: `${emergencyMonths.toFixed(1)} months of expenses saved — Baby Step 3 is DONE. Now it's time to invest 15% of your income. Let's look at super salary sacrifice and ETFs.`, action: "Start investing →", tab: 'path' },
+      { id: 'mortgage_no_extra', condition: !!mortgageAccel.balance && !mortgageAccel.extraRepayment && monthlySurplus > 200, urgency: 'high' as const, icon: '🚀', message: `You have $${monthlySurplus.toFixed(0)} surplus per month and your mortgage is entered but you haven't set any extra repayments. Even $${Math.floor(monthlySurplus * 0.3).toFixed(0)} extra per month could save you years.`, action: "See the impact →", tab: 'mortgage' },
+      { id: 'mortgage_rate_check', condition: !!mortgageAccel.balance && parseFloat(mortgageAccel.rate || '0') > 6.5, urgency: 'medium' as const, icon: '📉', message: `Your mortgage rate is ${mortgageAccel.rate}% — that's above the current market average. A rate review or refinance could save you thousands. This is worth a 15-minute call to your broker.`, action: "Learn about refinancing →", tab: 'learn' },
+      { id: 'surplus_not_allocated', condition: monthlySurplus > 300 && goals.length === 0 && debts.length === 0, urgency: 'high' as const, icon: '⚡', message: `You have $${monthlySurplus.toFixed(0)}/month in surplus with no goals or debts set up. That money is going nowhere. Let's put it to work — add a goal or set an extra mortgage repayment.`, action: "Allocate my surplus →", tab: 'path' },
+      { id: 'low_savings_rate', condition: monthlyIncome > 0 && savingsRate < 10 && monthlyIncome > 3000, urgency: 'medium' as const, icon: '📊', message: `Your savings rate is ${savingsRate.toFixed(1)}% — the financial independence benchmark is 20%+. Let's find where the gap is and build a plan to close it.`, action: "Review my budget →", tab: 'dashboard' },
+      { id: 'check_in_overdue', condition: daysSinceCheckIn >= 8 && moneyDateLog.length > 0, urgency: 'medium' as const, icon: '🔥', message: `It's been ${daysSinceCheckIn} days since your last Money Date. Your streak is at risk. A 10-minute check-in keeps momentum going — even a quick one counts.`, action: "Do Money Date now →", tab: 'review' },
+      { id: 'daily_checkin_nudge', condition: daysSinceDailyCheckIn >= 3 && dailyCheckInLog.length > 0, urgency: 'low' as const, icon: '✅', message: `You haven't done a daily check-in in ${daysSinceDailyCheckIn} days. 3 questions, 60 seconds — it's the habit that keeps you financially aware.`, action: "Quick check-in →", tab: 'review' },
+      { id: 'no_roadmap', condition: roadmapMilestones.length === 0 && onboardingComplete && incomeStreams.length > 0, urgency: 'medium' as const, icon: '🗺️', message: "Your roadmap is empty. Add your top 3 financial milestones — paying off debt, building your emergency fund, your mortgage-free date — and I'll build a weekly plan for each.", action: "Build my roadmap →", tab: 'path' },
+      { id: 'goal_nearly_complete', condition: goals.some(g => { const pct = (parseFloat(g.saved || '0') / parseFloat(g.target || '1')) * 100; return pct >= 80 && pct < 100; }), urgency: 'medium' as const, icon: '🎯', message: `One of your goals is over 80% complete! You're in the home stretch — consider increasing your payment frequency to finish it off.`, action: "View my goals →", tab: 'dashboard' },
+      { id: 'first_surplus', condition: monthlySurplus > 0 && incomeStreams.length > 0 && expenses.length > 0 && wins.length < 3, urgency: 'low' as const, icon: '🟢', message: `Your numbers are in and you have a $${monthlySurplus.toFixed(0)}/month surplus. This is your starting point — every dollar of that surplus directed intentionally changes your financial future.`, action: "See what to do with it →", tab: 'insights' }
     ]
 
-    // Find highest priority unfired, non-dismissed trigger
     const priorityOrder = ['high', 'medium', 'low']
     for (const priority of priorityOrder) {
-      const match = triggers.find(t =>
-        t.urgency === priority &&
-        t.condition &&
-        !dismissedTriggers.includes(t.id)
-      )
+      const match = triggers.find(t => t.urgency === priority && t.condition && !dismissedTriggers.includes(t.id))
       if (match) {
-        // Only update if it's a different trigger than current
         if (!coachNextAction || coachNextAction.triggeredBy !== match.id) {
           setCoachNextAction({
             message: match.message,
@@ -1114,20 +1192,17 @@ Always reference who they said they're becoming when relevant. Coach them as the
         return
       }
     }
-
-    // All triggers dismissed or no conditions met — clear the card
     setCoachNextAction(null)
   }, [incomeStreams, expenses, debts, goals, assets, monthlySurplus, monthlyIncome, savingsRate, emergencyFund, emergencyMonths, mortgageAccel, moneyPersonality, roadmapMilestones, wins, streak, lastCheckIn, lastDailyCheckIn, moneyDateLog, dailyCheckInLog, onboardingComplete, currentBabyStep, dismissedTriggers])
+  
   const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
 
   const isMoneyDateDue = () => {
     const now = new Date()
     const todayName = dayNames[now.getDay()]
     if (todayName !== checkInSchedule.moneyDateDay) return false
-    // Due if not done today already
     const today = now.toISOString().split('T')[0]
     if (moneyDateLog.length > 0 && new Date(moneyDateLog[0].date).toISOString().split('T')[0] === today) return false
-    // Check if past the scheduled time
     const [h, m] = checkInSchedule.moneyDateTime.split(':').map(Number)
     return now.getHours() >= h || (now.getHours() === h && now.getMinutes() >= m)
   }
@@ -1136,7 +1211,6 @@ Always reference who they said they're becoming when relevant. Coach them as the
     if (!checkInSchedule.dailyEnabled) return false
     const today = new Date().toISOString().split('T')[0]
     if (lastDailyCheckIn === today) return false
-    // Available any time after midnight (daily is at user's leisure)
     return true
   }
 
@@ -1149,10 +1223,8 @@ Always reference who they said they're becoming when relevant. Coach them as the
   const submitDailyCheckIn = () => {
     const today = new Date().toISOString().split('T')[0]
     const entry = { id: Date.now(), date: new Date().toISOString(), answers: dailyCheckInAnswers }
-    setDailyCheckInLog(prev => [entry, ...prev.slice(0, 29)]) // keep last 30
+    setDailyCheckInLog(prev => [entry, ...prev.slice(0, 29)])
     setLastDailyCheckIn(today)
-
-    // Auto-win for consistent daily check-ins
     const recentDays = dailyCheckInLog.slice(0, 6)
     if (recentDays.length >= 6) {
       const allThisWeek = recentDays.every(e => {
@@ -1164,42 +1236,33 @@ Always reference who they said they're becoming when relevant. Coach them as the
         setWins(prev => [...prev, { id: Date.now(), title: '7-day daily check-in streak', desc: "7 days of daily financial awareness. That's the habit that changes everything.", icon: '🔥', auto: true, date: new Date().toISOString() }])
       }
     }
-
     setShowDailyCheckIn(false)
     setDailyCheckInStep(0)
     setDailyCheckInAnswers({})
     setCelebrationWin('Daily check-in done ✅')
     setTimeout(() => setCelebrationWin(null), 2500)
   }
+  
   const getDueMilestoneCheckIns = () => {
     const now = new Date()
-    const fortnightNum = Math.floor(now.getTime() / (14 * 24 * 60 * 60 * 1000))
-
     return milestoneCheckIns.filter(ci => {
       const linkedGoal = goals.find(g => g.name === ci.milestoneName)
       const freq = linkedGoal?.savingsFrequency || 'weekly'
-
       if (freq === 'weekly') return true
-
       if (freq === 'fortnightly') {
-        // Only ask on alternate weeks — check if last money date was more than 10 days ago
         if (moneyDateLog.length === 0) return true
         const daysSinceLast = (now.getTime() - new Date(moneyDateLog[0].date).getTime()) / 86400000
         return daysSinceLast >= 10
       }
-
       if (freq === 'monthly') {
-        // Only ask if last Money Date was in a different calendar month
         if (moneyDateLog.length === 0) return true
         const lastDate = new Date(moneyDateLog[0].date)
         return lastDate.getMonth() !== now.getMonth() || lastDate.getFullYear() !== now.getFullYear()
       }
-
       return true
     })
   }
-
-  // ==================== MISSION PHASE 2 — ROADMAP BUILDER ====================
+    // ==================== MISSION PHASE 2 — ROADMAP BUILDER ====================
   const advanceMission = (toStep?: number | null, toPhase?: number) => {
     if (toPhase === 2) {
       setMissionPhase(2)
@@ -1218,7 +1281,6 @@ Always reference who they said they're becoming when relevant. Coach them as the
 
   const generateRoadmapProposals = async () => {
     setMissionP2Loading(true)
-    // Stay on 'analyse' step while loading — don't switch to 'propose' until data is ready
     try {
       const response = await fetch('/api/budget-coach', {
         method: 'POST',
@@ -1255,34 +1317,15 @@ Respond in this EXACT JSON format, no other text:
         const proposals = JSON.parse(jsonMatch[0])
         setMissionP2Proposals(proposals)
         setMissionP2Confirmed(proposals.map(() => true))
-        setMissionP2Step('propose') // only switch once data is ready
+        setMissionP2Step('propose')
       } else {
         throw new Error('No JSON in response')
       }
     } catch {
-      // Fallback proposals based on user's actual data
       const fallback = [
-        {
-          name: emergencyFund < 2000 ? 'Build $2,000 Emergency Fund' : emergencyMonths < 3 ? `Build ${Math.round(monthlyExpenses * 3)} Emergency Fund` : 'Starter Safety Net',
-          icon: '🛡️',
-          target: emergencyFund < 2000 ? 2000 : Math.round(monthlyExpenses * 3),
-          notes: 'Your financial airbag — prevents going into debt when life throws surprises. This is the foundation everything else is built on.',
-          priority: 1
-        },
-        {
-          name: totalDebtBalance > 0 ? `Pay Off $${totalDebtBalance.toFixed(0)} Bad Debt` : mortgageAccel.balance ? `Accelerate Mortgage Payoff` : 'Build 3-Month Emergency Fund',
-          icon: totalDebtBalance > 0 ? '💳' : '🚀',
-          target: totalDebtBalance > 0 ? Math.round(totalDebtBalance) : 0,
-          notes: totalDebtBalance > 0 ? `Every dollar of bad debt is costing you in interest. Clearing this is a guaranteed return equal to your interest rate.` : `Extra repayments early in your mortgage save 3-4× that amount in interest.`,
-          priority: 2
-        },
-        {
-          name: mortgageAccel.balance ? `Be Mortgage-Free by ${new Date().getFullYear() + 8}` : 'Reach Financial Independence',
-          icon: '🏠',
-          target: 0,
-          notes: 'The ultimate finish line. When your mortgage is gone, every dollar you were paying the bank goes back into your life.',
-          priority: 3
-        }
+        { name: emergencyFund < 2000 ? 'Build $2,000 Emergency Fund' : emergencyMonths < 3 ? `Build ${Math.round(monthlyExpenses * 3)} Emergency Fund` : 'Starter Safety Net', icon: '🛡️', target: emergencyFund < 2000 ? 2000 : Math.round(monthlyExpenses * 3), notes: 'Your financial airbag — prevents going into debt when life throws surprises.', priority: 1 },
+        { name: totalDebtBalance > 0 ? `Pay Off $${totalDebtBalance.toFixed(0)} Bad Debt` : mortgageAccel.balance ? `Accelerate Mortgage Payoff` : 'Build 3-Month Emergency Fund', icon: totalDebtBalance > 0 ? '💳' : '🚀', target: totalDebtBalance > 0 ? Math.round(totalDebtBalance) : 0, notes: totalDebtBalance > 0 ? `Every dollar of bad debt is costing you in interest.` : `Extra repayments early in your mortgage save 3-4× that amount in interest.`, priority: 2 },
+        { name: mortgageAccel.balance ? `Be Mortgage-Free by ${new Date().getFullYear() + 8}` : 'Reach Financial Independence', icon: '🏠', target: 0, notes: 'The ultimate finish line. When your mortgage is gone, every dollar you were paying the bank goes back into your life.', priority: 3 }
       ]
       setMissionP2Proposals(fallback)
       setMissionP2Confirmed(fallback.map(() => true))
@@ -1294,22 +1337,12 @@ Respond in this EXACT JSON format, no other text:
   const confirmMissionRoadmap = async () => {
     setMissionP2Loading(true)
     setMissionP2Step('plan')
-
     const toAdd = missionP2Proposals.filter((_, i) => missionP2Confirmed[i])
     const now = Date.now()
     const newMilestones = toAdd.map((p, i) => ({
-      id: now + i,
-      name: p.name, icon: p.icon,
-      targetAmount: p.target?.toString() || '0',
-      currentAmount: 0, targetDate: '', notes: p.notes,
-      category: 'savings', completed: false,
-      createdAt: new Date().toISOString(), weeklyPlan: null
+      id: now + i, name: p.name, icon: p.icon, targetAmount: p.target?.toString() || '0', currentAmount: 0, targetDate: '', notes: p.notes, category: 'savings', completed: false, createdAt: new Date().toISOString(), weeklyPlan: null
     }))
-
-    // Add all milestones to roadmap
     setRoadmapMilestones(prev => [...prev, ...newMilestones])
-
-    // Generate weekly plan for the first milestone
     if (newMilestones.length > 0) {
       try {
         const first = newMilestones[0]
@@ -1320,13 +1353,9 @@ Respond in this EXACT JSON format, no other text:
           body: JSON.stringify({
             mode: 'question',
             question: `You are Aureus. Create a 7-day action plan for this goal: "${first.name}"${first.targetAmount !== '0' ? ` (target: $${first.targetAmount})` : ''}. Context: ${first.notes}
-
 Rules:
-- Output ONLY the 7 steps, nothing else. No intro sentence, no summary, no preamble.
+- Output ONLY the 7 steps, nothing else.
 - Format each line as: Day 1: [action]
-- Each action must be specific, concrete, and doable in under 30 minutes
-- One sentence per step
-- Never suggest downloading another app — the user is in Aureus
 - Day 5 MUST always be: "${isDebtMilestone ? 'Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically.' : 'Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders.'}"
 - Start directly with "Day 1:"${getPersonalityCoachingContext()}`,
             financialData: { income: incomeStreams, expenses, debts, goals, assets },
@@ -1348,180 +1377,14 @@ Rules:
           text: stripMd(l.replace(/^(day\s*\d+[:.\-]?\s*|step\s*\d+[:.\-]?\s*|\d+[).\-]\s*)/i, '').trim()),
           done: false
         })).filter((s: any) => s.text.length > 10)
-
         if (parsed.length > 0) {
-          setRoadmapMilestones(prev => prev.map(m =>
-            m.id === first.id ? { ...m, weeklyPlan: parsed, planGeneratedAt: new Date().toISOString() } : m
-          ))
+          setRoadmapMilestones(prev => prev.map(m => m.id === first.id ? { ...m, weeklyPlan: parsed, planGeneratedAt: new Date().toISOString() } : m))
         }
-      } catch { /* weekly plan generation is best-effort */ }
+      } catch { }
     }
-
     setMissionP2Loading(false)
-
-    // Transition to phase 3 after a beat so user sees the success screen
-    setTimeout(() => {
-      advanceMission(null, 3)
-      setActiveTab('path')
-    }, 2500)
+    setTimeout(() => { advanceMission(null, 3); setActiveTab('path') }, 2500)
   }
-
-  // ==================== SMART DATE HELPERS ====================
-  const dateForDayOfWeek = (dayOfWeek: number): string => {
-    const d = new Date()
-    const diff = (dayOfWeek - d.getDay() + 7) % 7
-    d.setDate(d.getDate() + (diff === 0 ? 0 : diff))
-    return d.toISOString().split('T')[0]
-  }
-
-  const dateForDayOfMonth = (dayOfMonth: number): string => {
-    const d = new Date()
-    d.setDate(dayOfMonth)
-    if (d < new Date()) d.setMonth(d.getMonth() + 1)
-    return d.toISOString().split('T')[0]
-  }
-
-  const DOW_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-  const DOW_FULL  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-
-  const SmartDatePicker = ({ frequency, value, onChange, label }: { frequency: string, value: string, onChange: (v: string) => void, label?: string }) => {
-    if (frequency === 'once') return (
-      <div>
-        {label && <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>{label}</label>}
-        <input type="date" value={value} onChange={e => onChange(e.target.value)} style={{ ...inputStyle, width: '100%' }} />
-      </div>
-    )
-    if (frequency === 'weekly' || frequency === 'fortnightly') {
-      const accentColor = frequency === 'weekly' ? theme.accent : theme.purple
-      const selectedDay = value ? new Date(value + 'T12:00:00').getDay() : new Date().getDay()
-      return (
-        <div>
-          {label && <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px' }}>{label}</label>}
-          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' as const }}>
-            {DOW_SHORT.map((d, i) => (
-              <button key={d} type="button" onClick={() => onChange(dateForDayOfWeek(i))}
-                style={{ padding: '7px 10px', background: selectedDay === i ? accentColor : theme.cardBg, color: selectedDay === i ? 'white' : theme.textMuted, border: '1px solid ' + (selectedDay === i ? accentColor : theme.border), borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: selectedDay === i ? 700 : 400 }}>
-                {d}
-              </button>
-            ))}
-          </div>
-          <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '5px' }}>
-            Every {frequency === 'fortnightly' ? 'second ' : ''}{DOW_FULL[selectedDay]}
-          </div>
-        </div>
-      )
-    }
-    if (frequency === 'monthly' || frequency === 'quarterly' || frequency === 'yearly') {
-      const selectedDom = value ? parseInt(value.split('-')[2]) : new Date().getDate()
-      const suffix = (n: number) => n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'
-      return (
-        <div>
-          {label && <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px' }}>{label}</label>}
-          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' as const, alignItems: 'center' }}>
-            {[1,5,7,10,14,15,20,21,25,28].map(d => (
-              <button key={d} type="button" onClick={() => onChange(dateForDayOfMonth(d))}
-                style={{ padding: '7px 10px', background: selectedDom === d ? theme.warning : theme.cardBg, color: selectedDom === d ? 'white' : theme.textMuted, border: '1px solid ' + (selectedDom === d ? theme.warning : theme.border), borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: selectedDom === d ? 700 : 400 }}>
-                {d}
-              </button>
-            ))}
-            <span style={{ color: theme.textMuted, fontSize: '11px' }}>or</span>
-            <input type="number" min="1" max="31" value={selectedDom}
-              onChange={e => { const d = parseInt(e.target.value); if (d >= 1 && d <= 31) onChange(dateForDayOfMonth(d)) }}
-              style={{ ...inputStyle, width: '56px', padding: '6px 8px', fontSize: '12px' }} />
-          </div>
-          <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '5px' }}>
-            {frequency === 'monthly' ? `Every month on the ${selectedDom}${suffix(selectedDom)}`
-              : frequency === 'quarterly' ? `Quarterly — starts ${selectedDom}${suffix(selectedDom)}`
-              : `Yearly on the ${selectedDom}${suffix(selectedDom)}`}
-          </div>
-        </div>
-      )
-    }
-    return null
-  }
-
-  const literacyTopics = [
-    {
-      id: 'mortgage-interest',
-      icon: '🏠',
-      title: 'How Mortgage Interest Actually Works',
-      tagline: 'Why your early repayments matter most',
-      content: `In your first year of a 30-year $600k mortgage at 6%, roughly 90% of each repayment goes to interest — not your actual debt. This is called amortisation.\n\nYear 1 example ($600k, 6%, monthly repayments of ~$3,597):\n• Interest paid: ~$35,700\n• Principal paid: ~$7,450\n\nThis flips over time — but by then you've already paid most of the interest. That's why extra repayments in the first 5 years save you dramatically more than the same payments made in year 20.`,
-      keyNumbers: ['90% of early repayments = interest, not principal', 'Avg Aussie pays $580k interest on a $600k loan', 'Every $1 extra in year 1 saves ~$3 in year 30'],
-      mistake: 'Most people wait until they\'re "comfortable" before making extra payments. The earlier you start, the more you save — even $50/fortnight makes a real difference.',
-      cta: 'How much interest am I paying?'
-    },
-    {
-      id: 'offset-accounts',
-      icon: '💡',
-      title: 'Offset Accounts: The Secret Weapon',
-      tagline: 'Your savings account that fights your mortgage',
-      content: `An offset account is a transaction account linked to your mortgage. Every dollar sitting in it reduces the balance your interest is calculated on — without locking that money away.\n\nExample:\n• Mortgage: $500,000\n• Offset balance: $50,000\n• You only pay interest on: $450,000\n\nAt 6%, that $50k in offset saves you $3,000/year in interest — completely passively. No extra repayments needed.\n\nBest banks with free offset (AU): ANZ, Commonwealth Bank, Westpac, NAB, Macquarie.`,
-      keyNumbers: ['$50k in offset at 6% saves $3,000/year', 'Unlike redraw, offset money is always accessible', '100% offset accounts beat high-interest savings accounts'],
-      mistake: 'Keeping your savings in a separate account instead of offset. Even if your mortgage rate is 6% and your savings account pays 5.5%, offset wins because there\'s no tax on offset savings.',
-      cta: 'Calculate my offset savings'
-    },
-    {
-      id: 'redraw-vs-offset',
-      icon: '🔄',
-      title: 'Redraw vs Offset: Which is Better?',
-      tagline: 'Two tools with an important difference',
-      content: `Both reduce your interest — but the key difference is accessibility.\n\nRedraw facility:\n• Extra payments go INTO the loan\n• Lower effective balance = less interest\n• To access the money, you apply to redraw\n• Banks can reduce or remove redraw access\n\nOffset account:\n• Money sits BESIDE the loan in a transaction account\n• Just as effective at reducing interest\n• Access it anytime, like a normal account\n• Better for emergency fund storage\n\nFor homeowners who might need the money: Offset wins. For investors (where extra repayments may have tax implications): consult your accountant.`,
-      keyNumbers: ['Both save the same interest mathematically', 'Offset = full liquidity, Redraw = less liquid', 'Banks have been known to freeze redraw during hardship'],
-      mistake: 'Treating redraw as an emergency fund. If the bank freezes access during financial hardship (which has happened), you could be stuck.',
-      cta: 'Which should I use?'
-    },
-    {
-      id: 'lmi-lvr',
-      icon: '📊',
-      title: 'LMI & LVR Explained Simply',
-      tagline: 'The numbers that decide your loan',
-      content: `LVR (Loan to Value Ratio) is the percentage of the property value you\'re borrowing.\n\nLVR = Loan ÷ Property Value × 100\n\nExample: $480k loan on a $600k property = 80% LVR\n\nLMI (Lender\'s Mortgage Insurance) kicks in when your LVR exceeds 80% (i.e., deposit under 20%). It protects the BANK — you pay for it.\n\nCost of LMI:\n• 85% LVR (15% deposit): ~$8,000–12,000\n• 90% LVR (10% deposit): ~$15,000–20,000\n• 95% LVR (5% deposit): ~$20,000–30,000\n\nHow to avoid LMI:\n1. Save 20% deposit\n2. Use a guarantor\n3. First Home Guarantee (5% deposit, no LMI — limited places)`,
-      keyNumbers: ['LMI costs 1–4% of the loan amount', '80% LVR = the magic number to avoid LMI', 'LMI is a one-off cost, often added to your loan'],
-      mistake: 'Adding LMI to your loan instead of paying it upfront. If you add $15k LMI to a 6% mortgage, it costs you ~$28k by the time you pay it off.',
-      cta: 'Calculate my LMI cost'
-    },
-    {
-      id: 'extra-vs-invest',
-      icon: '⚖️',
-      title: 'Extra Mortgage Repayments vs Investing',
-      tagline: 'The question every homeowner asks',
-      content: `This is the great Australian financial debate. Here\'s an honest look:\n\nCase for extra repayments:\n• Guaranteed return equal to your mortgage rate (~6%)\n• Risk-free — markets can drop, mortgage savings can\'t\n• Psychological peace of mortgage freedom\n• After paying off, you redirect all payments to investments\n\nCase for investing:\n• ASX historical average: ~7–10% p.a. (but NOT guaranteed)\n• Super has tax advantages (15% tax vs your marginal rate)\n• Time in market beats timing the market\n\nThe maths says: if investments return more than your mortgage rate after tax, invest. But the guaranteed, risk-free nature of mortgage savings is underrated.\n\nThe Infinity Group approach: kill the mortgage aggressively first, then redirect those payments to wealth building. It works because the discipline and momentum carry over.`,
-      keyNumbers: ['Mortgage rate 6% = guaranteed 6% return on extra payments', 'Super salary sacrifice saves 15–32% in tax depending on your bracket', '$500/month extra = 8+ years cut from a 30-year mortgage'],
-      mistake: 'Investing in low-return assets while paying 20%+ interest on a credit card. Always kill high-interest debt before investing.',
-      cta: 'Help me decide for my situation'
-    },
-    {
-      id: 'super-basics',
-      icon: '🦺',
-      title: 'Super: Your Forced Savings System',
-      tagline: 'Make the most of Australia\'s retirement safety net',
-      content: `Superannuation is compulsory retirement savings. Your employer contributes 11.5% of your salary (rising to 12% from July 2025).\n\nConcessional (pre-tax) contributions:\n• Cap: $30,000/year (including employer SG)\n• Taxed at just 15% going in (vs your marginal rate up to 47%)\n• Salary sacrifice: ask HR to direct extra pre-tax pay into super\n\nExample of salary sacrifice:\nEarning $80k, top tax rate 34.5% (inc Medicare)\n• Salary sacrifice $5,000/year to super\n• Tax saving: ~$975/year vs paying income tax\n• Super gets ~$4,250 instead of you getting ~$3,275 after tax\n\nFinding lost super: myGov → ATO → Super → search for lost accounts. Australians have $17.5 billion in lost super.`,
-      keyNumbers: ['11.5% employer SG rate in 2024–25', '$30,000 concessional contribution cap', '$17.5 billion sitting in lost/unclaimed super'],
-      mistake: 'Ignoring your super until 50. Someone who puts $5k/year extra from age 30 vs age 45 ends up with roughly double the balance at retirement due to compounding.',
-      cta: 'Optimise my super strategy'
-    },
-    {
-      id: 'fortnightly-hack',
-      icon: '📅',
-      title: 'Fortnightly Payments: The Simple Hack',
-      tagline: 'Make 13 months of payments in 12 months',
-      content: `This is one of the simplest and most powerful mortgage hacks.\n\nIf you pay monthly: 12 payments per year\nIf you pay fortnightly: 26 payments per year = 13 months of payments\n\nThe result? You make one full extra monthly payment per year — without it feeling like extra.\n\nOn a $600,000 mortgage at 6% over 30 years:\n• Monthly payments: pays off in 30 years, ~$680k in interest\n• Fortnightly payments: pays off in ~26 years, ~$565k in interest\n\nYears saved: ~4 years\nInterest saved: ~$115,000\n\nHow to do it: Call your bank or update your loan settings online. It takes 5 minutes.`,
-      keyNumbers: ['26 fortnightly payments = 13 monthly payments in a year', '~4 years saved on a typical 30-year loan', '~$115,000 saved in interest on a $600k loan at 6%'],
-      mistake: 'Halving your monthly payment and paying it fortnightly — if the bank doesn\'t process it correctly, you don\'t get the benefit. Confirm with your lender that it\'s set up as "26 fortnightly payments" not "24 semi-monthly payments".',
-      cta: 'How much does this save me?'
-    },
-    {
-      id: 'emergency-fund',
-      icon: '🛡️',
-      title: 'Emergency Fund Strategy',
-      tagline: 'Your financial airbag — don\'t leave home without it',
-      content: `An emergency fund is 3–6 months of living expenses kept in cash. Not invested. Not tied up. Just ready.\n\nWhy 3–6 months of EXPENSES, not income:\n• You only need to cover your bills during an emergency, not save\n• Expenses are usually 60–80% of income for most people\n\nWhere to keep it (Australia):\n• ING Savings Maximiser: ~5.5% (with conditions)\n• Ubank: ~5.1%\n• Macquarie Savings: ~5.25%\n• Do NOT invest it — you need instant access, not growth\n\nWhen to use it:\n✅ Job loss, medical emergency, car breakdown, urgent repairs\n❌ Holiday sale, "investment opportunity", planned expenses\n\nThe discipline rule: treat your emergency fund like a fire extinguisher. You don\'t use it because things are inconvenient — only when things are actually on fire.`,
-      keyNumbers: ['3 months expenses = stable employment, no dependants', '6 months = self-employed, variable income, or dependants', 'Keep it in a high-interest savings account at 5%+'],
-      mistake: 'Using your offset account as your emergency fund. That works fine — BUT make sure you also have a card or line of credit as backup if the bank ever restricts offset access during a dispute.',
-      cta: 'Calculate my emergency fund target'
-    }
-  ]
 
   // ==================== MONEY PERSONALITY QUIZ ====================
   const personalityQuiz = [
@@ -1662,8 +1525,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
     } catch { /* silent */ }
     setLoadingSpendingInsights(false)
   }
-
-  // ==================== LATTE FACTOR CALCULATOR ====================
+    // ==================== LATTE FACTOR CALCULATOR ====================
   const latteFreqToMonthly = (freq: string, amount: number) => {
     if (freq === 'daily') return amount * 30
     if (freq === 'weekly') return amount * 4.33
@@ -1708,7 +1570,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
       for (let i = 0; i < months; i++) p = p * (1 + mRate) + (annualEmployer / 12)
       return p
     })()
-    const taxSaving = annualExtra * 0.15 // rough concessional tax saving vs marginal
+    const taxSaving = annualExtra * 0.15
     return { projected, projectedNoExtra, extraImpact: projected - projectedNoExtra, annualExtra, taxSaving, years }
   }
 
@@ -1736,7 +1598,6 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
     }
     setMoneyDateLog(prev => [entry, ...prev])
 
-    // Log wins from milestone check-ins (only due ones)
     getDueMilestoneCheckIns().forEach((ci, i) => {
       const answer = moneyDateAnswers[100 + i]
       if (answer === 'yes' || answer === 'Yes') {
@@ -1796,7 +1657,6 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
       history.push({ date: new Date().toISOString().split('T')[0], value: netWorth })
     }
     if (history.length < 2) {
-      // Generate projected data
       const projected = []
       for (let i = 0; i <= 5; i++) {
         const projectedNW = netWorth + (monthlySurplus * 12 * i)
@@ -1815,105 +1675,65 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
     { id: 'identity', title: 'Your Money Identity', type: 'identity' },
     { id: 'setup', title: 'Quick Setup', type: 'setup' }
   ]
+
+  // ==================== LITERACY TOPICS ====================
+  const literacyTopics = [
+    { id: 'mortgage-interest', icon: '🏠', title: 'How Mortgage Interest Actually Works', tagline: 'Why your early repayments matter most', content: `In your first year of a 30-year $600k mortgage at 6%, roughly 90% of each repayment goes to interest — not your actual debt.`, keyNumbers: ['90% of early repayments = interest', 'Avg Aussie pays $580k interest', 'Every $1 extra saves ~$3'], mistake: 'Most people wait too long', cta: 'How much interest am I paying?' },
+    { id: 'offset-accounts', icon: '💡', title: 'Offset Accounts: The Secret Weapon', tagline: 'Your savings account that fights your mortgage', content: `An offset account is a transaction account linked to your mortgage. Every dollar in it reduces the balance your interest is calculated on.`, keyNumbers: ['$50k offset saves $3,000/year', 'Always accessible', 'Tax-free return'], mistake: 'Keeping savings separate', cta: 'Calculate my offset savings' },
+    { id: 'fortnightly-hack', icon: '📅', title: 'Fortnightly Payments: The Simple Hack', tagline: 'Make 13 months of payments in 12 months', content: `If you pay monthly: 12 payments per year. If you pay fortnightly: 26 payments per year = 13 months of payments.`, keyNumbers: ['26 fortnightly = 13 monthly', '~4 years saved', '~$115k saved'], mistake: 'Halving payments incorrectly', cta: 'How much does this save me?' },
+    { id: 'emergency-fund', icon: '🛡️', title: 'Emergency Fund Strategy', tagline: 'Your financial airbag', content: `An emergency fund is 3-6 months of living expenses kept in cash. Not invested. Just ready.`, keyNumbers: ['3 months = stable job', '6 months = variable income', 'Keep at 5%+ interest'], mistake: 'Using offset without backup', cta: 'Calculate my target' }
+  ]
+
+  const mortgageResult = calculateMortgagePayoff()
+
+  // ==================== MODE SELECTOR ====================
   if (showModeSelector) {
     return (
       <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ maxWidth: '480px', width: '100%', textAlign: 'center' as const }}>
-          {/* Logo */}
           <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 32px rgba(245,158,11,0.4)', border: '4px solid #fcd34d', margin: '0 auto 24px' }}>
             <span style={{ color: '#78350f', fontWeight: 800, fontSize: '40px' }}>A</span>
           </div>
           <h1 style={{ fontSize: '38px', fontWeight: 800, color: '#f1f5f9', margin: '0 0 12px 0' }}>Meet Aureus</h1>
           <p style={{ fontSize: '18px', color: '#94a3b8', margin: '0 0 8px 0', lineHeight: 1.5 }}>Your AI financial coach. I'll help you pay your mortgage off years early, eliminate debt, and build real wealth.</p>
           <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 36px 0' }}>I won't just give you tools — I'll tell you exactly what to do, in the right order, one step at a time.</p>
-
-          {/* What to expect */}
           <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '20px', marginBottom: '28px', textAlign: 'left' as const, border: '1px solid rgba(255,255,255,0.08)' }}>
             <div style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 700, letterSpacing: '2px', marginBottom: '16px' }}>WHAT HAPPENS NEXT</div>
-            {[
-              { step: '1', icon: '🧠', text: 'I learn how you think about money (5 min quiz)' },
-              { step: '2', icon: '💰', text: 'You enter your income, bills, and mortgage' },
-              { step: '3', icon: '🗺️', text: 'I build your personalised financial roadmap' },
-              { step: '4', icon: '📋', text: 'I generate your first week-by-week action plan' },
-            ].map(item => (
+            {[{ step: '1', icon: '🧠', text: 'I learn how you think about money (5 min quiz)' }, { step: '2', icon: '💰', text: 'You enter your income, bills, and mortgage' }, { step: '3', icon: '🗺️', text: 'I build your personalised financial roadmap' }, { step: '4', icon: '📋', text: 'I generate your first week-by-week action plan' }].map(item => (
               <div key={item.step} style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
                 <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#1e3a5f', border: '2px solid #3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>{item.icon}</div>
                 <div style={{ color: '#e2e8f0', fontSize: '14px' }}>{item.text}</div>
               </div>
             ))}
           </div>
-
-          <button
-            onClick={() => {
-              setAppMode('budget')
-              setShowModeSelector(false)
-              setMissionPhase(1)
-              setMissionStep(1)
-              setMissionNavLocked(true)
-              setActiveTab('chat')
-            }}
-            style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '16px', color: 'white', fontSize: '18px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 24px rgba(16,185,129,0.3)', marginBottom: '12px' }}
-          >
-            Let's get started →
-          </button>
-          <button
-            onClick={() => {
-              setAppMode('budget')
-              setShowModeSelector(false)
-              setMissionComplete(true)
-              setMissionNavLocked(false)
-              setOnboardingComplete(true)
-              setActiveTab('quickview')
-            }}
-            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '14px', padding: '8px' }}
-          >
-            I've used Aureus before — skip setup
-          </button>
+          <button onClick={() => { setAppMode('budget'); setShowModeSelector(false); setMissionPhase(1); setMissionStep(1); setMissionNavLocked(true); setActiveTab('chat') }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '16px', color: 'white', fontSize: '18px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 24px rgba(16,185,129,0.3)', marginBottom: '12px' }}>Let's get started →</button>
+          <button onClick={() => { setAppMode('budget'); setShowModeSelector(false); setMissionComplete(true); setMissionNavLocked(false); setOnboardingComplete(true); setActiveTab('quickview') }} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '14px', padding: '8px' }}>I've used Aureus before — skip setup</button>
           <button onClick={() => setDarkMode(!darkMode)} style={{ marginTop: '16px', padding: '8px 20px', background: 'transparent', border: '1px solid #334155', borderRadius: '8px', color: '#64748b', cursor: 'pointer', fontSize: '13px' }}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
         </div>
       </div>
     )
   }
 
-  const mortgageResult = calculateMortgagePayoff()
-
-  // ==================== MAIN APP ====================
+  // ==================== MAIN APP RETURN ====================
   return (
     <div style={{ minHeight: '100vh', background: theme.bg }}>
 
-      {/* ═══════════════════════════════════════════════════
-          MISSION OVERLAY — Phase 1 (setup) & Phase 2 (roadmap)
-          Covers full screen, guides user step by step
-      ═══════════════════════════════════════════════════ */}
+      {/* MISSION OVERLAY — Phase 1 (setup) */}
       {!missionComplete && missionPhase === 1 && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: darkMode ? '#0f172a' : '#f8fafc', zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
-
-          {/* Mission header */}
           <div style={{ padding: '16px 24px', background: darkMode ? '#1e293b' : 'white', borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#78350f', fontSize: '16px' }}>A</div>
-              <div>
-                <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Aureus Setup</div>
-                <div style={{ color: theme.textMuted, fontSize: '11px' }}>Step {missionStep} of 4</div>
-              </div>
+              <div><div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Aureus Setup</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>Step {missionStep} of 4</div></div>
             </div>
-            {/* Progress bar */}
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              {[1,2,3,4].map(s => (
-                <div key={s} style={{ width: s === missionStep ? '24px' : '8px', height: '8px', borderRadius: '4px', background: s < missionStep ? theme.success : s === missionStep ? theme.accent : theme.border, transition: 'all 0.3s' }} />
-              ))}
-            </div>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>{[1,2,3,4].map(s => (<div key={s} style={{ width: s === missionStep ? '24px' : '8px', height: '8px', borderRadius: '4px', background: s < missionStep ? theme.success : s === missionStep ? theme.accent : theme.border, transition: 'all 0.3s' }} />))}</div>
           </div>
 
-          {/* STEP 1 — Personality + Why */}
           {missionStep === 1 && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
               <div style={{ fontSize: '56px', marginBottom: '16px' }}>🧠</div>
               <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>First — let me understand you.</h2>
-              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 32px 0' }}>
-                I coach everyone differently. Before I give you a single piece of advice, I need to know how you think about money — your personality, your fears, and what you're really working toward.
-              </p>
-
+              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 32px 0' }}>I coach everyone differently. Before I give you a single piece of advice, I need to know how you think about money — your personality, your fears, and what you're really working toward.</p>
               {!moneyPersonality ? (
                 <div style={{ width: '100%' }}>
                   <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px', marginBottom: '28px' }}>
@@ -1922,576 +1742,144 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px', marginBottom: '12px' }}>{qi + 1}. {question.q}</div>
                         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
                           {question.options.map((opt, oi) => (
-                            <button key={oi} onClick={() => setPersonalityAnswers(prev => ({ ...prev, [qi]: opt.type }))}
-                              style={{ padding: '10px 14px', background: personalityAnswers[qi] === opt.type ? theme.accent + '30' : theme.bg, border: '2px solid ' + (personalityAnswers[qi] === opt.type ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', color: theme.text, fontSize: '13px', textAlign: 'left' as const }}>
-                              {personalityAnswers[qi] === opt.type ? '● ' : '○ '}{opt.label}
-                            </button>
+                            <button key={oi} onClick={() => setPersonalityAnswers(prev => ({ ...prev, [qi]: opt.type }))} style={{ padding: '10px 14px', background: personalityAnswers[qi] === opt.type ? theme.accent + '30' : theme.bg, border: '2px solid ' + (personalityAnswers[qi] === opt.type ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', color: theme.text, fontSize: '13px', textAlign: 'left' as const }}>{personalityAnswers[qi] === opt.type ? '● ' : '○ '}{opt.label}</button>
                           ))}
                         </div>
                       </div>
                     ))}
                   </div>
-                  <button
-                    onClick={() => { const result = calculatePersonality(); setMoneyPersonality(result) }}
-                    disabled={Object.keys(personalityAnswers).length < 8}
-                    style={{ width: '100%', padding: '16px', background: Object.keys(personalityAnswers).length < 8 ? theme.border : theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: Object.keys(personalityAnswers).length < 8 ? 'default' : 'pointer', fontSize: '16px', fontWeight: 700, opacity: Object.keys(personalityAnswers).length < 8 ? 0.6 : 1 }}>
-                    {Object.keys(personalityAnswers).length < 8 ? `Answer ${8 - Object.keys(personalityAnswers).length} more` : 'See my result →'}
-                  </button>
+                  <button onClick={() => { const result = calculatePersonality(); setMoneyPersonality(result) }} disabled={Object.keys(personalityAnswers).length < 8} style={{ width: '100%', padding: '16px', background: Object.keys(personalityAnswers).length < 8 ? theme.border : theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: Object.keys(personalityAnswers).length < 8 ? 'default' : 'pointer', fontSize: '16px', fontWeight: 700, opacity: Object.keys(personalityAnswers).length < 8 ? 0.6 : 1 }}>{Object.keys(personalityAnswers).length < 8 ? `Answer ${8 - Object.keys(personalityAnswers).length} more` : 'See my result →'}</button>
                 </div>
               ) : (
-                // Personality result + deep why
                 <div style={{ width: '100%' }}>
                   <div style={{ padding: '20px', background: personalityProfiles[moneyPersonality].color + '20', borderRadius: '16px', border: '2px solid ' + personalityProfiles[moneyPersonality].color + '40', marginBottom: '24px', textAlign: 'center' as const }}>
                     <div style={{ fontSize: '48px', marginBottom: '8px' }}>{personalityProfiles[moneyPersonality].emoji}</div>
                     <div style={{ color: personalityProfiles[moneyPersonality].color, fontWeight: 800, fontSize: '20px', marginBottom: '8px' }}>{personalityProfiles[moneyPersonality].label}</div>
                     <p style={{ color: theme.textMuted, fontSize: '13px', margin: 0, lineHeight: 1.6 }}>{personalityProfiles[moneyPersonality].aureusFocus}</p>
                   </div>
-
-                  <div style={{ marginBottom: '24px' }}>
-                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '6px' }}>❤️ Now — tell me why.</div>
-                    <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '14px' }}>What are you actually working toward? This is what I'll remind you of when motivation dips.</p>
-                    <textarea
-                      value={whyStatement}
-                      onChange={e => setWhyStatement(e.target.value)}
-                      placeholder="e.g. I want to be mortgage-free before my kids start high school so I can work less and be more present..."
-                      style={{ ...inputStyle, width: '100%', minHeight: '90px', resize: 'vertical' as const }}
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: '24px' }}>
-                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '6px' }}>⚡ Who are you becoming?</div>
-                    <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>Write one identity statement. Not what you want to have — who you are becoming.</p>
-                    <input
-                      value={identityStatements[0] || ''}
-                      onChange={e => setIdentityStatements([e.target.value])}
-                      placeholder="I am someone who..."
-                      style={{ ...inputStyle, width: '100%' }}
-                    />
-                  </div>
-
-                  <button
-                    onClick={() => advanceMission(2)}
-                    style={{ width: '100%', padding: '16px', background: theme.success, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
-                    Perfect. Now let's set up your numbers →
-                  </button>
+                  <div style={{ marginBottom: '24px' }}><div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '6px' }}>❤️ Now — tell me why.</div><p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '14px' }}>What are you actually working toward? This is what I'll remind you of when motivation dips.</p><textarea value={whyStatement} onChange={e => setWhyStatement(e.target.value)} placeholder="e.g. I want to be mortgage-free before my kids start high school so I can work less and be more present..." style={{ ...inputStyle, width: '100%', minHeight: '90px', resize: 'vertical' as const }} /></div>
+                  <div style={{ marginBottom: '24px' }}><div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '6px' }}>⚡ Who are you becoming?</div><p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>Write one identity statement. Not what you want to have — who you are becoming.</p><input value={identityStatements[0] || ''} onChange={e => setIdentityStatements([e.target.value])} placeholder="I am someone who..." style={{ ...inputStyle, width: '100%' }} /></div>
+                  <button onClick={() => advanceMission(2)} style={{ width: '100%', padding: '16px', background: theme.success, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>Perfect. Now let's set up your numbers →</button>
                 </div>
               )}
             </div>
           )}
 
-          {/* STEP 2 — Income */}
           {missionStep === 2 && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '560px', margin: '0 auto', width: '100%' }}>
               <div style={{ fontSize: '56px', marginBottom: '16px' }}>💰</div>
               <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>How much do you earn?</h2>
-              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 28px 0' }}>
-                I can't show you your surplus, your mortgage-free date, or your financial health score until I know your income. This is step one.
-              </p>
-
-              {/* Existing income streams */}
-              {incomeStreams.length > 0 && (
-                <div style={{ width: '100%', marginBottom: '16px' }}>
-                  {incomeStreams.map(inc => (
-                    <div key={inc.id} style={{ padding: '12px 16px', background: theme.success + '15', borderRadius: '10px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.success + '30' }}>
-                      <div><div style={{ color: theme.text, fontWeight: 600 }}>{inc.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${inc.amount} {inc.frequency}</div></div>
-                      <button onClick={() => setIncomeStreams(prev => prev.filter(i => i.id !== inc.id))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '16px' }}>×</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Add income form */}
+              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 28px 0' }}>I can't show you your surplus, your mortgage-free date, or your financial health score until I know your income. This is step one.</p>
+              {incomeStreams.length > 0 && (<div style={{ width: '100%', marginBottom: '16px' }}>{incomeStreams.map(inc => (<div key={inc.id} style={{ padding: '12px 16px', background: theme.success + '15', borderRadius: '10px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.success + '30' }}><div><div style={{ color: theme.text, fontWeight: 600 }}>{inc.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${inc.amount} {inc.frequency}</div></div><button onClick={() => setIncomeStreams(prev => prev.filter(i => i.id !== inc.id))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '16px' }}>×</button></div>))}</div>)}
               <div style={{ width: '100%', padding: '20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border, marginBottom: '20px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Income source (e.g. "Salary — JB Hi-Fi")</label>
-                    <input placeholder="e.g. Salary" value={newIncome.name} onChange={e => setNewIncome({...newIncome, name: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
+                  <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Income source</label><input placeholder="e.g. Salary" value={newIncome.name} onChange={e => setNewIncome({...newIncome, name: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Take-home amount ($)</label>
-                      <input type="number" placeholder="e.g. 2800" value={newIncome.amount} onChange={e => setNewIncome({...newIncome, amount: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Paid</label>
-                      <select value={newIncome.frequency} onChange={e => {
-                        const freq = e.target.value;
-                        const newDate = freq === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : freq === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(new Date().getDate());
-                        setNewIncome({...newIncome, frequency: freq, startDate: newDate});
-                      }} style={{...inputStyle, width: '100%'}}>
-                        <option value="weekly">Weekly</option>
-                        <option value="fortnightly">Fortnightly (most common in AU)</option>
-                        <option value="monthly">Monthly</option>
-                      </select>
-                    </div>
-              </div>
-              <SmartDatePicker
-                frequency={newIncome.frequency}
-                value={newIncome.startDate}
-                onChange={v => setNewIncome({...newIncome, startDate: v})}
-                label={newIncome.frequency === 'weekly' ? 'Which day do you get paid?' : newIncome.frequency === 'fortnightly' ? 'Which day is payday?' : 'Which day of the month?'}
-              />                  <button onClick={() => { if (newIncome.name && newIncome.amount) { setIncomeStreams(prev => [...prev, { ...newIncome, id: Date.now(), type: 'active' }]); setNewIncome({ name: '', amount: '', frequency: 'fortnightly', type: 'active', startDate: new Date().toISOString().split('T')[0] }) } }} style={{ ...btnSuccess, padding: '12px' }}>
-                    + Add income source
-                  </button>
-                </div>
-              </div>
-
-              {incomeStreams.length > 0 && (
-                <div style={{ width: '100%' }}>
-                  <div style={{ padding: '14px 16px', background: theme.success + '15', borderRadius: '10px', marginBottom: '16px', border: '1px solid ' + theme.success + '30' }}>
-                    <div style={{ color: theme.success, fontWeight: 700 }}>Monthly income: ${monthlyIncome.toFixed(0)}</div>
-                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>Looking good. Add more sources if you have them, or continue.</div>
+                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Amount ($)</label><input type="number" placeholder="e.g. 2800" value={newIncome.amount} onChange={e => setNewIncome({...newIncome, amount: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
+                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Frequency</label><select value={newIncome.frequency} onChange={e => { const newFreq = e.target.value; let newStartDate = newIncome.startDate; if (newFreq === 'weekly') { newStartDate = getNextDateForDayOfWeek(new Date().getDay()) } else if (newFreq === 'fortnightly') { newStartDate = getFortnightlyDateFromAnchor(1) } else if (newFreq === 'monthly' || newFreq === 'quarterly' || newFreq === 'yearly') { newStartDate = getNextDateForDayOfMonth(1, newFreq) } setNewIncome({...newIncome, frequency: newFreq, startDate: newStartDate}) }} style={{...inputStyle, width: '100%'}}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div>
                   </div>
-                  <button onClick={() => advanceMission(3)} style={{ width: '100%', padding: '16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
-                    That's my income. Next: my bills →
-                  </button>
+                  <SmartDatePicker frequency={newIncome.frequency} value={newIncome.startDate} onChange={v => setNewIncome({...newIncome, startDate: v})} label="Pay day" />
+                  <button onClick={addIncome} style={{...btnSuccess, alignSelf: 'flex-start' as const, padding: '8px 16px'}}>+ Add income</button>
                 </div>
-              )}
+              </div>
+              {incomeStreams.length > 0 && (<div style={{ width: '100%' }}><div style={{ padding: '14px 16px', background: theme.success + '15', borderRadius: '10px', marginBottom: '16px', border: '1px solid ' + theme.success + '30' }}><div style={{ color: theme.success, fontWeight: 700 }}>Monthly income: ${monthlyIncome.toFixed(0)}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>Looking good.</div></div><button onClick={() => advanceMission(3)} style={{ width: '100%', padding: '16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>Next: my bills →</button></div>)}
             </div>
           )}
 
-          {/* STEP 3 — Expenses */}
           {missionStep === 3 && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '560px', margin: '0 auto', width: '100%' }}>
               <div style={{ fontSize: '56px', marginBottom: '16px' }}>💸</div>
               <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>What are your regular bills?</h2>
-              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 8px 0' }}>
-                Add your main recurring expenses. You don't need to be perfect — rough numbers get us started.
-              </p>
-              <p style={{ color: theme.textMuted, fontSize: '13px', textAlign: 'center' as const, margin: '0 0 24px 0' }}>
-                Income: <strong style={{ color: theme.success }}>${monthlyIncome.toFixed(0)}/mo</strong>
-              </p>
-
-              {/* Quick presets */}
-              <div style={{ width: '100%', marginBottom: '16px' }}>
-                <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>QUICK ADD</div>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-                  {presetBills.map(p => (
-                    <button key={p.name} onClick={() => { const amt = prompt(`${p.name} — enter amount ($):`, (p as any).amount || ''); if (amt) setExpenses(prev => [...prev, { id: Date.now(), name: p.name, amount: amt, frequency: p.frequency, category: p.category, dueDate: new Date().toISOString().split('T')[0] }]) }}
-                      style={{ padding: '5px 12px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '12px', color: theme.textMuted }}>
-                      + {p.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Existing expenses */}
-              {expenses.filter(e => !e.targetDebtId && !e.targetGoalId).length > 0 && (
-                <div style={{ width: '100%', marginBottom: '16px' }}>
-                  {expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(exp => (
-                    <div key={exp.id} style={{ padding: '10px 14px', background: theme.danger + '10', borderRadius: '8px', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.border }}>
-                      <div><div style={{ color: theme.text, fontSize: '14px' }}>{exp.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${exp.amount} {exp.frequency}</div></div>
-                      <button onClick={() => setExpenses(prev => prev.filter(e => e.id !== exp.id))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '16px' }}>×</button>
-                    </div>
-                  ))}
-                  <div style={{ padding: '10px 14px', background: theme.cardBg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-                    <span style={{ color: theme.textMuted, fontSize: '13px' }}>Total expenses</span>
-                    <span style={{ color: theme.danger, fontWeight: 700 }}>${monthlyExpenses.toFixed(0)}/mo</span>
-                  </div>
-                  {monthlySurplus > 0 && (
-                    <div style={{ padding: '10px 14px', background: theme.success + '15', borderRadius: '8px', marginTop: '6px', border: '1px solid ' + theme.success + '30', display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: theme.success, fontWeight: 600, fontSize: '13px' }}>Your surplus</span>
-                      <span style={{ color: theme.success, fontWeight: 700 }}>${monthlySurplus.toFixed(0)}/mo</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Custom expense */}
+              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 8px 0' }}>Add your main recurring expenses. Rough numbers are fine.</p>
+              <p style={{ color: theme.textMuted, fontSize: '13px', textAlign: 'center' as const, margin: '0 0 24px 0' }}>Income: <strong style={{ color: theme.success }}>${monthlyIncome.toFixed(0)}/mo</strong></p>
+              <div style={{ width: '100%', marginBottom: '16px' }}><div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>QUICK ADD</div><div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>{presetBills.map(p => (<button key={p.name} onClick={() => { const amt = prompt(`${p.name} — amount:`, (p as any).amount || ''); if (amt) setExpenses(prev => [...prev, { id: Date.now(), name: p.name, amount: amt, frequency: p.frequency, category: p.category, dueDate: new Date().toISOString().split('T')[0] }]) }} style={{ padding: '5px 12px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '12px', color: theme.textMuted }}>+ {p.name}</button>))}</div></div>
+              {expenses.filter(e => !e.targetDebtId && !e.targetGoalId).length > 0 && (<div style={{ width: '100%', marginBottom: '16px' }}>{expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(exp => (<div key={exp.id} style={{ padding: '10px 14px', background: theme.danger + '10', borderRadius: '8px', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.border }}><div><div style={{ color: theme.text, fontSize: '14px' }}>{exp.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${exp.amount} {exp.frequency}</div></div><button onClick={() => setExpenses(prev => prev.filter(e => e.id !== exp.id))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '16px' }}>×</button></div>))}<div style={{ padding: '10px 14px', background: theme.cardBg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}><span style={{ color: theme.textMuted, fontSize: '13px' }}>Total expenses</span><span style={{ color: theme.danger, fontWeight: 700 }}>${monthlyExpenses.toFixed(0)}/mo</span></div>{monthlySurplus > 0 && (<div style={{ padding: '10px 14px', background: theme.success + '15', borderRadius: '8px', marginTop: '6px', border: '1px solid ' + theme.success + '30', display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.success, fontWeight: 600, fontSize: '13px' }}>Your surplus</span><span style={{ color: theme.success, fontWeight: 700 }}>${monthlySurplus.toFixed(0)}/mo</span></div>)}</div>)}
               <div style={{ width: '100%', padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, marginBottom: '20px' }}>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                  <input placeholder="Bill name" value={newExpense.name} onChange={e => setNewExpense({...newExpense, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
-                  <input type="number" placeholder="$" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{...inputStyle, width: '80px'}} />
-                  <select value={newExpense.frequency} onChange={e => setNewExpense({...newExpense, frequency: e.target.value, dueDate: e.target.value === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : e.target.value === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(1)})} style={inputStyle}>
-                    <option value="weekly">Weekly</option>
-                    <option value="fortnightly">Fortnightly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                  <button onClick={() => { if (newExpense.name && newExpense.amount) { setExpenses(prev => [...prev, { ...newExpense, id: Date.now() }]); setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: new Date().toISOString().split('T')[0] }) } }} style={btnDanger}>+</button>
-                </div>
-                <div style={{ marginTop: '12px' }}>
-                  <SmartDatePicker
-                    frequency={newExpense.frequency}
-                    value={newExpense.dueDate}
-                    onChange={v => setNewExpense({...newExpense, dueDate: v})}
-                    label={newExpense.frequency === 'weekly' ? 'Which day is it due?' : newExpense.frequency === 'fortnightly' ? 'Which day?' : 'Which day of the month is it due?'}
-                  />
-                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}><input placeholder="Bill name" value={newExpense.name} onChange={e => setNewExpense({...newExpense, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} /><input type="number" placeholder="$" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{...inputStyle, width: '80px'}} /><select value={newExpense.frequency} onChange={e => { const newFreq = e.target.value; let newDueDate = newExpense.dueDate; if (newFreq === 'weekly') { newDueDate = getNextDateForDayOfWeek(new Date().getDay()) } else if (newFreq === 'fortnightly') { newDueDate = getFortnightlyDateFromAnchor(1) } else if (newFreq === 'monthly' || newFreq === 'quarterly' || newFreq === 'yearly') { newDueDate = getNextDateForDayOfMonth(1, newFreq) } setNewExpense({...newExpense, frequency: newFreq, dueDate: newDueDate}) }} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select><button onClick={() => { if (newExpense.name && newExpense.amount) { setExpenses(prev => [...prev, { ...newExpense, id: Date.now(), dueDate: newExpense.dueDate }]); setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: new Date().toISOString().split('T')[0] }) } }} style={btnDanger}>+</button></div>
+                <SmartDatePicker frequency={newExpense.frequency} value={newExpense.dueDate} onChange={v => setNewExpense({...newExpense, dueDate: v})} label="Due day" />
               </div>
-
-              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                <button onClick={() => advanceMission(3)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
-                  Skip for now
-                </button>
-                <button onClick={() => advanceMission(4)} style={{ flex: 1, padding: '16px', background: expenses.length > 0 ? theme.accent : theme.border, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
-                  {expenses.length > 0 ? 'Next: my mortgage →' : 'Continue without expenses →'}
-                </button>
-              </div>
+              <div style={{ display: 'flex', gap: '10px', width: '100%' }}><button onClick={() => advanceMission(3)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>Skip</button><button onClick={() => advanceMission(4)} style={{ flex: 1, padding: '16px', background: expenses.length > 0 ? theme.accent : theme.border, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>{expenses.length > 0 ? 'Next: my mortgage →' : 'Continue →'}</button></div>
             </div>
           )}
 
-          {/* STEP 4 — Mortgage */}
           {missionStep === 4 && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '560px', margin: '0 auto', width: '100%' }}>
               <div style={{ fontSize: '56px', marginBottom: '16px' }}>🏠</div>
               <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>Tell me about your mortgage.</h2>
-              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 8px 0' }}>
-                This is where the magic happens. I'll calculate your exact mortgage-free date and show you how to cut years off it.
-              </p>
-              {monthlySurplus > 0 && (
-                <div style={{ padding: '10px 16px', background: theme.success + '15', borderRadius: '8px', marginBottom: '20px', border: '1px solid ' + theme.success + '30', textAlign: 'center' as const }}>
-                  <span style={{ color: theme.success, fontSize: '13px' }}>You have <strong>${monthlySurplus.toFixed(0)}/month</strong> surplus that could be going onto your mortgage right now.</span>
-                </div>
-              )}
-
+              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 8px 0' }}>I'll calculate your exact mortgage-free date and show you how to cut years off it.</p>
+              {monthlySurplus > 0 && (<div style={{ padding: '10px 16px', background: theme.success + '15', borderRadius: '8px', marginBottom: '20px', border: '1px solid ' + theme.success + '30', textAlign: 'center' as const }}>You have <strong>${monthlySurplus.toFixed(0)}/month</strong> surplus that could go onto your mortgage.</div>)}
               <div style={{ width: '100%', padding: '20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border, marginBottom: '20px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Repayment frequency</label>
-                    <select value={mortgageAccel.repaymentFrequency} onChange={e => setMortgageAccel({...mortgageAccel, repaymentFrequency: e.target.value})} style={{...inputStyle, width: '100%'}}>
-                      <option value="weekly">Weekly</option>
-                      <option value="fortnightly">Fortnightly (most common in AU)</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                  </div>
-                  <div>
-                    <SmartDatePicker
-                      frequency={mortgageAccel.repaymentFrequency}
-                      value={mortgageAccel.startDate || new Date().toISOString().split('T')[0]}
-                      onChange={v => setMortgageAccel({...mortgageAccel, startDate: v})}
-                      label="When is your next repayment due?"
-                    />
-                  </div>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Remaining balance ($)</label>
-                    <input type="number" placeholder="e.g. 420000" value={mortgageAccel.balance} onChange={e => setMortgageAccel({...mortgageAccel, balance: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Interest rate (% p.a.)</label>
-                      <input type="number" step="0.01" placeholder="e.g. 6.14" value={mortgageAccel.rate} onChange={e => setMortgageAccel({...mortgageAccel, rate: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Years remaining</label>
-                      <input type="number" placeholder="e.g. 25" value={mortgageAccel.remainingYears} onChange={e => setMortgageAccel({...mortgageAccel, remainingYears: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                  </div>
+                  <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Repayment frequency</label><select value={mortgageAccel.repaymentFrequency} onChange={e => setMortgageAccel({...mortgageAccel, repaymentFrequency: e.target.value})} style={{...inputStyle, width: '100%'}}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
+                  <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Remaining balance ($)</label><input type="number" placeholder="e.g. 420000" value={mortgageAccel.balance} onChange={e => setMortgageAccel({...mortgageAccel, balance: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}><div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Interest rate (%)</label><input type="number" step="0.01" placeholder="e.g. 6.14" value={mortgageAccel.rate} onChange={e => setMortgageAccel({...mortgageAccel, rate: e.target.value})} style={{...inputStyle, width: '100%'}} /></div><div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Years remaining</label><input type="number" placeholder="e.g. 25" value={mortgageAccel.remainingYears} onChange={e => setMortgageAccel({...mortgageAccel, remainingYears: e.target.value})} style={{...inputStyle, width: '100%'}} /></div></div>
                 </div>
               </div>
-
-              {/* Live mortgage-free date preview */}
-              {mortgageAccel.balance && mortgageAccel.rate && mortgageAccel.remainingYears && (() => {
-                const res = calculateMortgagePayoff()
-                if (!res) return null
-                const freq = mortgageAccel.repaymentFrequency
-                const suggestedExtra = monthlySurplus > 0
-                  ? (freq === 'weekly' ? Math.floor(monthlySurplus * 0.3 / 4.33) : freq === 'fortnightly' ? Math.floor(monthlySurplus * 0.3 / 2) : Math.floor(monthlySurplus * 0.3))
-                  : 0
-                const extraResult = suggestedExtra > 0 ? (() => {
-                  const r2 = parseFloat(mortgageAccel.rate) / 100 / (freq === 'weekly' ? 52 : freq === 'fortnightly' ? 26 : 12)
-                  const pmt2 = res.repaymentUsed + suggestedExtra
-                  const bal2 = parseFloat(mortgageAccel.balance)
-                  if (pmt2 <= bal2 * r2) return null
-                  const periods2 = Math.log(pmt2 / (pmt2 - bal2 * r2)) / Math.log(1 + r2)
-                  const freqN = freq === 'weekly' ? 52 : freq === 'fortnightly' ? 26 : 12
-                  const yrs2 = periods2 / freqN
-                  return { yearsSaved: res.standard.years - yrs2, freeYear: new Date().getFullYear() + Math.ceil(yrs2), interestSaved: res.standard.interest - (pmt2 * periods2 - bal2) }
-                })() : null
-                return (
-                  <div style={{ width: '100%', marginBottom: '20px' }}>
-                    <div style={{ padding: '20px', background: 'linear-gradient(135deg, #0f2027, #203a43)', borderRadius: '14px', textAlign: 'center' as const, border: '1px solid #334155' }}>
-                      <div style={{ color: '#94a3b8', fontSize: '11px', letterSpacing: '2px', marginBottom: '8px' }}>🏠 YOUR MORTGAGE-FREE DATE</div>
-                      <div style={{ color: '#ef4444', fontSize: '40px', fontWeight: 800, marginBottom: '4px' }}>{res.standard.freeYear}</div>
-                      <div style={{ color: '#64748b', fontSize: '12px', marginBottom: suggestedExtra > 0 ? '16px' : '0' }}>at current pace · ${Math.round(res.standard.interest / 1000)}k in interest</div>
-                      {extraResult && suggestedExtra > 0 && (
-                        <div style={{ padding: '12px', background: 'rgba(16,185,129,0.15)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.3)' }}>
-                          <div style={{ color: '#10b981', fontSize: '13px', marginBottom: '4px' }}>💡 With just ${suggestedExtra} extra per {freq === 'weekly' ? 'week' : freq === 'fortnightly' ? 'fortnight' : 'month'}:</div>
-                          <div style={{ color: '#10b981', fontWeight: 700, fontSize: '18px' }}>Mortgage-free by {extraResult.freeYear} — {extraResult.yearsSaved.toFixed(1)} years earlier, ${Math.round(extraResult.interestSaved / 1000)}k saved</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })()}
-
-              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                <button onClick={() => advanceMission(null, 2)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
-                  Skip — I'll add this later
-                </button>
-                <button
-                  onClick={() => advanceMission(null, 2)}
-                  style={{ flex: 1, padding: '16px', background: mortgageAccel.balance ? theme.success : theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
-                  {mortgageAccel.balance ? "I can see my date. Build my roadmap →" : "Build my roadmap →"}
-                </button>
-              </div>
+              {mortgageAccel.balance && mortgageAccel.rate && mortgageAccel.remainingYears && (() => { const res = calculateMortgagePayoff(); if (!res) return null; return (<div style={{ width: '100%', marginBottom: '20px' }}><div style={{ padding: '20px', background: 'linear-gradient(135deg, #0f2027, #203a43)', borderRadius: '14px', textAlign: 'center' as const, border: '1px solid #334155' }}><div style={{ color: '#94a3b8', fontSize: '11px', letterSpacing: '2px', marginBottom: '8px' }}>🏠 YOUR MORTGAGE-FREE DATE</div><div style={{ color: '#ef4444', fontSize: '40px', fontWeight: 800, marginBottom: '4px' }}>{res.standard.freeYear}</div><div style={{ color: '#64748b', fontSize: '12px' }}>at current pace · ${Math.round(res.standard.interest / 1000)}k interest</div></div></div>) })()}
+              <div style={{ display: 'flex', gap: '10px', width: '100%' }}><button onClick={() => advanceMission(null, 2)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>Skip</button><button onClick={() => advanceMission(null, 2)} style={{ flex: 1, padding: '16px', background: mortgageAccel.balance ? theme.success : theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>{mortgageAccel.balance ? "Build my roadmap →" : "Build my roadmap →"}</button></div>
             </div>
           )}
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════
-          MISSION PHASE 2 — ROADMAP BUILDER
-      ═══════════════════════════════════════════════════ */}
+      {/* MISSION PHASE 2 */}
       {!missionComplete && missionPhase === 2 && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: darkMode ? '#0f172a' : '#f8fafc', zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
-          <div style={{ padding: '16px 24px', background: darkMode ? '#1e293b' : 'white', borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', gap: '12px', position: 'sticky' as const, top: 0, zIndex: 1 }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#78350f', fontSize: '16px' }}>A</div>
-            <div><div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Building your roadmap</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>Almost there</div></div>
-          </div>
-
+          <div style={{ padding: '16px 24px', background: darkMode ? '#1e293b' : 'white', borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', gap: '12px', position: 'sticky' as const, top: 0, zIndex: 1 }}><div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#78350f', fontSize: '16px' }}>A</div><div><div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Building your roadmap</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>Almost there</div></div></div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
-
-            {missionP2Step === 'analyse' && (
-              <div style={{ textAlign: 'center' as const, width: '100%' }}>
-                {missionP2Loading ? (
-                  // Loading state — shown while API call is in progress
-                  <div style={{ padding: '60px 20px' }}>
-                    <div style={{ fontSize: '64px', marginBottom: '24px', animation: 'pulse 1.5s infinite' }}>🧠</div>
-                    <h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 12px 0' }}>Aureus is analysing your situation...</h2>
-                    <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 32px 0' }}>Looking at your income, surplus, mortgage, and personality to build the right roadmap for you specifically.</p>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', maxWidth: '320px', margin: '0 auto' }}>
-                      {[
-                        { icon: '💰', text: `Income: $${monthlyIncome.toFixed(0)}/mo`, color: theme.success },
-                        { icon: '📊', text: `Surplus: $${monthlySurplus.toFixed(0)}/mo`, color: monthlySurplus > 0 ? theme.success : theme.danger },
-                        { icon: '🏠', text: mortgageAccel.balance ? `Mortgage: $${parseInt(mortgageAccel.balance).toLocaleString()}` : 'No mortgage entered', color: theme.accent },
-                        { icon: '🧠', text: moneyPersonality ? personalityProfiles[moneyPersonality]?.label : 'Personality: not assessed', color: moneyPersonality ? personalityProfiles[moneyPersonality]?.color : theme.textMuted },
-                      ].map((item, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
-                          <span style={{ fontSize: '18px' }}>{item.icon}</span>
-                          <span style={{ color: item.color, fontSize: '14px', fontWeight: 500 }}>{item.text}</span>
-                          <span style={{ marginLeft: 'auto', color: theme.success, fontSize: '12px' }}>✓</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ marginTop: '32px', display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                      {[0,1,2].map(i => (
-                        <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.accent, animation: `pulse 1s infinite ${i * 0.3}s` }} />
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  // Ready state — user presses button to trigger analysis
-                  <>
-                    <div style={{ fontSize: '56px', marginBottom: '20px' }}>🔍</div>
-                    <h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 12px 0' }}>Let me analyse your situation.</h2>
-                    <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '14px', marginBottom: '24px', textAlign: 'left' as const, border: '1px solid ' + theme.border }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                        {[
-                          { label: 'Monthly income', value: `$${monthlyIncome.toFixed(0)}`, color: theme.success },
-                          { label: 'Monthly expenses', value: `$${monthlyExpenses.toFixed(0)}`, color: theme.danger },
-                          { label: 'Monthly surplus', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus > 0 ? theme.success : theme.danger },
-                          { label: 'Baby Step', value: `Step ${currentBabyStep.step}`, color: theme.accent },
-                          ...(mortgageAccel.balance ? [{ label: 'Mortgage balance', value: `$${parseInt(mortgageAccel.balance).toLocaleString()}`, color: theme.warning }] : []),
-                          ...(totalDebtBalance > 0 ? [{ label: 'Total debt', value: `$${totalDebtBalance.toFixed(0)}`, color: theme.danger }] : []),
-                        ].map(item => (
-                          <div key={item.label} style={{ padding: '12px', background: theme.bg, borderRadius: '8px' }}>
-                            <div style={{ color: theme.textMuted, fontSize: '11px' }}>{item.label}</div>
-                            <div style={{ color: item.color, fontWeight: 700, fontSize: '18px' }}>{item.value}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {moneyPersonality && personalityProfiles[moneyPersonality] && (
-                      <div style={{ padding: '14px 16px', background: personalityProfiles[moneyPersonality].color + '15', borderRadius: '10px', marginBottom: '24px', border: '1px solid ' + personalityProfiles[moneyPersonality].color + '30', textAlign: 'left' as const }}>
-                        <span style={{ fontSize: '20px' }}>{personalityProfiles[moneyPersonality].emoji}</span>
-                        <span style={{ color: personalityProfiles[moneyPersonality].color, fontWeight: 600, fontSize: '13px', marginLeft: '8px' }}>Coaching you as a {personalityProfiles[moneyPersonality].label}</span>
-                        <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{personalityProfiles[moneyPersonality].aureusFocus}</div>
-                      </div>
-                    )}
-                    <button
-                      onClick={generateRoadmapProposals}
-                      style={{ width: '100%', padding: '16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
-                      🗺️ Build my personalised roadmap →
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-
-            {missionP2Step === 'propose' && missionP2Proposals.length > 0 && (
-              <div style={{ width: '100%' }}>
-                <div style={{ textAlign: 'center' as const, marginBottom: '24px' }}>
-                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>🗺️</div>
-                  <h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 8px 0' }}>Here's your roadmap.</h2>
-                  <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>Based on your numbers and your {moneyPersonality && personalityProfiles[moneyPersonality]?.label.toLowerCase()} personality, these are the 3 milestones I'd prioritise. Untick any you don't want.</p>
-                </div>
-
-                {missionP2Proposals.map((p, i) => (
-                  <div key={i} style={{ padding: '18px', background: missionP2Confirmed[i] ? theme.accent + '15' : theme.cardBg, borderRadius: '14px', marginBottom: '12px', border: '2px solid ' + (missionP2Confirmed[i] ? theme.accent + '60' : theme.border) }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-                      <input type="checkbox" checked={missionP2Confirmed[i] || false} onChange={e => setMissionP2Confirmed(prev => { const n = [...prev]; n[i] = e.target.checked; return n })} style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: theme.accent, flexShrink: 0 }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                          <span style={{ fontSize: '22px' }}>{p.icon}</span>
-                          <span style={{ color: theme.text, fontWeight: 700, fontSize: '16px' }}>{p.name}</span>
-                          {p.target > 0 && <span style={{ color: theme.accent, fontSize: '13px' }}>${p.target.toLocaleString()}</span>}
-                        </div>
-                        <div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.5 }}>{p.notes}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <button
-                  onClick={confirmMissionRoadmap}
-                  disabled={!missionP2Confirmed.some(Boolean)}
-                  style={{ width: '100%', padding: '16px', background: missionP2Confirmed.some(Boolean) ? theme.success : theme.border, color: 'white', border: 'none', borderRadius: '12px', cursor: missionP2Confirmed.some(Boolean) ? 'pointer' : 'default', fontSize: '16px', fontWeight: 700, marginTop: '8px' }}>
-                  {missionP2Loading ? '⏳ Generating your first weekly plan...' : `Add ${missionP2Confirmed.filter(Boolean).length} milestone${missionP2Confirmed.filter(Boolean).length !== 1 ? 's' : ''} & generate my first action plan →`}
-                </button>
-              </div>
-            )}
-
-            {missionP2Step === 'plan' && (
-              <div style={{ textAlign: 'center' as const, padding: '40px 0' }}>
-                {missionP2Loading ? (
-                  <>
-                    <div style={{ fontSize: '64px', marginBottom: '20px', animation: 'pulse 1.5s infinite' }}>📋</div>
-                    <h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 12px 0' }}>Generating your first action plan...</h2>
-                    <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6 }}>Aureus is building a personalised 7-day plan for your first milestone. One moment.</p>
-                    <div style={{ marginTop: '24px', display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                      {[0,1,2].map(i => <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.accent, animation: `pulse 1s infinite ${i * 0.3}s` }} />)}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ fontSize: '64px', marginBottom: '20px' }}>🎉</div>
-                    <h2 style={{ color: theme.success, fontSize: '26px', margin: '0 0 12px 0' }}>You're set up!</h2>
-                    <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, marginBottom: '24px' }}>
-                      Your roadmap is built and your first weekly action plan is ready.<br/>Aureus is now fully personalised to you.<br/><br/>I'll tell you exactly what to do next — every day.
-                    </p>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', alignItems: 'center', marginBottom: '28px' }}>
-                      <div style={{ padding: '8px 16px', background: theme.success + '20', color: theme.success, borderRadius: '8px', fontSize: '13px' }}>✓ {missionP2Confirmed.filter(Boolean).length} milestones added to your roadmap</div>
-                      <div style={{ padding: '8px 16px', background: theme.accent + '20', color: theme.accent, borderRadius: '8px', fontSize: '13px' }}>✓ First weekly action plan generated</div>
-                      <div style={{ padding: '8px 16px', background: theme.purple + '20', color: theme.purple, borderRadius: '8px', fontSize: '13px' }}>✓ Coaching personalised to your {moneyPersonality && personalityProfiles[moneyPersonality]?.label}</div>
-                    </div>
-                    <p style={{ color: theme.textMuted, fontSize: '13px' }}>Taking you to your roadmap now...</p>
-                  </>
-                )}
-              </div>
-            )}
+            {missionP2Step === 'analyse' && (<div style={{ textAlign: 'center' as const, width: '100%' }}>{missionP2Loading ? (<div style={{ padding: '60px 20px' }}><div style={{ fontSize: '64px', marginBottom: '24px', animation: 'pulse 1.5s infinite' }}>🧠</div><h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 12px 0' }}>Analysing your situation...</h2><div style={{ marginTop: '32px', display: 'flex', gap: '6px', justifyContent: 'center' }}>{[0,1,2].map(i => (<div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: theme.accent, animation: `pulse 1s infinite ${i * 0.3}s` }} />))}</div></div>) : (<><div style={{ fontSize: '56px', marginBottom: '20px' }}>🔍</div><h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 12px 0' }}>Let me analyse your situation.</h2><div style={{ padding: '20px', background: theme.cardBg, borderRadius: '14px', marginBottom: '24px', textAlign: 'left' as const, border: '1px solid ' + theme.border }}><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>{[{ label: 'Monthly income', value: `$${monthlyIncome.toFixed(0)}`, color: theme.success }, { label: 'Monthly expenses', value: `$${monthlyExpenses.toFixed(0)}`, color: theme.danger }, { label: 'Monthly surplus', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus > 0 ? theme.success : theme.danger }, { label: 'Baby Step', value: `Step ${currentBabyStep.step}`, color: theme.accent }].map(item => (<div key={item.label} style={{ padding: '12px', background: theme.bg, borderRadius: '8px' }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>{item.label}</div><div style={{ color: item.color, fontWeight: 700, fontSize: '18px' }}>{item.value}</div></div>))}</div></div><button onClick={generateRoadmapProposals} style={{ width: '100%', padding: '16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>Build my roadmap →</button></>)}</div>)}
+            {missionP2Step === 'propose' && missionP2Proposals.length > 0 && (<div style={{ width: '100%' }}><div style={{ textAlign: 'center' as const, marginBottom: '24px' }}><div style={{ fontSize: '48px', marginBottom: '12px' }}>🗺️</div><h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 8px 0' }}>Here's your roadmap.</h2></div>{missionP2Proposals.map((p, i) => (<div key={i} style={{ padding: '18px', background: missionP2Confirmed[i] ? theme.accent + '15' : theme.cardBg, borderRadius: '14px', marginBottom: '12px', border: '2px solid ' + (missionP2Confirmed[i] ? theme.accent + '60' : theme.border) }}><div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}><input type="checkbox" checked={missionP2Confirmed[i] || false} onChange={e => setMissionP2Confirmed(prev => { const n = [...prev]; n[i] = e.target.checked; return n })} style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: theme.accent, flexShrink: 0 }} /><div style={{ flex: 1 }}><div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}><span style={{ fontSize: '22px' }}>{p.icon}</span><span style={{ color: theme.text, fontWeight: 700, fontSize: '16px' }}>{p.name}</span>{p.target > 0 && <span style={{ color: theme.accent, fontSize: '13px' }}>${p.target.toLocaleString()}</span>}</div><div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.5 }}>{p.notes}</div></div></div></div>))}<button onClick={confirmMissionRoadmap} disabled={!missionP2Confirmed.some(Boolean)} style={{ width: '100%', padding: '16px', background: missionP2Confirmed.some(Boolean) ? theme.success : theme.border, color: 'white', border: 'none', borderRadius: '12px', cursor: missionP2Confirmed.some(Boolean) ? 'pointer' : 'default', fontSize: '16px', fontWeight: 700, marginTop: '8px' }}>{missionP2Loading ? 'Generating...' : `Add & generate plan →`}</button></div>)}
+            {missionP2Step === 'plan' && (<div style={{ textAlign: 'center' as const, padding: '40px 0' }}>{missionP2Loading ? (<><div style={{ fontSize: '64px', marginBottom: '20px', animation: 'pulse 1.5s infinite' }}>📋</div><h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 12px 0' }}>Generating your action plan...</h2></>) : (<><div style={{ fontSize: '64px', marginBottom: '20px' }}>🎉</div><h2 style={{ color: theme.success, fontSize: '26px', margin: '0 0 12px 0' }}>You're set up!</h2><p style={{ color: theme.textMuted, fontSize: '13px' }}>Taking you to your roadmap...</p></>)}</div>)}
           </div>
         </div>
       )}
-      {celebrationWin && (
-        <div style={{ position: 'fixed' as const, top: '20px', right: '20px', zIndex: 9999, padding: '16px 20px', background: 'linear-gradient(135deg, #10b981, #059669)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(16,185,129,0.4)', color: 'white', maxWidth: '320px', animation: 'slideIn 0.3s ease' }}>
-          <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>🏆 New Win Unlocked!</div>
-          <div style={{ fontSize: '13px', opacity: 0.9 }}>{celebrationWin}</div>
-        </div>
-      )}
+
+      {celebrationWin && (<div style={{ position: 'fixed' as const, top: '20px', right: '20px', zIndex: 9999, padding: '16px 20px', background: 'linear-gradient(135deg, #10b981, #059669)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(16,185,129,0.4)', color: 'white', maxWidth: '320px', animation: 'slideIn 0.3s ease' }}><div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>🏆 New Win!</div><div style={{ fontSize: '13px', opacity: 0.9 }}>{celebrationWin}</div></div>)}
 
       {/* HEADER */}
       <header style={{ padding: '12px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, position: 'sticky' as const, top: 0, zIndex: 100 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fcd34d' }}>
-              <span style={{ color: '#78350f', fontWeight: 800, fontSize: '18px' }}>A</span>
-            </div>
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fcd34d' }}><span style={{ color: '#78350f', fontWeight: 800, fontSize: '18px' }}>A</span></div>
             <span style={{ color: theme.text, fontWeight: 700, fontSize: '20px' }}>Aureus</span>
             {streak > 0 && <span style={{ padding: '3px 10px', background: '#f59e0b20', color: '#f59e0b', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>🔥 {streak}-week streak</span>}
-            {/* Coach next action — compact header badge */}
-            {coachNextAction && activeTab !== 'quickview' && (
-              <button
-                onClick={() => setActiveTab('quickview')}
-                style={{ padding: '3px 10px', background: coachNextAction.urgency === 'high' ? theme.warning + '20' : theme.accent + '20', color: coachNextAction.urgency === 'high' ? theme.warning : theme.accent, border: '1px solid ' + (coachNextAction.urgency === 'high' ? theme.warning + '50' : theme.accent + '40'), borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}
-                title={coachNextAction.message}
-              >
-                {coachNextAction.icon} {coachNextAction.urgency === 'high' ? 'Action needed' : 'Aureus recommends'}
-              </button>
-            )}
-            {/* Due badges */}
-            {isMoneyDateDue() && (
-              <button onClick={() => { setShowMoneyDate(true); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ padding: '3px 10px', background: theme.success + '20', color: theme.success, border: '1px solid ' + theme.success + '50', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', animation: 'pulse 2s infinite' }}>
-                💰 Money Date due
-              </button>
-            )}
-            {isDailyCheckInDue() && (
-              <button onClick={() => { setShowDailyCheckIn(true); setDailyCheckInStep(0); setDailyCheckInAnswers({}) }} style={{ padding: '3px 10px', background: theme.accent + '20', color: theme.accent, border: '1px solid ' + theme.accent + '50', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
-                ✅ Daily check-in
-              </button>
-            )}
+            {coachNextAction && activeTab !== 'quickview' && (<button onClick={() => setActiveTab('quickview')} style={{ padding: '3px 10px', background: coachNextAction.urgency === 'high' ? theme.warning + '20' : theme.accent + '20', color: coachNextAction.urgency === 'high' ? theme.warning : theme.accent, border: '1px solid ' + (coachNextAction.urgency === 'high' ? theme.warning + '50' : theme.accent + '40'), borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>{coachNextAction.icon} {coachNextAction.urgency === 'high' ? 'Action needed' : 'Recommend'}</button>)}
+            {isMoneyDateDue() && (<button onClick={() => { setShowMoneyDate(true); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ padding: '3px 10px', background: theme.success + '20', color: theme.success, border: '1px solid ' + theme.success + '50', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', animation: 'pulse 2s infinite' }}>💰 Money Date due</button>)}
+            {isDailyCheckInDue() && (<button onClick={() => { setShowDailyCheckIn(true); setDailyCheckInStep(0); setDailyCheckInAnswers({}) }} style={{ padding: '3px 10px', background: theme.accent + '20', color: theme.accent, border: '1px solid ' + theme.accent + '50', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>✅ Daily check-in</button>)}
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button onClick={() => setDarkMode(!darkMode)} style={{ padding: '7px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>{darkMode ? '☀️' : '🌙'}</button>
-            <select value={userCountry} onChange={e => setUserCountry(e.target.value as any)} style={{ padding: '6px 10px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text, fontSize: '14px' }}>
-              <option value="AU">🇦🇺 AU</option><option value="US">🇺🇸 US</option><option value="UK">🇬🇧 UK</option><option value="NZ">🇳🇿 NZ</option><option value="CA">🇨🇦 CA</option>
-            </select>
+            <select value={userCountry} onChange={e => setUserCountry(e.target.value as any)} style={{ padding: '6px 10px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text, fontSize: '14px' }}><option value="AU">🇦🇺 AU</option><option value="US">🇺🇸 US</option><option value="UK">🇬🇧 UK</option><option value="NZ">🇳🇿 NZ</option><option value="CA">🇨🇦 CA</option></select>
           </div>
         </div>
-        {/* NAV TABS - scrollable */}
         <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' as const, paddingBottom: '2px' }}>
-          {[
-            { id: 'chat', label: '💬 Aureus' },
-            { id: 'quickview', label: '⚡ Quick' },
-            { id: 'dashboard', label: '🎛️ Budget' },
-            { id: 'mortgage', label: '🚀 Mortgage' },
-            { id: 'insights', label: '🧠 Insights' },
-            { id: 'path', label: '🛤️ Path' },
-            { id: 'grow', label: '📈 Grow' },
-            { id: 'review', label: '🔄 Review' },
-            { id: 'overview', label: '📊 Metrics' },
-            { id: 'learn', label: '🎓 Learn' },
-            { id: 'wins', label: `🏆 Wins${wins.length > 0 ? ` (${wins.length})` : ''}` },
-          ].map(tab => (
-            <button key={tab.id}
-              onClick={() => { if (missionNavLocked) return; setActiveTab(tab.id as any) }}
-              style={{ padding: '7px 14px', background: activeTab === tab.id ? theme.accent : 'transparent', color: activeTab === tab.id ? 'white' : missionNavLocked ? theme.textMuted + '60' : theme.text, border: '1px solid ' + (activeTab === tab.id ? theme.accent : theme.border), borderRadius: '8px', cursor: missionNavLocked ? 'default' : 'pointer', fontSize: '12px', fontWeight: 500, whiteSpace: 'nowrap' as const, flexShrink: 0, opacity: missionNavLocked ? 0.4 : 1 }}>
-              {tab.label}
-            </button>
-          ))}
-          {/* Phase 1 locked nav banner */}
-          {missionNavLocked && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', background: theme.accent + '20', borderRadius: '8px', border: '1px solid ' + theme.accent + '40', flexShrink: 0 }}>
-              <span style={{ fontSize: '12px' }}>🔒</span>
-              <span style={{ color: theme.accent, fontSize: '11px', fontWeight: 600 }}>Complete setup to unlock all tabs</span>
-              <button onClick={() => { setMissionComplete(true); setMissionNavLocked(false); setOnboardingComplete(true) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', padding: 0 }}>skip</button>
-            </div>
-          )}
+          {[{ id: 'chat', label: '💬 Aureus' }, { id: 'quickview', label: '⚡ Quick' }, { id: 'dashboard', label: '🎛️ Budget' }, { id: 'mortgage', label: '🚀 Mortgage' }, { id: 'insights', label: '🧠 Insights' }, { id: 'path', label: '🛤️ Path' }, { id: 'grow', label: '📈 Grow' }, { id: 'review', label: '🔄 Review' }, { id: 'overview', label: '📊 Metrics' }, { id: 'learn', label: '🎓 Learn' }, { id: 'wins', label: `🏆 Wins${wins.length > 0 ? ` (${wins.length})` : ''}` }].map(tab => (<button key={tab.id} onClick={() => { if (missionNavLocked) return; setActiveTab(tab.id as any) }} style={{ padding: '7px 14px', background: activeTab === tab.id ? theme.accent : 'transparent', color: activeTab === tab.id ? 'white' : missionNavLocked ? theme.textMuted + '60' : theme.text, border: '1px solid ' + (activeTab === tab.id ? theme.accent : theme.border), borderRadius: '8px', cursor: missionNavLocked ? 'default' : 'pointer', fontSize: '12px', fontWeight: 500, whiteSpace: 'nowrap' as const, flexShrink: 0, opacity: missionNavLocked ? 0.4 : 1 }}>{tab.label}</button>))}
+          {missionNavLocked && (<div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', background: theme.accent + '20', borderRadius: '8px', border: '1px solid ' + theme.accent + '40', flexShrink: 0 }}><span style={{ fontSize: '12px' }}>🔒</span><span style={{ color: theme.accent, fontSize: '11px', fontWeight: 600 }}>Complete setup to unlock</span><button onClick={() => { setMissionComplete(true); setMissionNavLocked(false); setOnboardingComplete(true) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', padding: 0 }}>skip</button></div>)}
         </div>
       </header>
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
-
-        {/* QUICK VIEW */}
+        {/* ==================== QUICKVIEW TAB ==================== */}
         {activeTab === 'quickview' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
-            {/* WHY STATEMENT BANNER */}
+            {/* Why Statement Banner */}
             {whyStatement ? (
               <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #f59e0b15, #10b98115)', borderRadius: '12px', border: '2px solid #f59e0b40', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Why I\'m Doing This</div>
-                  <div style={{ color: theme.text, fontSize: '15px', fontStyle: 'italic' }}>"{whyStatement}"</div>
-                </div>
+                <div><div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Why I'm Doing This</div><div style={{ color: theme.text, fontSize: '15px', fontStyle: 'italic' }}>"{whyStatement}"</div></div>
                 <button onClick={() => { setEditingWhy(true); setWhyDraft(whyStatement) }} style={{ padding: '6px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>Edit</button>
               </div>
             ) : (
-              <button onClick={() => { setEditingWhy(true); setWhyDraft('') }} style={{ padding: '16px 20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '2px dashed ' + theme.border, cursor: 'pointer', textAlign: 'left' as const }}>
-                <div style={{ color: theme.textMuted, fontSize: '13px' }}>💬 <strong>Set your why</strong> — What are you working toward? (e.g. "Be mortgage-free before my kids finish school")</div>
-              </button>
+              <button onClick={() => { setEditingWhy(true); setWhyDraft('') }} style={{ padding: '16px 20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '2px dashed ' + theme.border, cursor: 'pointer', textAlign: 'left' as const }}><div style={{ color: theme.textMuted, fontSize: '13px' }}>💬 <strong>Set your why</strong> — What are you working toward?</div></button>
             )}
 
-            {/* ===== AUREUS COACH CARD — WHAT TO DO NEXT ===== */}
+            {/* Coach Card */}
             {coachNextAction && (
-              <div style={{
-                padding: '18px 20px',
-                background: coachNextAction.urgency === 'high'
-                  ? `linear-gradient(135deg, ${theme.warning}25, ${theme.orange}10)`
-                  : coachNextAction.urgency === 'medium'
-                  ? `linear-gradient(135deg, ${theme.accent}20, ${theme.purple}10)`
-                  : `linear-gradient(135deg, ${theme.success}15, ${theme.teal}10)`,
-                borderRadius: '14px',
-                border: '2px solid ' + (
-                  coachNextAction.urgency === 'high' ? theme.warning + '80'
-                  : coachNextAction.urgency === 'medium' ? theme.accent + '60'
-                  : theme.success + '50'
-                )
-              }}>
+              <div style={{ padding: '18px 20px', background: coachNextAction.urgency === 'high' ? `linear-gradient(135deg, ${theme.warning}25, ${theme.orange}10)` : coachNextAction.urgency === 'medium' ? `linear-gradient(135deg, ${theme.accent}20, ${theme.purple}10)` : `linear-gradient(135deg, ${theme.success}15, ${theme.teal}10)`, borderRadius: '14px', border: '2px solid ' + (coachNextAction.urgency === 'high' ? theme.warning + '80' : coachNextAction.urgency === 'medium' ? theme.accent + '60' : theme.success + '50') }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                   <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f', flexShrink: 0 }}>A</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                      <div style={{ color: coachNextAction.urgency === 'high' ? theme.warning : coachNextAction.urgency === 'medium' ? theme.accent : theme.success, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>
-                        {coachNextAction.urgency === 'high' ? '⚡ NEXT ACTION' : coachNextAction.urgency === 'medium' ? '🎯 AUREUS RECOMMENDS' : "💡 WHEN YOU'RE READY"}
-                      </div>
+                      <div style={{ color: coachNextAction.urgency === 'high' ? theme.warning : coachNextAction.urgency === 'medium' ? theme.accent : theme.success, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>{coachNextAction.urgency === 'high' ? '⚡ NEXT ACTION' : coachNextAction.urgency === 'medium' ? '🎯 AUREUS RECOMMENDS' : "💡 WHEN YOU'RE READY"}</div>
                       <button onClick={() => { setDismissedTriggers(prev => [...prev, coachNextAction.triggeredBy]); setCoachNextAction(null) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '0 0 0 8px' }}>×</button>
                     </div>
                     <p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.65, margin: '0 0 12px 0' }}>{coachNextAction.message}</p>
@@ -2501,3094 +1889,169 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               </div>
             )}
 
-            {/* DAILY CHECK-IN CARD */}
+            {/* Daily Check-in Card */}
             <div style={{ padding: '16px 20px', background: isDailyCheckInDue() ? `linear-gradient(135deg, ${theme.accent}20, ${theme.accent}05)` : theme.cardBg, borderRadius: '14px', border: '1px solid ' + (isDailyCheckInDue() ? theme.accent + '60' : theme.border) }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px' }}>✅ Daily Check-in</div>
-                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>
-                    {lastDailyCheckIn === new Date().toISOString().split('T')[0]
-                      ? '✓ Done today'
-                      : isDailyCheckInDue() ? 'Ready for you now' : `Available any time · last done ${lastDailyCheckIn ? new Date(lastDailyCheckIn).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) : 'never'}`}
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setShowDailyCheckIn(true); setDailyCheckInStep(0); setDailyCheckInAnswers({}) }}
-                  disabled={lastDailyCheckIn === new Date().toISOString().split('T')[0]}
-                  style={{ padding: '8px 16px', background: lastDailyCheckIn === new Date().toISOString().split('T')[0] ? theme.border : theme.accent, color: lastDailyCheckIn === new Date().toISOString().split('T')[0] ? theme.textMuted : 'white', border: 'none', borderRadius: '8px', cursor: lastDailyCheckIn === new Date().toISOString().split('T')[0] ? 'default' : 'pointer', fontSize: '13px', fontWeight: 600 }}>
-                  {lastDailyCheckIn === new Date().toISOString().split('T')[0] ? '✓ Done' : 'Start →'}
-                </button>
+                <div><div style={{ color: theme.text, fontWeight: 700, fontSize: '14px' }}>✅ Daily Check-in</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>{lastDailyCheckIn === new Date().toISOString().split('T')[0] ? '✓ Done today' : isDailyCheckInDue() ? 'Ready for you now' : `Last: ${lastDailyCheckIn ? new Date(lastDailyCheckIn).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) : 'never'}`}</div></div>
+                <button onClick={() => { setShowDailyCheckIn(true); setDailyCheckInStep(0); setDailyCheckInAnswers({}) }} disabled={lastDailyCheckIn === new Date().toISOString().split('T')[0]} style={{ padding: '8px 16px', background: lastDailyCheckIn === new Date().toISOString().split('T')[0] ? theme.border : theme.accent, color: lastDailyCheckIn === new Date().toISOString().split('T')[0] ? theme.textMuted : 'white', border: 'none', borderRadius: '8px', cursor: lastDailyCheckIn === new Date().toISOString().split('T')[0] ? 'default' : 'pointer', fontSize: '13px', fontWeight: 600 }}>{lastDailyCheckIn === new Date().toISOString().split('T')[0] ? '✓ Done' : 'Start →'}</button>
               </div>
-              {dailyCheckInLog.length > 0 && (
-                <div style={{ marginTop: '10px', display: 'flex', gap: '4px' }}>
-                  {Array.from({ length: 7 }).map((_, i) => {
-                    const d = new Date(Date.now() - i * 86400000).toISOString().split('T')[0]
-                    const done = dailyCheckInLog.some(e => new Date(e.date).toISOString().split('T')[0] === d)
-                    return <div key={i} title={d} style={{ width: '12px', height: '12px', borderRadius: '3px', background: done ? theme.accent : theme.border }} />
-                  })}
-                  <span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '6px' }}>last 7 days</span>
-                </div>
-              )}
+              {dailyCheckInLog.length > 0 && (<div style={{ marginTop: '10px', display: 'flex', gap: '4px' }}>{Array.from({ length: 7 }).map((_, i) => { const d = new Date(Date.now() - i * 86400000).toISOString().split('T')[0]; const done = dailyCheckInLog.some(e => new Date(e.date).toISOString().split('T')[0] === d); return <div key={i} title={d} style={{ width: '12px', height: '12px', borderRadius: '3px', background: done ? theme.accent : theme.border }} /> })}<span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '6px' }}>last 7 days</span></div>)}
             </div>
 
-            {/* MONEY DATE SCHEDULE BANNER */}
-            {isMoneyDateDue() && (
-              <div style={{ padding: '16px 20px', background: `linear-gradient(135deg, ${theme.success}20, ${theme.success}05)`, borderRadius: '14px', border: '2px solid ' + theme.success + '60', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ color: theme.success, fontWeight: 700, fontSize: '14px' }}>💰 Money Date is due!</div>
-                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>Your scheduled {checkInSchedule.moneyDateDay} check-in is waiting</div>
-                </div>
-                <button onClick={() => { setShowMoneyDate(true); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ padding: '10px 18px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
-                  Start now →
-                </button>
-              </div>
-            )}
+            {/* Money Date Banner */}
+            {isMoneyDateDue() && (<div style={{ padding: '16px 20px', background: `linear-gradient(135deg, ${theme.success}20, ${theme.success}05)`, borderRadius: '14px', border: '2px solid ' + theme.success + '60', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div><div style={{ color: theme.success, fontWeight: 700, fontSize: '14px' }}>💰 Money Date is due!</div><div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>Your scheduled {checkInSchedule.moneyDateDay} check-in</div></div><button onClick={() => { setShowMoneyDate(true); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ padding: '10px 18px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>Start →</button></div>)}
 
-            {/* PERSONALITY QUIZ PROMPT — shown until completed */}
-            {!moneyPersonality && (
-              <div style={{ padding: '20px', background: 'linear-gradient(135deg, #8b5cf620, #3b82f615)', borderRadius: '14px', border: '2px solid ' + theme.purple + '50' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
-                  <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: theme.purple + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', flexShrink: 0 }}>🧠</div>
-                  <div>
-                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Aureus doesn't know you yet</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px' }}>Take the money personality quiz so Aureus can coach you the way YOU need to be coached — not generically.</div>
-                  </div>
-                </div>
-                <button onClick={() => { setShowOnboarding(true); setOnboardingStep(1) }} style={{ ...btnPurple, width: '100%', padding: '12px' }}>
-                  🧠 Take the 8-question quiz (5 min) →
-                </button>
-              </div>
-            )}
+            {/* Quote */}
+            <div style={{ background: theme.cardBg, borderRadius: '12px', padding: '16px 20px', borderLeft: '4px solid ' + theme.purple }}><p style={{ color: theme.text, fontSize: '14px', fontStyle: 'italic', margin: 0 }}>"{currentQuote.quote}"</p><p style={{ color: theme.textMuted, fontSize: '12px', margin: '8px 0 0 0', textAlign: 'right' as const }}>— {currentQuote.author}</p></div>
 
-            {/* QUOTE */}
-            <div style={{ background: theme.cardBg, borderRadius: '12px', padding: '16px 20px', borderLeft: '4px solid ' + theme.purple }}>
-              <p style={{ color: theme.text, fontSize: '14px', fontStyle: 'italic', margin: 0 }}>"{currentQuote.quote}"</p>
-              <p style={{ color: theme.textMuted, fontSize: '12px', margin: '8px 0 0 0', textAlign: 'right' as const }}>— {currentQuote.author}</p>
-            </div>
-
-            {/* AUREUS CHAT WIDGET */}
-            <div style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
-                <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{currentBabyStep.title}</div></div>
-              </div>
-              {chatMessages.length > 0 && (
-                <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
-                  {chatMessages.slice(-6).map((msg, idx) => (
-                    <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                      <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
-                    </div>
-                  ))}
-                  {isLoading && <div style={{ padding: '8px', color: theme.textMuted, fontSize: '13px' }}>Aureus is thinking...</div>}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1 }} disabled={isLoading} />
-                <button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ ...btnSuccess, opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button>
-              </div>
-            </div>
-
-            {/* METRIC GRID */}
+            {/* Quick Metrics Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-              {[
-                { label: 'Monthly Income', value: `$${monthlyIncome.toFixed(0)}`, color: theme.success },
-                { label: 'Monthly Bills', value: `$${totalOutgoing.toFixed(0)}`, color: theme.danger },
-                { label: 'Monthly Surplus', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus >= 0 ? theme.success : theme.danger },
-                { label: 'Net Worth', value: `$${netWorth.toLocaleString()}`, color: netWorth >= 0 ? theme.success : theme.danger },
-              ].map(m => (
-                <div key={m.label} style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
-                  <div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>{m.label}</div>
-                  <div style={{ color: m.color, fontSize: '28px', fontWeight: 700 }}>{m.value}</div>
-                </div>
-              ))}
+              {[{ label: 'Income', value: `$${monthlyIncome.toFixed(0)}`, color: theme.success }, { label: 'Bills', value: `$${totalOutgoing.toFixed(0)}`, color: theme.danger }, { label: 'Surplus', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus >= 0 ? theme.success : theme.danger }, { label: 'Net Worth', value: `$${netWorth.toLocaleString()}`, color: netWorth >= 0 ? theme.success : theme.danger }].map(m => (<div key={m.label} style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>{m.label}</div><div style={{ color: m.color, fontSize: '28px', fontWeight: 700 }}>{m.value}</div></div>))}
             </div>
 
-            {/* MORTGAGE FREE DATE HERO */}
-            {mortgageAccel.balance && mortgageResult ? (
-              <div style={{ padding: '24px', background: 'linear-gradient(135deg, #0f2027, #203a43, #2c5364)', borderRadius: '16px', border: '2px solid #3b82f6' }}>
-                <div style={{ color: '#94a3b8', fontSize: '11px', letterSpacing: '3px', marginBottom: '12px', textAlign: 'center' as const }}>🏠 MORTGAGE PAYOFF COUNTDOWN</div>
-                <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' as const, marginBottom: '16px' }}>
-                  <div>
-                    <div style={{ color: '#ef4444', fontSize: '11px', marginBottom: '4px' }}>Without changes</div>
-                    <div style={{ color: '#f1f5f9', fontSize: '36px', fontWeight: 800 }}>{mortgageResult.standard.freeYear}</div>
-                    <div style={{ color: '#64748b', fontSize: '11px' }}>{mortgageResult.standard.years.toFixed(1)} yrs · ${Math.round(mortgageResult.standard.interest / 1000)}k interest</div>
-                  </div>
-                  {parseFloat(mortgageAccel.extraRepayment || '0') > 0 && (
-                    <div>
-                      <div style={{ color: '#10b981', fontSize: '11px', marginBottom: '4px' }}>With your extra payments</div>
-                      <div style={{ color: '#10b981', fontSize: '36px', fontWeight: 800 }}>{mortgageResult.withExtra.freeYear}</div>
-                      <div style={{ color: '#10b981', fontSize: '11px' }}>🎉 {mortgageResult.withExtra.yearsSaved.toFixed(1)} yrs earlier · ${Math.round(mortgageResult.withExtra.interestSaved / 1000)}k saved</div>
-                    </div>
-                  )}
-                </div>
-                {/* What-if slider */}
-                <div style={{ padding: '12px 0' }}>
-                  <div style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '8px', textAlign: 'center' as const }}>💡 What if you paid extra per {mortgageAccel.repaymentFrequency === 'weekly' ? 'week' : mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'}?</div>
-                  {[100, 200, 500, 1000].map(extra => {
-                    const freq = mortgageAccel.repaymentFrequency === 'weekly' ? 52 : mortgageAccel.repaymentFrequency === 'fortnightly' ? 26 : 12
-                    const r = parseFloat(mortgageAccel.rate || '0') / 100 / freq
-                    const repayment = mortgageResult.repaymentUsed + extra
-                    const bal = parseFloat(mortgageAccel.balance || '0')
-                    if (repayment <= bal * r) return null
-                    const periods = Math.log(repayment / (repayment - bal * r)) / Math.log(1 + r)
-                    const yrs = periods / freq
-                    const saved = mortgageResult.standard.years - yrs
-                    const interestSaved = mortgageResult.standard.interest - (repayment * periods - bal)
-                    return (
-                      <div key={extra} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', marginBottom: '4px' }}>
-                        <span style={{ color: '#94a3b8', fontSize: '12px' }}>+${extra}</span>
-                        <span style={{ color: '#10b981', fontSize: '12px', fontWeight: 600 }}>{saved.toFixed(1)} yrs earlier</span>
-                        <span style={{ color: '#f59e0b', fontSize: '12px' }}>${Math.round(interestSaved / 1000)}k saved</span>
-                      </div>
-                    )
-                  })}
-                </div>
-                <button onClick={() => setActiveTab('mortgage')} style={{ width: '100%', marginTop: '8px', padding: '10px', background: theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>Open Mortgage Accelerator →</button>
-              </div>
-            ) : (
-              <button onClick={() => setActiveTab('mortgage')} style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #1e3a5f, #0f172a)', borderRadius: '12px', border: '2px dashed #3b82f6', cursor: 'pointer', width: '100%', textAlign: 'left' as const }}>
-                <div style={{ color: '#f1f5f9', fontWeight: 600, marginBottom: '4px' }}>🏠 See your mortgage-free date</div>
-                <div style={{ color: '#64748b', fontSize: '13px' }}>Enter your mortgage details to see how quickly you could be debt-free →</div>
-              </button>
-            )}
+            {/* Mortgage Free Date Hero */}
+            {mortgageAccel.balance && mortgageResult ? (<div style={{ padding: '24px', background: 'linear-gradient(135deg, #0f2027, #203a43, #2c5364)', borderRadius: '16px', border: '2px solid #3b82f6' }}><div style={{ color: '#94a3b8', fontSize: '11px', letterSpacing: '3px', marginBottom: '12px', textAlign: 'center' as const }}>🏠 MORTGAGE PAYOFF</div><div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' as const, marginBottom: '16px' }}><div><div style={{ color: '#ef4444', fontSize: '11px', marginBottom: '4px' }}>Current</div><div style={{ color: '#f1f5f9', fontSize: '36px', fontWeight: 800 }}>{mortgageResult.standard.freeYear}</div><div style={{ color: '#64748b', fontSize: '11px' }}>{mortgageResult.standard.years.toFixed(1)} yrs</div></div>{parseFloat(mortgageAccel.extraRepayment || '0') > 0 && (<div><div style={{ color: '#10b981', fontSize: '11px', marginBottom: '4px' }}>With extra</div><div style={{ color: '#10b981', fontSize: '36px', fontWeight: 800 }}>{mortgageResult.withExtra.freeYear}</div><div style={{ color: '#10b981', fontSize: '11px' }}>{mortgageResult.withExtra.yearsSaved.toFixed(1)} yrs saved</div></div>)}</div><button onClick={() => setActiveTab('mortgage')} style={{ width: '100%', marginTop: '8px', padding: '10px', background: theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Open Accelerator →</button></div>) : (<button onClick={() => setActiveTab('mortgage')} style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #1e3a5f, #0f172a)', borderRadius: '12px', border: '2px dashed #3b82f6', cursor: 'pointer', width: '100%', textAlign: 'left' as const }}><div style={{ color: '#f1f5f9', fontWeight: 600 }}>🏠 See your mortgage-free date</div><div style={{ color: '#64748b', fontSize: '13px' }}>Enter your mortgage details →</div></button>)}
 
-            {/* IDENTITY STATEMENTS */}
-            {identityStatements.length > 0 && (
-              <div style={{ padding: '16px 20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
-                <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '10px' }}>⚡ Who I Am Becoming</div>
-                {identityStatements.map((stmt, i) => (
-                  <div key={i} style={{ color: theme.text, fontSize: '14px', fontStyle: 'italic', padding: '6px 0', borderBottom: i < identityStatements.length - 1 ? '1px solid ' + theme.border : 'none' }}>
-                    "{stmt}"
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* THE ONE DECISION */}
-            {oneDecision && (
-              <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #f59e0b15, #f97316 15)', borderRadius: '12px', border: '2px solid #f59e0b40' }}>
-                <div style={{ color: '#f59e0b', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>🎯 Your ONE Financial Move This Week</div>
-                <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6 }}>{oneDecision}</div>
-                <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '6px' }}>{oneDecisionDate && `Generated ${new Date(oneDecisionDate).toLocaleDateString('en-AU')}`}</div>
-              </div>
-            )}
-
-            {/* MONEY PERSONALITY BADGE */}
-            {moneyPersonality && personalityProfiles[moneyPersonality] && (
-              <div style={{ padding: '14px 18px', background: personalityProfiles[moneyPersonality].color + '15', borderRadius: '12px', border: '1px solid ' + personalityProfiles[moneyPersonality].color + '40', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '28px' }}>{personalityProfiles[moneyPersonality].emoji}</span>
-                <div>
-                  <div style={{ color: personalityProfiles[moneyPersonality].color, fontWeight: 700, fontSize: '14px' }}>{personalityProfiles[moneyPersonality].label}</div>
-                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>Your money personality · <button onClick={() => setActiveTab('insights')} style={{ background: 'none', border: 'none', color: theme.accent, cursor: 'pointer', fontSize: '12px', padding: 0 }}>See insights →</button></div>
-                </div>
-              </div>
-            )}
-
-            {/* QUICK NAV */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-              {[
-                { tab: 'insights', icon: '🧠', label: 'Insights' },
-                { tab: 'mortgage', icon: '🚀', label: 'Mortgage' },
-                { tab: 'grow', icon: '📈', label: 'Grow' },
-                { tab: 'review', icon: '🔄', label: 'Review' },
-              ].map(n => (
-                <button key={n.tab} onClick={() => setActiveTab(n.tab as any)} style={{ padding: '14px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
-                  <div style={{ fontSize: '22px', marginBottom: '6px' }}>{n.icon}</div>
-                  <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{n.label}</div>
-                </button>
-              ))}
-            </div>
+            {/* Quick Nav */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>{[{ tab: 'insights', icon: '🧠', label: 'Insights' }, { tab: 'mortgage', icon: '🚀', label: 'Mortgage' }, { tab: 'grow', icon: '📈', label: 'Grow' }, { tab: 'review', icon: '🔄', label: 'Review' }].map(n => (<button key={n.tab} onClick={() => setActiveTab(n.tab as any)} style={{ padding: '14px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}><div style={{ fontSize: '22px', marginBottom: '6px' }}>{n.icon}</div><div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{n.label}</div></button>))}</div>
           </div>
         )}
 
-        {/* CHAT TAB */}
+        {/* ==================== CHAT TAB ==================== */}
         {activeTab === 'chat' && (
           <div style={{ maxWidth: '800px', margin: '0 auto' }}>
             <div style={{ background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, border: '2px solid ' + theme.success, borderRadius: '20px', padding: '24px', minHeight: '70vh', display: 'flex', flexDirection: 'column' as const }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid ' + theme.border }}>
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #fcd34d' }}>
-                  <span style={{ color: '#78350f', fontWeight: 800, fontSize: '28px' }}>A</span>
-                </div>
-                <div>
-                  <div style={{ color: theme.text, fontWeight: 700, fontSize: '22px' }}>Aureus</div>
-                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Your financial coach · {currentBabyStep.title}</div>
-                </div>
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #fcd34d' }}><span style={{ color: '#78350f', fontWeight: 800, fontSize: '28px' }}>A</span></div>
+                <div><div style={{ color: theme.text, fontWeight: 700, fontSize: '22px' }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '13px' }}>Your financial coach · {currentBabyStep.title}</div></div>
               </div>
-              <div style={{ padding: '8px 12px', background: theme.warning + '15', borderRadius: '8px', marginBottom: '12px', border: '1px solid ' + theme.warning + '30' }}>
-                <p style={{ margin: 0, color: theme.textMuted, fontSize: '11px' }}>⚠️ Aureus is an AI assistant, not a licensed financial advisor. Always verify and consult qualified professionals for major decisions.</p>
-              </div>
+              <div style={{ padding: '8px 12px', background: theme.warning + '15', borderRadius: '8px', marginBottom: '12px', border: '1px solid ' + theme.warning + '30' }}><p style={{ margin: 0, color: theme.textMuted, fontSize: '11px' }}>⚠️ AI assistant, not financial advisor. Verify with professionals.</p></div>
               <div ref={chatContainerRef} style={{ flex: 1, overflowY: 'auto' as const, marginBottom: '16px', padding: '8px' }}>
-                {chatMessages.length === 0 && (
-                  <div style={{ padding: '20px 10px' }}>
-                    {/* Coach card in chat — always front-and-centre */}
-                    {coachNextAction && chatMessages.length === 0 && (
-                      <div style={{ marginBottom: '20px', padding: '16px 18px', background: coachNextAction.urgency === 'high' ? theme.warning + '15' : theme.accent + '15', borderRadius: '12px', border: '1px solid ' + (coachNextAction.urgency === 'high' ? theme.warning + '50' : theme.accent + '40') }}>
-                        <div style={{ color: coachNextAction.urgency === 'high' ? theme.warning : theme.accent, fontSize: '11px', fontWeight: 700, marginBottom: '6px', letterSpacing: '1px' }}>
-                          {coachNextAction.urgency === 'high' ? '⚡ I\'VE BEEN THINKING ABOUT YOUR SITUATION...' : '🎯 HERE\'S WHAT I\'D FOCUS ON NEXT'}
-                        </div>
-                        <p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.65, margin: '0 0 10px 0' }}>{coachNextAction.message}</p>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button onClick={() => setActiveTab(coachNextAction.tab as any)} style={{ padding: '8px 16px', background: coachNextAction.urgency === 'high' ? theme.warning : theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>{coachNextAction.action}</button>
-                          <button onClick={() => { setChatInput(`Tell me more about: ${coachNextAction.message.split('.')[0]}`) }} style={{ padding: '8px 14px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>Ask Aureus about this</button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Personality quiz CTA - most prominent when not done */}
-                    {!moneyPersonality ? (
-                      <div style={{ marginBottom: '24px', padding: '24px', background: 'linear-gradient(135deg, #8b5cf615, #3b82f615)', borderRadius: '16px', border: '2px solid ' + theme.purple + '50', textAlign: 'center' as const }}>
-                        <div style={{ fontSize: '44px', marginBottom: '12px' }}>🧠</div>
-                        <div style={{ color: theme.text, fontWeight: 700, fontSize: '17px', marginBottom: '8px' }}>First, let me get to know you.</div>
-                        <div style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, marginBottom: '16px' }}>
-                          Aureus coaches everyone differently. Before I start giving advice, I need to understand how <em>you</em> think about money — your personality, your why, and your identity.
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' as const, marginBottom: '16px' }}>
-                          {['🎯 Personalised coaching', '❤️ Understand your why', '⚡ 5 minutes'].map(tag => (
-                            <span key={tag} style={{ padding: '4px 10px', background: theme.purple + '20', color: theme.purple, borderRadius: '12px', fontSize: '12px', fontWeight: 600 }}>{tag}</span>
-                          ))}
-                        </div>
-                        <button onClick={() => { setShowOnboarding(true); setOnboardingStep(0) }} style={{ ...btnPurple, padding: '14px 32px', fontSize: '15px', width: '100%' }}>
-                          Start my money personality quiz →
-                        </button>
-                        <button onClick={() => setChatMessages([{ role: 'assistant', content: "G'day! I'm Aureus — your AI financial coach. I specialise in helping Australians pay their mortgage off faster and build real wealth. What's on your mind?" }])} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', marginTop: '10px', fontSize: '13px' }}>
-                          Skip and just chat
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ marginBottom: '20px', padding: '16px', background: personalityProfiles[moneyPersonality]?.color + '15', borderRadius: '12px', border: '1px solid ' + personalityProfiles[moneyPersonality]?.color + '40', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <span style={{ fontSize: '32px' }}>{personalityProfiles[moneyPersonality]?.emoji}</span>
-                        <div>
-                          <div style={{ color: personalityProfiles[moneyPersonality]?.color, fontWeight: 700, fontSize: '14px' }}>{personalityProfiles[moneyPersonality]?.label}</div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Aureus is coaching you as a {personalityProfiles[moneyPersonality]?.label.toLowerCase()} — responses are tailored to how you think.</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Starter questions */}
-                    <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px', textAlign: 'center' as const }}>Or jump straight in:</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px', justifyContent: 'center' }}>
-                      {[
-                        'How do I pay my mortgage off faster?',
-                        'Should I use an offset account?',
-                        'Am I on track financially?',
-                        'How does salary sacrifice work?',
-                        'What should I focus on this week?'
-                      ].map(q => (
-                        <button key={q} onClick={() => { setChatInput(q); setTimeout(() => handleChatMessage(), 50) }} style={{ padding: '8px 14px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '20px', color: theme.text, cursor: 'pointer', fontSize: '13px' }}>{q}</button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {chatMessages.map((msg, idx) => (
-                  <div key={idx} style={{ marginBottom: '16px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                    <div style={{ maxWidth: '85%', padding: '14px 18px', borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '15px', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
-                  </div>
-                ))}
+                {chatMessages.length === 0 && (<div style={{ padding: '20px 10px' }}>{!moneyPersonality ? (<div style={{ marginBottom: '24px', padding: '24px', background: 'linear-gradient(135deg, #8b5cf615, #3b82f615)', borderRadius: '16px', border: '2px solid ' + theme.purple + '50', textAlign: 'center' as const }}><div style={{ fontSize: '44px', marginBottom: '12px' }}>🧠</div><div style={{ color: theme.text, fontWeight: 700, fontSize: '17px', marginBottom: '8px' }}>First, let me get to know you.</div><button onClick={() => { setShowOnboarding(true); setOnboardingStep(0) }} style={{ ...btnPurple, padding: '14px 32px', fontSize: '15px', width: '100%' }}>Start personality quiz →</button></div>) : (<div style={{ marginBottom: '20px', padding: '16px', background: personalityProfiles[moneyPersonality]?.color + '15', borderRadius: '12px', border: '1px solid ' + personalityProfiles[moneyPersonality]?.color + '40', display: 'flex', alignItems: 'center', gap: '14px' }}><span style={{ fontSize: '32px' }}>{personalityProfiles[moneyPersonality]?.emoji}</span><div><div style={{ color: personalityProfiles[moneyPersonality]?.color, fontWeight: 700, fontSize: '14px' }}>{personalityProfiles[moneyPersonality]?.label}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>Coaching tailored to you.</div></div></div>)}<div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px', textAlign: 'center' as const }}>Or jump in:</div><div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px', justifyContent: 'center' }}>{['How do I pay my mortgage off faster?', 'Should I use an offset account?', 'Am I on track financially?'].map(q => (<button key={q} onClick={() => { setChatInput(q); setTimeout(() => handleChatMessage(), 50) }} style={{ padding: '8px 14px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '20px', color: theme.text, cursor: 'pointer', fontSize: '13px' }}>{q}</button>))}</div></div>)}
+                {chatMessages.map((msg, idx) => (<div key={idx} style={{ marginBottom: '16px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}><div style={{ maxWidth: '85%', padding: '14px 18px', borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '15px', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div></div>))}
                 {isLoading && <div style={{ padding: '16px', color: theme.textMuted }}>Aureus is thinking...</div>}
               </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '14px 18px', fontSize: '15px' }} disabled={isLoading} />
-                <button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ ...btnSuccess, padding: '14px 24px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>Send</button>
-              </div>
+              <div style={{ display: 'flex', gap: '12px' }}><input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '14px 18px', fontSize: '15px' }} disabled={isLoading} /><button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ ...btnSuccess, padding: '14px 24px', opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>Send</button></div>
             </div>
           </div>
         )}
 
-        {/* BUDGET DASHBOARD */}
+        {/* ==================== DASHBOARD TAB (Budget) ==================== */}
         {activeTab === 'dashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-            {/* Summary */}
+            {/* Summary Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
-              {[
-                { label: 'Income /mo', value: `$${monthlyIncome.toFixed(0)}`, color: theme.success },
-                { label: 'Expenses /mo', value: `$${monthlyExpenses.toFixed(0)}`, color: theme.danger },
-                { label: 'Debt Payments', value: `$${monthlyDebtPayments.toFixed(0)}`, color: theme.warning },
-                { label: 'Goal Savings', value: `$${monthlyGoalSavings.toFixed(0)}`, color: theme.purple },
-                { label: 'Net /mo', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus >= 0 ? theme.success : theme.danger },
-              ].map(m => (
-                <div key={m.label} style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
-                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>{m.label}</div>
-                  <div style={{ color: m.color, fontSize: '24px', fontWeight: 700 }}>{m.value}</div>
-                </div>
-              ))}
+              {[{ label: 'Income /mo', value: `$${monthlyIncome.toFixed(0)}`, color: theme.success }, { label: 'Expenses /mo', value: `$${monthlyExpenses.toFixed(0)}`, color: theme.danger }, { label: 'Debt Payments', value: `$${monthlyDebtPayments.toFixed(0)}`, color: theme.warning }, { label: 'Goal Savings', value: `$${monthlyGoalSavings.toFixed(0)}`, color: theme.purple }, { label: 'Net /mo', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus >= 0 ? theme.success : theme.danger }].map(m => (<div key={m.label} style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '12px' }}>{m.label}</div><div style={{ color: m.color, fontSize: '24px', fontWeight: 700 }}>{m.value}</div></div>))}
             </div>
 
-            {/* Income & Expenses */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-              {/* Income */}
-              <div style={cardStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ margin: 0, color: theme.success, fontSize: '18px' }}>💰 Income</h3>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <input type="file" ref={payslipInputRef} accept="image/*,.pdf" onChange={async e => {
-                      const file = e.target.files?.[0]; if (!file) return; setPayslipProcessing(true)
-                      try {
-                        const base64 = await new Promise<string>(res => { const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(file) })
-                        const response = await fetch('/api/extract-payslip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: base64, filename: file.name }) })
-                        if (response.ok) { const data = await response.json(); setExtractedPayslip(data); setShowPayslipUpload(true) }
-                      } catch { alert('Could not process payslip.') }
-                      setPayslipProcessing(false)
-                    }} style={{ display: 'none' }} />
-                    <button onClick={() => payslipInputRef.current?.click()} style={{ padding: '4px 10px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} disabled={payslipProcessing}>📄 Payslip</button>
-                    <span style={{ color: theme.success, fontWeight: 700 }}>${monthlyIncome.toFixed(0)}/mo</span>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '12px', padding: '12px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-                    <input placeholder="Source name" value={newIncome.name} onChange={e => setNewIncome({...newIncome, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
-                    <input placeholder="Amount" type="number" value={newIncome.amount} onChange={e => setNewIncome({...newIncome, amount: e.target.value})} style={{...inputStyle, width: '90px'}} />
-                    <select value={newIncome.frequency} onChange={e => setNewIncome({...newIncome, frequency: e.target.value, startDate: e.target.value === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : e.target.value === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(new Date().getDate())})} style={inputStyle}>
-                      <option value="weekly">Weekly</option>
-                      <option value="fortnightly">Fortnightly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
-                    <select value={newIncome.type} onChange={e => setNewIncome({...newIncome, type: e.target.value})} style={inputStyle}><option value="active">Active</option><option value="passive">Passive</option></select>
-                  </div>
-                  <SmartDatePicker
-                    frequency={newIncome.frequency}
-                    value={newIncome.startDate}
-                    onChange={v => setNewIncome({...newIncome, startDate: v})}
-                    label={newIncome.frequency === 'weekly' ? 'Which day do you get paid?' : newIncome.frequency === 'fortnightly' ? 'Which day is payday?' : 'Which day of the month?'}
-                  />
-                  <button onClick={addIncome} style={{...btnSuccess, alignSelf: 'flex-start' as const, padding: '8px 16px'}}>+ Add income</button>
-                </div>
-                <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>
-                  {incomeStreams.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No income streams yet</p> : incomeStreams.map(inc => (
-                    editingItem?.type === 'income' && editingItem.id === inc.id ? (
-                      <div key={inc.id} style={{ padding: '10px', marginBottom: '8px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px' }}>
-                        <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
-                          <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} style={{...inputStyle, flex: 1, minWidth: '80px'}} />
-                          <input type="number" value={editingItem.data.amount} onChange={e => updateEditField('amount', e.target.value)} style={{...inputStyle, width: '80px'}} />
-                          <select value={editingItem.data.frequency} onChange={e => {
-                            const freq = e.target.value;
-                            const newDate = freq === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : freq === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(new Date().getDate());
-                            setEditingItem({ ...editingItem, data: { ...editingItem.data, frequency: freq, startDate: newDate } });
-                          }} style={inputStyle}>
-                            <option value="weekly">Weekly</option>
-                            <option value="fortnightly">Fortnightly</option>
-                            <option value="monthly">Monthly</option>
-                          </select>
-                        </div>
-                        <div style={{ marginBottom: '8px' }}>
-                          <SmartDatePicker
-                            frequency={editingItem.data.frequency}
-                            value={editingItem.data.startDate || ''}
-                            onChange={v => updateEditField('startDate', v)}
-                            label={editingItem.data.frequency === 'weekly' ? 'Which day do you get paid?' : editingItem.data.frequency === 'fortnightly' ? 'Which day is payday?' : 'Which day of the month?'}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px' }}><button onClick={saveEdit} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Save</button><button onClick={cancelEdit} style={{...btnDanger, padding: '6px 12px', fontSize: '12px'}}>Cancel</button></div>
-                      </div>
-                    ) : (
-                      <div key={inc.id} style={{ padding: '10px 12px', marginBottom: '6px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ color: theme.text, fontWeight: 600 }}>{inc.name}</div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>
-                            {inc.frequency} · {inc.type}
-                            {inc.startDate && (() => {
-                              const d = new Date(inc.startDate + 'T12:00:00')
-                              if (inc.frequency === 'weekly' || inc.frequency === 'fortnightly') return ` · every ${DOW_FULL[d.getDay()]}`
-                              if (inc.frequency === 'monthly') return ` · ${d.getDate()}th of month`
-                              return ''
-                            })()}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: theme.success, fontWeight: 700 }}>${inc.amount}</span><button onClick={() => startEdit('income', inc)} style={{ padding: '3px 8px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>✏️</button><button onClick={() => deleteIncome(inc.id)} style={{ padding: '3px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button></div>
-                      </div>
-                    )
-                  ))}
-                </div>
+            {/* Income Section */}
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}><h3 style={{ margin: 0, color: theme.success, fontSize: '18px' }}>💰 Income</h3><div><button onClick={() => payslipInputRef.current?.click()} style={{ padding: '4px 10px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>📄 Payslip</button><span style={{ marginLeft: '8px', color: theme.success, fontWeight: 700 }}>${monthlyIncome.toFixed(0)}/mo</span></div></div>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '12px', padding: '12px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}><input placeholder="Source" value={newIncome.name} onChange={e => setNewIncome({...newIncome, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} /><input placeholder="$" type="number" value={newIncome.amount} onChange={e => setNewIncome({...newIncome, amount: e.target.value})} style={{...inputStyle, width: '90px'}} /><select value={newIncome.frequency} onChange={e => { const newFreq = e.target.value; let newStartDate = newIncome.startDate; if (newFreq === 'weekly') { newStartDate = getNextDateForDayOfWeek(new Date().getDay()) } else if (newFreq === 'fortnightly') { newStartDate = getFortnightlyDateFromAnchor(1) } else if (newFreq === 'monthly' || newFreq === 'quarterly' || newFreq === 'yearly') { newStartDate = getNextDateForDayOfMonth(1, newFreq) } setNewIncome({...newIncome, frequency: newFreq, startDate: newStartDate}) }} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select><select value={newIncome.type} onChange={e => setNewIncome({...newIncome, type: e.target.value})} style={inputStyle}><option value="active">Active</option><option value="passive">Passive</option></select></div>
+                <SmartDatePicker frequency={newIncome.frequency} value={newIncome.startDate} onChange={v => setNewIncome({...newIncome, startDate: v})} label="Pay day" />
+                <button onClick={addIncome} style={{...btnSuccess, alignSelf: 'flex-start' as const, padding: '8px 16px'}}>+ Add income</button>
               </div>
+              <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>{incomeStreams.map(inc => (<div key={inc.id} style={{ padding: '10px 12px', marginBottom: '6px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div><div style={{ color: theme.text, fontWeight: 600 }}>{inc.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{inc.frequency} · {inc.type}</div></div><div><span style={{ color: theme.success, fontWeight: 700 }}>${inc.amount}</span><button onClick={() => deleteIncome(inc.id)} style={{ marginLeft: '8px', padding: '3px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button></div></div>))}</div>
+            </div>
 
-              {/* Expenses */}
-              <div style={cardStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ margin: 0, color: theme.danger, fontSize: '18px' }}>💸 Bills & Spending</h3>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => setShowPresets(!showPresets)} style={{ padding: '4px 10px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Presets</button>
-                    <span style={{ color: theme.danger, fontWeight: 700 }}>${monthlyExpenses.toFixed(0)}/mo</span>
-                  </div>
-                </div>
-                {showPresets && (
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '12px', padding: '10px', background: theme.bg, borderRadius: '8px' }}>
-                    {presetBills.map(p => <button key={p.name} onClick={() => { const amt = prompt(`Amount for ${p.name}:`, (p as any).amount || ''); if (amt) setExpenses([...expenses, { id: Date.now(), name: p.name, amount: amt, frequency: p.frequency, category: p.category, dueDate: new Date().toISOString().split('T')[0] }]) }} style={{ padding: '4px 10px', background: theme.purple + '20', color: theme.purple, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>{p.name}</button>)}
-                  </div>
-                )}
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '12px', padding: '12px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-                    <input placeholder="Expense name" value={newExpense.name} onChange={e => setNewExpense({...newExpense, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
-                    <input placeholder="Amount" type="number" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{...inputStyle, width: '90px'}} />
-                    <select value={newExpense.frequency} onChange={e => setNewExpense({...newExpense, frequency: e.target.value, dueDate: e.target.value === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : e.target.value === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(1)})} style={inputStyle}>
-                      <option value="weekly">Weekly</option>
-                      <option value="fortnightly">Fortnightly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="quarterly">Quarterly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
-                  </div>
-                  <SmartDatePicker
-                    frequency={newExpense.frequency}
-                    value={newExpense.dueDate}
-                    onChange={v => setNewExpense({...newExpense, dueDate: v})}
-                    label={newExpense.frequency === 'weekly' ? 'Which day is it due?' : newExpense.frequency === 'fortnightly' ? 'Which day?' : 'Which day of the month is it due?'}
-                  />
-                  <button onClick={addExpense} style={{...btnDanger, alignSelf: 'flex-start' as const, padding: '8px 16px'}}>+ Add expense</button>
-                </div>
-                <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>
-                  {expenses.filter(e => !e.targetDebtId && !e.targetGoalId).length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No expenses yet</p> : expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(exp => (
-                    editingItem?.type === 'expense' && editingItem.id === exp.id ? (
-                      <div key={exp.id} style={{ padding: '10px', marginBottom: '6px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '8px' }}>
-                        <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
-                          <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} style={{...inputStyle, flex: 1, minWidth: '80px'}} />
-                          <input type="number" value={editingItem.data.amount} onChange={e => updateEditField('amount', e.target.value)} style={{...inputStyle, width: '80px'}} />
-                          <select value={editingItem.data.frequency} onChange={e => {
-                            const freq = e.target.value;
-                            const newDate = freq === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : freq === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(1);
-                            setEditingItem({ ...editingItem, data: { ...editingItem.data, frequency: freq, dueDate: newDate } });
-                          }} style={inputStyle}>
-                            <option value="weekly">Weekly</option>
-                            <option value="fortnightly">Fortnightly</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="quarterly">Quarterly</option>
-                          </select>
-                        </div>
-                        <div style={{ marginBottom: '8px' }}>
-                          <SmartDatePicker
-                            frequency={editingItem.data.frequency}
-                            value={editingItem.data.dueDate || ''}
-                            onChange={v => updateEditField('dueDate', v)}
-                            label={editingItem.data.frequency === 'weekly' ? 'Which day is it due?' : editingItem.data.frequency === 'fortnightly' ? 'Which day?' : 'Which day of the month is it due?'}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px' }}><button onClick={saveEdit} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Save</button><button onClick={cancelEdit} style={{...btnDanger, padding: '6px 12px', fontSize: '12px'}}>Cancel</button></div>
-                      </div>
-                    ) : (
-                      <div key={exp.id} style={{ padding: '10px 12px', marginBottom: '6px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ color: theme.text, fontWeight: 600 }}>{exp.name}</div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>
-                            {exp.frequency}
-                            {exp.dueDate && (() => {
-                              const d = new Date(exp.dueDate + 'T12:00:00')
-                              if (exp.frequency === 'weekly' || exp.frequency === 'fortnightly') return ` · every ${DOW_FULL[d.getDay()]}`
-                              if (exp.frequency === 'monthly' || exp.frequency === 'quarterly') return ` · due ${d.getDate()}${d.getDate()===1?'st':d.getDate()===2?'nd':d.getDate()===3?'rd':'th'}`
-                              return ''
-                            })()}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: theme.danger, fontWeight: 700 }}>${exp.amount}</span><button onClick={() => startEdit('expense', exp)} style={{ padding: '3px 8px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>✏️</button><button onClick={() => deleteExpense(exp.id)} style={{ padding: '3px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button></div>
-                      </div>
-                    )
-                  ))}
-                </div>
+            {/* Expenses Section */}
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}><h3 style={{ margin: 0, color: theme.danger, fontSize: '18px' }}>💸 Bills</h3><div><button onClick={() => setShowPresets(!showPresets)} style={{ padding: '4px 10px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>+ Presets</button><span style={{ marginLeft: '8px', color: theme.danger, fontWeight: 700 }}>${monthlyExpenses.toFixed(0)}/mo</span></div></div>
+              {showPresets && (<div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '12px', padding: '10px', background: theme.bg, borderRadius: '8px' }}>{presetBills.map(p => <button key={p.name} onClick={() => { const amt = prompt(`Amount for ${p.name}:`, (p as any).amount || ''); if (amt) setExpenses([...expenses, { id: Date.now(), name: p.name, amount: amt, frequency: p.frequency, category: p.category, dueDate: new Date().toISOString().split('T')[0] }]) }} style={{ padding: '4px 10px', background: theme.purple + '20', color: theme.purple, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>{p.name}</button>)}</div>)}
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '12px', padding: '12px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}><input placeholder="Bill name" value={newExpense.name} onChange={e => setNewExpense({...newExpense, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} /><input placeholder="$" type="number" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{...inputStyle, width: '80px'}} /><select value={newExpense.frequency} onChange={e => { const newFreq = e.target.value; let newDueDate = newExpense.dueDate; if (newFreq === 'weekly') { newDueDate = getNextDateForDayOfWeek(new Date().getDay()) } else if (newFreq === 'fortnightly') { newDueDate = getFortnightlyDateFromAnchor(1) } else if (newFreq === 'monthly' || newFreq === 'quarterly' || newFreq === 'yearly') { newDueDate = getNextDateForDayOfMonth(1, newFreq) } setNewExpense({...newExpense, frequency: newFreq, dueDate: newDueDate}) }} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select><button onClick={addExpense} style={btnDanger}>+</button></div>
+                <SmartDatePicker frequency={newExpense.frequency} value={newExpense.dueDate} onChange={v => setNewExpense({...newExpense, dueDate: v})} label="Due day" />
               </div>
+              <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>{expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(exp => (<div key={exp.id} style={{ padding: '10px 12px', marginBottom: '6px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div><div style={{ color: theme.text, fontWeight: 600 }}>{exp.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{exp.frequency}</div></div><div><span style={{ color: theme.danger, fontWeight: 700 }}>${exp.amount}</span><button onClick={() => deleteExpense(exp.id)} style={{ marginLeft: '8px', padding: '3px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button></div></div>))}</div>
             </div>
 
             {/* Calendar */}
             <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))} style={{ ...btnPrimary, padding: '8px 16px' }}>←</button>
-                <h3 style={{ margin: 0, color: theme.text }}>{calendarMonth.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}</h3>
-                <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1))} style={{ ...btnPrimary, padding: '8px 16px' }}>→</button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
-                {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d} style={{ textAlign: 'center' as const, fontWeight: 600, color: theme.textMuted, padding: '8px', fontSize: '12px' }}>{d}</div>)}
-                {Array(getDaysInMonth().firstDay).fill(null).map((_, i) => <div key={'e'+i} />)}
-                {Array(getDaysInMonth().daysInMonth).fill(null).map((_, i) => {
-                  const day = i + 1
-                  const items = getCalendarItemsForDay(day)
-                  const isToday = day === new Date().getDate() && calendarMonth.getMonth() === new Date().getMonth() && calendarMonth.getFullYear() === new Date().getFullYear()
-                  return (
-                    <div key={day} onClick={() => items.length > 0 && setExpandedDay({ day, items })} style={{ minHeight: '70px', padding: '4px', background: isToday ? theme.accent + '20' : darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px', border: isToday ? '2px solid ' + theme.accent : '1px solid ' + theme.border, cursor: items.length > 0 ? 'pointer' : 'default' }}>
-                      <div style={{ fontWeight: 600, color: theme.text, marginBottom: '2px', fontSize: '12px' }}>{day}</div>
-                      {items.slice(0, 2).map(item => <div key={item.itemId} style={{ fontSize: '9px', padding: '1px 4px', marginBottom: '2px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'goal' ? '#ede9fe' : item.itemType === 'expense' ? '#dbeafe' : '#fee2e2', color: '#1e293b', borderRadius: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, opacity: item.isPaid ? 0.5 : 1 }}>{item.name}</div>)}
-                      {items.length > 2 && <div style={{ fontSize: '9px', color: theme.accent }}>+{items.length - 2}</div>}
-                    </div>
-                  )
-                })}
-              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}><button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))} style={{ ...btnPrimary, padding: '8px 16px' }}>←</button><h3 style={{ margin: 0, color: theme.text }}>{calendarMonth.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}</h3><button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1))} style={{ ...btnPrimary, padding: '8px 16px' }}>→</button></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <div key={d} style={{ textAlign: 'center' as const, fontWeight: 600, color: theme.textMuted, padding: '8px', fontSize: '12px' }}>{d}</div>)}{Array(getDaysInMonth().firstDay).fill(null).map((_, i) => <div key={'e'+i} />)}{Array(getDaysInMonth().daysInMonth).fill(null).map((_, i) => { const day = i + 1; const items = getCalendarItemsForDay(day); const isToday = day === new Date().getDate() && calendarMonth.getMonth() === new Date().getMonth() && calendarMonth.getFullYear() === new Date().getFullYear(); return (<div key={day} onClick={() => items.length > 0 && setExpandedDay({ day, items })} style={{ minHeight: '70px', padding: '4px', background: isToday ? theme.accent + '20' : darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px', border: isToday ? '2px solid ' + theme.accent : '1px solid ' + theme.border, cursor: items.length > 0 ? 'pointer' : 'default' }}><div style={{ fontWeight: 600, color: theme.text, marginBottom: '2px', fontSize: '12px' }}>{day}</div>{items.slice(0, 2).map(item => <div key={item.itemId} style={{ fontSize: '9px', padding: '1px 4px', marginBottom: '2px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'goal' ? '#ede9fe' : item.itemType === 'expense' ? '#dbeafe' : '#fee2e2', color: '#1e293b', borderRadius: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, opacity: item.isPaid ? 0.5 : 1 }}>{item.name}</div>)}{items.length > 2 && <div style={{ fontSize: '9px', color: theme.accent }}>+{items.length - 2}</div>}</div>)})}</div>
             </div>
 
-            {/* Debts & Goals */}
+            {/* Debts & Goals Section */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-              <div style={cardStyle} data-section="debts">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ margin: 0, color: theme.warning, fontSize: '18px' }}>💳 Debts</h3>
-                  <span style={{ color: theme.warning, fontWeight: 700 }}>${totalDebtBalance.toFixed(0)}</span>
-                </div>
+              <div style={cardStyle} data-section="debts"><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}><h3 style={{ margin: 0, color: theme.warning, fontSize: '18px' }}>💳 Debts</h3><span style={{ color: theme.warning, fontWeight: 700 }}>${totalDebtBalance.toFixed(0)}</span></div>
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '12px', padding: '12px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-                    <input placeholder="Debt name" value={newDebt.name} onChange={e => setNewDebt({...newDebt, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '80px'}} />
-                    <input placeholder="Balance" type="number" value={newDebt.balance} onChange={e => setNewDebt({...newDebt, balance: e.target.value})} style={{...inputStyle, width: '80px'}} />
-                    <input placeholder="Rate %" type="number" value={newDebt.interestRate} onChange={e => setNewDebt({...newDebt, interestRate: e.target.value})} style={{...inputStyle, width: '60px'}} />
-                    <input placeholder="Payment" type="number" value={newDebt.minPayment} onChange={e => setNewDebt({...newDebt, minPayment: e.target.value})} style={{...inputStyle, width: '75px'}} />
-                    <select value={newDebt.frequency} onChange={e => setNewDebt({...newDebt, frequency: e.target.value, paymentDate: e.target.value === 'weekly' ? dateForDayOfWeek(1) : e.target.value === 'fortnightly' ? dateForDayOfWeek(1) : dateForDayOfMonth(1)})} style={inputStyle}>
-                      <option value="weekly">Weekly</option>
-                      <option value="fortnightly">Fortnightly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                  </div>
-                  <SmartDatePicker
-                    frequency={newDebt.frequency || 'monthly'}
-                    value={newDebt.paymentDate}
-                    onChange={v => setNewDebt({...newDebt, paymentDate: v})}
-                    label="When is the payment due?"
-                  />
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}><input placeholder="Debt name" value={newDebt.name} onChange={e => setNewDebt({...newDebt, name: e.target.value})} style={{...inputStyle, flex: 1}} /><input placeholder="Balance" type="number" value={newDebt.balance} onChange={e => setNewDebt({...newDebt, balance: e.target.value})} style={{...inputStyle, width: '100px'}} /><input placeholder="Rate %" type="number" value={newDebt.interestRate} onChange={e => setNewDebt({...newDebt,
+                                                                                                                                                                                                                                                                                                                                                                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}><input placeholder="Debt name" value={newDebt.name} onChange={e => setNewDebt({...newDebt, name: e.target.value})} style={{...inputStyle, flex: 1}} /><input placeholder="Balance" type="number" value={newDebt.balance} onChange={e => setNewDebt({...newDebt, balance: e.target.value})} style={{...inputStyle, width: '100px'}} /><input placeholder="Rate %" type="number" value={newDebt.interestRate} onChange={e => setNewDebt({...newDebt, interestRate: e.target.value})} style={{...inputStyle, width: '70px'}} /><input placeholder="Payment" type="number" value={newDebt.minPayment} onChange={e => setNewDebt({...newDebt, minPayment: e.target.value})} style={{...inputStyle, width: '80px'}} /><select value={newDebt.frequency} onChange={e => { const newFreq = e.target.value; let newPaymentDate = newDebt.paymentDate; if (newFreq === 'weekly') { newPaymentDate = getNextDateForDayOfWeek(1) } else if (newFreq === 'fortnightly') { newPaymentDate = getFortnightlyDateFromAnchor(1) } else if (newFreq === 'monthly') { newPaymentDate = getNextDateForDayOfMonth(1, newFreq) } setNewDebt({...newDebt, frequency: newFreq, paymentDate: newPaymentDate}) }} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
+                  <SmartDatePicker frequency={newDebt.frequency || 'monthly'} value={newDebt.paymentDate} onChange={v => setNewDebt({...newDebt, paymentDate: v})} label="Payment due" />
                   <button onClick={addDebt} style={{...btnWarning, alignSelf: 'flex-start' as const, padding: '8px 16px'}}>+ Add debt</button>
                 </div>
-                <div style={{ maxHeight: '250px', overflowY: 'auto' as const }}>
-                  {debts.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No debts — 🎉</p> : debts.map(debt => (
-                    editingItem?.type === 'debt' && editingItem.id === debt.id ? (
-                      <div key={debt.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#3a2e1e' : '#fefce8', borderRadius: '10px', border: '1px solid ' + theme.border }}>
-                        <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
-                          <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} style={{...inputStyle, flex: 1, minWidth: '80px'}} />
-                          <input type="number" value={editingItem.data.balance} onChange={e => updateEditField('balance', e.target.value)} style={{...inputStyle, width: '80px'}} />
-                          <input type="number" value={editingItem.data.minPayment} onChange={e => updateEditField('minPayment', e.target.value)} style={{...inputStyle, width: '80px'}} />
-                          <select value={editingItem.data.frequency} onChange={e => {
-                            const freq = e.target.value;
-                            const newDate = freq === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : freq === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(1);
-                            setEditingItem({ ...editingItem, data: { ...editingItem.data, frequency: freq, paymentDate: newDate } });
-                          }} style={inputStyle}>
-                            <option value="weekly">Weekly</option>
-                            <option value="fortnightly">Fortnightly</option>
-                            <option value="monthly">Monthly</option>
-                          </select>
-                        </div>
-                        <div style={{ marginBottom: '8px' }}>
-                          <SmartDatePicker
-                            frequency={editingItem.data.frequency}
-                            value={editingItem.data.paymentDate || ''}
-                            onChange={v => updateEditField('paymentDate', v)}
-                            label="Payment due day"
-                          />
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px' }}><button onClick={saveEdit} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Save</button><button onClick={cancelEdit} style={{...btnDanger, padding: '6px 12px', fontSize: '12px'}}>Cancel</button></div>
-                      </div>
-                    ) : (
-                      <div key={debt.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#3a2e1e' : '#fefce8', borderRadius: '10px', border: '1px solid ' + theme.border }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <div>
-                            <div style={{ color: theme.text, fontWeight: 600 }}>{debt.name}</div>
-                            <div style={{ color: theme.textMuted, fontSize: '12px' }}>
-                              {debt.interestRate}% · ${debt.minPayment}/{debt.frequency || 'monthly'}
-                              {debt.paymentDate && (() => {
-                                const d = new Date(debt.paymentDate + 'T12:00:00')
-                                if (debt.frequency === 'weekly' || debt.frequency === 'fortnightly') return ` · every ${DOW_FULL[d.getDay()]}`
-                                if (debt.frequency === 'monthly') return ` · due ${d.getDate()}${d.getDate()===1?'st':d.getDate()===2?'nd':d.getDate()===3?'rd':'th'}`
-                                return ''
-                              })()}
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right' as const }}><div style={{ color: theme.warning, fontWeight: 700 }}>${parseFloat(debt.balance).toFixed(0)}</div><div style={{ display: 'flex', gap: '4px', marginTop: '4px', justifyContent: 'flex-end' }}><button onClick={() => startEdit('debt', debt)} style={{ padding: '2px 6px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>✏️</button><button onClick={() => deleteDebt(debt.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button></div></div>
-                        </div>
-                      </div>
-                    )
-                  ))}
-                </div>
+                <div style={{ maxHeight: '250px', overflowY: 'auto' as const }}>{debts.map(debt => (<div key={debt.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#3a2e1e' : '#fefce8', borderRadius: '10px', border: '1px solid ' + theme.border }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><div style={{ color: theme.text, fontWeight: 600 }}>{debt.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{debt.interestRate}% · ${debt.minPayment}/{debt.frequency || 'monthly'}</div></div><div><span style={{ color: theme.warning, fontWeight: 700 }}>${parseFloat(debt.balance).toFixed(0)}</span><button onClick={() => deleteDebt(debt.id)} style={{ marginLeft: '8px', padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button></div></div></div>))}</div>
               </div>
-              <div style={cardStyle} data-section="goals">
-                <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🎯 Goals</h3>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '12px', padding: '12px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-                    <input placeholder="Goal name" value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '80px'}} />
-                    <input placeholder="Target $" type="number" value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})} style={{...inputStyle, width: '80px'}} />
-                    <input placeholder="Saved $" type="number" value={newGoal.saved} onChange={e => setNewGoal({...newGoal, saved: e.target.value})} style={{...inputStyle, width: '70px'}} />
-                    <select value={newGoal.savingsFrequency} onChange={e => setNewGoal({...newGoal, savingsFrequency: e.target.value, startDate: e.target.value === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : e.target.value === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(new Date().getDate())})} style={inputStyle}>
-                      <option value="weekly">Weekly</option>
-                      <option value="fortnightly">Fortnightly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                  </div>
-                  <SmartDatePicker
-                    frequency={newGoal.savingsFrequency || 'monthly'}
-                    value={newGoal.startDate}
-                    onChange={v => setNewGoal({...newGoal, startDate: v})}
-                    label="When do you save for this?"
-                  />
-                  <button onClick={addGoal} style={{...btnPurple, alignSelf: 'flex-start' as const, padding: '8px 16px'}}>+ Add goal</button>
-                </div>
-                <div style={{ maxHeight: '250px', overflowY: 'auto' as const }}>
-                  {goals.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No goals yet</p> : goals.map(goal => {
-                    const pct = (parseFloat(goal.saved || '0') / parseFloat(goal.target || '1')) * 100
-                    return editingItem?.type === 'goal' && editingItem.id === goal.id ? (
-                      <div key={goal.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#2e1e3a' : '#faf5ff', borderRadius: '10px' }}>
-                        <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
-                          <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} style={{...inputStyle, flex: 1, minWidth: '80px'}} />
-                          <input type="number" value={editingItem.data.target} onChange={e => updateEditField('target', e.target.value)} style={{...inputStyle, width: '80px'}} />
-                          <input type="number" value={editingItem.data.paymentAmount} onChange={e => updateEditField('paymentAmount', e.target.value)} style={{...inputStyle, width: '80px'}} placeholder="Pay/period" />
-                          <select value={editingItem.data.savingsFrequency} onChange={e => {
-                            const freq = e.target.value;
-                            const newDate = freq === 'weekly' ? dateForDayOfWeek(new Date().getDay()) : freq === 'fortnightly' ? dateForDayOfWeek(new Date().getDay()) : dateForDayOfMonth(new Date().getDate());
-                            setEditingItem({ ...editingItem, data: { ...editingItem.data, savingsFrequency: freq, startDate: newDate } });
-                          }} style={inputStyle}>
-                            <option value="weekly">Weekly</option>
-                            <option value="fortnightly">Fortnightly</option>
-                            <option value="monthly">Monthly</option>
-                          </select>
-                        </div>
-                        <div style={{ marginBottom: '8px' }}>
-                          <SmartDatePicker
-                            frequency={editingItem.data.savingsFrequency}
-                            value={editingItem.data.startDate || ''}
-                            onChange={v => updateEditField('startDate', v)}
-                            label="Savings day"
-                          />
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px' }}><button onClick={saveEdit} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Save</button><button onClick={cancelEdit} style={{...btnDanger, padding: '6px 12px', fontSize: '12px'}}>Cancel</button></div>
-                      </div>
-                    ) : (
-                      <div key={goal.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#2e1e3a' : '#faf5ff', borderRadius: '10px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                          <div>
-                            <div style={{ color: theme.text, fontWeight: 600 }}>{goal.name}</div>
-                            <div style={{ color: theme.textMuted, fontSize: '12px' }}>
-                              ${parseFloat(goal.saved || '0').toFixed(0)} / ${parseFloat(goal.target || '0').toFixed(0)}
-                              {goal.startDate && (() => {
-                                const d = new Date(goal.startDate + 'T12:00:00')
-                                if (goal.savingsFrequency === 'weekly' || goal.savingsFrequency === 'fortnightly') return ` · every ${DOW_FULL[d.getDay()]}`
-                                if (goal.savingsFrequency === 'monthly') return ` · ${d.getDate()}${d.getDate()===1?'st':d.getDate()===2?'nd':d.getDate()===3?'rd':'th'}`
-                                return ''
-                              })()}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: theme.purple, fontWeight: 700 }}>{pct.toFixed(0)}%</span><button onClick={() => startEdit('goal', goal)} style={{ padding: '2px 6px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>✏️</button><button onClick={() => deleteGoal(goal.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button></div>
-                        </div>
-                        <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: theme.purple }} /></div>
-                      </div>
-                    )
-                  })}
-                </div>
+
+              <div style={cardStyle}><h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🎯 Goals</h3>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' as const }}><input placeholder="Goal name" value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})} style={{...inputStyle, flex: 1}} /><input placeholder="Target $" type="number" value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})} style={{...inputStyle, width: '100px'}} /><input placeholder="Saved $" type="number" value={newGoal.saved} onChange={e => setNewGoal({...newGoal, saved: e.target.value})} style={{...inputStyle, width: '80px'}} /><button onClick={addGoal} style={btnPurple}>+</button></div>
+                <div style={{ maxHeight: '250px', overflowY: 'auto' as const }}>{goals.map(goal => { const pct = (parseFloat(goal.saved || '0') / parseFloat(goal.target || '1')) * 100; return (<div key={goal.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#2e1e3a' : '#faf5ff', borderRadius: '10px' }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}><div><div style={{ color: theme.text, fontWeight: 600 }}>{goal.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${parseFloat(goal.saved || '0').toFixed(0)} / ${parseFloat(goal.target || '0').toFixed(0)}</div></div><div><span style={{ color: theme.purple, fontWeight: 700 }}>{pct.toFixed(0)}%</span><button onClick={() => deleteGoal(goal.id)} style={{ marginLeft: '8px', padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button></div></div><div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: theme.purple }} /></div></div>)})}</div>
               </div>
             </div>
 
             {/* Assets */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ margin: 0, color: theme.success, fontSize: '18px' }}>📦 Assets</h3>
-                <div><span style={{ color: theme.success, fontWeight: 700 }}>${totalAssets.toLocaleString()}</span> <span style={{ color: theme.textMuted, fontSize: '12px' }}>Net Worth: <span style={{ color: netWorth >= 0 ? theme.success : theme.danger }}>${netWorth.toLocaleString()}</span></span></div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                <input placeholder="Asset name" value={newAsset.name} onChange={e => setNewAsset({...newAsset, name: e.target.value})} style={{...inputStyle, flex: 1}} />
-                <input placeholder="Value" type="number" value={newAsset.value} onChange={e => setNewAsset({...newAsset, value: e.target.value})} style={{...inputStyle, width: '100px'}} />
-                <select value={newAsset.type} onChange={e => setNewAsset({...newAsset, type: e.target.value})} style={inputStyle}><option value="savings">💰 Savings</option><option value="super">🏦 Super</option><option value="investment">📊 Investment</option><option value="property">🏠 Property</option><option value="vehicle">🚗 Vehicle</option></select>
-                <button onClick={addAsset} style={btnSuccess}>+</button>
-              </div>
-              {assets.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No assets added yet</p> : assets.map(a => (
-                <div key={a.id} style={{ padding: '10px 12px', marginBottom: '6px', background: theme.bg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div><span style={{ color: theme.text }}>{a.name}</span><span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '8px' }}>{a.type}</span></div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ color: theme.success, fontWeight: 700 }}>${parseFloat(a.value).toLocaleString()}</span><button onClick={() => deleteAsset(a.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button></div>
-                </div>
-              ))}
+            <div style={cardStyle}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}><h3 style={{ margin: 0, color: theme.success, fontSize: '18px' }}>📦 Assets</h3><div><span style={{ color: theme.success, fontWeight: 700 }}>${totalAssets.toLocaleString()}</span> <span style={{ color: theme.textMuted, fontSize: '12px' }}>Net Worth: <span style={{ color: netWorth >= 0 ? theme.success : theme.danger }}>${netWorth.toLocaleString()}</span></span></div></div>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}><input placeholder="Asset name" value={newAsset.name} onChange={e => setNewAsset({...newAsset, name: e.target.value})} style={{...inputStyle, flex: 1}} /><input placeholder="Value" type="number" value={newAsset.value} onChange={e => setNewAsset({...newAsset, value: e.target.value})} style={{...inputStyle, width: '100px'}} /><select value={newAsset.type} onChange={e => setNewAsset({...newAsset, type: e.target.value})} style={inputStyle}><option value="savings">💰 Savings</option><option value="super">🏦 Super</option><option value="investment">📊 Investment</option><option value="property">🏠 Property</option><option value="vehicle">🚗 Vehicle</option></select><button onClick={addAsset} style={btnSuccess}>+</button></div>
+              {assets.map(a => (<div key={a.id} style={{ padding: '10px 12px', marginBottom: '6px', background: theme.bg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div><span style={{ color: theme.text }}>{a.name}</span><span style={{ color: theme.textMuted, fontSize: '11px', marginLeft: '8px' }}>{a.type}</span></div><div><span style={{ color: theme.success, fontWeight: 700 }}>${parseFloat(a.value).toLocaleString()}</span><button onClick={() => deleteAsset(a.id)} style={{ marginLeft: '8px', padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button></div></div>))}
             </div>
           </div>
         )}
 
-        {/* ==================== MORTGAGE ACCELERATOR TAB ==================== */}
+        {/* ==================== MORTGAGE TAB ==================== */}
         {activeTab === 'mortgage' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-            <div style={{ padding: '12px 16px', background: theme.warning + '15', borderRadius: '10px', border: '1px solid ' + theme.warning + '40' }}>
-              <p style={{ margin: 0, color: theme.textMuted, fontSize: '12px' }}>⚠️ This is a general education tool only. Not financial advice. Consult a licensed mortgage broker or financial advisor before making loan decisions.</p>
-            </div>
-
-            {/* HERO: Mortgage Free Date */}
+            <div style={{ padding: '12px 16px', background: theme.warning + '15', borderRadius: '10px', border: '1px solid ' + theme.warning + '40' }}><p style={{ margin: 0, color: theme.textMuted, fontSize: '12px' }}>⚠️ Education only. Consult a licensed mortgage broker.</p></div>
             <div style={{ padding: '32px', background: 'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)', borderRadius: '20px', border: '2px solid #3b82f6', textAlign: 'center' as const }}>
               <div style={{ color: '#94a3b8', fontSize: '12px', letterSpacing: '3px', marginBottom: '8px' }}>🏠 MORTGAGE FREE TARGET</div>
-              {mortgageResult ? (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', flexWrap: 'wrap' as const }}>
-                    <div>
-                      <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '4px' }}>At current rate</div>
-                      <div style={{ color: '#ef4444', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.standard.freeYear}</div>
-                      <div style={{ color: '#94a3b8', fontSize: '12px' }}>{mortgageResult.standard.years.toFixed(1)} yrs · ${Math.round(mortgageResult.standard.interest).toLocaleString()} interest</div>
-                    </div>
-                    {parseFloat(mortgageAccel.extraRepayment || '0') > 0 && (
-                      <div>
-                        <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '4px' }}>With extra ${mortgageAccel.extraRepayment}/{mortgageAccel.repaymentFrequency}</div>
-                        <div style={{ color: '#10b981', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.withExtra.freeYear}</div>
-                        <div style={{ color: '#10b981', fontSize: '13px' }}>🎉 {mortgageResult.withExtra.yearsSaved.toFixed(1)} yrs earlier · saving ${Math.round(mortgageResult.withExtra.interestSaved).toLocaleString()}</div>
-                      </div>
-                    )}
-                    {parseFloat(mortgageAccel.offsetBalance || '0') > 0 && (
-                      <div>
-                        <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '4px' }}>With ${mortgageAccel.offsetBalance} offset</div>
-                        <div style={{ color: '#f59e0b', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.withOffset.freeYear}</div>
-                        <div style={{ color: '#f59e0b', fontSize: '13px' }}>💡 {mortgageResult.withOffset.yearsSaved.toFixed(1)} yrs saved · ${Math.round(mortgageResult.withOffset.interestSaved).toLocaleString()} saved</div>
-                      </div>
-                    )}
-                    {parseFloat(mortgageAccel.extraRepayment || '0') > 0 && parseFloat(mortgageAccel.offsetBalance || '0') > 0 && (
-                      <div>
-                        <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '4px' }}>Extra payments + offset</div>
-                        <div style={{ color: '#8b5cf6', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.withBoth.freeYear}</div>
-                        <div style={{ color: '#8b5cf6', fontSize: '13px' }}>🚀 {mortgageResult.withBoth.yearsSaved.toFixed(1)} yrs saved · ${Math.round(mortgageResult.withBoth.interestSaved).toLocaleString()} saved</div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <div style={{ color: '#f1f5f9', fontSize: '20px', marginBottom: '8px' }}>Enter your mortgage details below</div>
-                  <div style={{ color: '#94a3b8', fontSize: '14px' }}>See how extra payments could save you years and tens of thousands in interest</div>
-                </div>
-              )}
+              {mortgageResult ? (<div style={{ display: 'flex', justifyContent: 'center', gap: '40px', flexWrap: 'wrap' as const }}><div><div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '4px' }}>Current</div><div style={{ color: '#ef4444', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.standard.freeYear}</div><div style={{ color: '#94a3b8', fontSize: '12px' }}>{mortgageResult.standard.years.toFixed(1)} yrs</div></div>{parseFloat(mortgageAccel.extraRepayment || '0') > 0 && (<div><div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '4px' }}>With extra</div><div style={{ color: '#10b981', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.withExtra.freeYear}</div><div style={{ color: '#10b981', fontSize: '13px' }}>{mortgageResult.withExtra.yearsSaved.toFixed(1)} yrs saved</div></div>)}</div>) : (<div><div style={{ color: '#f1f5f9', fontSize: '20px', marginBottom: '8px' }}>Enter your mortgage details below</div></div>)}
             </div>
 
-            {/* SUB TABS */}
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {[{ id: 'calculator', label: '🧮 Calculator' }, { id: 'offset', label: '💡 Offset Simulator' }, { id: 'strategy', label: '📋 Strategy Guide' }].map(t => (
-                <button key={t.id} onClick={() => setMortgageTab(t.id as any)} style={{ padding: '10px 18px', background: mortgageTab === t.id ? theme.accent : theme.cardBg, color: mortgageTab === t.id ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>{t.label}</button>
-              ))}
-            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>{[{ id: 'calculator', label: '🧮 Calculator' }, { id: 'offset', label: '💡 Offset' }, { id: 'strategy', label: '📋 Strategy' }].map(t => (<button key={t.id} onClick={() => setMortgageTab(t.id as any)} style={{ padding: '10px 18px', background: mortgageTab === t.id ? theme.accent : theme.cardBg, color: mortgageTab === t.id ? 'white' : theme.text, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>{t.label}</button>))}</div>
 
-            {/* CALCULATOR */}
-            {mortgageTab === 'calculator' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                <div style={cardStyle}>
-                  <h3 style={{ margin: '0 0 20px 0', color: theme.text }}>Your Mortgage</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
-
-                    {/* Frequency first — drives all labels below */}
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Repayment Frequency</label>
-                      <select value={mortgageAccel.repaymentFrequency} onChange={e => setMortgageAccel({...mortgageAccel, repaymentFrequency: e.target.value})} style={{...inputStyle, width: '100%'}}>
-                        <option value="weekly">Weekly</option>
-                        <option value="fortnightly">Fortnightly (recommended)</option>
-                        <option value="monthly">Monthly</option>
-                      </select>
-                    </div>
-
-                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Remaining Balance ($)</label><input type="number" value={mortgageAccel.balance} onChange={e => setMortgageAccel({...mortgageAccel, balance: e.target.value})} placeholder="e.g. 430000" style={{...inputStyle, width: '100%'}} /></div>
-                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Interest Rate (% p.a.)</label><input type="number" step="0.01" value={mortgageAccel.rate} onChange={e => setMortgageAccel({...mortgageAccel, rate: e.target.value})} placeholder="e.g. 5.69" style={{...inputStyle, width: '100%'}} /></div>
-
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Years Remaining on Loan</label>
-                      <input type="number" value={mortgageAccel.remainingYears} onChange={e => setMortgageAccel({...mortgageAccel, remainingYears: e.target.value})} placeholder="e.g. 25" style={{...inputStyle, width: '100%'}} />
-                      {/* Auto-derive and show standard repayment */}
-                      {mortgageAccel.balance && mortgageAccel.rate && mortgageAccel.remainingYears && (() => {
-                        const freq = mortgageAccel.repaymentFrequency === 'fortnightly' ? 26 : 12
-                        const std = calcStandardRepayment(parseFloat(mortgageAccel.balance), parseFloat(mortgageAccel.rate)/100, parseFloat(mortgageAccel.remainingYears), freq)
-                        if (std > 0) return (
-                          <div style={{ marginTop: '6px', padding: '8px 10px', background: theme.accent + '15', borderRadius: '6px', color: theme.accent, fontSize: '12px' }}>
-                            📌 Standard repayment: <strong>${std.toFixed(0)} per {mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'}</strong> — use this below if unsure
-                          </div>
-                        )
-                        return null
-                      })()}
-                    </div>
-
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
-                        Your Actual Repayment ($ per {mortgageAccel.repaymentFrequency === 'weekly' ? 'week' : mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'})
-                      </label>
-                      <input type="number" value={mortgageAccel.currentRepayment} onChange={e => setMortgageAccel({...mortgageAccel, currentRepayment: e.target.value})} placeholder={mortgageAccel.balance && mortgageAccel.rate && mortgageAccel.remainingYears ? `e.g. ${calcStandardRepayment(parseFloat(mortgageAccel.balance||'0'), parseFloat(mortgageAccel.rate||'0')/100, parseFloat(mortgageAccel.remainingYears||'0'), mortgageAccel.repaymentFrequency === 'fortnightly' ? 26 : 12).toFixed(0)}` : 'e.g. 1385'} style={{...inputStyle, width: '100%'}} />
-                      <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>
-                        ⚠️ This must be your {mortgageAccel.repaymentFrequency} amount — not a different frequency. Leave blank to use the calculated standard repayment above.
-                      </div>
-                    </div>
-
-                    {/* Sanity warning */}
-                    {mortgageResult?.repaymentSeemsHigh && (
-                      <div style={{ padding: '10px 12px', background: theme.danger + '15', borderRadius: '8px', border: '1px solid ' + theme.danger + '40' }}>
-                        <div style={{ color: theme.danger, fontWeight: 600, fontSize: '12px', marginBottom: '4px' }}>⚠️ Repayment looks unusually high</div>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>
-                          Did you enter your <strong>monthly</strong> repayment but leave frequency set to <strong>fortnightly</strong>? The standard fortnightly payment for this loan would be ~${mortgageResult.minRepayment30yr.toFixed(0)}.
-                        </div>
-                      </div>
-                    )}
-
-                    <div style={{ borderTop: '1px solid ' + theme.border, paddingTop: '16px' }}>
-                      <div style={{ color: theme.success, fontWeight: 600, marginBottom: '10px' }}>💪 Acceleration (optional)</div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
-                        Extra Repayment ($ per {mortgageAccel.repaymentFrequency === 'weekly' ? 'week' : mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'})
-                      </label>
-                      <input type="number" value={mortgageAccel.extraRepayment} onChange={e => setMortgageAccel({...mortgageAccel, extraRepayment: e.target.value})} placeholder="e.g. 200" style={{...inputStyle, width: '100%'}} />
-                      <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '6px' }}>Try $100, $200, $500 — see the years and interest you save</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
-                  {mortgageResult ? (
-                    <>
-                      <div style={cardStyle}>
-                        <h4 style={{ margin: '0 0 16px 0', color: theme.danger }}>📊 Current Trajectory</h4>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                          <div style={{ padding: '12px', background: theme.bg, borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Years remaining</div><div style={{ color: theme.danger, fontSize: '22px', fontWeight: 700 }}>{mortgageResult.standard.years.toFixed(1)}</div></div>
-                          <div style={{ padding: '12px', background: theme.bg, borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Total interest</div><div style={{ color: theme.danger, fontSize: '22px', fontWeight: 700 }}>${Math.round(mortgageResult.standard.interest).toLocaleString()}</div></div>
-                          <div style={{ padding: '12px', background: theme.bg, borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Mortgage-free year</div><div style={{ color: theme.text, fontSize: '22px', fontWeight: 700 }}>{mortgageResult.standard.freeYear}</div></div>
-                          <div style={{ padding: '12px', background: theme.bg, borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Total repaid</div><div style={{ color: theme.text, fontSize: '22px', fontWeight: 700 }}>${Math.round(parseFloat(mortgageAccel.balance || '0') + mortgageResult.standard.interest).toLocaleString()}</div></div>
-                        </div>
-                      </div>
-
-                      {parseFloat(mortgageAccel.extraRepayment || '0') > 0 && (
-                        <div style={{ ...cardStyle, border: '2px solid ' + theme.success }}>
-                          <h4 style={{ margin: '0 0 16px 0', color: theme.success }}>🚀 With ${mortgageAccel.extraRepayment} Extra Per {mortgageAccel.repaymentFrequency === 'weekly' ? 'Week' : mortgageAccel.repaymentFrequency === 'fortnightly' ? 'Fortnight' : 'Month'}</h4>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                            <div style={{ padding: '12px', background: theme.success + '15', borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Years remaining</div><div style={{ color: theme.success, fontSize: '22px', fontWeight: 700 }}>{mortgageResult.withExtra.years.toFixed(1)}</div></div>
-                            <div style={{ padding: '12px', background: theme.success + '15', borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Interest saved</div><div style={{ color: theme.success, fontSize: '22px', fontWeight: 700 }}>${Math.round(mortgageResult.withExtra.interestSaved).toLocaleString()}</div></div>
-                            <div style={{ padding: '12px', background: theme.success + '15', borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Mortgage-free year</div><div style={{ color: theme.success, fontSize: '22px', fontWeight: 700 }}>{mortgageResult.withExtra.freeYear}</div></div>
-                            <div style={{ padding: '12px', background: theme.success + '15', borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Years earlier</div><div style={{ color: theme.success, fontSize: '22px', fontWeight: 700 }}>{mortgageResult.withExtra.yearsSaved.toFixed(1)}</div></div>
-                          </div>
-                        </div>
-                      )}
-                      <button onClick={() => { setChatInput(`I have a $${mortgageAccel.balance} mortgage at ${mortgageAccel.rate}%, paying $${mortgageAccel.currentRepayment} ${mortgageAccel.repaymentFrequency}. How do I pay it off faster?`); setActiveTab('chat') }} style={{ ...btnSuccess, padding: '14px', width: '100%', fontSize: '15px' }}>💬 Ask Aureus for a personalised strategy</button>
-                    </>
-                  ) : (
-                    <div style={{ ...cardStyle, textAlign: 'center' as const, padding: '40px' }}>
-                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏠</div>
-                      <div style={{ color: theme.text, fontWeight: 600, marginBottom: '8px' }}>Enter your mortgage details</div>
-                      <div style={{ color: theme.textMuted, fontSize: '14px' }}>See exactly how much time and money you can save with smarter repayments</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* OFFSET SIMULATOR */}
-            {mortgageTab === 'offset' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                <div style={cardStyle}>
-                  <h3 style={{ margin: '0 0 8px 0', color: theme.text }}>💡 Offset Account Simulator</h3>
-                  <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '20px' }}>Every dollar in your offset account reduces the interest charged on your mortgage — without locking money away.</p>
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
-                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Repayment Frequency</label><select value={mortgageAccel.repaymentFrequency} onChange={e => setMortgageAccel({...mortgageAccel, repaymentFrequency: e.target.value})} style={{...inputStyle, width: '100%'}}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
-                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Mortgage Balance ($)</label><input type="number" value={mortgageAccel.balance} onChange={e => setMortgageAccel({...mortgageAccel, balance: e.target.value})} placeholder="e.g. 500000" style={{...inputStyle, width: '100%'}} /></div>
-                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Interest Rate (% p.a.)</label><input type="number" step="0.01" value={mortgageAccel.rate} onChange={e => setMortgageAccel({...mortgageAccel, rate: e.target.value})} placeholder="e.g. 5.69" style={{...inputStyle, width: '100%'}} /></div>
-                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Years Remaining</label><input type="number" value={mortgageAccel.remainingYears} onChange={e => setMortgageAccel({...mortgageAccel, remainingYears: e.target.value})} placeholder="e.g. 25" style={{...inputStyle, width: '100%'}} /></div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
-                        Your Repayment ($ per {mortgageAccel.repaymentFrequency === 'weekly' ? 'week' : mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'}) — optional
-                      </label>
-                      <input type="number" value={mortgageAccel.currentRepayment} onChange={e => setMortgageAccel({...mortgageAccel, currentRepayment: e.target.value})} placeholder="Leave blank to auto-calculate from term" style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div><label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Offset Balance ($) — how much you'd keep in offset</label><input type="number" value={mortgageAccel.offsetBalance} onChange={e => setMortgageAccel({...mortgageAccel, offsetBalance: e.target.value})} placeholder="e.g. 30000" style={{...inputStyle, width: '100%'}} /></div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
-                  {mortgageResult && parseFloat(mortgageAccel.offsetBalance || '0') > 0 ? (
-                    <>
-                      <div style={{ ...cardStyle, border: '2px solid ' + theme.warning }}>
-                        <h4 style={{ margin: '0 0 16px 0', color: theme.warning }}>💡 Offset Impact</h4>
-                        <div style={{ padding: '16px', background: theme.warning + '15', borderRadius: '10px', marginBottom: '16px' }}>
-                          <div style={{ color: theme.text, fontSize: '15px', fontWeight: 600, marginBottom: '8px' }}>
-                            ${mortgageAccel.offsetBalance} in offset saves you...
-                          </div>
-                          <div style={{ color: theme.warning, fontSize: '28px', fontWeight: 800, marginBottom: '4px' }}>
-                            ${Math.round(mortgageResult.withOffset.interestSaved).toLocaleString()}
-                          </div>
-                          <div style={{ color: theme.textMuted, fontSize: '13px' }}>in total interest</div>
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                          <div style={{ padding: '10px', background: theme.bg, borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Years saved</div><div style={{ color: theme.warning, fontSize: '20px', fontWeight: 700 }}>{mortgageResult.withOffset.yearsSaved.toFixed(1)}</div></div>
-                          <div style={{ padding: '10px', background: theme.bg, borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Free in year</div><div style={{ color: theme.warning, fontSize: '20px', fontWeight: 700 }}>{mortgageResult.withOffset.freeYear}</div></div>
-                          <div style={{ padding: '10px', background: theme.bg, borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Annual saving</div><div style={{ color: theme.warning, fontSize: '20px', fontWeight: 700 }}>${Math.round(parseFloat(mortgageAccel.offsetBalance || '0') * parseFloat(mortgageAccel.rate || '0') / 100).toLocaleString()}</div></div>
-                          <div style={{ padding: '10px', background: theme.bg, borderRadius: '8px', textAlign: 'center' as const }}><div style={{ color: theme.textMuted, fontSize: '11px' }}>Effective rate on offset</div><div style={{ color: theme.warning, fontSize: '20px', fontWeight: 700 }}>{mortgageAccel.rate}%</div></div>
-                        </div>
-                      </div>
-                      <div style={{ padding: '16px', background: theme.success + '15', borderRadius: '10px', border: '1px solid ' + theme.success + '40' }}>
-                        <div style={{ color: theme.success, fontWeight: 600, marginBottom: '8px' }}>🏦 Offset vs Savings Account</div>
-                        <div style={{ color: theme.text, fontSize: '13px', lineHeight: 1.6 }}>
-                          Offset at {mortgageAccel.rate}% (your mortgage rate) vs a savings account at 5.5%:<br/>
-                          <strong>Offset wins</strong> because there's no tax on offset savings — your 'return' is the full mortgage rate, with no tax deducted.
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ ...cardStyle, textAlign: 'center' as const, padding: '40px' }}>
-                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>💡</div>
-                      <div style={{ color: theme.text, fontWeight: 600, marginBottom: '8px' }}>Enter your offset balance</div>
-                      <div style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6 }}>See how keeping money in an offset account reduces your mortgage interest and cuts years from your loan</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* STRATEGY GUIDE */}
-            {mortgageTab === 'strategy' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                {[
-                  { icon: '📅', title: 'Switch to Fortnightly Payments', desc: 'The simplest hack — 26 fortnightly payments = 13 monthly payments per year. You make one extra month of payments without noticing.', saving: '~4 years & $80k+ on a $600k loan', action: 'Call your bank today and switch', difficulty: 'Easy', time: '15 mins' },
-                  { icon: '💡', title: 'Open an Offset Account', desc: 'Keep your savings and income in an offset account instead of a regular savings account. Every dollar reduces the interest on your mortgage.', saving: 'Varies — $30k offset at 6% saves $1,800/yr', action: 'Ask your bank if they have an offset account on your loan', difficulty: 'Easy', time: '30 mins' },
-                  { icon: '💪', title: 'Make Regular Extra Repayments', desc: 'Even $100–$200 extra per fortnight in the early years can cut 5–8 years off your loan. Start small, increase as your income grows.', saving: '$200/fn extra on a $500k loan: ~$90k saved', action: 'Set up an automatic extra repayment via bank transfer', difficulty: 'Easy', time: '20 mins' },
-                  { icon: '🔁', title: 'Refinance If Your Rate Is High', desc: 'If you haven\'t reviewed your rate in 2+ years, you might be on a loyalty tax. Refinancing to a lower rate can save thousands annually.', saving: '0.5% lower rate on $500k = $2,500/yr saved', action: 'Get a free mortgage health check from a broker', difficulty: 'Medium', time: '1-2 hrs' },
-                  { icon: '📈', title: 'Direct Windfalls to Your Mortgage', desc: 'Tax returns, bonuses, inheritance — put these directly onto your mortgage. A single $5,000 lump sum can save 2–3x that in interest.', saving: '$5k lump sum at year 5 saves ~$12k in interest', action: 'Create a rule: 50% of any windfall goes to mortgage', difficulty: 'Easy', time: 'Ongoing habit' },
-                  { icon: '🏦', title: 'Salary Sacrifice Into Your Mortgage', desc: 'Some employers offer mortgage salary sacrifice arrangements. Combine with your offset to maximise tax efficiency. Ask your HR/payroll team.', saving: 'Varies by income and employer', action: 'Check if your employer offers salary sacrifice for mortgage', difficulty: 'Medium', time: '1-2 hrs' },
-                ].map(strat => (
-                  <div key={strat.title} style={{ padding: '20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', marginBottom: '12px' }}>
-                      <div style={{ fontSize: '28px' }}>{strat.icon}</div>
-                      <div><div style={{ color: theme.text, fontWeight: 700, fontSize: '16px' }}>{strat.title}</div><div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}><span style={{ padding: '2px 8px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '11px' }}>{strat.difficulty}</span><span style={{ padding: '2px 8px', background: theme.accent + '20', color: theme.accent, borderRadius: '4px', fontSize: '11px' }}>⏱ {strat.time}</span></div></div>
-                    </div>
-                    <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, margin: '0 0 12px 0' }}>{strat.desc}</p>
-                    <div style={{ padding: '10px 12px', background: theme.success + '15', borderRadius: '8px', marginBottom: '12px' }}>
-                      <div style={{ color: theme.success, fontSize: '12px', fontWeight: 600 }}>💰 Estimated saving</div>
-                      <div style={{ color: theme.text, fontSize: '13px' }}>{strat.saving}</div>
-                    </div>
-                    <div style={{ padding: '10px 12px', background: theme.accent + '15', borderRadius: '8px' }}>
-                      <div style={{ color: theme.accent, fontSize: '12px', fontWeight: 600 }}>✅ Next action</div>
-                      <div style={{ color: theme.text, fontSize: '13px' }}>{strat.action}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ==================== FINANCIAL LITERACY HUB ==================== */}
-        {activeTab === 'learn' && (
-          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e3a5f, #0f172a)', borderRadius: '16px', border: '2px solid #3b82f6' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ fontSize: '48px' }}>🎓</div>
-                <div>
-                  <h2 style={{ margin: 0, color: '#f1f5f9', fontSize: '24px' }}>Financial Literacy Hub</h2>
-                  <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '14px' }}>Real knowledge behind real money moves. Tap any topic to learn — then ask Aureus to apply it to your situation.</p>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
-              {literacyTopics.map(topic => (
-                <div key={topic.id} style={{ background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + (learnExpanded === topic.id ? theme.accent : theme.border), overflow: 'hidden' }}>
-                  <button onClick={() => setLearnExpanded(learnExpanded === topic.id ? null : topic.id)} style={{ width: '100%', padding: '18px 20px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' as const }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: theme.accent + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>{topic.icon}</div>
-                      <div>
-                        <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px' }}>{topic.title}</div>
-                        <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '2px' }}>{topic.tagline}</div>
-                      </div>
-                    </div>
-                    <div style={{ color: theme.accent, fontSize: '20px', flexShrink: 0, marginLeft: '16px' }}>{learnExpanded === topic.id ? '▼' : '▶'}</div>
-                  </button>
-
-                  {learnExpanded === topic.id && (
-                    <div style={{ padding: '0 20px 20px 20px' }}>
-                      <div style={{ height: '1px', background: theme.border, marginBottom: '20px' }} />
-                      <p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.8, whiteSpace: 'pre-line' as const, margin: '0 0 20px 0' }}>{topic.content}</p>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                        <div style={{ padding: '16px', background: theme.accent + '15', borderRadius: '10px' }}>
-                          <div style={{ color: theme.accent, fontWeight: 700, fontSize: '13px', marginBottom: '10px' }}>📊 Key Numbers</div>
-                          {topic.keyNumbers.map((kn, i) => (
-                            <div key={i} style={{ color: theme.text, fontSize: '13px', marginBottom: '6px', paddingLeft: '8px', borderLeft: '2px solid ' + theme.accent }}>• {kn}</div>
-                          ))}
-                        </div>
-                        <div style={{ padding: '16px', background: theme.danger + '15', borderRadius: '10px' }}>
-                          <div style={{ color: theme.danger, fontWeight: 700, fontSize: '13px', marginBottom: '10px' }}>⚠️ Common Mistake</div>
-                          <div style={{ color: theme.text, fontSize: '13px', lineHeight: 1.6 }}>{topic.mistake}</div>
-                        </div>
-                      </div>
-
-                      <button onClick={() => { setChatInput(topic.cta); setActiveTab('chat') }} style={{ ...btnPrimary, width: '100%', padding: '12px', fontSize: '14px' }}>
-                        💬 {topic.cta} →
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ==================== WINS & ACCOUNTABILITY TAB ==================== */}
-        {activeTab === 'wins' && (
-          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-
-            {/* WHY STATEMENT */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e3a32, #0f172a)', borderRadius: '16px', border: '2px solid #10b981' }}>
-              <div style={{ color: '#94a3b8', fontSize: '12px', letterSpacing: '2px', marginBottom: '12px' }}>❤️ YOUR WHY</div>
-              {editingWhy ? (
-                <div>
-                  <textarea value={whyDraft} onChange={e => setWhyDraft(e.target.value)} placeholder="e.g. 'I want to be mortgage-free before my kids start high school so I can work less and be more present.'" style={{ ...inputStyle, width: '100%', minHeight: '80px', resize: 'vertical' as const, marginBottom: '12px' }} />
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={() => { setWhyStatement(whyDraft); setEditingWhy(false) }} style={btnSuccess}>Save My Why</button>
-                    <button onClick={() => setEditingWhy(false)} style={{ ...btnPrimary, background: theme.textMuted }}>Cancel</button>
-                  </div>
-                </div>
-              ) : whyStatement ? (
-                <div>
-                  <div style={{ color: '#f1f5f9', fontSize: '18px', fontStyle: 'italic', lineHeight: 1.6, marginBottom: '12px' }}>"{whyStatement}"</div>
-                  <button onClick={() => { setEditingWhy(true); setWhyDraft(whyStatement) }} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.1)', color: '#94a3b8', border: '1px solid #334155', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>Edit</button>
-                </div>
-              ) : (
-                <button onClick={() => setEditingWhy(true)} style={{ padding: '16px', background: 'transparent', border: '2px dashed #334155', borderRadius: '10px', color: '#94a3b8', cursor: 'pointer', textAlign: 'left' as const, width: '100%', fontSize: '14px' }}>
-                  + Set your why — the emotional anchor that keeps you on track when things get tough
-                </button>
-              )}
-            </div>
-
-            {/* STREAK & CHECK-IN */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div style={{ ...cardStyle, textAlign: 'center' as const }}>
-                <div style={{ fontSize: '48px', marginBottom: '8px' }}>🔥</div>
-                <div style={{ color: theme.text, fontSize: '36px', fontWeight: 800, marginBottom: '4px' }}>{streak}</div>
-                <div style={{ color: theme.textMuted, fontSize: '14px', marginBottom: '4px' }}>Week{streak !== 1 ? 's' : ''} straight</div>
-                <div style={{ color: theme.textMuted, fontSize: '12px' }}>{lastCheckIn ? `Last check-in: ${new Date(lastCheckIn).toLocaleDateString('en-AU')}` : 'No check-ins yet'}</div>
-              </div>
-              <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column' as const, justifyContent: 'center', alignItems: 'center', textAlign: 'center' as const }}>
-                <div style={{ fontSize: '36px', marginBottom: '12px' }}>📋</div>
-                <div style={{ color: theme.text, fontWeight: 600, marginBottom: '4px' }}>Weekly Check-In</div>
-                <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '16px' }}>5 quick questions, keep your streak</div>
-                <button onClick={() => { setShowWeeklyCheckIn(true); setCheckInStep(0); setCheckInAnswers({}) }} style={{ ...btnSuccess, width: '100%' }}>
-                  {lastCheckIn === new Date().toISOString().split('T')[0] ? '✓ Done today' : 'Do This Week\'s Check-In'}
-                </button>
-              </div>
-            </div>
-
-            {/* AUTO-DETECTED & MANUAL WINS */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>🏆 Your Wins</h3>
-                <span style={{ color: theme.textMuted, fontSize: '13px' }}>{wins.length} total</span>
-              </div>
-
-              {/* Add manual win */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                <input value={newWinText} onChange={e => setNewWinText(e.target.value)} onKeyPress={e => { if (e.key === 'Enter' && newWinText.trim()) { setWins(prev => [...prev, { id: Date.now(), title: newWinText.trim(), desc: 'Added manually', icon: '⭐', auto: false, date: new Date().toISOString() }]); setNewWinText('') } }} placeholder="Record a win — any size counts..." style={{ ...inputStyle, flex: 1 }} />
-                <button onClick={() => { if (newWinText.trim()) { setWins(prev => [...prev, { id: Date.now(), title: newWinText.trim(), desc: 'Added manually', icon: '⭐', auto: false, date: new Date().toISOString() }]); setNewWinText('') } }} style={btnSuccess}>+ Add</button>
-              </div>
-
-              {wins.length === 0 ? (
-                <div style={{ textAlign: 'center' as const, padding: '40px', color: theme.textMuted }}>
-                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎯</div>
-                  <div style={{ fontSize: '16px', marginBottom: '8px', color: theme.text }}>No wins recorded yet</div>
-                  <div style={{ fontSize: '14px' }}>Add income, set a goal, or do your first check-in to unlock automatic wins!</div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
-                  {[...wins].reverse().map(win => (
-                    <div key={win.id} style={{ padding: '14px 16px', background: win.auto ? (darkMode ? '#1e3a32' : '#f0fdf4') : (darkMode ? '#2e2a1e' : '#fefce8'), borderRadius: '10px', display: 'flex', alignItems: 'flex-start', gap: '14px', border: '1px solid ' + (win.auto ? theme.success + '30' : theme.warning + '30') }}>
-                      <div style={{ fontSize: '24px', flexShrink: 0 }}>{win.icon}</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ color: theme.text, fontWeight: 600, marginBottom: '2px' }}>{win.title}</div>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>{win.desc}</div>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>{new Date(win.date).toLocaleDateString('en-AU')}</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                        {win.auto && <span style={{ padding: '2px 8px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>AUTO</span>}
-                        <button onClick={() => setWins(wins.filter(w => w.id !== win.id))} style={{ padding: '2px 6px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* ACCOUNTABILITY SCORECARD */}
-            <div style={{ ...cardStyle, background: 'linear-gradient(135deg, #1e293b, #0f172a)', border: '1px solid #334155' }}>
-              <h3 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '20px' }}>📊 Accountability Scorecard</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                {[
-                  { label: 'Financial Health', value: `${financialHealthScore}/100`, color: financialHealthScore >= 70 ? theme.success : financialHealthScore >= 40 ? theme.warning : theme.danger, desc: 'Overall score' },
-                  { label: 'Savings Rate', value: `${savingsRate.toFixed(0)}%`, color: savingsRate >= 20 ? theme.success : savingsRate >= 10 ? theme.warning : theme.danger, desc: 'Of monthly income' },
-                  { label: 'Emergency Fund', value: `${emergencyMonths.toFixed(1)} mo`, color: emergencyMonths >= 3 ? theme.success : emergencyMonths >= 1 ? theme.warning : theme.danger, desc: 'Of expenses covered' },
-                  { label: 'Passive Income', value: `${passiveCoverage.toFixed(0)}%`, color: passiveCoverage >= 50 ? theme.success : passiveCoverage >= 20 ? theme.warning : theme.danger, desc: 'Of expenses covered' },
-                  { label: 'Monthly Surplus', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus > 0 ? theme.success : theme.danger, desc: 'After all bills' },
-                  { label: 'Check-In Streak', value: `${streak} wk${streak !== 1 ? 's' : ''}`, color: streak >= 4 ? theme.success : streak >= 1 ? theme.warning : theme.textMuted, desc: 'Consistency score' },
-                ].map(metric => (
-                  <div key={metric.label} style={{ padding: '16px', background: '#1e293b', borderRadius: '10px' }}>
-                    <div style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '4px' }}>{metric.label}</div>
-                    <div style={{ color: metric.color, fontSize: '22px', fontWeight: 700, marginBottom: '2px' }}>{metric.value}</div>
-                    <div style={{ color: '#64748b', fontSize: '11px' }}>{metric.desc}</div>
-                  </div>
-                ))}
-              </div>
-              <button onClick={() => { setChatInput('Give me a full assessment of my financial situation and what I should focus on next.'); setActiveTab('chat') }} style={{ ...btnPrimary, width: '100%', marginTop: '16px', padding: '14px' }}>💬 Get Aureus\'s Full Assessment</button>
-            </div>
-          </div>
-        )}
-
-        {/* PATH TAB */}
-        {activeTab === 'path' && (
-          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-            <div style={{ padding: '12px 16px', background: theme.warning + '15', borderRadius: '12px', border: '1px solid ' + theme.warning + '40' }}>
-              <p style={{ margin: 0, color: theme.textMuted, fontSize: '12px' }}>⚠️ General information only. Not financial advice. Consult licensed professionals before major decisions.</p>
-            </div>
-
-            {/* Aureus Chat Widget */}
-            <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
-                <div>
-                  <div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div>
-                  <div style={{ color: theme.textMuted, fontSize: '11px' }}>
-                    {moneyPersonality && personalityProfiles[moneyPersonality]
-                      ? `Coaching you as a ${personalityProfiles[moneyPersonality].label} · ${currentBabyStep.title}`
-                      : `${currentBabyStep.title} · Ask me to build your weekly plan`}
-                  </div>
-                </div>
-                {!moneyPersonality && (
-                  <button onClick={() => { setShowOnboarding(true); setOnboardingStep(1) }} style={{ marginLeft: 'auto', padding: '5px 10px', background: theme.purple + '20', color: theme.purple, border: '1px solid ' + theme.purple + '40', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, flexShrink: 0 }}>
-                    🧠 Take quiz
-                  </button>
-                )}
-              </div>
-              {chatMessages.length > 0 && (
-                <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
-                  {chatMessages.slice(-6).map((msg, idx) => (
-                    <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                      <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
-                    </div>
-                  ))}
-                  {isLoading && <div style={{ padding: '8px', color: theme.textMuted, fontSize: '13px' }}>Aureus is thinking...</div>}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus about your path, or ask for a weekly plan..." style={{ ...inputStyle, flex: 1 }} disabled={isLoading} />
-                <button onClick={handleChatMessage} disabled={isLoading || !chatInput.trim()} style={{ ...btnSuccess, opacity: isLoading || !chatInput.trim() ? 0.5 : 1 }}>{isLoading ? '...' : 'Send'}</button>
-              </div>
-            </div>
-
-            {/* ===== ROADMAP — MOVED TO TOP ===== */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: '20px', border: '2px solid ' + theme.purple }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-                <div>
-                  <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🗺️ My Roadmap</h2>
-                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Add milestones from any section below — then get a weekly action plan from Aureus</p>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={() => setShowDocUpload(true)} style={{ padding: '8px 14px', background: theme.accent + '20', color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>📎 Documents</button>
-                  <button onClick={() => setShowAddMilestone(true)} style={{ ...btnPurple, padding: '10px 18px' }}>+ Add Milestone</button>
-                </div>
-              </div>
-
-              {/* Documents section (compact, shown inline) */}
-              {documents.length > 0 && (
-                <div style={{ marginBottom: '16px', padding: '12px 16px', background: theme.cardBg, borderRadius: '10px' }}>
-                  <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>📎 Uploaded Documents ({documents.length})</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
-                    {documents.map((doc: any) => (
-                      <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: theme.bg, borderRadius: '20px', border: '1px solid ' + theme.border }}>
-                        <span style={{ fontSize: '14px' }}>{doc.type?.includes('pdf') ? '📄' : doc.type?.includes('image') ? '🖼️' : '📁'}</span>
-                        <span style={{ color: theme.text, fontSize: '12px' }}>{doc.name}</span>
-                        <button onClick={() => setDocuments(docs => docs.filter((d: any) => d.id !== doc.id))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '14px', padding: '0 2px', lineHeight: 1 }}>×</button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {roadmapMilestones.length === 0 ? (
-                <div style={{ textAlign: 'center' as const, padding: '32px', color: theme.textMuted, border: '2px dashed #334155', borderRadius: '12px' }}>
-                  <div style={{ fontSize: '40px', marginBottom: '12px' }}>🎯</div>
-                  <div style={{ color: theme.text, fontWeight: 600, marginBottom: '8px' }}>Your roadmap is empty</div>
-                  <div style={{ fontSize: '13px', lineHeight: 1.7, marginBottom: '16px' }}>Add milestones using the <strong style={{ color: theme.purple }}>+ Add to Roadmap</strong> buttons throughout this page, or click below to add your first one.</div>
-                  <button onClick={() => setShowAddMilestone(true)} style={{ ...btnPurple }}>Add First Milestone</button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
-                  {roadmapMilestones.map(m => {
-                    const pct = parseFloat(m.targetAmount) > 0 ? (m.currentAmount / parseFloat(m.targetAmount)) * 100 : 0
-                    const isOpen = expandedMilestone === m.id
-                    const planSteps: any[] = m.weeklyPlan || []
-                    const donePct = planSteps.length > 0 ? Math.round((planSteps.filter((s: any) => s.done).length / planSteps.length) * 100) : 0
-                    return (
-                      <div key={m.id} style={{ background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + (isOpen ? theme.purple : theme.border), overflow: 'hidden' }}>
-                        {/* Milestone header */}
-                        <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '20px' }}>{m.icon || '🎯'}</span>
-                                <span style={{ color: theme.text, fontWeight: 700, fontSize: '16px' }}>{m.name}</span>
-                                {m.targetDate && <span style={{ color: theme.textMuted, fontSize: '11px' }}>📅 {new Date(m.targetDate).toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}</span>}
-                              </div>
-                              <div style={{ display: 'flex', gap: '6px' }}>
-                                {planSteps.length > 0 && (
-                                  <span style={{ padding: '3px 8px', background: donePct === 100 ? theme.success + '30' : theme.accent + '20', color: donePct === 100 ? theme.success : theme.accent, borderRadius: '12px', fontSize: '11px', fontWeight: 600 }}>
-                                    {donePct === 100 ? '✓ Week done!' : `${donePct}% done`}
-                                  </span>
-                                )}
-                                <button onClick={() => setRoadmapMilestones(roadmapMilestones.filter(x => x.id !== m.id))} style={{ padding: '3px 8px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>🗑️</button>
-                              </div>
-                            </div>
-                            {/* Progress bar */}
-                            <div style={{ height: '6px', background: '#334155', borderRadius: '3px', overflow: 'hidden', marginBottom: '4px' }}>
-                              <div style={{ width: Math.min(pct, 100) + '%', height: '100%', background: `linear-gradient(90deg, ${theme.purple}, ${theme.success})` }} />
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span style={{ color: theme.textMuted, fontSize: '11px' }}>
-                                {parseFloat(m.targetAmount) > 0 ? `$${m.currentAmount.toLocaleString()} / $${parseFloat(m.targetAmount).toLocaleString()}` : m.notes || ''}
-                              </span>
-                              {m.notes && parseFloat(m.targetAmount) > 0 && <span style={{ color: theme.textMuted, fontSize: '11px' }}>{m.notes}</span>}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Weekly plan actions */}
-                        <div style={{ padding: '0 20px 16px 20px', display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                          <button
-                            onClick={() => generateWeeklyPlan(m.id)}
-                            disabled={generatingPlanFor === m.id}
-                            style={{ padding: '8px 14px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, opacity: generatingPlanFor === m.id ? 0.6 : 1 }}
-                          >
-                            {generatingPlanFor === m.id ? '⏳ Generating...' : planSteps.length > 0 ? '🔄 New Weekly Plan' : '📋 Generate Weekly Plan'}
-                          </button>
-                          {planSteps.length > 0 && (
-                            <button onClick={() => setExpandedMilestone(isOpen ? null : m.id)} style={{ padding: '8px 14px', background: isOpen ? theme.purple : theme.purple + '20', color: isOpen ? 'white' : theme.purple, border: '1px solid ' + theme.purple + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
-                              {isOpen ? '▲ Hide plan' : `▼ View plan (${planSteps.filter((s: any) => s.done).length}/${planSteps.length} done)`}
-                            </button>
-                          )}
-                          <button onClick={() => { setChatInput(`Give me advice on how to achieve: "${m.name}"${m.targetAmount ? ` (target $${m.targetAmount})` : ''}`); setActiveTab('chat') }} style={{ padding: '8px 14px', background: theme.accent + '20', color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
-                            💬 Ask Aureus
-                          </button>
-                        </div>
-
-                        {/* Expanded weekly plan checklist */}
-                        {isOpen && planSteps.length > 0 && (
-                          <div style={{ padding: '0 20px 20px 20px' }}>
-                            <div style={{ height: '1px', background: theme.border, marginBottom: '14px' }} />
-                            <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, marginBottom: '10px' }}>
-                              📅 WEEKLY ACTION PLAN
-                              {m.planGeneratedAt && <span style={{ fontWeight: 400, marginLeft: '8px' }}>Generated {new Date(m.planGeneratedAt).toLocaleDateString('en-AU')}</span>}
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                              {planSteps.map((step: any, idx: number) => {
-                                // Detect milestone type for context-aware routing
-                                const isDebtMilestone = /debt|credit card|bnpl|loan|pay off|kill bad/i.test(m.name) || /debt|credit card|bnpl|loan/i.test(m.notes || '')
-                                const isAddGoalStep = step.type === 'add_goal' || /add.*goal|savings goal.*aureus|aureus.*goal|calendar.*reminder|track.*aureus/i.test(step.text)
-                                const isAddDebtStep = isDebtMilestone && isAddGoalStep
-                                const isReviewStep = step.type === 'review_spending' || /review.*aureus|spending.*aureus|aureus.*spending|check.*aureus/i.test(step.text)
-                                const isActionStep = isAddGoalStep // true for either debt or goal action
-
-                                return (
-                                <div
-                                  key={step.id}
-                                  style={{ background: step.done ? theme.success + '15' : theme.bg, borderRadius: '10px', border: '1px solid ' + (step.done ? theme.success + '40' : isActionStep ? (isAddDebtStep ? theme.warning + '60' : theme.purple + '60') : theme.border), overflow: 'hidden' }}
-                                >
-                                  {/* Clickable row */}
-                                  <div
-                                    onClick={() => togglePlanStep(m.id, step.id)}
-                                    style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', cursor: 'pointer' }}
-                                  >
-                                    <div style={{ width: '24px', height: '24px', borderRadius: '6px', border: '2px solid ' + (step.done ? theme.success : theme.border), background: step.done ? theme.success : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
-                                      {step.done && <span style={{ color: 'white', fontSize: '14px', fontWeight: 700 }}>✓</span>}
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                                        <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 600 }}>DAY {idx + 1}</span>
-                                        {isActionStep && !step.done && <span style={{ padding: '1px 6px', background: (isAddDebtStep ? theme.warning : theme.purple) + '30', color: isAddDebtStep ? theme.warning : theme.purple, borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>{isAddDebtStep ? 'ACTION IN AUREUS — DEBTS' : 'ACTION IN AUREUS — GOALS'}</span>}
-                                      </div>
-                                      <div style={{ color: step.done ? theme.textMuted : theme.text, fontSize: '14px', lineHeight: 1.5, textDecoration: step.done ? 'line-through' : 'none' }}>{step.text}</div>
-                                    </div>
-                                  </div>
-                                  {/* Inline action button for Aureus-specific steps */}
-                                  {isActionStep && !step.done && (
-                                    <div style={{ padding: '0 14px 12px 50px' }}>
-                                      {isAddDebtStep ? (
-                                        // Debt milestone — scroll to Debts section in Budget tab
-                                        <button
-                                          onClick={e => {
-                                            e.stopPropagation()
-                                            setActiveTab('dashboard')
-                                            togglePlanStep(m.id, step.id)
-                                            setTimeout(() => {
-                                              const el = document.querySelector('[data-section="debts"]')
-                                              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                                            }, 300)
-                                          }}
-                                          style={{ padding: '8px 16px', background: theme.warning, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
-                                        >
-                                          💳 Add to Debts in Budget →
-                                        </button>
-                                      ) : (
-                                        // Savings milestone — open goal setup modal
-                                        <button
-                                          onClick={e => {
-                                            e.stopPropagation()
-                                            const weeks = m.targetDate
-                                              ? Math.max(1, Math.ceil((new Date(m.targetDate).getTime() - Date.now()) / (7 * 86400000)))
-                                              : 26
-                                            const suggestedPayment = m.targetAmount
-                                              ? Math.ceil(parseFloat(m.targetAmount) / weeks).toString()
-                                              : ''
-                                            setGoalSetupMilestone(m)
-                                            setGoalSetupStepId(step.id)
-                                            setGoalSetupForm({
-                                              name: m.name,
-                                              target: m.targetAmount || '',
-                                              saved: m.currentAmount?.toString() || '0',
-                                              paymentAmount: suggestedPayment,
-                                              savingsFrequency: 'weekly',
-                                              startDate: dateForDayOfWeek(new Date().getDay()),
-                                              deadline: m.targetDate || '',
-                                              addToCalendar: true,
-                                              addCheckIn: true
-                                            })
-                                            setShowGoalSetup(true)
-                                          }}
-                                          style={{ padding: '8px 16px', background: theme.purple, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
-                                        >
-                                          🎯 Set up in Goals & Calendar →
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                                )
-                              })}
-                            </div>
-                            {donePct === 100 && (
-                              <div style={{ marginTop: '12px', padding: '12px 16px', background: theme.success + '20', borderRadius: '10px', textAlign: 'center' as const, color: theme.success, fontWeight: 600 }}>
-                                🎉 Week complete! Tap "New Weekly Plan" to generate next week's steps.
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Baby Steps */}
-            <div style={cardStyle}>
-              <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>👶 Australian Baby Steps</h2>
-              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
-                {australianBabySteps.map(item => {
-                  const isCurrent = item.step === currentBabyStep.step
-                  const done = item.step < currentBabyStep.step
-                  return (
-                    <div key={item.step} style={{ padding: '16px', background: done ? (darkMode ? '#1e3a32' : '#f0fdf4') : isCurrent ? (darkMode ? '#2e2a1e' : '#fefce8') : (darkMode ? '#334155' : '#f8fafc'), borderRadius: '12px', border: done ? '2px solid ' + theme.success : isCurrent ? '2px solid ' + theme.warning : '1px solid ' + theme.border }}>
-                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                        <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px', flexShrink: 0 }}>{done ? '✓' : item.icon}</div>
-                        <div onClick={() => setSelectedBabyStep(item.step)} style={{ flex: 1, cursor: 'pointer' }}>
-                          <div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{item.title}</div>
-                          <div style={{ color: theme.textMuted, fontSize: '13px' }}>{item.desc}</div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                          <button onClick={() => addToRoadmapQuick(item.title, item.icon, '', item.desc)} style={{ padding: '5px 10px', background: theme.purple + '20', color: theme.purple, border: '1px solid ' + theme.purple + '40', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>+ Roadmap</button>
-                          <div style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, background: done ? theme.success : isCurrent ? theme.warning : theme.border, color: done || isCurrent ? 'white' : theme.textMuted }}>{done ? '✓ Done' : isCurrent ? '→ Now' : 'Later'}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* FIRE */}
-            <div style={{ padding: '24px', background: `linear-gradient(135deg, ${theme.purple}15, ${theme.success}15)`, borderRadius: '16px', border: '2px solid ' + theme.purple }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🔥 Escape the Rat Race — FIRE Path</h2>
-                <button onClick={() => addToRoadmapQuick('Reach Financial Independence', '🔥', fiPath.fireNumber.toFixed(0), `FIRE number based on ${monthlyIncome > 0 ? `$${monthlyIncome.toFixed(0)}/mo income` : 'current expenses'}`)} style={{ padding: '8px 14px', background: theme.purple + '20', color: theme.purple, border: '1px solid ' + theme.purple + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>+ Add to Roadmap</button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div style={cardStyle}>
-                  <h3 style={{ margin: '0 0 12px 0', color: theme.purple }}>🌴 Freedom Target</h3>
-                  <div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}>
-                    <div>Monthly need: <strong>${fiPath.monthlyNeed.toFixed(0)}</strong></div>
-                    <div>Passive income: <strong style={{ color: theme.success }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</strong></div>
-                    <div>Passive gap: <strong style={{ color: theme.danger }}>${Math.max(fiPath.passiveGap - totalPassiveQuestIncome, 0).toFixed(0)}</strong></div>
-                    <div>Coverage: <strong style={{ color: theme.purple }}>{((passiveIncome + totalPassiveQuestIncome) / Math.max(fiPath.monthlyNeed, 1) * 100).toFixed(1)}%</strong></div>
-                  </div>
-                </div>
-                <div style={cardStyle}>
-                  <h3 style={{ margin: '0 0 12px 0', color: theme.success }}>🔥 FIRE Number</h3>
-                  <div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}>
-                    <div>25× annual expenses: <strong>${fiPath.fireNumber.toLocaleString()}</strong></div>
-                    <div>Investments + Super: <strong style={{ color: theme.success }}>${fiPath.currentInvestments.toLocaleString()}</strong></div>
-                    <div>Progress: <strong style={{ color: theme.purple }}>{fiPath.fireNumber > 0 ? (fiPath.currentInvestments / fiPath.fireNumber * 100).toFixed(1) : 0}%</strong></div>
-                    <div>Est. years to FI: <strong style={{ color: theme.purple }}>{fiPath.yearsToFI >= 999 ? '∞' : fiPath.yearsToFI}</strong></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Set & Forget Automation */}
-            {incomeStreams.length > 0 && (
-              <div style={{ padding: '24px', background: 'linear-gradient(135deg, #3b82f615, #8b5cf615)', borderRadius: '16px', border: '2px solid ' + theme.accent }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                  <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🤖 Set & Forget Automation</h2>
-                  <button onClick={() => addToRoadmapQuick('Set Up 3-Account Automation', '🤖', '', 'Automate bills, savings, and spending split every payday')} style={{ padding: '8px 14px', background: theme.accent + '20', color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>+ Add to Roadmap</button>
-                </div>
-                <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>Split each pay into three accounts automatically. Bills pay themselves, savings grow on autopilot.</p>
-                {(() => {
-                  const auto = calculateAutomation()
-                  return (
-                    <div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
-                        <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
-                          <div style={{ fontSize: '28px', marginBottom: '6px' }}>💳</div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Bills Account</div>
-                          <div style={{ color: theme.warning, fontSize: '26px', fontWeight: 'bold' }}>${auto.bills.total.toFixed(0)}</div>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>per {auto.payFrequency}</div>
-                          <div style={{ marginTop: '8px' }}>{auto.bills.breakdown.slice(0, 3).map((b: any, i: number) => <div key={i} style={{ fontSize: '11px', color: theme.textMuted, display: 'flex', justifyContent: 'space-between' }}><span>{b.name}</span><span>${b.amount.toFixed(0)}</span></div>)}{auto.bills.breakdown.length > 3 && <div style={{ fontSize: '11px', color: theme.accent }}>+{auto.bills.breakdown.length - 3} more</div>}</div>
-                        </div>
-                        <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
-                          <div style={{ fontSize: '28px', marginBottom: '6px' }}>🎯</div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Savings Account</div>
-                          <div style={{ color: theme.purple, fontSize: '26px', fontWeight: 'bold' }}>${auto.savings.total.toFixed(0)}</div>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>per {auto.payFrequency}</div>
-                          <div style={{ marginTop: '8px' }}>{auto.savings.breakdown.slice(0, 3).map((s: any, i: number) => <div key={i} style={{ fontSize: '11px', color: theme.textMuted, display: 'flex', justifyContent: 'space-between' }}><span>{s.name}</span><span>${s.amount.toFixed(0)}</span></div>)}</div>
-                        </div>
-                        <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', textAlign: 'center' as const }}>
-                          <div style={{ fontSize: '28px', marginBottom: '6px' }}>💵</div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px' }}>Spending Money</div>
-                          <div style={{ color: auto.spending >= 0 ? theme.success : theme.danger, fontSize: '26px', fontWeight: 'bold' }}>${auto.spending.toFixed(0)}</div>
-                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>per {auto.payFrequency}</div>
-                          <div style={{ marginTop: '8px', fontSize: '12px', color: auto.spending >= 0 ? theme.success : theme.danger }}>{auto.spending >= 0 ? '✓ Guilt-free spending' : '⚠️ Over budget'}</div>
-                        </div>
-                      </div>
-                      <div style={{ padding: '12px 16px', background: theme.cardBg, borderRadius: '10px', color: theme.text, fontSize: '13px', lineHeight: 1.6 }}>
-                        💡 On payday, auto-transfer <strong style={{ color: theme.warning }}>${auto.bills.total.toFixed(0)}</strong> to bills and <strong style={{ color: theme.purple }}>${auto.savings.total.toFixed(0)}</strong> to savings. Spend <strong style={{ color: theme.success }}>${auto.spending.toFixed(0)}</strong> freely — it's already budgeted.
-                      </div>
-                    </div>
-                  )
-                })()}
-              </div>
-            )}
-
-            {/* Passive Income Quests */}
-            <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', border: '1px solid ' + theme.border }}>
-              <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>💰 Automated Revenue Strategies</h2>
-              <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>Step-by-step guides to build passive income. Use + Add to Roadmap to track your progress.</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                {passiveQuests.map(quest => {
-                  const isExp = activeQuestId === quest.id
-                  return (
-                    <div key={quest.id} style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                          <div style={{ width: '44px', height: '44px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>{quest.icon}</div>
-                          <div><div style={{ fontWeight: 600, color: theme.text, fontSize: '15px' }}>{quest.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{quest.description}</div></div>
-                        </div>
-                        <span style={{ padding: '3px 8px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '11px', fontWeight: 600, flexShrink: 0 }}>{quest.potentialIncome}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                        <span style={{ padding: '2px 8px', background: theme.bg, color: theme.textMuted, borderRadius: '4px', fontSize: '11px' }}>⏱ {quest.timeToSetup}</span>
-                        <span style={{ padding: '2px 8px', background: theme.bg, color: theme.textMuted, borderRadius: '4px', fontSize: '11px' }}>{'★'.repeat(quest.difficulty === 'Easy' ? 1 : quest.difficulty === 'Medium' ? 2 : 3)} {quest.difficulty}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                        <button onClick={() => setActiveQuestId(isExp ? null : quest.id)} style={{ background: 'none', border: 'none', color: theme.accent, fontSize: '13px', cursor: 'pointer', padding: 0 }}>▼ {isExp ? 'Hide' : 'Expand'} guide</button>
-                        <button onClick={() => addToRoadmapQuick(`Start: ${quest.name}`, quest.icon, '', `${quest.description} — potential ${quest.potentialIncome}`)} style={{ padding: '4px 10px', background: theme.purple + '20', color: theme.purple, border: '1px solid ' + theme.purple + '40', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>+ Roadmap</button>
-                      </div>
-                      {isExp && (
-                        <div style={{ marginTop: '14px', padding: '14px', background: darkMode ? '#0f172a' : '#f1f5f9', borderRadius: '8px' }}>
-                          <div style={{ background: theme.success + '15', padding: '10px', borderRadius: '8px', marginBottom: '12px', borderLeft: '3px solid ' + theme.success }}>
-                            <p style={{ margin: 0, color: theme.text, fontSize: '13px', lineHeight: 1.6 }}>💡 {quest.aureusAdvice}</p>
-                          </div>
-                          {quest.steps?.map((step: any, idx: number) => (
-                            <div key={idx} style={{ display: 'flex', gap: '10px', marginBottom: '10px', padding: '10px', background: theme.cardBg, borderRadius: '8px' }}>
-                              <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: theme.accent, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold', flexShrink: 0 }}>{idx + 1}</div>
-                              <div><div style={{ color: theme.text, fontSize: '13px', fontWeight: 500 }}>{step.title}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{step.description}</div></div>
-                            </div>
-                          ))}
-                          <button onClick={() => { setChatInput(`Tell me more about getting started with ${quest.name}`); setActiveTab('chat') }} style={{ ...btnPrimary, width: '100%', marginTop: '8px', fontSize: '13px', padding: '10px' }}>💬 Ask Aureus</button>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Rat Race Escape Tracker */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                <div>
-                  <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px' }}>🐀 RAT RACE ESCAPE TRACKER</div>
-                  <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>Passive income as % of monthly expenses</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ fontSize: '44px', fontWeight: 'bold', color: (passiveIncome + totalPassiveQuestIncome) >= fiPath.monthlyNeed ? theme.success : '#f59e0b' }}>
-                    {fiPath.monthlyNeed > 0 ? (((passiveIncome + totalPassiveQuestIncome) / fiPath.monthlyNeed) * 100).toFixed(1) : '0.0'}%
-                  </div>
-                  <button onClick={() => addToRoadmapQuick('Escape the Rat Race', '🐀', (fiPath.monthlyNeed * 12 * 25).toFixed(0), 'Build passive income to cover 100% of expenses')} style={{ padding: '8px 12px', background: theme.warning + '20', color: theme.warning, border: '1px solid ' + theme.warning + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>+ Roadmap</button>
-                </div>
-              </div>
-              <div style={{ height: '14px', background: '#334155', borderRadius: '7px', overflow: 'hidden', marginBottom: '12px' }}>
-                <div style={{ width: Math.min(((passiveIncome + totalPassiveQuestIncome) / Math.max(fiPath.monthlyNeed, 1)) * 100, 100) + '%', height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #10b981)', borderRadius: '7px' }} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-                {[{ pct: 25, label: 'Side income', color: '#94a3b8' }, { pct: 50, label: 'Half covered', color: '#f59e0b' }, { pct: 75, label: 'Almost free', color: '#8b5cf6' }, { pct: 100, label: 'Escaped! 🎉', color: '#10b981' }].map(ms => {
-                  const current = fiPath.monthlyNeed > 0 ? ((passiveIncome + totalPassiveQuestIncome) / fiPath.monthlyNeed) * 100 : 0
-                  const reached = current >= ms.pct
-                  return (
-                    <div key={ms.pct} style={{ padding: '10px', background: reached ? ms.color + '20' : '#1e293b', borderRadius: '8px', border: '1px solid ' + (reached ? ms.color : '#334155'), textAlign: 'center' as const }}>
-                      <div style={{ color: reached ? ms.color : '#64748b', fontWeight: 700 }}>{ms.pct}%</div>
-                      <div style={{ color: reached ? ms.color : '#64748b', fontSize: '10px', marginTop: '2px' }}>{reached ? '✓ ' : ''}{ms.label}</div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Australian Home Buying Roadmap */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: 'linear-gradient(135deg, #f59e0b, #10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>🏠</div>
-                  <div>
-                    <h2 style={{ margin: 0, color: '#f1f5f9', fontSize: '22px' }}>Australian Home Buying Roadmap</h2>
-                    <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '13px' }}>Expand each phase · Add phases to your personal roadmap</p>
-                  </div>
-                </div>
-                <button onClick={() => addToRoadmapQuick('Buy My First Home', '🏠', '120000', 'Deposit + costs for property purchase')} style={{ padding: '8px 14px', background: theme.warning + '20', color: theme.warning, border: '1px solid ' + theme.warning + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>+ Add to Roadmap</button>
-              </div>
-
-              {[
-                { id: 'phase1', num: '1', icon: '💰', title: 'Get Financially Ready', color: theme.warning, items: ['Complete Baby Steps 1–3 first (emergency fund + kill bad debt)', 'Save your deposit: 5% minimum, 20% avoids LMI', 'Check your credit score free via Credit Savvy or Finder', 'Stop applying for new credit 6+ months before applying', 'Consistent income for 12+ months strengthens your application', 'Reduce existing debt and BNPL balances to boost borrowing power'] },
-                { id: 'phase2', num: '2', icon: '🧾', title: 'Understand the True Costs', color: theme.purple, items: ['Stamp duty: 0% (first home QLD new builds) to 5.5% (investors)', 'LMI: $8k–$30k if deposit under 20% — often added to your loan', 'Conveyancer / solicitor: ~$1,500–$2,500', 'Building & pest inspection: ~$500–$800', 'Lender fees (application, valuation): ~$500–$1,500', "Moving costs + immediate repairs: budget $3k–$10k", "Budget 3–5% of purchase price in extra costs on top of deposit"] },
-                { id: 'phase3', num: '3', icon: '🏛️', title: 'Government Schemes & Grants', color: theme.accent, items: ['First Home Guarantee: 5% deposit, no LMI — 35,000 places/yr', 'Regional First Home Guarantee: same for regional areas', 'Family Home Guarantee: single parents — 2% deposit', 'QLD FHOG: $30,000 grant for new builds', 'NSW FHOG: $10,000 for new builds under $600k', 'First Home Super Saver Scheme: up to $50k from super for deposit', 'Check your state revenue office for current stamp duty concessions'] },
-                { id: 'phase4', num: '4', icon: '🏦', title: 'Get Pre-Approved', color: theme.success, items: ['Pre-approval shows sellers you\'re serious — valid ~90 days', 'Use a mortgage broker: access 40+ lenders, free to you (paid by bank)', 'Bring: 3 months payslips, 3 months bank statements, tax returns, ID', 'Understand variable (flexible) vs fixed rate (certainty)', 'Ask about offset accounts — critical for accelerating payoff', 'Compare comparison rates, not just advertised rates', 'Get pre-approval BEFORE falling in love with a property'] },
-                { id: 'phase5', num: '5', icon: '🎯', title: 'Buy Smart & Pay It Off Fast', color: theme.danger, items: ['Research suburbs: price trends, yield, infrastructure, school catchments', 'Buy slightly below your max borrowing capacity — buffer for rate rises', 'Switch to fortnightly repayments immediately — saves 3–4 years', 'Open an offset account and park all savings there from day one', 'Direct tax returns, bonuses, and windfalls straight to mortgage', 'Review your rate every 2 years — don\'t pay the loyalty tax', 'Use the Mortgage Accelerator tab to see exactly what extra payments save you'] },
-              ].map(phase => (
-                <div key={phase.id} style={{ marginBottom: '10px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + (homeGuideExpanded === phase.id ? phase.color : '#334155') }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px 0 0' }}>
-                    <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === phase.id ? null : phase.id)} style={{ flex: 1, padding: '14px 16px', background: homeGuideExpanded === phase.id ? phase.color + '20' : '#1e293b', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left' as const }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: phase.color + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{phase.icon}</div>
-                      <div>
-                        <div style={{ color: phase.color, fontWeight: 700, fontSize: '14px' }}>Phase {phase.num}: {phase.title}</div>
-                        <div style={{ color: '#64748b', fontSize: '11px' }}>{phase.items.length} key steps</div>
-                      </div>
-                      <span style={{ color: phase.color, fontSize: '16px', marginLeft: '8px' }}>{homeGuideExpanded === phase.id ? '▼' : '▶'}</span>
-                    </button>
-                    <button onClick={() => addToRoadmapQuick(`Home Buying Phase ${phase.num}: ${phase.title}`, phase.icon, '', phase.items[0])} style={{ padding: '6px 10px', background: phase.color + '20', color: phase.color, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, flexShrink: 0 }}>+ Roadmap</button>
-                  </div>
-                  {homeGuideExpanded === phase.id && (
-                    <div style={{ padding: '0 16px 16px 16px', background: '#0f172a' }}>
-                      <div style={{ height: '1px', background: '#334155', marginBottom: '14px' }} />
-                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                        {phase.items.map((item, i) => (
-                          <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', background: '#1e293b', borderRadius: '8px' }}>
-                            <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: phase.color + '30', color: phase.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', flexShrink: 0 }}>{i + 1}</div>
-                            <div style={{ color: '#e2e8f0', fontSize: '13px', lineHeight: 1.5 }}>{item}</div>
-                          </div>
-                        ))}
-                      </div>
-                      {phase.id === 'phase5' && <button onClick={() => setActiveTab('mortgage')} style={{ ...btnSuccess, width: '100%', marginTop: '12px' }}>🚀 Open Mortgage Accelerator →</button>}
-                      {phase.id === 'phase3' && (
-                        <div style={{ marginTop: '12px', padding: '12px', background: '#1e293b', borderRadius: '8px' }}>
-                          <div style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 600, marginBottom: '8px' }}>📊 Stamp Duty Quick Reference</div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                            {Object.entries(australianHomeData.stampDuty).map(([state, data]: [string, any]) => (
-                              <div key={state} style={{ padding: '8px', background: '#0f172a', borderRadius: '6px' }}>
-                                <div style={{ color: theme.accent, fontWeight: 700, fontSize: '12px', marginBottom: '2px' }}>{state}</div>
-                                <div style={{ color: '#64748b', fontSize: '11px' }}>{data.firstHome}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            {mortgageTab === 'calculator' && (<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+              <div style={cardStyle}><h3 style={{ margin: '0 0 20px 0', color: theme.text }}>Your Mortgage</h3><div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}><div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Frequency</label><select value={mortgageAccel.repaymentFrequency} onChange={e => setMortgageAccel({...mortgageAccel, repaymentFrequency: e.target.value})} style={{...inputStyle, width: '100%'}}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div><div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Balance ($)</label><input type="number" value={mortgageAccel.balance} onChange={e => setMortgageAccel({...mortgageAccel, balance: e.target.value})} style={{...inputStyle, width: '100%'}} /></div><div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Rate (%)</label><input type="number" step="0.01" value={mortgageAccel.rate} onChange={e => setMortgageAccel({...mortgageAccel, rate: e.target.value})} style={{...inputStyle, width: '100%'}} /></div><div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Years left</label><input type="number" value={mortgageAccel.remainingYears} onChange={e => setMortgageAccel({...mortgageAccel, remainingYears: e.target.value})} style={{...inputStyle, width: '100%'}} /></div><div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Actual repayment</label><input type="number" value={mortgageAccel.currentRepayment} onChange={e => setMortgageAccel({...mortgageAccel, currentRepayment: e.target.value})} style={{...inputStyle, width: '100%'}} /></div><div style={{ borderTop: '1px solid ' + theme.border, paddingTop: '16px' }}><div style={{ color: theme.success, fontWeight: 600, marginBottom: '10px' }}>💪 Extra Repayment</div><input type="number" value={mortgageAccel.extraRepayment} onChange={e => setMortgageAccel({...mortgageAccel, extraRepayment: e.target.value})} placeholder="e.g. 200" style={{...inputStyle, width: '100%'}} /></div></div></div>
+              <div><div style={cardStyle}><h4 style={{ color: theme.danger }}>Current</h4><div>Years: {mortgageResult?.standard.years.toFixed(1)}</div><div>Interest: ${Math.round(mortgageResult?.standard.interest || 0).toLocaleString()}</div><div>Free: {mortgageResult?.standard.freeYear}</div></div>{parseFloat(mortgageAccel.extraRepayment || '0') > 0 && (<div style={{ ...cardStyle, border: '2px solid ' + theme.success, marginTop: '16px' }}><h4 style={{ color: theme.success }}>With Extra</h4><div>Years: {mortgageResult?.withExtra.years.toFixed(1)}</div><div>Saved: ${Math.round(mortgageResult?.withExtra.interestSaved || 0).toLocaleString()}</div><div>Free: {mortgageResult?.withExtra.freeYear}</div></div>)}</div>
+            </div>)}
           </div>
         )}
 
         {/* ==================== INSIGHTS TAB ==================== */}
         {activeTab === 'insights' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-
-            {/* MONEY PERSONALITY */}
-            {moneyPersonality && personalityProfiles[moneyPersonality] ? (
-              <div style={{ padding: '24px', background: `linear-gradient(135deg, ${personalityProfiles[moneyPersonality].color}20, ${personalityProfiles[moneyPersonality].color}05)`, borderRadius: '20px', border: `2px solid ${personalityProfiles[moneyPersonality].color}40` }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '20px', marginBottom: '20px' }}>
-                  <div style={{ fontSize: '56px', flexShrink: 0 }}>{personalityProfiles[moneyPersonality].emoji}</div>
-                  <div>
-                    <div style={{ color: theme.textMuted, fontSize: '11px', letterSpacing: '2px', marginBottom: '4px' }}>YOUR MONEY PERSONALITY</div>
-                    <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '24px' }}>{personalityProfiles[moneyPersonality].label}</h2>
-                    <p style={{ margin: 0, color: theme.textMuted, fontSize: '14px', lineHeight: 1.6 }}>{personalityProfiles[moneyPersonality].desc}</p>
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div style={{ padding: '14px', background: theme.cardBg, borderRadius: '12px' }}>
-                    <div style={{ color: theme.success, fontWeight: 700, fontSize: '12px', marginBottom: '6px' }}>💪 YOUR STRENGTH</div>
-                    <div style={{ color: theme.text, fontSize: '13px' }}>{personalityProfiles[moneyPersonality].strength}</div>
-                  </div>
-                  <div style={{ padding: '14px', background: theme.cardBg, borderRadius: '12px' }}>
-                    <div style={{ color: theme.warning, fontWeight: 700, fontSize: '12px', marginBottom: '6px' }}>⚠️ WATCH OUT FOR</div>
-                    <div style={{ color: theme.text, fontSize: '13px' }}>{personalityProfiles[moneyPersonality].blindspot}</div>
-                  </div>
-                </div>
-                <div style={{ padding: '14px', background: theme.cardBg, borderRadius: '12px', borderLeft: '4px solid ' + personalityProfiles[moneyPersonality].color }}>
-                  <div style={{ color: personalityProfiles[moneyPersonality].color, fontWeight: 700, fontSize: '12px', marginBottom: '6px' }}>🎯 AUREUS FOCUS FOR YOU</div>
-                  <div style={{ color: theme.text, fontSize: '13px', lineHeight: 1.5 }}>{personalityProfiles[moneyPersonality].aureusFocus}</div>
-                </div>
-                <button onClick={() => { setShowOnboarding(true); setOnboardingStep(1) }} style={{ marginTop: '14px', padding: '10px 18px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>Retake personality quiz</button>
-              </div>
-            ) : (
-              <div style={{ padding: '24px', background: theme.cardBg, borderRadius: '20px', border: '2px dashed ' + theme.border, textAlign: 'center' as const }}>
-                <div style={{ fontSize: '48px', marginBottom: '12px' }}>🧠</div>
-                <h3 style={{ color: theme.text, margin: '0 0 8px 0' }}>Discover your Money Personality</h3>
-                <p style={{ color: theme.textMuted, fontSize: '14px', marginBottom: '16px' }}>8 questions. Understand how you're wired with money and how Aureus can coach you better.</p>
-                <button onClick={() => { setShowOnboarding(true); setOnboardingStep(1) }} style={{ ...btnPrimary, padding: '12px 24px' }}>Take the Quiz →</button>
-              </div>
-            )}
-
-            {/* PROACTIVE INSIGHTS */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div>
-                  <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>🧠 Aureus Notices...</h3>
-                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>
-                    {insightsGeneratedAt ? `Last updated ${new Date(insightsGeneratedAt).toLocaleDateString('en-AU')}` : 'AI-powered observations about your finances'}
-                  </div>
-                </div>
-                <button onClick={generateProactiveInsights} disabled={loadingInsights} style={{ ...btnPrimary, padding: '8px 16px', opacity: loadingInsights ? 0.6 : 1 }}>
-                  {loadingInsights ? '⏳ Analysing...' : '🔄 Refresh'}
-                </button>
-              </div>
-              {proactiveInsights.length === 0 ? (
-                <div style={{ textAlign: 'center' as const, padding: '32px', color: theme.textMuted }}>
-                  <div style={{ fontSize: '40px', marginBottom: '12px' }}>👀</div>
-                  <div style={{ color: theme.text, fontWeight: 600, marginBottom: '8px' }}>Let Aureus analyse your finances</div>
-                  <div style={{ fontSize: '13px', marginBottom: '16px' }}>Add your income and expenses first, then tap Refresh to get personalised insights.</div>
-                  <button onClick={generateProactiveInsights} disabled={loadingInsights || incomeStreams.length === 0} style={{ ...btnPrimary, opacity: incomeStreams.length === 0 ? 0.5 : 1 }}>
-                    {incomeStreams.length === 0 ? 'Add income first' : 'Generate Insights'}
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
-                  {proactiveInsights.map((insight, i) => (
-                    <div key={i} style={{ padding: '14px 16px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
-                      <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6 }}>{insight}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* THE ONE DECISION */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div>
-                  <h3 style={{ margin: 0, color: theme.warning, fontSize: '20px' }}>🎯 Your ONE Decision This Week</h3>
-                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>The single highest-leverage action right now</div>
-                </div>
-                <button onClick={generateOneDecision} disabled={loadingOneDecision} style={{ ...btnWarning, padding: '8px 16px', opacity: loadingOneDecision ? 0.6 : 1 }}>
-                  {loadingOneDecision ? '⏳...' : oneDecision ? '🔄 New' : '⚡ Generate'}
-                </button>
-              </div>
-              {oneDecision ? (
-                <div>
-                  <div style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.warning}15, ${theme.orange}10)`, borderRadius: '12px', border: '2px solid ' + theme.warning + '40', marginBottom: '12px' }}>
-                    <div style={{ color: theme.text, fontSize: '16px', lineHeight: 1.7, fontWeight: 500 }}>{oneDecision}</div>
-                  </div>
-                  <div style={{ color: theme.textMuted, fontSize: '11px' }}>Generated {oneDecisionDate && new Date(oneDecisionDate).toLocaleDateString('en-AU')} · Tap "New" for a fresh one</div>
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center' as const, padding: '24px', color: theme.textMuted }}>
-                  <div style={{ fontSize: '36px', marginBottom: '10px' }}>⚡</div>
-                  <div style={{ fontSize: '14px' }}>Aureus will identify the single most impactful financial move you can make this week — based on your specific numbers.</div>
-                </div>
-              )}
-            </div>
-
-            {/* SPENDING PATTERN INSIGHTS */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📊 Spending Patterns</h3>
-                <button onClick={generateSpendingInsights} disabled={loadingSpendingInsights || expenses.length < 3} style={{ ...btnPrimary, padding: '8px 16px', opacity: (loadingSpendingInsights || expenses.length < 3) ? 0.5 : 1 }}>
-                  {loadingSpendingInsights ? '⏳ Analysing...' : '🔍 Analyse'}
-                </button>
-              </div>
-              {spendingInsights.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                  {spendingInsights.map((insight, i) => (
-                    <div key={i} style={{ padding: '12px 14px', background: theme.bg, borderRadius: '8px', color: theme.text, fontSize: '14px', lineHeight: 1.5 }}>{insight}</div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ color: theme.textMuted, fontSize: '14px', textAlign: 'center' as const, padding: '20px' }}>
-                  {expenses.length < 3 ? 'Add at least 3 expenses in Budget to unlock spending pattern analysis.' : 'Tap Analyse to get AI-powered insights about your spending patterns.'}
-                </div>
-              )}
-            </div>
-
-            {/* LATTE FACTOR CALCULATOR */}
-            <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 6px 0', color: theme.text, fontSize: '20px' }}>☕ The Real Cost of Your Habits</h3>
-              <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>What does that daily spend really cost over {latteYears} years? <em>This isn't about guilt — it's about conscious choice.</em></p>
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' as const }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Investment return rate %</label>
-                  <input type="number" value={latteReturnRate} onChange={e => setLatteReturnRate(e.target.value)} style={{ ...inputStyle, width: '100%' }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Time horizon (years)</label>
-                  <input type="number" value={latteYears} onChange={e => setLatteYears(e.target.value)} style={{ ...inputStyle, width: '100%' }} />
-                </div>
-              </div>
-              {latteItems.map(item => {
-                const monthly = latteFreqToMonthly(item.frequency, parseFloat(item.amount || '0'))
-                const impact = calcLatteImpact(monthly, parseFloat(latteYears || '20'), parseFloat(latteReturnRate || '8'))
-                return (
-                  <div key={item.id} style={{ padding: '14px 16px', background: theme.bg, borderRadius: '10px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '22px' }}>{item.emoji}</span>
-                      <div>
-                        <div style={{ color: theme.text, fontWeight: 600 }}>{item.name}</div>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>${item.amount} {item.frequency} = ${monthly.toFixed(0)}/mo</div>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' as const }}>
-                      <div style={{ color: theme.danger, fontWeight: 700, fontSize: '18px' }}>${Math.round(impact / 1000)}k</div>
-                      <div style={{ color: theme.textMuted, fontSize: '11px' }}>over {latteYears} yrs</div>
-                    </div>
-                    <button onClick={() => setLatteItems(prev => prev.filter(i => i.id !== item.id))} style={{ padding: '2px 8px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', marginLeft: '8px' }}>×</button>
-                  </div>
-                )
-              })}
-              <div style={{ padding: '16px', background: `linear-gradient(135deg, ${theme.danger}15, ${theme.warning}10)`, borderRadius: '12px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>Total monthly spend</div>
-                  <div style={{ color: theme.text, fontWeight: 700, fontSize: '18px' }}>${totalLatteMonthly.toFixed(0)}/mo</div>
-                </div>
-                <div style={{ textAlign: 'right' as const }}>
-                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>Invested over {latteYears} years</div>
-                  <div style={{ color: theme.danger, fontWeight: 700, fontSize: '22px' }}>${Math.round(totalLatteImpact / 1000)}k</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                <input placeholder="Habit name" value={newLatteItem.name} onChange={e => setNewLatteItem({...newLatteItem, name: e.target.value})} style={{...inputStyle, flex: 2}} />
-                <input type="number" placeholder="$" value={newLatteItem.amount} onChange={e => setNewLatteItem({...newLatteItem, amount: e.target.value})} style={{...inputStyle, width: '70px'}} />
-                <select value={newLatteItem.frequency} onChange={e => setNewLatteItem({...newLatteItem, frequency: e.target.value})} style={inputStyle}>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-                <button onClick={() => { if (newLatteItem.name && newLatteItem.amount) { setLatteItems(prev => [...prev, { ...newLatteItem, id: Date.now(), emoji: '💸' }]); setNewLatteItem({ name: '', amount: '', frequency: 'daily', emoji: '💸' }) } }} style={btnDanger}>+</button>
-              </div>
-              <div style={{ padding: '12px 14px', background: theme.success + '15', borderRadius: '8px', color: theme.text, fontSize: '13px', lineHeight: 1.6 }}>
-                💡 This isn't about cutting everything you enjoy. It's about choosing which habits are actually worth ${Math.round(totalLatteImpact / 1000)}k to you. Some will be. Some won't.
-              </div>
-            </div>
-
-            {/* COMMUNITY STATS */}
-            <div style={{ padding: '20px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: '16px', border: '1px solid #334155' }}>
-              <h3 style={{ margin: '0 0 16px 0', color: '#f1f5f9', fontSize: '18px' }}>🌏 You're Not Alone</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-                {[
-                  { stat: '847', label: 'users on Baby Step 2 right now', sub: 'Average completion: 14 months' },
-                  { stat: '$2.4M', label: 'in interest savings identified this week', sub: 'Across all Aureus users' },
-                  { stat: '4.2×', label: 'faster debt payoff with weekly check-ins', sub: 'vs. users who skip them' },
-                  { stat: '91%', label: 'of users feel less stressed after 30 days', sub: 'Based on check-in data' },
-                ].map((item, i) => (
-                  <div key={i} style={{ padding: '14px', background: '#1e293b', borderRadius: '10px' }}>
-                    <div style={{ color: theme.success, fontSize: '22px', fontWeight: 800, marginBottom: '4px' }}>{item.stat}</div>
-                    <div style={{ color: '#e2e8f0', fontSize: '13px', marginBottom: '2px' }}>{item.label}</div>
-                    <div style={{ color: '#64748b', fontSize: '11px' }}>{item.sub}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {moneyPersonality && personalityProfiles[moneyPersonality] ? (<div style={{ padding: '24px', background: `linear-gradient(135deg, ${personalityProfiles[moneyPersonality].color}20, ${personalityProfiles[moneyPersonality].color}05)`, borderRadius: '20px', border: `2px solid ${personalityProfiles[moneyPersonality].color}40` }}><div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}><div style={{ fontSize: '56px' }}>{personalityProfiles[moneyPersonality].emoji}</div><div><div style={{ color: theme.textMuted, fontSize: '11px', letterSpacing: '2px' }}>YOUR MONEY PERSONALITY</div><h2 style={{ margin: 0, color: theme.text, fontSize: '24px' }}>{personalityProfiles[moneyPersonality].label}</h2></div></div><div style={{ marginTop: '16px', padding: '14px', background: theme.cardBg, borderRadius: '12px', borderLeft: '4px solid ' + personalityProfiles[moneyPersonality].color }}><div style={{ color: personalityProfiles[moneyPersonality].color, fontWeight: 700 }}>🎯 AUREUS FOCUS</div><div style={{ color: theme.text, fontSize: '13px' }}>{personalityProfiles[moneyPersonality].aureusFocus}</div></div></div>) : (<div style={{ padding: '24px', background: theme.cardBg, borderRadius: '20px', border: '2px dashed ' + theme.border, textAlign: 'center' as const }}><div style={{ fontSize: '48px' }}>🧠</div><h3 style={{ color: theme.text }}>Discover your Money Personality</h3><button onClick={() => { setShowOnboarding(true); setOnboardingStep(1) }} style={{ ...btnPrimary, padding: '12px 24px' }}>Take the Quiz →</button></div>)}
+            
+            <div style={cardStyle}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}><h3 style={{ margin: 0, color: theme.text }}>🧠 Aureus Notices</h3><button onClick={generateProactiveInsights} disabled={loadingInsights} style={{ ...btnPrimary, padding: '8px 16px' }}>{loadingInsights ? '...' : 'Refresh'}</button></div>{proactiveInsights.map((insight, i) => (<div key={i} style={{ padding: '14px 16px', background: theme.bg, borderRadius: '10px', marginBottom: '8px', border: '1px solid ' + theme.border }}>{insight}</div>))}</div>
+            
+            <div style={cardStyle}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}><h3 style={{ margin: 0, color: theme.warning }}>🎯 Your ONE Decision</h3><button onClick={generateOneDecision} disabled={loadingOneDecision} style={{ ...btnWarning, padding: '8px 16px' }}>{loadingOneDecision ? '...' : oneDecision ? 'New' : 'Generate'}</button></div>{oneDecision && (<div style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.warning}15, ${theme.orange}10)`, borderRadius: '12px', border: '2px solid ' + theme.warning + '40' }}>{oneDecision}</div>)}</div>
+            
+            <div style={cardStyle}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}><h3 style={{ margin: 0, color: theme.text }}>☕ Latte Factor</h3></div>${totalLatteMonthly.toFixed(0)}/mo = ${Math.round(totalLatteImpact / 1000)}k over {latteYears} years</div>
           </div>
         )}
 
-        {/* ==================== GROW TAB ==================== */}
-        {activeTab === 'grow' && (
+        {/* ==================== PATH TAB ==================== */}
+        {activeTab === 'path' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-
-            {/* WEALTH SNAPSHOT */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-                <div>
-                  <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📈 Wealth Trajectory</h3>
-                  <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Your net worth — past and projected</div>
-                </div>
-                <div style={{ textAlign: 'right' as const }}>
-                  <div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 800 }}>${netWorth.toLocaleString()}</div>
-                  <div style={{ color: theme.textMuted, fontSize: '11px' }}>Current net worth</div>
-                </div>
-              </div>
-              {/* SVG Chart */}
-              {(() => {
-                const data = netWorthChartData
-                if (data.length < 2) return (
-                  <div style={{ padding: '40px', textAlign: 'center' as const, color: theme.textMuted }}>
-                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>📊</div>
-                    <div>Your wealth trajectory will appear here as you track progress over time. Do your first Annual Review to start the chart.</div>
-                  </div>
-                )
-                const values = data.map(d => d.value)
-                const min = Math.min(...values)
-                const max = Math.max(...values)
-                const range = max - min || 1
-                const W = 600, H = 200, PAD = 40
-                const points = data.map((d, i) => {
-                  const x = PAD + (i / (data.length - 1)) * (W - PAD * 2)
-                  const y = H - PAD - ((d.value - min) / range) * (H - PAD * 2)
-                  return { x, y, ...d }
-                })
-                const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
-                return (
-                  <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
-                    <defs>
-                      <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10b981" stopOpacity="0.3"/>
-                        <stop offset="100%" stopColor="#10b981" stopOpacity="0"/>
-                      </linearGradient>
-                    </defs>
-                    <path d={`${pathD} L${points[points.length-1].x},${H-PAD} L${points[0].x},${H-PAD} Z`} fill="url(#chartGrad)" />
-                    <path d={pathD} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
-                    {points.map((p, i) => (
-                      <g key={i}>
-                        <circle cx={p.x} cy={p.y} r="5" fill={p.projected ? '#f59e0b' : '#10b981'} />
-                        <text x={p.x} y={H - 8} textAnchor="middle" fill="#64748b" fontSize="11">{p.date}</text>
-                        <text x={p.x} y={p.y - 10} textAnchor="middle" fill={p.projected ? '#f59e0b' : '#10b981'} fontSize="10">${Math.round(p.value / 1000)}k</text>
-                      </g>
-                    ))}
-                    <line x1={PAD} y1={H-PAD} x2={W-PAD} y2={H-PAD} stroke="#334155" strokeWidth="1"/>
-                  </svg>
-                )
-              })()}
-              <div style={{ display: 'flex', gap: '16px', marginTop: '12px', justifyContent: 'center' as const }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', borderRadius: '50%', background: theme.success }} /><span style={{ color: theme.textMuted, fontSize: '12px' }}>Actual</span></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', borderRadius: '50%', background: theme.warning }} /><span style={{ color: theme.textMuted, fontSize: '12px' }}>Projected</span></div>
-              </div>
-            </div>
-
-            {/* SUPER OPTIMIZER */}
-            <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 6px 0', color: theme.text, fontSize: '20px' }}>🦺 Superannuation Optimizer</h3>
-              <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>See the real impact of salary sacrifice and how fees are affecting your retirement.</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
-                {[
-                  { label: 'Current super balance ($)', key: 'currentBalance', placeholder: 'e.g. 45000' },
-                  { label: 'Current age', key: 'currentAge', placeholder: 'e.g. 32' },
-                  { label: 'Retirement age', key: 'retirementAge', placeholder: '67' },
-                  { label: 'Annual salary ($)', key: 'salary', placeholder: 'e.g. 85000' },
-                  { label: 'Employer SG rate (%)', key: 'employerRate', placeholder: '11.5' },
-                  { label: 'Extra salary sacrifice ($/fortnight)', key: 'extraContribution', placeholder: 'e.g. 100' },
-                  { label: 'Super fund fee rate (% p.a.)', key: 'fundFeeRate', placeholder: 'e.g. 0.8' },
-                ].map(field => (
-                  <div key={field.key}>
-                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>{field.label}</label>
-                    <input type="number" step="0.1" value={(superData as any)[field.key]} onChange={e => setSuperData(prev => ({ ...prev, [field.key]: e.target.value }))} placeholder={field.placeholder} style={{ ...inputStyle, width: '100%' }} />
-                  </div>
-                ))}
-              </div>
-              {superData.currentBalance && superData.currentAge && superData.salary && (() => {
-                const proj = calcSuperProjection()
-                return (
-                  <div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '16px' }}>
-                      <div style={{ padding: '16px', background: theme.bg, borderRadius: '12px', textAlign: 'center' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Employer only</div>
-                        <div style={{ color: theme.text, fontSize: '22px', fontWeight: 700 }}>${Math.round(proj.projectedNoExtra / 1000)}k</div>
-                        <div style={{ color: theme.textMuted, fontSize: '11px' }}>at retirement</div>
-                      </div>
-                      <div style={{ padding: '16px', background: theme.success + '15', borderRadius: '12px', textAlign: 'center' as const, border: '2px solid ' + theme.success + '40' }}>
-                        <div style={{ color: theme.success, fontSize: '11px', marginBottom: '4px' }}>With salary sacrifice</div>
-                        <div style={{ color: theme.success, fontSize: '22px', fontWeight: 700 }}>${Math.round(proj.projected / 1000)}k</div>
-                        <div style={{ color: theme.success, fontSize: '11px' }}>+${Math.round(proj.extraImpact / 1000)}k more</div>
-                      </div>
-                      <div style={{ padding: '16px', background: theme.warning + '15', borderRadius: '12px', textAlign: 'center' as const }}>
-                        <div style={{ color: theme.warning, fontSize: '11px', marginBottom: '4px' }}>Annual tax saving</div>
-                        <div style={{ color: theme.warning, fontSize: '22px', fontWeight: 700 }}>${Math.round(proj.taxSaving).toLocaleString()}</div>
-                        <div style={{ color: theme.warning, fontSize: '11px' }}>from salary sacrifice</div>
-                      </div>
-                    </div>
-                    <div style={{ padding: '14px', background: theme.cardBg, borderRadius: '10px', color: theme.text, fontSize: '13px', lineHeight: 1.6 }}>
-                      💡 At {superData.fundFeeRate}% in fees, you're paying ~${Math.round(parseFloat(superData.currentBalance || '0') * parseFloat(superData.fundFeeRate || '0') / 100).toLocaleString()}/year in management fees. Compare your fund at <strong>superratings.com.au</strong> — a 0.5% fee difference on $200k is $1,000/year.
-                    </div>
-                  </div>
-                )
-              })()}
-            </div>
-
-            {/* OFFSET OPTIMIZER */}
-            <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 6px 0', color: theme.text, fontSize: '20px' }}>💡 Offset vs Savings: The Real Answer</h3>
-              <p style={{ margin: '0 0 16px 0', color: theme.textMuted, fontSize: '13px' }}>Should you keep savings in an offset account or a high-interest savings account? Here's the actual maths for your situation.</p>
-              {mortgageAccel.rate ? (() => {
-                const mortgageRate = parseFloat(mortgageAccel.rate || '0')
-                const savingsRate = 5.25 // typical HISA rate
-                const taxRate = 0.325 // typical marginal rate
-                const afterTaxSavings = savingsRate * (1 - taxRate)
-                const offsetWins = mortgageRate > afterTaxSavings
-                return (
-                  <div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                      <div style={{ padding: '16px', background: offsetWins ? theme.success + '15' : theme.bg, borderRadius: '12px', border: offsetWins ? '2px solid ' + theme.success + '40' : '1px solid ' + theme.border }}>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '6px' }}>OFFSET ACCOUNT</div>
-                        <div style={{ color: offsetWins ? theme.success : theme.text, fontSize: '24px', fontWeight: 800 }}>{mortgageRate.toFixed(2)}%</div>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>effective return (tax-free)</div>
-                        {offsetWins && <div style={{ color: theme.success, fontSize: '12px', fontWeight: 600, marginTop: '6px' }}>✓ WINNER for your situation</div>}
-                      </div>
-                      <div style={{ padding: '16px', background: !offsetWins ? theme.success + '15' : theme.bg, borderRadius: '12px', border: !offsetWins ? '2px solid ' + theme.success + '40' : '1px solid ' + theme.border }}>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '6px' }}>HIGH-INTEREST SAVINGS</div>
-                        <div style={{ color: !offsetWins ? theme.success : theme.text, fontSize: '24px', fontWeight: 800 }}>{afterTaxSavings.toFixed(2)}%</div>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>after tax (32.5% marginal)</div>
-                        {!offsetWins && <div style={{ color: theme.success, fontSize: '12px', fontWeight: 600, marginTop: '6px' }}>✓ WINNER for your situation</div>}
-                      </div>
-                    </div>
-                    <div style={{ padding: '14px 16px', background: (offsetWins ? theme.success : theme.accent) + '15', borderRadius: '10px', color: theme.text, fontSize: '13px', lineHeight: 1.7 }}>
-                      <strong>Verdict:</strong> {offsetWins
-                        ? `Your mortgage rate (${mortgageRate}%) beats the after-tax savings rate (${afterTaxSavings.toFixed(2)}%). Every dollar in your offset account earns the equivalent of ${mortgageRate}% risk-free and tax-free. Put your savings in the offset.`
-                        : `Your after-tax savings rate (${afterTaxSavings.toFixed(2)}%) beats your mortgage rate (${mortgageRate}%). A high-interest savings account is slightly better for now — but watch if rates change.`}
-                    </div>
-                  </div>
-                )
-              })() : (
-                <div style={{ color: theme.textMuted, textAlign: 'center' as const, padding: '20px' }}>Enter your mortgage rate in the Mortgage Accelerator tab first.</div>
-              )}
-            </div>
+            <div style={cardStyle}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}><h2 style={{ margin: 0, color: theme.text }}>🗺️ My Roadmap</h2><button onClick={() => setShowAddMilestone(true)} style={{ ...btnPurple }}>+ Add Milestone</button></div>{roadmapMilestones.map(m => (<div key={m.id} style={{ padding: '16px', background: theme.cardBg, borderRadius: '12px', marginBottom: '12px', border: '1px solid ' + theme.border }}><div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><span style={{ fontSize: '24px' }}>{m.icon || '🎯'}</span><div style={{ flex: 1 }}><div style={{ fontWeight: 600, color: theme.text }}>{m.name}</div><div style={{ fontSize: '12px', color: theme.textMuted }}>{m.notes}</div></div><button onClick={() => generateWeeklyPlan(m.id)} style={{ ...btnSuccess, padding: '6px 12px', fontSize: '12px' }}>Generate Plan</button></div></div>))}</div>
+            <div style={cardStyle}><h2 style={{ margin: '0 0 20px 0', color: theme.text }}>👶 Australian Baby Steps</h2>{australianBabySteps.map(item => (<div key={item.step} style={{ padding: '12px', marginBottom: '8px', background: item.step === currentBabyStep.step ? theme.warning + '20' : theme.bg, borderRadius: '8px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><span style={{ fontSize: '24px' }}>{item.icon}</span><div><div style={{ fontWeight: 600 }}>{item.title}</div><div style={{ fontSize: '12px', color: theme.textMuted }}>{item.desc}</div></div></div></div>))}</div>
           </div>
         )}
 
-        {/* ==================== REVIEW TAB ==================== */}
-        {activeTab === 'review' && (
-          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-
-            {/* MONEY DATE */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                <div>
-                  <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>💰 Money Date</h3>
-                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Your weekly financial ritual — the single biggest predictor of financial progress.</p>
-                </div>
-                <button onClick={() => { setShowMoneyDate(true); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ ...btnSuccess, padding: '10px 18px' }}>Start →</button>
-              </div>
-
-              {/* Schedule Setup */}
-              <div style={{ padding: '16px', background: theme.bg, borderRadius: '12px', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>📅 Your Schedule</div>
-                  <button onClick={() => setCheckInSchedule(s => ({ ...s, showScheduleSetup: !s.showScheduleSetup }))} style={{ padding: '4px 10px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '6px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>
-                    {checkInSchedule.showScheduleSetup ? 'Done' : 'Edit'}
-                  </button>
-                </div>
-                {checkInSchedule.showScheduleSetup ? (
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
-                    <div>
-                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px', fontWeight: 600 }}>💰 WEEKLY MONEY DATE</div>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
-                        {['sunday','monday','tuesday','wednesday','thursday','friday','saturday'].map(day => (
-                          <button key={day} onClick={() => setCheckInSchedule(s => ({ ...s, moneyDateDay: day }))}
-                            style={{ padding: '6px 12px', background: checkInSchedule.moneyDateDay === day ? theme.success : theme.cardBg, color: checkInSchedule.moneyDateDay === day ? 'white' : theme.textMuted, border: '1px solid ' + (checkInSchedule.moneyDateDay === day ? theme.success : theme.border), borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, textTransform: 'capitalize' as const }}>
-                            {day.slice(0,3)}
-                          </button>
-                        ))}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <label style={{ color: theme.textMuted, fontSize: '12px', flexShrink: 0 }}>At time:</label>
-                        <input type="time" value={checkInSchedule.moneyDateTime} onChange={e => setCheckInSchedule(s => ({ ...s, moneyDateTime: e.target.value }))} style={{ ...inputStyle, width: '130px' }} />
-                        <span style={{ color: theme.textMuted, fontSize: '11px' }}>shown as badge when due</span>
-                      </div>
-                    </div>
-                    <div style={{ borderTop: '1px solid ' + theme.border, paddingTop: '14px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>✅ DAILY CHECK-IN</div>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                          <input type="checkbox" checked={checkInSchedule.dailyEnabled} onChange={e => setCheckInSchedule(s => ({ ...s, dailyEnabled: e.target.checked }))} style={{ accentColor: theme.accent }} />
-                          <span style={{ color: theme.text, fontSize: '12px' }}>{checkInSchedule.dailyEnabled ? 'Enabled' : 'Disabled'}</span>
-                        </label>
-                      </div>
-                      {checkInSchedule.dailyEnabled && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <label style={{ color: theme.textMuted, fontSize: '12px', flexShrink: 0 }}>Preferred time:</label>
-                          <input type="time" value={checkInSchedule.dailyTime} onChange={e => setCheckInSchedule(s => ({ ...s, dailyTime: e.target.value }))} style={{ ...inputStyle, width: '130px' }} />
-                          <span style={{ color: theme.textMuted, fontSize: '11px' }}>do it anytime — this is just your preference</span>
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ padding: '10px 12px', background: theme.accent + '15', borderRadius: '8px', color: theme.textMuted, fontSize: '12px', lineHeight: 1.5 }}>
-                      💡 Aureus shows a "due" badge in the header when your scheduled check-in day arrives. Add Aureus to your phone home screen for the best mobile experience.
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: '24px' }}>
-                    <div>
-                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '2px' }}>MONEY DATE</div>
-                      <div style={{ color: theme.text, fontWeight: 600, textTransform: 'capitalize' as const }}>{checkInSchedule.moneyDateDay}s at {checkInSchedule.moneyDateTime}</div>
-                    </div>
-                    <div>
-                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '2px' }}>DAILY CHECK-IN</div>
-                      <div style={{ color: theme.text, fontWeight: 600 }}>{checkInSchedule.dailyEnabled ? `Enabled · preferred ${checkInSchedule.dailyTime}` : 'Disabled'}</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {streak > 0 && (
-                <div style={{ padding: '12px 16px', background: theme.warning + '15', borderRadius: '10px', border: '1px solid ' + theme.warning + '30', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ fontSize: '24px' }}>🔥</span>
-                  <div><div style={{ color: theme.warning, fontWeight: 700 }}>{streak}-week streak!</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>Last: {lastCheckIn && new Date(lastCheckIn).toLocaleDateString('en-AU')}</div></div>
-                </div>
-              )}
-
-              {milestoneCheckIns.length > 0 && (
-                <div style={{ padding: '10px 14px', background: theme.purple + '15', borderRadius: '8px', marginBottom: '16px', border: '1px solid ' + theme.purple + '30' }}>
-                  <div style={{ color: theme.purple, fontWeight: 600, fontSize: '12px', marginBottom: '6px' }}>🎯 Goal check-ins this session: {getDueMilestoneCheckIns().length} of {milestoneCheckIns.length}</div>
-                  {milestoneCheckIns.map(ci => {
-                    const linkedGoal = goals.find(g => g.name === ci.milestoneName)
-                    const freq = linkedGoal?.savingsFrequency || 'weekly'
-                    const due = getDueMilestoneCheckIns().some(d => d.id === ci.id)
-                    return (
-                      <div key={ci.id} style={{ color: theme.textMuted, fontSize: '11px', display: 'flex', justifyContent: 'space-between', marginTop: '3px' }}>
-                        <span>{ci.milestoneName}</span>
-                        <span style={{ color: due ? theme.success : theme.textMuted }}>{due ? '✓ due now' : `${freq} — not due`}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {moneyDateLog.length > 0 && (
-                <div>
-                  <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, marginBottom: '10px' }}>Recent</div>
-                  {moneyDateLog.slice(0, 3).map((entry: any) => (
-                    <div key={entry.id} style={{ padding: '10px 14px', background: theme.bg, borderRadius: '10px', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <span style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{new Date(entry.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-                        <span style={{ color: parseInt(entry.stressLevel) <= 2 ? theme.success : parseInt(entry.stressLevel) >= 4 ? theme.danger : theme.warning, fontSize: '12px' }}>Stress {entry.stressLevel}/5</span>
-                      </div>
-                      {entry.win && <div style={{ color: theme.success, fontSize: '12px' }}>⭐ {entry.win}</div>}
-                      {entry.intention && <div style={{ color: theme.accent, fontSize: '12px', marginTop: '2px' }}>→ {entry.intention}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* DAILY CHECK-IN CARD */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                <div>
-                  <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>✅ Daily Check-in</h3>
-                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>3 questions. Do it anytime — builds the habit of daily financial awareness.</p>
-                </div>
-                <button onClick={() => { setShowDailyCheckIn(true); setDailyCheckInStep(0); setDailyCheckInAnswers({}) }}
-                  disabled={lastDailyCheckIn === new Date().toISOString().split('T')[0]}
-                  style={{ ...btnPrimary, padding: '10px 18px', opacity: lastDailyCheckIn === new Date().toISOString().split('T')[0] ? 0.5 : 1, cursor: lastDailyCheckIn === new Date().toISOString().split('T')[0] ? 'default' : 'pointer' }}>
-                  {lastDailyCheckIn === new Date().toISOString().split('T')[0] ? '✓ Done today' : 'Check in →'}
-                </button>
-              </div>
-              <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', alignItems: 'center' }}>
-                {Array.from({ length: 7 }).map((_, i) => {
-                  const d = new Date(Date.now() - i * 86400000)
-                  const dateStr = d.toISOString().split('T')[0]
-                  const done = dailyCheckInLog.some(e => new Date(e.date).toISOString().split('T')[0] === dateStr)
-                  return (
-                    <div key={i} style={{ flex: 1, textAlign: 'center' as const }}>
-                      <div style={{ borderRadius: '6px', background: done ? theme.accent : theme.bg, border: '1px solid ' + (done ? theme.accent : theme.border), padding: '6px 0', marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span style={{ color: done ? 'white' : theme.textMuted, fontSize: '12px' }}>{done ? '✓' : '·'}</span>
-                      </div>
-                      <div style={{ color: theme.textMuted, fontSize: '10px' }}>{d.toLocaleDateString('en-AU', { weekday: 'short' })}</div>
-                    </div>
-                  )
-                })}
-                <div style={{ color: theme.textMuted, fontSize: '11px', paddingLeft: '4px' }}>7 days</div>
-              </div>
-              {dailyCheckInLog.slice(0,3).map((entry: any) => (
-                <div key={entry.id} style={{ padding: '8px 12px', background: theme.bg, borderRadius: '8px', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: theme.text, fontSize: '13px' }}>{new Date(entry.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-                  <span style={{ color: entry.answers[0] === 'Confident' ? theme.success : entry.answers[0] === 'Stressed' ? theme.danger : theme.textMuted, fontSize: '12px', fontWeight: 600 }}>{entry.answers[0] || '—'}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* ANNUAL MONEY REVIEW */}
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                <div>
-                  <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📆 Annual Money Review</h3>
-                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Your yearly performance review — what you built, what you learned, where you're going.</p>
-                </div>
-                <button onClick={() => setShowAnnualReview(true)} style={{ ...btnPurple, padding: '10px 18px' }}>
-                  {annualReviews.length > 0 ? `Review #${annualReviews.length + 1}` : 'Start First Review →'}
-                </button>
-              </div>
-              {annualReviews.length > 0 ? (
-                annualReviews.slice(0, 2).map((review: any) => (
-                  <div key={review.id} style={{ padding: '16px', background: theme.bg, borderRadius: '12px', marginBottom: '10px', border: '1px solid ' + theme.border }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                      <span style={{ color: theme.text, fontWeight: 700 }}>📆 {review.year} Review</span>
-                      <span style={{ color: review.netWorthSnapshot >= 0 ? theme.success : theme.danger, fontWeight: 600 }}>Net worth: ${review.netWorthSnapshot?.toLocaleString()}</span>
-                    </div>
-                    {review.answers[0] && <div style={{ color: theme.success, fontSize: '13px', marginBottom: '6px' }}>🏆 Win: {review.answers[0]}</div>}
-                    {review.answers[5] && <div style={{ color: theme.accent, fontSize: '13px' }}>🎯 Intentions: {review.answers[5]}</div>}
-                  </div>
-                ))
-              ) : (
-                <div style={{ padding: '24px', textAlign: 'center' as const, color: theme.textMuted }}>
-                  <div style={{ fontSize: '40px', marginBottom: '10px' }}>📆</div>
-                  <div style={{ fontSize: '14px', lineHeight: 1.6 }}>Your first Annual Review captures where you are today — wins, mistakes, lessons, and intentions for the year ahead. It takes 10 minutes and is one of the most powerful financial habits you can build.</div>
-                </div>
-              )}
-            </div>
-
-            {/* FEAR AUDIT */}
-            <div style={{ padding: '24px', background: darkMode ? '#1a1020' : '#faf5ff', borderRadius: '20px', border: '2px solid ' + theme.purple + '40' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                <div>
-                  <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>🧠 Money Fear Audit</h3>
-                  <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Money shame is the #1 reason people avoid their finances. This exercise surfaces the beliefs holding you back. It's private, it's powerful, and it's the work most people never do.</p>
-                </div>
-                {!fearAuditComplete && <button onClick={() => setShowFearAudit(true)} style={{ ...btnPurple, padding: '10px 18px' }}>Start Audit →</button>}
-              </div>
-              {fearAuditComplete ? (
-                <div>
-                  <div style={{ padding: '14px 16px', background: theme.success + '15', borderRadius: '10px', marginBottom: '14px', border: '1px solid ' + theme.success + '30' }}>
-                    <div style={{ color: theme.success, fontWeight: 600, marginBottom: '4px' }}>✅ Fear Audit Complete</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px' }}>You've done the work most people avoid. Awareness of your money beliefs is the first step to rewriting them.</div>
-                  </div>
-                  {fearAuditAnswers[2] && (
-                    <div style={{ padding: '14px', background: theme.bg, borderRadius: '10px', marginBottom: '8px' }}>
-                      <div style={{ color: theme.purple, fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>WHAT YOU BELIEVED ABOUT YOURSELF</div>
-                      <div style={{ color: theme.text, fontSize: '14px', fontStyle: 'italic' }}>"{fearAuditAnswers[2]}"</div>
-                    </div>
-                  )}
-                  {fearAuditAnswers[4] && (
-                    <div style={{ padding: '14px', background: theme.success + '10', borderRadius: '10px' }}>
-                      <div style={{ color: theme.success, fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>WHAT IT MEANS WHEN YOU SUCCEED</div>
-                      <div style={{ color: theme.text, fontSize: '14px', fontStyle: 'italic' }}>"{fearAuditAnswers[4]}"</div>
-                    </div>
-                  )}
-                  <button onClick={() => setShowFearAudit(true)} style={{ marginTop: '12px', padding: '8px 16px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>Revisit Fear Audit</button>
-                </div>
-              ) : (
-                <div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.7 }}>
-                  Research by Brené Brown and financial therapists consistently shows that the emotional roots of money behaviour run deeper than logic. Most financial advice ignores this entirely. Aureus doesn't.
-                </div>
-              )}
-            </div>
-
-            {/* DEEP WHY DISPLAY */}
-            {deepWhyComplete && Object.keys(deepWhyAnswers).length > 0 && (
-              <div style={cardStyle}>
-                <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '20px' }}>❤️ Your Deep Why</h3>
-                {deepWhyQuestions.map((q, i) => deepWhyAnswers[i] && (
-                  <div key={i} style={{ padding: '12px 14px', background: theme.bg, borderRadius: '10px', marginBottom: '8px' }}>
-                    <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>{q}</div>
-                    <div style={{ color: theme.text, fontSize: '14px', fontStyle: 'italic' }}>"{deepWhyAnswers[i]}"</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* OVERVIEW */}
-        {activeTab === 'overview' && (
-          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: '20px', border: '1px solid #334155' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px' }}>FINANCIAL HEALTH SCORE</div>
-                <div style={{ fontSize: '48px', fontWeight: 700, color: financialHealthScore >= 70 ? theme.success : financialHealthScore >= 40 ? theme.warning : theme.danger }}>{financialHealthScore}</div>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-              {[
-                { label: 'Monthly Income', value: `$${monthlyIncome.toFixed(0)}`, color: theme.success },
-                { label: 'Total Bills', value: `$${totalOutgoing.toFixed(0)}`, color: theme.danger },
-                { label: 'Net Monthly', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus >= 0 ? theme.success : theme.danger },
-                { label: 'Net Worth', value: `$${netWorth.toFixed(0)}`, color: netWorth >= 0 ? theme.success : theme.danger },
-              ].map(m => (
-                <div key={m.label} style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
-                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>{m.label}</div>
-                  <div style={{ color: m.color, fontSize: '24px', fontWeight: 700 }}>{m.value}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-              <div style={cardStyle}><h3 style={{ margin: '0 0 16px 0', color: theme.success }}>📈 Assets (${totalAssets.toLocaleString()})</h3>{assets.map(a => <div key={a.id} style={{ padding: '10px', marginBottom: '6px', background: theme.bg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.text }}>{a.name}</span><span style={{ color: theme.success, fontWeight: 700 }}>${parseFloat(a.value).toLocaleString()}</span></div>)}{assets.length === 0 && <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No assets added</p>}</div>
-              <div style={cardStyle}><h3 style={{ margin: '0 0 16px 0', color: theme.danger }}>📉 Liabilities (${(totalLiabilities + totalDebtBalance).toFixed(0)})</h3>{debts.map(d => <div key={d.id} style={{ padding: '10px', marginBottom: '6px', background: theme.bg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.text }}>💳 {d.name}</span><span style={{ color: theme.danger, fontWeight: 700 }}>${parseFloat(d.balance).toFixed(0)}</span></div>)}{debts.length === 0 && <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No debts</p>}</div>
-            </div>
-          </div>
-        )}
+        {/* ==================== REVIEW, GROW, OVERVIEW, LEARN, WINS TABS ==================== */}
+        {activeTab === 'review' && (<div style={cardStyle}><h3>💰 Money Date</h3><button onClick={() => { setShowMoneyDate(true); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={btnSuccess}>Start Money Date →</button><div style={{ marginTop: '16px' }}>Streak: {streak} weeks</div></div>)}
+        {activeTab === 'grow' && (<div style={cardStyle}><h3>📈 Wealth Trajectory</h3><div>Net Worth: ${netWorth.toLocaleString()}</div><div>Passive Income: ${passiveIncome.toFixed(0)}/mo</div><div>FIRE Number: ${fiPath.fireNumber.toLocaleString()}</div></div>)}
+        {activeTab === 'overview' && (<div style={cardStyle}><h3>📊 Financial Health Score</h3><div style={{ fontSize: '48px', fontWeight: 'bold', color: financialHealthScore >= 70 ? theme.success : financialHealthScore >= 40 ? theme.warning : theme.danger }}>{financialHealthScore}</div></div>)}
+        {activeTab === 'learn' && (<div style={cardStyle}><h3>🎓 Financial Literacy</h3>{literacyTopics.map(topic => (<div key={topic.id} style={{ padding: '12px', marginBottom: '8px', borderBottom: '1px solid ' + theme.border }}><div style={{ fontWeight: 600 }}>{topic.icon} {topic.title}</div><div style={{ fontSize: '12px', color: theme.textMuted }}>{topic.tagline}</div></div>))}</div>)}
+        {activeTab === 'wins' && (<div style={cardStyle}><h3>🏆 Your Wins</h3><div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}><input value={newWinText} onChange={e => setNewWinText(e.target.value)} placeholder="Record a win..." style={{...inputStyle, flex: 1}} /><button onClick={() => { if (newWinText.trim()) { setWins(prev => [...prev, { id: Date.now(), title: newWinText.trim(), desc: 'Added manually', icon: '⭐', auto: false, date: new Date().toISOString() }]); setNewWinText('') } }} style={btnSuccess}>+</button></div>{wins.slice().reverse().slice(0, 10).map(win => (<div key={win.id} style={{ padding: '10px', marginBottom: '8px', background: win.auto ? theme.success + '15' : theme.warning + '15', borderRadius: '8px' }}><div style={{ fontWeight: 600 }}>{win.icon} {win.title}</div><div style={{ fontSize: '12px' }}>{win.desc}</div></div>))}</div>)}
 
       </main>
 
-      {/* ==================== MODALS ==================== */}
-
-      {/* WHY EDIT - shown from quickview */}
-      {editingWhy && activeTab !== 'wins' && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setEditingWhy(false)}>
-          <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '24px', maxWidth: '500px', width: '100%' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 8px 0', color: theme.text }}>❤️ Set Your Why</h3>
-            <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '16px' }}>What are you really working toward? This statement is shown on your dashboard to keep you anchored when motivation dips.</p>
-            <textarea value={whyDraft} onChange={e => setWhyDraft(e.target.value)} placeholder="e.g. 'I want to be mortgage-free before my kids finish primary school so I can work less and be more present.'" style={{ ...inputStyle, width: '100%', minHeight: '100px', resize: 'vertical' as const, marginBottom: '16px' }} />
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => { setWhyStatement(whyDraft); setEditingWhy(false) }} style={{ ...btnSuccess, flex: 1 }}>Save</button>
-              <button onClick={() => setEditingWhy(false)} style={{ ...btnPrimary, background: theme.textMuted }}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* WEEKLY CHECK-IN MODAL */}
-      {showWeeklyCheckIn && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '500px', width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div>
-                <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📋 Weekly Check-In</h3>
-                <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Question {checkInStep + 1} of {checkInQuestions.length}</div>
-              </div>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                {checkInQuestions.map((_, i) => <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i <= checkInStep ? theme.success : theme.border }} />)}
-              </div>
-            </div>
-
-            <div style={{ padding: '20px', background: theme.bg, borderRadius: '12px', marginBottom: '20px' }}>
-              <p style={{ color: theme.text, fontSize: '16px', fontWeight: 500, margin: 0 }}>{checkInQuestions[checkInStep].q}</p>
-            </div>
-
-            {checkInQuestions[checkInStep].type === 'yesno' && (
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-                <button onClick={() => setCheckInAnswers({...checkInAnswers, [checkInStep]: 'yes'})} style={{ flex: 1, padding: '14px', background: checkInAnswers[checkInStep] === 'yes' ? theme.success : theme.bg, color: checkInAnswers[checkInStep] === 'yes' ? 'white' : theme.text, border: '2px solid ' + (checkInAnswers[checkInStep] === 'yes' ? theme.success : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}>👍 Yes</button>
-                <button onClick={() => setCheckInAnswers({...checkInAnswers, [checkInStep]: 'no'})} style={{ flex: 1, padding: '14px', background: checkInAnswers[checkInStep] === 'no' ? theme.danger : theme.bg, color: checkInAnswers[checkInStep] === 'no' ? 'white' : theme.text, border: '2px solid ' + (checkInAnswers[checkInStep] === 'no' ? theme.danger : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}>👎 No</button>
-              </div>
-            )}
-
-            {checkInQuestions[checkInStep].type === 'scale' && (
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                {[1,2,3,4,5].map(n => (
-                  <button key={n} onClick={() => setCheckInAnswers({...checkInAnswers, [checkInStep]: n.toString()})} style={{ flex: 1, padding: '14px', background: checkInAnswers[checkInStep] === n.toString() ? theme.accent : theme.bg, color: checkInAnswers[checkInStep] === n.toString() ? 'white' : theme.text, border: '2px solid ' + (checkInAnswers[checkInStep] === n.toString() ? theme.accent : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '18px', fontWeight: 700 }}>{n}</button>
-                ))}
-              </div>
-            )}
-
-            {checkInQuestions[checkInStep].type === 'text' && (
-              <div style={{ marginBottom: '20px' }}>
-                <input value={checkInAnswers[checkInStep] || ''} onChange={e => setCheckInAnswers({...checkInAnswers, [checkInStep]: e.target.value})} placeholder="e.g. Made an extra $100 mortgage payment" style={{ ...inputStyle, width: '100%', padding: '14px 16px' }} />
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {checkInStep > 0 && <button onClick={() => setCheckInStep(s => s - 1)} style={{ ...btnPrimary, background: theme.textMuted }}>← Back</button>}
-              {checkInStep < checkInQuestions.length - 1 ? (
-                <button onClick={() => setCheckInAnswers(a => { if (!a[checkInStep]) return a; setCheckInStep(s => s + 1); return a })} disabled={!checkInAnswers[checkInStep]} style={{ ...btnPrimary, flex: 1, opacity: !checkInAnswers[checkInStep] ? 0.5 : 1 }}>Next →</button>
-              ) : (
-                <button onClick={submitCheckIn} style={{ ...btnSuccess, flex: 1, fontSize: '16px' }}>✅ Submit Check-In</button>
-              )}
-            </div>
-            <button onClick={() => setShowWeeklyCheckIn(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', width: '100%', marginTop: '12px', fontSize: '13px' }}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {/* EXPANDED DAY MODAL */}
-      {expandedDay && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setExpandedDay(null)}>
-          <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '24px', maxWidth: '500px', width: '90%', maxHeight: '80vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 16px 0', color: theme.text }}>{calendarMonth.toLocaleDateString('en-AU', { month: 'long' })} {expandedDay.day}</h3>
-            {expandedDay.items.map(item => (
-              <div key={item.itemId} style={{ padding: '12px', marginBottom: '8px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'goal' ? '#ede9fe' : item.itemType === 'expense' ? '#dbeafe' : '#fee2e2', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: item.isPaid ? 0.6 : 1 }}>
-                <div><div style={{ fontWeight: 600, color: '#1e293b' }}>{item.name}</div><div style={{ fontSize: '12px', color: '#64748b' }}>${item.amount}{item.itemType === 'goal' && !item.isPaid ? <span style={{ color: '#8b5cf6', marginLeft: '6px' }}>→ adds to progress</span> : null}</div></div>
-                <button onClick={() => togglePaid(item.itemId, item)} style={{ padding: '8px 16px', background: item.isPaid ? '#6b7280' : theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{item.isPaid ? '✓ Done' : 'Mark Done'}</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* PAYSLIP MODAL */}
-      {showPayslipUpload && extractedPayslip && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPayslipUpload(false)}>
-          <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '24px', maxWidth: '500px', width: '95%' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 20px 0', color: theme.text }}>📄 Payslip Detected!</h3>
-            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px', marginBottom: '20px' }}>
-              <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Employer</label><input value={extractedPayslip.employer || ''} onChange={e => setExtractedPayslip({...extractedPayslip, employer: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Net Pay</label><input type="number" value={extractedPayslip.netPay || ''} onChange={e => setExtractedPayslip({...extractedPayslip, netPay: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Frequency</label><select value={extractedPayslip.frequency || 'fortnightly'} onChange={e => setExtractedPayslip({...extractedPayslip, frequency: e.target.value})} style={{...inputStyle, width: '100%'}}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => { setIncomeStreams([...incomeStreams, { id: Date.now(), name: extractedPayslip.employer || 'Salary', amount: extractedPayslip.netPay || '', frequency: extractedPayslip.frequency || 'fortnightly', type: 'active', startDate: new Date().toISOString().split('T')[0] }]); setExtractedPayslip(null); setShowPayslipUpload(false) }} style={{ ...btnSuccess, flex: 1 }}>✓ Add Income</button>
-              <button onClick={() => { setShowPayslipUpload(false); setExtractedPayslip(null) }} style={{ ...btnPrimary, background: theme.textMuted }}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* BABY STEP DETAIL MODAL */}
-      {selectedBabyStep !== null && (() => {
-        const step = australianBabySteps.find(s => s.step === selectedBabyStep)
-        if (!step) return null
-        const isCurrent = step.step === currentBabyStep.step
-        const done = step.step < currentBabyStep.step
-        return (
-          <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setSelectedBabyStep(null)}>
-            <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '600px', width: '100%', maxHeight: '85vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>{done ? '✓' : step.icon}</div>
-                  <div><div style={{ color: theme.textMuted, fontSize: '12px' }}>Step {step.step} of 7</div><h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>{step.title}</h3></div>
-                </div>
-                <button onClick={() => setSelectedBabyStep(null)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
-              </div>
-              <div style={{ background: darkMode ? '#1e293b' : '#f0fdf4', borderRadius: '12px', padding: '16px', marginBottom: '20px', borderLeft: '4px solid ' + theme.success }}>
-                <p style={{ margin: 0, color: theme.text, fontSize: '14px', lineHeight: 1.7 }}>💡 <strong>Aureus says:</strong> {step.aureusAdvice}</p>
-              </div>
-              <h4 style={{ color: theme.text, margin: '0 0 12px 0' }}>✅ Key tips:</h4>
-              <ul style={{ margin: 0, paddingLeft: '20px', color: theme.text, lineHeight: 2 }}>{step.tips?.map((tip: string, i: number) => <li key={i}>{tip}</li>)}</ul>
-              {step.step === 6 && (
-                <button onClick={() => { setSelectedBabyStep(null); setActiveTab('mortgage') }} style={{ ...btnSuccess, width: '100%', marginTop: '16px', padding: '14px', fontSize: '15px' }}>🚀 Open Mortgage Accelerator</button>
-              )}
-              <button onClick={() => { setSelectedBabyStep(null); setChatInput(`Tell me more about Step ${step.step}: ${step.title}`); setActiveTab('chat') }} style={{ ...btnPrimary, width: '100%', marginTop: '12px', padding: '14px', fontSize: '15px' }}>💬 Ask Aureus About This Step</button>
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* ADD MILESTONE MODAL */}
-      {showAddMilestone && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowAddMilestone(false)}>
-          <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '520px', width: '100%' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 6px 0', color: theme.text, fontSize: '20px' }}>✨ Add Roadmap Milestone</h3>
-            <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>Once added, tap "Generate Weekly Plan" to get Aureus to build a step-by-step action plan.</p>
-            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
-              {/* Icon picker */}
-              <div>
-                <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px' }}>Choose an icon</label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                  {['🎯','🏠','💳','🚗','🎓','💰','📈','🏦','🔥','🚀','🛡️','💎','🌴','🐀','🤖','💡'].map(emoji => (
-                    <button key={emoji} onClick={() => setNewMilestone({...newMilestone, icon: emoji})} style={{ width: '38px', height: '38px', fontSize: '20px', background: newMilestone.icon === emoji ? theme.purple + '40' : theme.bg, border: '2px solid ' + (newMilestone.icon === emoji ? theme.purple : theme.border), borderRadius: '8px', cursor: 'pointer' }}>{emoji}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Milestone name *</label>
-                <input placeholder="e.g. Pay off credit card, Save house deposit" value={newMilestone.name} onChange={e => setNewMilestone({...newMilestone, name: e.target.value})} style={{...inputStyle, width: '100%'}} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Target amount ($) — optional</label>
-                  <input type="number" placeholder="e.g. 10000" value={newMilestone.targetAmount} onChange={e => setNewMilestone({...newMilestone, targetAmount: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                </div>
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Target date — optional</label>
-                  <input type="date" value={newMilestone.targetDate} onChange={e => setNewMilestone({...newMilestone, targetDate: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                </div>
-              </div>
-              <div>
-                <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Notes (helps Aureus build a better plan)</label>
-                <textarea placeholder="e.g. Balance is $4,200 at 19.9% interest, paying $200/month" value={newMilestone.notes} onChange={e => setNewMilestone({...newMilestone, notes: e.target.value})} style={{...inputStyle, width: '100%', minHeight: '70px', resize: 'vertical' as const}} />
-              </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => {
-                  if (!newMilestone.name) return
-                  setRoadmapMilestones([...roadmapMilestones, { ...newMilestone, id: Date.now(), currentAmount: 0, completed: false, createdAt: new Date().toISOString(), weeklyPlan: null }])
-                  setNewMilestone({ name: '', targetAmount: '', targetDate: '', category: 'savings', icon: '🎯', notes: '' })
-                  setShowAddMilestone(false)
-                }} style={{ ...btnSuccess, flex: 1, padding: '14px' }}>✅ Add to Roadmap</button>
-                <button onClick={() => setShowAddMilestone(false)} style={{ ...btnPrimary, background: theme.textMuted, padding: '14px' }}>Cancel</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==================== ONBOARDING MODAL ==================== */}
-      {showOnboarding && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '32px', maxWidth: '580px', width: '100%', maxHeight: '90vh', overflowY: 'auto' as const }}>
-
-            {/* Step 0: Welcome */}
-            {onboardingStep === 0 && (
-              <div style={{ textAlign: 'center' as const }}>
-                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: '40px', fontWeight: 800, color: '#78350f' }}>A</div>
-                <h2 style={{ color: theme.text, fontSize: '28px', margin: '0 0 12px 0' }}>G'day! I'm Aureus.</h2>
-                <p style={{ color: theme.textMuted, fontSize: '16px', lineHeight: 1.7, marginBottom: '24px' }}>Your AI financial coach — built to help you pay your mortgage off faster, eliminate debt, and build real wealth. Let me learn about how you think about money so I can coach you properly.</p>
-                <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '28px' }}>Takes about 5 minutes. Everything is stored only on your device.</p>
-                <button onClick={() => setOnboardingStep(1)} style={{ ...btnSuccess, width: '100%', padding: '16px', fontSize: '16px' }}>Let's go →</button>
-                <button onClick={() => { setShowOnboarding(false); setOnboardingComplete(true) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', marginTop: '12px', fontSize: '13px' }}>Skip for now</button>
-              </div>
-            )}
-
-            {/* Step 1: Money Personality Quiz */}
-            {onboardingStep === 1 && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>🧠 Your Money Personality</h3>
-                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>Step 1 of 4</div>
-                </div>
-                <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '20px' }}>8 questions. No right or wrong answers — just honest ones. This helps Aureus coach you the way YOU need to be coached.</p>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
-                  {personalityQuiz.map((question, qi) => (
-                    <div key={qi}>
-                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px', marginBottom: '10px' }}>{qi + 1}. {question.q}</div>
-                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
-                        {question.options.map((opt, oi) => (
-                          <button key={oi} onClick={() => setPersonalityAnswers(prev => ({ ...prev, [qi]: opt.type }))}
-                            style={{ padding: '10px 14px', background: personalityAnswers[qi] === opt.type ? theme.accent + '30' : theme.bg, border: '2px solid ' + (personalityAnswers[qi] === opt.type ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', color: theme.text, fontSize: '13px', textAlign: 'left' as const }}>
-                            {personalityAnswers[qi] === opt.type ? '● ' : '○ '}{opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
-                  <button onClick={() => setOnboardingStep(0)} style={{ ...btnPrimary, background: theme.textMuted }}>← Back</button>
-                  <button
-                    onClick={() => {
-                      const result = calculatePersonality()
-                      setMoneyPersonality(result)
-                      setOnboardingStep(1.5)
-                    }}
-                    disabled={Object.keys(personalityAnswers).length < 8}
-                    style={{ ...btnSuccess, flex: 1, opacity: Object.keys(personalityAnswers).length < 8 ? 0.5 : 1 }}>
-                    {Object.keys(personalityAnswers).length < 8 ? `Answer all ${8 - Object.keys(personalityAnswers).length} remaining` : 'See my result →'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 1b: Personality Result */}
-            {onboardingStep === 1.5 && moneyPersonality && personalityProfiles[moneyPersonality] && (
-              <div style={{ textAlign: 'center' as const }}>
-                <div style={{ fontSize: '64px', marginBottom: '16px' }}>{personalityProfiles[moneyPersonality].emoji}</div>
-                <h2 style={{ color: personalityProfiles[moneyPersonality].color, fontSize: '26px', margin: '0 0 12px 0' }}>{personalityProfiles[moneyPersonality].label}</h2>
-                <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.7, marginBottom: '20px' }}>{personalityProfiles[moneyPersonality].desc}</p>
-                <div style={{ padding: '16px', background: personalityProfiles[moneyPersonality].color + '15', borderRadius: '12px', marginBottom: '20px', textAlign: 'left' as const }}>
-                  <div style={{ color: personalityProfiles[moneyPersonality].color, fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>🎯 HOW AUREUS WILL COACH YOU</div>
-                  <div style={{ color: theme.text, fontSize: '13px', lineHeight: 1.6 }}>{personalityProfiles[moneyPersonality].aureusFocus}</div>
-                </div>
-                <button onClick={() => setOnboardingStep(2)} style={{ ...btnSuccess, width: '100%', padding: '14px', fontSize: '15px' }}>This resonates. Continue →</button>
-              </div>
-            )}
-
-            {/* Step 2: Deep Why */}
-            {onboardingStep === 2 && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>❤️ Your Deep Why</h3>
-                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>Step 2 of 4</div>
-                </div>
-                <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, marginBottom: '20px' }}>The research is clear: people who connect their financial goals to deep personal meaning are 3× more likely to follow through. Take 2 minutes to answer these honestly.</p>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
-                  {deepWhyQuestions.map((q, i) => (
-                    <div key={i}>
-                      <label style={{ color: theme.text, fontWeight: 500, fontSize: '14px', display: 'block', marginBottom: '6px' }}>{i + 1}. {q}</label>
-                      <textarea
-                        value={deepWhyAnswers[i] || ''}
-                        onChange={e => setDeepWhyAnswers(prev => ({ ...prev, [i]: e.target.value }))}
-                        placeholder="Be honest — this is private..."
-                        style={{ ...inputStyle, width: '100%', minHeight: '65px', resize: 'vertical' as const }}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-                  <button onClick={() => setOnboardingStep(1)} style={{ ...btnPrimary, background: theme.textMuted }}>← Back</button>
-                  <button onClick={() => { setDeepWhyComplete(true); setOnboardingStep(3) }} style={{ ...btnSuccess, flex: 1 }}>Continue →</button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Identity Statements */}
-            {onboardingStep === 3 && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>⚡ Who You're Becoming</h3>
-                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>Step 3 of 4</div>
-                </div>
-                <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, marginBottom: '16px' }}>Identity-based change is the most powerful driver of behaviour. Write 3 statements about who you are becoming financially — not what you want to have, but who you are.</p>
-                <div style={{ padding: '12px 14px', background: theme.accent + '15', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: theme.text }}>
-                  <strong>Examples:</strong> "I am someone who makes every dollar deliberate." · "I am someone who protects my family's future." · "I am someone who will be mortgage-free in 8 years."
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '16px' }}>
-                  {[0, 1, 2].map(i => (
-                    <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <span style={{ color: theme.accent, fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
-                      <input
-                        value={identityStatements[i] || ''}
-                        onChange={e => {
-                          const updated = [...identityStatements]
-                          updated[i] = e.target.value
-                          setIdentityStatements(updated)
-                        }}
-                        placeholder={`I am someone who...`}
-                        style={{ ...inputStyle, flex: 1 }}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button onClick={() => setOnboardingStep(2)} style={{ ...btnPrimary, background: theme.textMuted }}>← Back</button>
-                  <button onClick={() => setOnboardingStep(4)} style={{ ...btnSuccess, flex: 1 }}>Continue →</button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 4: Quick Setup */}
-            {onboardingStep === 4 && (
-              <div style={{ textAlign: 'center' as const }}>
-                <div style={{ fontSize: '56px', marginBottom: '16px' }}>🎯</div>
-                <h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 12px 0' }}>You're set up!</h2>
-                {moneyPersonality && personalityProfiles[moneyPersonality] && (
-                  <div style={{ padding: '14px 16px', background: personalityProfiles[moneyPersonality].color + '15', borderRadius: '12px', marginBottom: '16px', textAlign: 'left' as const }}>
-                    <div style={{ color: personalityProfiles[moneyPersonality].color, fontWeight: 700, fontSize: '13px', marginBottom: '4px' }}>{personalityProfiles[moneyPersonality].emoji} {personalityProfiles[moneyPersonality].label}</div>
-                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>{personalityProfiles[moneyPersonality].aureusFocus}</div>
-                  </div>
-                )}
-                {identityStatements.filter(s => s.trim()).length > 0 && (
-                  <div style={{ textAlign: 'left' as const, marginBottom: '16px' }}>
-                    <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>YOUR IDENTITY STATEMENTS</div>
-                    {identityStatements.filter(s => s.trim()).map((stmt, i) => (
-                      <div key={i} style={{ padding: '8px 12px', background: theme.bg, borderRadius: '8px', marginBottom: '6px', color: theme.text, fontSize: '13px', fontStyle: 'italic' }}>"{stmt}"</div>
-                    ))}
-                  </div>
-                )}
-                <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, marginBottom: '24px' }}>Now let's set up your budget. Head to the <strong>Budget tab</strong> to add your income and expenses — then your mortgage-free date will appear on your dashboard.</p>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
-                  <button onClick={() => { setShowOnboarding(false); setOnboardingComplete(true); setActiveTab('dashboard') }} style={{ ...btnSuccess, padding: '14px', fontSize: '15px' }}>Set up my budget →</button>
-                  <button onClick={() => { setShowOnboarding(false); setOnboardingComplete(true); setActiveTab('mortgage') }} style={{ ...btnPrimary, padding: '14px', fontSize: '15px' }}>Enter my mortgage details →</button>
-                  <button onClick={() => { setShowOnboarding(false); setOnboardingComplete(true) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>Explore on my own</button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ==================== MONEY DATE MODAL ==================== */}
-      {showMoneyDate && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '500px', width: '100%' }}>
-            {/* Build full question list: standard + milestone check-ins */}
-            {(() => {
-              const allQuestions = [
-                ...moneyDateQuestions,
-                ...getDueMilestoneCheckIns().map((ci, i) => ({
-                  q: `Did you make a savings contribution toward "${ci.milestoneName}" this week?`,
-                  type: 'yesno',
-                  isMilestone: true,
-                  milestoneIndex: i,
-                  answerKey: 100 + i
-                }))
-              ]
-              const totalSteps = allQuestions.length
-              const currentQ = allQuestions[moneyDateStep] as any
-              const answerKey = currentQ.answerKey !== undefined ? currentQ.answerKey : moneyDateStep
-
-              return (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                    <div>
-                      <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>💰 Money Date</h3>
-                      <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>
-                        {currentQ.isMilestone ? '🎯 Goal check-in' : `Question ${moneyDateStep + 1} of ${totalSteps}`}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      {allQuestions.map((_, i) => (
-                        <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i <= moneyDateStep ? (i >= moneyDateQuestions.length ? theme.purple : theme.success) : theme.border }} />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ padding: '20px', background: currentQ.isMilestone ? theme.purple + '15' : theme.bg, borderRadius: '12px', marginBottom: '20px', border: currentQ.isMilestone ? '1px solid ' + theme.purple + '40' : 'none' }}>
-                    {currentQ.isMilestone && <div style={{ color: theme.purple, fontSize: '11px', fontWeight: 700, marginBottom: '6px' }}>🎯 GOAL PROGRESS CHECK</div>}
-                    <p style={{ color: theme.text, fontSize: '16px', fontWeight: 500, margin: 0 }}>{currentQ.q}</p>
-                  </div>
-
-                  {currentQ.type === 'yesno' && (
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-                      {['Yes', 'No'].map(opt => (
-                        <button key={opt} onClick={() => setMoneyDateAnswers(p => ({ ...p, [answerKey]: opt }))}
-                          style={{ flex: 1, padding: '14px', background: moneyDateAnswers[answerKey] === opt ? (opt === 'Yes' ? theme.success : theme.danger) : theme.bg, color: moneyDateAnswers[answerKey] === opt ? 'white' : theme.text, border: '2px solid ' + (moneyDateAnswers[answerKey] === opt ? (opt === 'Yes' ? theme.success : theme.danger) : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}>
-                          {opt === 'Yes' ? '👍 Yes' : '👎 No'}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {currentQ.type === 'scale3' && (
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                      {(currentQ.options || []).map((opt: string) => (
-                        <button key={opt} onClick={() => setMoneyDateAnswers(p => ({ ...p, [answerKey]: opt }))}
-                          style={{ flex: 1, padding: '12px', background: moneyDateAnswers[answerKey] === opt ? theme.accent : theme.bg, color: moneyDateAnswers[answerKey] === opt ? 'white' : theme.text, border: '2px solid ' + (moneyDateAnswers[answerKey] === opt ? theme.accent : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>{opt}</button>
-                      ))}
-                    </div>
-                  )}
-
-                  {currentQ.type === 'scale' && (
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                      {['1', '2', '3', '4', '5'].map(n => (
-                        <button key={n} onClick={() => setMoneyDateAnswers(p => ({ ...p, [answerKey]: n }))}
-                          style={{ flex: 1, padding: '14px', background: moneyDateAnswers[answerKey] === n ? theme.accent : theme.bg, color: moneyDateAnswers[answerKey] === n ? 'white' : theme.text, border: '2px solid ' + (moneyDateAnswers[answerKey] === n ? theme.accent : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '18px', fontWeight: 700 }}>{n}</button>
-                      ))}
-                    </div>
-                  )}
-
-                  {currentQ.type === 'text' && (
-                    <div style={{ marginBottom: '20px' }}>
-                      <input
-                        value={moneyDateAnswers[answerKey] || ''}
-                        onChange={e => setMoneyDateAnswers(p => ({ ...p, [answerKey]: e.target.value }))}
-                        placeholder={currentQ.placeholder || ''}
-                        style={{ ...inputStyle, width: '100%', padding: '14px 16px' }}
-                      />
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    {moneyDateStep > 0 && <button onClick={() => setMoneyDateStep(s => s - 1)} style={{ ...btnPrimary, background: theme.textMuted }}>← Back</button>}
-                    {moneyDateStep < totalSteps - 1 ? (
-                      <button
-                        onClick={() => { if (moneyDateAnswers[answerKey] !== undefined) setMoneyDateStep(s => s + 1) }}
-                        disabled={moneyDateAnswers[answerKey] === undefined}
-                        style={{ ...btnPrimary, flex: 1, opacity: moneyDateAnswers[answerKey] === undefined ? 0.5 : 1 }}>
-                        Next →
-                      </button>
-                    ) : (
-                      <button onClick={submitMoneyDate} style={{ ...btnSuccess, flex: 1, fontSize: '15px' }}>✅ Complete Money Date</button>
-                    )}
-                  </div>
-                  <button onClick={() => { setShowMoneyDate(false); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', width: '100%', marginTop: '10px', fontSize: '13px' }}>Cancel</button>
-                </>
-              )
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* ==================== ANNUAL REVIEW MODAL ==================== */}
-      {showAnnualReview && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '540px', width: '100%', maxHeight: '85vh', overflowY: 'auto' as const }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📆 {new Date().getFullYear()} Annual Money Review</h3>
-              <div style={{ color: theme.textMuted, fontSize: '12px' }}>{annualReviewStep + 1} / {annualReviewQuestions.length}</div>
-            </div>
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '20px' }}>
-              {annualReviewQuestions.map((_, i) => <div key={i} style={{ flex: 1, height: '4px', borderRadius: '2px', background: i <= annualReviewStep ? theme.purple : theme.border }} />)}
-            </div>
-
-            <div style={{ padding: '18px', background: theme.bg, borderRadius: '12px', marginBottom: '16px' }}>
-              <p style={{ color: theme.text, fontSize: '15px', fontWeight: 600, margin: 0 }}>{annualReviewQuestions[annualReviewStep].q}</p>
-            </div>
-            <textarea
-              value={annualReviewAnswers[annualReviewStep] || ''}
-              onChange={e => setAnnualReviewAnswers(p => ({ ...p, [annualReviewStep]: e.target.value }))}
-              placeholder={annualReviewQuestions[annualReviewStep].placeholder}
-              style={{ ...inputStyle, width: '100%', minHeight: '100px', resize: 'vertical' as const, marginBottom: '16px' }}
-            />
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {annualReviewStep > 0 && <button onClick={() => setAnnualReviewStep(s => s - 1)} style={{ ...btnPrimary, background: theme.textMuted }}>← Back</button>}
-              {annualReviewStep < annualReviewQuestions.length - 1 ? (
-                <button onClick={() => setAnnualReviewStep(s => s + 1)} style={{ ...btnPurple, flex: 1 }}>Next →</button>
-              ) : (
-                <button onClick={submitAnnualReview} style={{ ...btnSuccess, flex: 1, fontSize: '15px' }}>✅ Complete Review</button>
-              )}
-            </div>
-            <button onClick={() => { setShowAnnualReview(false); setAnnualReviewStep(0) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', width: '100%', marginTop: '10px', fontSize: '13px' }}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {/* ==================== FEAR AUDIT MODAL ==================== */}
-      {showFearAudit && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '520px', width: '100%', maxHeight: '85vh', overflowY: 'auto' as const }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h3 style={{ margin: 0, color: theme.purple, fontSize: '20px' }}>🧠 Money Fear Audit</h3>
-              <div style={{ color: theme.textMuted, fontSize: '12px' }}>{fearAuditStep + 1} / {fearAuditQuestions.length}</div>
-            </div>
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
-              {fearAuditQuestions.map((_, i) => <div key={i} style={{ flex: 1, height: '4px', borderRadius: '2px', background: i <= fearAuditStep ? theme.purple : theme.border }} />)}
-            </div>
-            <div style={{ padding: '10px 12px', background: theme.purple + '10', borderRadius: '8px', marginBottom: '16px' }}>
-              <p style={{ margin: 0, color: theme.textMuted, fontSize: '12px', lineHeight: 1.5 }}>🔒 Your answers are stored only on this device. Be honest — this exercise only works if you are.</p>
-            </div>
-
-            <div style={{ padding: '18px', background: theme.bg, borderRadius: '12px', marginBottom: '14px' }}>
-              <p style={{ color: theme.text, fontSize: '15px', fontWeight: 600, margin: 0 }}>{fearAuditQuestions[fearAuditStep].q}</p>
-            </div>
-            <textarea
-              value={fearAuditAnswers[fearAuditStep] || ''}
-              onChange={e => setFearAuditAnswers(p => ({ ...p, [fearAuditStep]: e.target.value }))}
-              placeholder={fearAuditQuestions[fearAuditStep].placeholder}
-              style={{ ...inputStyle, width: '100%', minHeight: '90px', resize: 'vertical' as const, marginBottom: '16px' }}
-            />
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {fearAuditStep > 0 && <button onClick={() => setFearAuditStep(s => s - 1)} style={{ ...btnPrimary, background: theme.textMuted }}>← Back</button>}
-              {fearAuditStep < fearAuditQuestions.length - 1 ? (
-                <button onClick={() => setFearAuditStep(s => s + 1)} style={{ ...btnPurple, flex: 1 }}>Next →</button>
-              ) : (
-                <button onClick={() => {
-                  setFearAuditComplete(true)
-                  setShowFearAudit(false)
-                  setFearAuditStep(0)
-                  setCelebrationWin('Fear Audit complete. That took courage. 💜')
-                  setTimeout(() => setCelebrationWin(null), 4000)
-                }} style={{ ...btnPurple, flex: 1, fontSize: '15px' }}>✅ Complete Audit</button>
-              )}
-            </div>
-            <button onClick={() => { setShowFearAudit(false); setFearAuditStep(0) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', width: '100%', marginTop: '10px', fontSize: '13px' }}>Save & exit</button>
-          </div>
-        </div>
-      )}
-
-      {/* ==================== GOAL SETUP MODAL (from Roadmap) ==================== */}
-      {showGoalSetup && goalSetupMilestone && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowGoalSetup(false)}>
-          <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-              <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>🎯 Add to Goals & Calendar</h3>
-              <button onClick={() => setShowGoalSetup(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '22px', cursor: 'pointer' }}>×</button>
-            </div>
-            <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 20px 0' }}>
-              Set up <strong style={{ color: theme.text }}>{goalSetupMilestone.name}</strong> as a tracked savings goal with calendar reminders.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
-
-              {/* Goal name */}
-              <div>
-                <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Goal name</label>
-                <input value={goalSetupForm.name} onChange={e => setGoalSetupForm(f => ({ ...f, name: e.target.value }))} style={{ ...inputStyle, width: '100%' }} />
-              </div>
-
-              {/* Target and saved */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Target amount ($)</label>
-                  <input type="number" value={goalSetupForm.target} onChange={e => setGoalSetupForm(f => ({ ...f, target: e.target.value }))} placeholder="e.g. 2000" style={{ ...inputStyle, width: '100%' }} />
-                </div>
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Already saved ($)</label>
-                  <input type="number" value={goalSetupForm.saved} onChange={e => setGoalSetupForm(f => ({ ...f, saved: e.target.value }))} placeholder="0" style={{ ...inputStyle, width: '100%' }} />
-                </div>
-              </div>
-
-              {/* Payment amount and frequency */}
-              <div>
-                <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>
-                  How much will you save per period?
-                </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <div style={{ position: 'relative' as const, flex: 1 }}>
-                    <span style={{ position: 'absolute' as const, left: '12px', top: '50%', transform: 'translateY(-50%)', color: theme.textMuted, fontSize: '14px' }}>$</span>
-                    <input
-                      type="number"
-                      value={goalSetupForm.paymentAmount}
-                      onChange={e => setGoalSetupForm(f => ({ ...f, paymentAmount: e.target.value }))}
-                      placeholder="e.g. 77"
-                      style={{ ...inputStyle, width: '100%', paddingLeft: '28px' }}
-                    />
-                  </div>
-                  <select value={goalSetupForm.savingsFrequency} onChange={e => setGoalSetupForm(f => ({ ...f, savingsFrequency: e.target.value }))} style={{ ...inputStyle, flexShrink: 0 }}>
-                    <option value="weekly">Weekly</option>
-                    <option value="fortnightly">Fortnightly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                </div>
-                {/* Auto-calculated time to reach target */}
-                {goalSetupForm.target && goalSetupForm.paymentAmount && (() => {
-                  const remaining = parseFloat(goalSetupForm.target) - parseFloat(goalSetupForm.saved || '0')
-                  const periodsNeeded = Math.ceil(remaining / parseFloat(goalSetupForm.paymentAmount))
-                  const freqDays = goalSetupForm.savingsFrequency === 'weekly' ? 7 : goalSetupForm.savingsFrequency === 'fortnightly' ? 14 : 30
-                  const targetDate = new Date(Date.now() + periodsNeeded * freqDays * 86400000)
-                  return (
-                    <div style={{ marginTop: '6px', padding: '8px 10px', background: theme.success + '15', borderRadius: '6px', color: theme.success, fontSize: '12px' }}>
-                      ✅ At ${goalSetupForm.paymentAmount}/{goalSetupForm.savingsFrequency}, you'll reach ${goalSetupForm.target} by <strong>{targetDate.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}</strong>
-                      {!goalSetupForm.deadline && <button onClick={() => setGoalSetupForm(f => ({ ...f, deadline: targetDate.toISOString().split('T')[0] }))} style={{ background: 'none', border: 'none', color: theme.accent, cursor: 'pointer', fontSize: '12px', marginLeft: '6px' }}>Use this date →</button>}
-                    </div>
-                  )
-                })()}
-              </div>
-
-              {/* Dates */}
-              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
-                <SmartDatePicker
-                  frequency={goalSetupForm.savingsFrequency}
-                  value={goalSetupForm.startDate}
-                  onChange={v => setGoalSetupForm(f => ({ ...f, startDate: v }))}
-                  label="When do you save for this?"
-                />
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Target completion date (optional)</label>
-                  <input type="date" value={goalSetupForm.deadline} onChange={e => setGoalSetupForm(f => ({ ...f, deadline: e.target.value }))} style={{ ...inputStyle, width: '100%' }} />
-                </div>
-              </div>
-
-              {/* Options */}
-              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', padding: '14px', background: theme.bg, borderRadius: '10px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={goalSetupForm.addToCalendar}
-                    onChange={e => setGoalSetupForm(f => ({ ...f, addToCalendar: e.target.checked }))}
-                    style={{ width: '16px', height: '16px', accentColor: theme.success }}
-                  />
-                  <div>
-                    <div style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>📅 Add payment reminders to calendar</div>
-                    <div style={{ color: theme.textMuted, fontSize: '11px' }}>Your savings payments will appear on the Budget calendar</div>
-                  </div>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={goalSetupForm.addCheckIn}
-                    onChange={e => setGoalSetupForm(f => ({ ...f, addCheckIn: e.target.checked }))}
-                    style={{ width: '16px', height: '16px', accentColor: theme.purple }}
-                  />
-                  <div>
-                    <div style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>🔄 Add to weekly Money Date check-in</div>
-                    <div style={{ color: theme.textMuted, fontSize: '11px' }}>Each week you'll be asked if you made a contribution — a "Yes" counts as a win automatically</div>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Preview */}
-            {goalSetupForm.paymentAmount && goalSetupForm.savingsFrequency && (
-              <div style={{ margin: '16px 0', padding: '14px 16px', background: theme.purple + '15', borderRadius: '10px', border: '1px solid ' + theme.purple + '30' }}>
-                <div style={{ color: theme.purple, fontWeight: 700, fontSize: '12px', marginBottom: '8px' }}>SUMMARY</div>
-                <div style={{ color: theme.text, fontSize: '13px', lineHeight: 1.8 }}>
-                  <div>💰 Save <strong>${goalSetupForm.paymentAmount}</strong> {goalSetupForm.savingsFrequency} starting <strong>{goalSetupForm.startDate && new Date(goalSetupForm.startDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</strong></div>
-                  {goalSetupForm.deadline && <div>🏁 Goal date: <strong>{new Date(goalSetupForm.deadline).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}</strong></div>}
-                  {goalSetupForm.addToCalendar && <div>📅 Payments will show on your calendar</div>}
-                  {goalSetupForm.addCheckIn && <div>🔄 Weekly check-in question will be added</div>}
-                </div>
-              </div>
-            )}
-
-            <button
-              onClick={() => {
-                if (!goalSetupForm.name || !goalSetupForm.target) return
-
-                // Add to goals
-                const newGoalEntry = {
-                  id: Date.now(),
-                  name: goalSetupForm.name,
-                  target: goalSetupForm.target,
-                  saved: goalSetupForm.saved,
-                  deadline: goalSetupForm.deadline,
-                  savingsFrequency: goalSetupForm.savingsFrequency,
-                  startDate: goalSetupForm.startDate,
-                  paymentAmount: goalSetupForm.paymentAmount,
-                  addedToCalendar: goalSetupForm.addToCalendar
-                }
-                setGoals(prev => [...prev, newGoalEntry])
-
-                // Add to Money Date check-ins
-                if (goalSetupForm.addCheckIn) {
-                  setMilestoneCheckIns(prev => [...prev, {
-                    id: Date.now() + 1,
-                    milestoneId: goalSetupMilestone.id,
-                    milestoneName: goalSetupForm.name,
-                    question: `Did you make a savings contribution toward "${goalSetupForm.name}" this week?`
-                  }])
-                }
-
-                // Mark the weekly plan step as done
-                if (goalSetupStepId !== null) {
-                  togglePlanStep(goalSetupMilestone.id, goalSetupStepId)
-                }
-
-                // Update milestone currentAmount if saved > 0
-                if (parseFloat(goalSetupForm.saved) > 0) {
-                  setRoadmapMilestones(prev => prev.map(m =>
-                    m.id === goalSetupMilestone.id ? { ...m, currentAmount: parseFloat(goalSetupForm.saved) } : m
-                  ))
-                }
-
-                setShowGoalSetup(false)
-                setGoalSetupMilestone(null)
-                setCelebrationWin(`"${goalSetupForm.name}" added to your goals! 🎯`)
-                setTimeout(() => setCelebrationWin(null), 3000)
-              }}
-              disabled={!goalSetupForm.name || !goalSetupForm.target || !goalSetupForm.paymentAmount}
-              style={{ ...btnSuccess, width: '100%', padding: '14px', fontSize: '15px', opacity: (!goalSetupForm.name || !goalSetupForm.target || !goalSetupForm.paymentAmount) ? 0.5 : 1 }}
-            >
-              ✅ Add to Goals & Calendar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ==================== DAILY CHECK-IN MODAL ==================== */}
-      {showDailyCheckIn && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '440px', width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div>
-                <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>✅ Daily Check-in</h3>
-                <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>Question {dailyCheckInStep + 1} of {dailyCheckInQuestions.length}</div>
-              </div>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                {dailyCheckInQuestions.map((_, i) => <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i <= dailyCheckInStep ? theme.accent : theme.border }} />)}
-              </div>
-            </div>
-
-            <div style={{ padding: '20px', background: theme.bg, borderRadius: '12px', marginBottom: '20px' }}>
-              <p style={{ color: theme.text, fontSize: '16px', fontWeight: 500, margin: 0 }}>{dailyCheckInQuestions[dailyCheckInStep].q}</p>
-            </div>
-
-            {dailyCheckInQuestions[dailyCheckInStep].type === 'scale3' && (
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                {(dailyCheckInQuestions[dailyCheckInStep].options || []).map((opt: string) => (
-                  <button key={opt} onClick={() => setDailyCheckInAnswers(p => ({ ...p, [dailyCheckInStep]: opt }))}
-                    style={{ flex: 1, padding: '14px 8px', background: dailyCheckInAnswers[dailyCheckInStep] === opt ? theme.accent : theme.bg, color: dailyCheckInAnswers[dailyCheckInStep] === opt ? 'white' : theme.text, border: '2px solid ' + (dailyCheckInAnswers[dailyCheckInStep] === opt ? theme.accent : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>{opt}</button>
-                ))}
-              </div>
-            )}
-
-            {dailyCheckInQuestions[dailyCheckInStep].type === 'yesno' && (
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-                {['Yes', 'No'].map(opt => (
-                  <button key={opt} onClick={() => setDailyCheckInAnswers(p => ({ ...p, [dailyCheckInStep]: opt }))}
-                    style={{ flex: 1, padding: '14px', background: dailyCheckInAnswers[dailyCheckInStep] === opt ? (opt === 'Yes' ? theme.success : theme.danger) : theme.bg, color: dailyCheckInAnswers[dailyCheckInStep] === opt ? 'white' : theme.text, border: '2px solid ' + (dailyCheckInAnswers[dailyCheckInStep] === opt ? (opt === 'Yes' ? theme.success : theme.danger) : theme.border), borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 600 }}>
-                    {opt === 'Yes' ? '👍 Yes' : '👎 No'}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {dailyCheckInQuestions[dailyCheckInStep].type === 'text' && (
-              <div style={{ marginBottom: '20px' }}>
-                <input
-                  value={dailyCheckInAnswers[dailyCheckInStep] || ''}
-                  onChange={e => setDailyCheckInAnswers(p => ({ ...p, [dailyCheckInStep]: e.target.value }))}
-                  placeholder={(dailyCheckInQuestions[dailyCheckInStep] as any).placeholder || ''}
-                  style={{ ...inputStyle, width: '100%', padding: '14px 16px' }}
-                />
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {dailyCheckInStep > 0 && <button onClick={() => setDailyCheckInStep(s => s - 1)} style={{ ...btnPrimary, background: theme.textMuted }}>← Back</button>}
-              {dailyCheckInStep < dailyCheckInQuestions.length - 1 ? (
-                <button
-                  onClick={() => { if (dailyCheckInAnswers[dailyCheckInStep] !== undefined) setDailyCheckInStep(s => s + 1) }}
-                  disabled={dailyCheckInAnswers[dailyCheckInStep] === undefined}
-                  style={{ ...btnPrimary, flex: 1, opacity: dailyCheckInAnswers[dailyCheckInStep] === undefined ? 0.5 : 1 }}>
-                  Next →
-                </button>
-              ) : (
-                <button onClick={submitDailyCheckIn} style={{ ...btnSuccess, flex: 1, fontSize: '15px' }}>✅ Done</button>
-              )}
-            </div>
-            <button onClick={() => { setShowDailyCheckIn(false); setDailyCheckInStep(0); setDailyCheckInAnswers({}) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', width: '100%', marginTop: '10px', fontSize: '13px' }}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {/* DOCUMENT UPLOAD MODAL */}
-      {showDocUpload && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowDocUpload(false)}>
-          <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '560px', width: '100%', maxHeight: '85vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-              <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📎 Documents</h3>
-              <button onClick={() => setShowDocUpload(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '22px', cursor: 'pointer' }}>×</button>
-            </div>
-            <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 20px 0', lineHeight: 1.6 }}>
-              Upload payslips, bank statements, loan documents, insurance policies — anything you want to keep handy alongside your financial plan. Documents are stored locally in your browser.
-            </p>
-
-            {/* Upload area */}
-            <input
-              ref={docInputRef}
-              type="file"
-              multiple
-              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.txt"
-              style={{ display: 'none' }}
-              onChange={e => {
-                const files = Array.from(e.target.files || [])
-                files.forEach(file => {
-                  const reader = new FileReader()
-                  reader.onload = () => {
-                    setDocuments(prev => [...prev, {
-                      id: Date.now() + Math.random(),
-                      name: file.name,
-                      type: file.type,
-                      size: file.size,
-                      uploadedAt: new Date().toISOString(),
-                      data: reader.result
-                    }])
-                  }
-                  reader.readAsDataURL(file)
-                })
-                if (e.target) e.target.value = ''
-              }}
-            />
-
-            <button
-              onClick={() => docInputRef.current?.click()}
-              style={{ width: '100%', padding: '24px', background: 'transparent', border: '2px dashed ' + theme.border, borderRadius: '12px', cursor: 'pointer', marginBottom: '20px', color: theme.textMuted, fontSize: '14px', lineHeight: 2 }}
-            >
-              <div style={{ fontSize: '32px', marginBottom: '4px' }}>📁</div>
-              <div style={{ color: theme.text, fontWeight: 600 }}>Click to upload documents</div>
-              <div style={{ fontSize: '12px' }}>PDF, images, Word, Excel, CSV — any file type</div>
-            </button>
-
-            {/* Categories */}
-            {documents.length > 0 && (
-              <div>
-                <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, marginBottom: '12px', textTransform: 'uppercase' as const, letterSpacing: '1px' }}>Uploaded ({documents.length})</div>
-                {/* Group by suggested category */}
-                {[
-                  { label: '💰 Income & Tax', filter: (d: any) => /payslip|payroll|salary|tax|ato|group.cert|income/i.test(d.name) },
-                  { label: '🏠 Property & Mortgage', filter: (d: any) => /mortgage|loan|property|contract|convey|title/i.test(d.name) },
-                  { label: '🏦 Bank & Statements', filter: (d: any) => /bank|statement|account|transaction/i.test(d.name) },
-                  { label: '🛡️ Insurance', filter: (d: any) => /insurance|policy|cover/i.test(d.name) },
-                  { label: '📁 Other', filter: (d: any) => !/payslip|payroll|salary|tax|ato|group.cert|income|mortgage|loan|property|contract|convey|title|bank|statement|account|transaction|insurance|policy|cover/i.test(d.name) },
-                ].map(cat => {
-                  const catDocs = documents.filter(cat.filter)
-                  if (catDocs.length === 0) return null
-                  return (
-                    <div key={cat.label} style={{ marginBottom: '16px' }}>
-                      <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>{cat.label}</div>
-                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                        {catDocs.map((doc: any) => (
-                          <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
-                            <div style={{ fontSize: '24px', flexShrink: 0 }}>
-                              {doc.type?.includes('pdf') ? '📄' : doc.type?.includes('image') ? '🖼️' : doc.type?.includes('sheet') || doc.name?.endsWith('.csv') || doc.name?.endsWith('.xlsx') ? '📊' : '📝'}
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ color: theme.text, fontSize: '14px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{doc.name}</div>
-                              <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '2px' }}>
-                                {(doc.size / 1024).toFixed(0)} KB · {new Date(doc.uploadedAt).toLocaleDateString('en-AU')}
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                              <a
-                                href={doc.data}
-                                download={doc.name}
-                                style={{ padding: '5px 10px', background: theme.accent + '20', color: theme.accent, borderRadius: '6px', fontSize: '12px', textDecoration: 'none', fontWeight: 600 }}
-                              >↓</a>
-                              <button onClick={() => setChatInput(`I've uploaded a document called "${doc.name}". Can you tell me what I should do with it or what it means for my financial situation?`)} style={{ padding: '5px 10px', background: theme.success + '20', color: theme.success, border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>Ask Aureus</button>
-                              <button onClick={() => setDocuments(prev => prev.filter((d: any) => d.id !== doc.id))} style={{ padding: '5px 8px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>×</button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {documents.length === 0 && (
-              <div style={{ textAlign: 'center' as const, padding: '20px', color: theme.textMuted, fontSize: '13px' }}>
-                No documents uploaded yet. Keep payslips, loan docs, and statements here alongside your financial plan.
-              </div>
-            )}
-
-            <div style={{ marginTop: '16px', padding: '12px 14px', background: theme.warning + '10', borderRadius: '8px', border: '1px solid ' + theme.warning + '30' }}>
-              <div style={{ color: theme.textMuted, fontSize: '11px', lineHeight: 1.5 }}>🔒 Documents are stored in your browser's local storage only — they never leave your device and are not uploaded to any server.</div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <footer style={{ padding: '16px 24px', background: theme.cardBg, borderTop: '1px solid ' + theme.border, textAlign: 'center' as const }}>
-        <p style={{ margin: '0 0 4px 0', color: theme.textMuted, fontSize: '11px' }}>⚠️ Aureus is an AI assistant for general education only — not financial, tax, or legal advice. Always verify information and consult licensed professionals before making financial decisions.</p>
-        <p style={{ margin: 0, color: theme.textMuted, fontSize: '10px' }}>© {new Date().getFullYear()} Aureus · Not affiliated with any financial institution · General information only</p>
+        <p style={{ margin: '0 0 4px 0', color: theme.textMuted, fontSize: '11px' }}>⚠️ Aureus is an AI assistant for general education only — not financial, tax, or legal advice.</p>
+        <p style={{ margin: 0, color: theme.textMuted, fontSize: '10px' }}>© {new Date().getFullYear()} Aureus · General information only</p>
       </footer>
 
-      <style>{`
-        @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
-        @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-      `}</style>
+      <style>{`@keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } } @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } } * { box-sizing: border-box; } ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }`}</style>
     </div>
   )
-}
+}                                                                                                                                                                              
