@@ -810,7 +810,7 @@ export default function Dashboard() {
   const generateWeeklyPlan = async (milestoneId: number) => {
     const milestone = roadmapMilestones.find(m => m.id === milestoneId)
     if (!milestone) return
-    const isDebtMilestone = /debt|credit card|bnpl|loan|pay off|kill bad/i.test(milestone.name) || /debt|credit card|bnpl|loan/i.test(milestone.notes || '')
+    const isDebtMilestone = /\bkill bad\b|\bpay.*off.*debt\b|\bdebt.*payoff\b|\bcredit card\b|\bbnpl\b|\bpersonal loan\b/i.test(milestone.name)
     setGeneratingPlanFor(milestoneId)
     try {
       const response = await fetch('/api/budget-coach', {
@@ -1361,7 +1361,7 @@ Respond in this EXACT JSON format, no other text:
     if (newMilestones.length > 0) {
       try {
         const first = newMilestones[0]
-        const isDebtMilestone = /debt|credit card|bnpl|loan|pay off|kill bad/i.test(first.name)
+        const isDebtMilestone = /\bkill bad\b|\bpay.*off.*debt\b|\bdebt.*payoff\b|\bcredit card\b|\bbnpl\b|\bpersonal loan\b/i.test(first.name)
         const response = await fetch('/api/budget-coach', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -3893,7 +3893,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
                               {planSteps.map((step: any, idx: number) => {
                                 // Detect milestone type for context-aware routing
-                                const isDebtMilestone = /debt|credit card|bnpl|loan|pay off|kill bad/i.test(m.name) || /debt|credit card|bnpl|loan/i.test(m.notes || '')
+                                const isDebtMilestone = /\bkill bad\b|\bpay.*off.*debt\b|\bdebt.*payoff\b|\bcredit card\b|\bbnpl\b|\bpersonal loan\b/i.test(m.name)
                                 const isAddGoalStep = step.type === 'add_goal' || /add.*goal|savings goal.*aureus|aureus.*goal|calendar.*reminder|track.*aureus/i.test(step.text)
                                 const isAddDebtStep = isDebtMilestone && isAddGoalStep
                                 const isReviewStep = step.type === 'review_spending' || /review.*aureus|spending.*aureus|aureus.*spending|check.*aureus/i.test(step.text)
