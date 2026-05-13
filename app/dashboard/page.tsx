@@ -245,28 +245,28 @@ export default function Dashboard() {
 
   // ==================== THEME ====================
   const theme = {
-    bg: '#0a0e27',
-    cardBg: '#1a1f3a',
-    text: '#f5f1e8',
-    textMuted: '#b8a878',
-    border: '#2d2416',
-    input: '#1a1f3a',
-    inputBorder: '#4a3f2f',
-    accent: '#d4af37',
-    success: '#b8a878',
-    warning: '#d4af37',
-    danger: '#c41e3a',
-    purple: '#8b7355',
-    teal: '#6b5b4a',
-    orange: '#d4af37'
+    bg: '#0a0a0a',
+    cardBg: '#141414',
+    text: '#F5F5F5',
+    textMuted: '#9a8a6a',
+    border: '#2a2218',
+    input: '#1c1810',
+    inputBorder: '#3a2e1e',
+    accent: '#D4AF37',
+    success: '#B68B2E',
+    warning: '#D4AF37',
+    danger: '#c0392b',
+    purple: '#8C6A1F',
+    teal: '#B68B2E',
+    orange: '#D4AF37'
   }
 
   const inputStyle: React.CSSProperties = { padding: '10px 14px', border: '2px solid ' + theme.inputBorder, borderRadius: '8px', fontSize: '14px', background: theme.input, color: theme.text, outline: 'none' }
-  const btnPrimary: React.CSSProperties = { padding: '10px 20px', background: theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }
-  const btnSuccess: React.CSSProperties = { ...btnPrimary, background: theme.success }
-  const btnDanger: React.CSSProperties = { ...btnPrimary, background: theme.danger }
-  const btnWarning: React.CSSProperties = { ...btnPrimary, background: theme.warning }
-  const btnPurple: React.CSSProperties = { ...btnPrimary, background: theme.purple }
+  const btnPrimary: React.CSSProperties = { padding: '10px 20px', background: 'linear-gradient(135deg, #D4AF37 0%, #B68B2E 100%)', color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }
+  const btnSuccess: React.CSSProperties = { ...btnPrimary, background: 'linear-gradient(135deg, #B68B2E 0%, #8C6A1F 100%)', color: '#F5F5F5' }
+  const btnDanger: React.CSSProperties = { ...btnPrimary, background: theme.danger, color: 'white' }
+  const btnWarning: React.CSSProperties = { ...btnPrimary, background: 'linear-gradient(135deg, #D4AF37 0%, #B68B2E 100%)', color: '#0a0a0a' }
+  const btnPurple: React.CSSProperties = { ...btnPrimary, background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a' }
   const cardStyle: React.CSSProperties = { padding: '24px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }
 
   const countryConfig: {[key: string]: any} = {
@@ -1398,50 +1398,6 @@ Rules:
       <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
         {label && <label style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>{label}</label>}
 
-        {/* Shortcut buttons for weekly/fortnightly */}
-        {(frequency === 'weekly' || frequency === 'fortnightly') && (
-          <div>
-            <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '5px' }}>Quick pick day:</div>
-            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' as const }}>
-              {DOW_SHORT.map((d, i) => (
-                <button key={d} type="button"
-                  onClick={() => onChange(nextDayOfWeek(i))}
-                  style={{
-                    padding: '6px 10px',
-                    background: selectedDow === i ? accentColor : theme.bg,
-                    color: selectedDow === i ? 'white' : theme.textMuted,
-                    border: '2px solid ' + (selectedDow === i ? accentColor : theme.border),
-                    borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
-                    fontWeight: selectedDow === i ? 700 : 400
-                  }}>{d}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Shortcut buttons for monthly/quarterly/yearly */}
-        {(frequency === 'monthly' || frequency === 'quarterly' || frequency === 'yearly') && (
-          <div>
-            <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '5px' }}>Quick pick day of month:</div>
-            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' as const }}>
-              {[1,5,7,10,14,15,20,21,25,28].map(d => (
-                <button key={d} type="button"
-                  onClick={() => onChange(nextDayOfMonth(d))}
-                  style={{
-                    padding: '6px 10px',
-                    background: selectedDom === d ? accentColor : theme.bg,
-                    color: selectedDom === d ? 'white' : theme.textMuted,
-                    border: '2px solid ' + (selectedDom === d ? accentColor : theme.border),
-                    borderRadius: '6px', cursor: 'pointer', fontSize: '12px',
-                    fontWeight: selectedDom === d ? 700 : 400
-                  }}>{d}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Always show full date picker */}
         <div>
           <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '5px' }}>
@@ -1566,12 +1522,12 @@ Rules:
   ]
 
   const personalityProfiles: {[key: string]: {label: string, emoji: string, desc: string, strength: string, blindspot: string, aureusFocus: string, color: string}} = {
-    planner: { label: 'The Strategic Planner', emoji: '🎯', desc: "You approach money with logic and structure. You're future-oriented, make deliberate decisions, and rarely let emotion drive spending. Your challenge is flexibility — when life doesn't follow the plan, you can freeze.", strength: 'Discipline, long-term thinking, goal clarity', blindspot: "Can be rigid — sometimes life needs you to adapt the plan, not abandon it", aureusFocus: "Focus on optimising systems and accelerating your mortgage. You're already wired right — Aureus helps you find the gaps in an already-good plan.", color: '#10b981' },
-    avoider: { label: 'The Avoider', emoji: '🙈', desc: "Money stress makes you want to look away. You function fine day-to-day but big financial decisions get postponed indefinitely. The avoidance usually comes from a fear of discovering things are worse than you think.", strength: 'Adaptable, not materialistic, can live on little when needed', blindspot: "Avoidance is the most expensive money habit. Problems compound when ignored.", aureusFocus: "Aureus gives you a safe place to look — no judgement, just clarity. Small steps done consistently are your superpower.", color: '#f59e0b' },
-    spender: { label: 'The Lifestyle Spender', emoji: '🛍️', desc: "You earn, you spend, you enjoy life. The problem isn't your income — it's the gap between what you earn and what leaves the account before the mortgage can benefit.", strength: 'Generous, social, knows how to enjoy the present', blindspot: "Lifestyle inflation silently kills wealth. Every $100/month in lifestyle is ~$30,000 less in your mortgage payoff.", aureusFocus: "Aureus helps you find the spending that doesn't actually make you happy — so you can cut that specifically, not everything.", color: '#ef4444' },
-    worrier: { label: 'The Anxious Achiever', emoji: '😰', desc: "High earner, high anxiety. You work hard, earn well, but the number never feels like enough. Financial stress follows you even when you're doing well on paper.", strength: 'Motivated, responsible, high earning potential', blindspot: "Worry without action is just suffering. You need clear metrics that tell you you're actually okay.", aureusFocus: "Aureus gives you the data to replace worry with facts. The numbers usually look better than the fear tells you.", color: '#8b5cf6' },
-    hoarder: { label: 'The Safety Seeker', emoji: '🏦', desc: "Security drives every decision. You save aggressively but find it genuinely difficult to deploy money — even into good opportunities. The emergency fund has three years of expenses in it.", strength: 'Resilient, disciplined saver, never in a financial crisis', blindspot: "Hoarding cash while paying mortgage interest is costing you. Offset accounts and investments beat sitting on cash.", aureusFocus: "Aureus helps you put money to work without losing the security you need. Offset accounts are made for you.", color: '#3b82f6' },
-    warrior: { label: 'The Financial Warrior', emoji: '⚔️', desc: "Setbacks don't stop you. You've been through financial difficulty and come out the other side stronger. You're motivated but sometimes reactive — you solve today's problem without a long-term system.", strength: 'Resilient, action-oriented, strong under pressure', blindspot: "Reactive without a system means repeating the same battles. You need a plan that works when things are calm, not just when they're on fire.", aureusFocus: "Aureus helps you build the system that matches your resilience. Your attitude is your biggest asset — let's give it structure.", color: '#f97316' }
+    planner: { label: 'The Strategic Planner', emoji: '🎯', desc: "You approach money with logic and structure. You're future-oriented, make deliberate decisions, and rarely let emotion drive spending. Your challenge is flexibility — when life doesn't follow the plan, you can freeze.", strength: 'Discipline, long-term thinking, goal clarity', blindspot: "Can be rigid — sometimes life needs you to adapt the plan, not abandon it", aureusFocus: "Focus on optimising systems and accelerating your mortgage. You're already wired right — Aureus helps you find the gaps in an already-good plan.", color: '#B68B2E' },
+    avoider: { label: 'The Avoider', emoji: '🙈', desc: "Money stress makes you want to look away. You function fine day-to-day but big financial decisions get postponed indefinitely. The avoidance usually comes from a fear of discovering things are worse than you think.", strength: 'Adaptable, not materialistic, can live on little when needed', blindspot: "Avoidance is the most expensive money habit. Problems compound when ignored.", aureusFocus: "Aureus gives you a safe place to look — no judgement, just clarity. Small steps done consistently are your superpower.", color: '#D4AF37' },
+    spender: { label: 'The Lifestyle Spender', emoji: '🛍️', desc: "You earn, you spend, you enjoy life. The problem isn't your income — it's the gap between what you earn and what leaves the account before the mortgage can benefit.", strength: 'Generous, social, knows how to enjoy the present', blindspot: "Lifestyle inflation silently kills wealth. Every $100/month in lifestyle is ~$30,000 less in your mortgage payoff.", aureusFocus: "Aureus helps you find the spending that doesn't actually make you happy — so you can cut that specifically, not everything.", color: '#c0392b' },
+    worrier: { label: 'The Anxious Achiever', emoji: '😰', desc: "High earner, high anxiety. You work hard, earn well, but the number never feels like enough. Financial stress follows you even when you're doing well on paper.", strength: 'Motivated, responsible, high earning potential', blindspot: "Worry without action is just suffering. You need clear metrics that tell you you're actually okay.", aureusFocus: "Aureus gives you the data to replace worry with facts. The numbers usually look better than the fear tells you.", color: '#D4AF37' },
+    hoarder: { label: 'The Safety Seeker', emoji: '🏦', desc: "Security drives every decision. You save aggressively but find it genuinely difficult to deploy money — even into good opportunities. The emergency fund has three years of expenses in it.", strength: 'Resilient, disciplined saver, never in a financial crisis', blindspot: "Hoarding cash while paying mortgage interest is costing you. Offset accounts and investments beat sitting on cash.", aureusFocus: "Aureus helps you put money to work without losing the security you need. Offset accounts are made for you.", color: '#D4AF37' },
+    warrior: { label: 'The Financial Warrior', emoji: '⚔️', desc: "Setbacks don't stop you. You've been through financial difficulty and come out the other side stronger. You're motivated but sometimes reactive — you solve today's problem without a long-term system.", strength: 'Resilient, action-oriented, strong under pressure', blindspot: "Reactive without a system means repeating the same battles. You need a plan that works when things are calm, not just when they're on fire.", aureusFocus: "Aureus helps you build the system that matches your resilience. Your attitude is your biggest asset — let's give it structure.", color: '#D4AF37' }
   }
 
   const calculatePersonality = () => {
@@ -1847,19 +1803,19 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
   ]
   if (showModeSelector) {
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div style={{ minHeight: '100vh', background: 'theme.bg', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ maxWidth: '480px', width: '100%', textAlign: 'center' as const }}>
           {/* Logo */}
-          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 32px rgba(245,158,11,0.4)', border: '4px solid #fcd34d', margin: '0 auto 24px' }}>
-            <span style={{ color: '#78350f', fontWeight: 800, fontSize: '40px' }}>A</span>
+          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 32px rgba(212,175,55,0.3)', border: '4px solid #D4AF37', margin: '0 auto 24px' }}>
+            <span style={{ color: '#0a0a0a', fontWeight: 800, fontSize: '40px' }}>A</span>
           </div>
-          <h1 style={{ fontSize: '38px', fontWeight: 800, color: '#f1f5f9', margin: '0 0 12px 0' }}>Meet Aureus</h1>
-          <p style={{ fontSize: '18px', color: '#94a3b8', margin: '0 0 8px 0', lineHeight: 1.5 }}>Your AI financial coach. I'll help you pay your mortgage off years early, eliminate debt, and build real wealth.</p>
+          <h1 style={{ fontSize: '38px', fontWeight: 800, color: 'theme.text', margin: '0 0 12px 0' }}>Meet Aureus</h1>
+          <p style={{ fontSize: '18px', color: 'theme.textMuted', margin: '0 0 8px 0', lineHeight: 1.5 }}>Your AI financial coach. I'll help you pay your mortgage off years early, eliminate debt, and build real wealth.</p>
           <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 36px 0' }}>I won't just give you tools — I'll tell you exactly what to do, in the right order, one step at a time.</p>
 
           {/* What to expect */}
           <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '20px', marginBottom: '28px', textAlign: 'left' as const, border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 700, letterSpacing: '2px', marginBottom: '16px' }}>WHAT HAPPENS NEXT</div>
+            <div style={{ color: 'theme.textMuted', fontSize: '11px', fontWeight: 700, letterSpacing: '2px', marginBottom: '16px' }}>WHAT HAPPENS NEXT</div>
             {[
               { step: '1', icon: '🧠', text: 'I learn how you think about money (5 min quiz)' },
               { step: '2', icon: '💰', text: 'You enter your income, bills, and mortgage' },
@@ -1867,7 +1823,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               { step: '4', icon: '📋', text: 'I generate your first week-by-week action plan' },
             ].map(item => (
               <div key={item.step} style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#1e3a5f', border: '2px solid #3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>{item.icon}</div>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#1a1208', border: '2px solid #D4AF37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>{item.icon}</div>
                 <div style={{ color: '#e2e8f0', fontSize: '14px' }}>{item.text}</div>
               </div>
             ))}
@@ -1882,7 +1838,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               setMissionNavLocked(true)
               setActiveTab('chat')
             }}
-            style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '16px', color: 'white', fontSize: '18px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 24px rgba(16,185,129,0.3)', marginBottom: '12px' }}
+            style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #D4AF37, #B68B2E)', border: 'none', borderRadius: '16px', color: 'white', fontSize: '18px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 24px rgba(16,185,129,0.3)', marginBottom: '12px' }}
           >
             Let's get started →
           </button>
@@ -1899,7 +1855,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           >
             I've used Aureus before — skip setup
           </button>
-          <button onClick={() => setDarkMode(!darkMode)} style={{ marginTop: '16px', padding: '8px 20px', background: 'transparent', border: '1px solid #334155', borderRadius: '8px', color: '#64748b', cursor: 'pointer', fontSize: '13px' }}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
+          <button onClick={() => setDarkMode(!darkMode)} style={{ marginTop: '16px', padding: '8px 20px', background: 'transparent', border: '1px solid theme.border', borderRadius: '8px', color: '#64748b', cursor: 'pointer', fontSize: '13px' }}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
         </div>
       </div>
     )
@@ -1916,12 +1872,12 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           Covers full screen, guides user step by step
       ═══════════════════════════════════════════════════ */}
       {!missionComplete && missionPhase === 1 && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: darkMode ? '#0f172a' : '#f8fafc', zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: theme.bg, zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
 
           {/* Mission header */}
-          <div style={{ padding: '16px 24px', background: darkMode ? '#1e293b' : 'white', borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 1 }}>
+          <div style={{ padding: '16px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#78350f', fontSize: '16px' }}>A</div>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#0a0a0a', fontSize: '16px' }}>A</div>
               <div>
                 <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Aureus Setup</div>
                 <div style={{ color: theme.textMuted, fontSize: '11px' }}>Step {missionStep} of 4</div>
@@ -2211,14 +2167,14 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 })() : null
                 return (
                   <div style={{ width: '100%', marginBottom: '20px' }}>
-                    <div style={{ padding: '20px', background: 'linear-gradient(135deg, #0f2027, #203a43)', borderRadius: '14px', textAlign: 'center' as const, border: '1px solid #334155' }}>
-                      <div style={{ color: '#94a3b8', fontSize: '11px', letterSpacing: '2px', marginBottom: '8px' }}>🏠 YOUR MORTGAGE-FREE DATE</div>
-                      <div style={{ color: '#ef4444', fontSize: '40px', fontWeight: 800, marginBottom: '4px' }}>{res.standard.freeYear}</div>
+                    <div style={{ padding: '20px', background: 'linear-gradient(135deg, #0a0a0a, #1a1208)', borderRadius: '14px', textAlign: 'center' as const, border: '1px solid theme.border' }}>
+                      <div style={{ color: 'theme.textMuted', fontSize: '11px', letterSpacing: '2px', marginBottom: '8px' }}>🏠 YOUR MORTGAGE-FREE DATE</div>
+                      <div style={{ color: '#c0392b', fontSize: '40px', fontWeight: 800, marginBottom: '4px' }}>{res.standard.freeYear}</div>
                       <div style={{ color: '#64748b', fontSize: '12px', marginBottom: suggestedExtra > 0 ? '16px' : '0' }}>at current pace · ${Math.round(res.standard.interest / 1000)}k in interest</div>
                       {extraResult && suggestedExtra > 0 && (
                         <div style={{ padding: '12px', background: 'rgba(16,185,129,0.15)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.3)' }}>
-                          <div style={{ color: '#10b981', fontSize: '13px', marginBottom: '4px' }}>💡 With just ${suggestedExtra} extra per {freq === 'weekly' ? 'week' : freq === 'fortnightly' ? 'fortnight' : 'month'}:</div>
-                          <div style={{ color: '#10b981', fontWeight: 700, fontSize: '18px' }}>Mortgage-free by {extraResult.freeYear} — {extraResult.yearsSaved.toFixed(1)} years earlier, ${Math.round(extraResult.interestSaved / 1000)}k saved</div>
+                          <div style={{ color: '#B68B2E', fontSize: '13px', marginBottom: '4px' }}>💡 With just ${suggestedExtra} extra per {freq === 'weekly' ? 'week' : freq === 'fortnightly' ? 'fortnight' : 'month'}:</div>
+                          <div style={{ color: '#B68B2E', fontWeight: 700, fontSize: '18px' }}>Mortgage-free by {extraResult.freeYear} — {extraResult.yearsSaved.toFixed(1)} years earlier, ${Math.round(extraResult.interestSaved / 1000)}k saved</div>
                         </div>
                       )}
                     </div>
@@ -2245,9 +2201,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           MISSION PHASE 2 — ROADMAP BUILDER
       ═══════════════════════════════════════════════════ */}
       {!missionComplete && missionPhase === 2 && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: darkMode ? '#0f172a' : '#f8fafc', zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
-          <div style={{ padding: '16px 24px', background: darkMode ? '#1e293b' : 'white', borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', gap: '12px', position: 'sticky' as const, top: 0, zIndex: 1 }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#78350f', fontSize: '16px' }}>A</div>
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: theme.bg, zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
+          <div style={{ padding: '16px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', gap: '12px', position: 'sticky' as const, top: 0, zIndex: 1 }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#0a0a0a', fontSize: '16px' }}>A</div>
             <div><div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Building your roadmap</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>Almost there</div></div>
           </div>
 
@@ -2331,7 +2287,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 {missionP2Proposals.map((p, i) => (
                   <div key={i} style={{ padding: '18px', background: missionP2Confirmed[i] ? theme.accent + '15' : theme.cardBg, borderRadius: '14px', marginBottom: '12px', border: '2px solid ' + (missionP2Confirmed[i] ? theme.accent + '60' : theme.border) }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-                      <input type="checkbox" checked={missionP2Confirmed[i] || false} onChange={e => setMissionP2Confirmed(prev => { const n = [...prev]; n[i] = e.target.checked; return n })} style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: theme.accent, flexShrink: 0 }} />
+                      <input type="checkbox" checked={missionP2Confirmed[i] || false} onChange={e => setMissionP2Confirmed(prev => { const n = [...prev]; n[i] = e.target.checked; return n })} style={{ width: '18px', height: '18px', marginTop: '2px', #D4AF37, flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                           <span style={{ fontSize: '22px' }}>{p.icon}</span>
@@ -2385,7 +2341,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         </div>
       )}
       {celebrationWin && (
-        <div style={{ position: 'fixed' as const, top: '20px', right: '20px', zIndex: 9999, padding: '16px 20px', background: 'linear-gradient(135deg, #10b981, #059669)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(16,185,129,0.4)', color: 'white', maxWidth: '320px', animation: 'slideIn 0.3s ease' }}>
+        <div style={{ position: 'fixed' as const, top: '20px', right: '20px', zIndex: 9999, padding: '16px 20px', background: 'linear-gradient(135deg, #D4AF37, #B68B2E)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(212,175,55,0.3)', color: 'white', maxWidth: '320px', animation: 'slideIn 0.3s ease' }}>
           <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>🏆 New Win Unlocked!</div>
           <div style={{ fontSize: '13px', opacity: 0.9 }}>{celebrationWin}</div>
         </div>
@@ -2395,11 +2351,11 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
       <header style={{ padding: '12px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, position: 'sticky' as const, top: 0, zIndex: 100 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fcd34d' }}>
-              <span style={{ color: '#78350f', fontWeight: 800, fontSize: '18px' }}>A</span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #D4AF37 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #D4AF37' }}>
+              <span style={{ color: '#0a0a0a', fontWeight: 800, fontSize: '18px' }}>A</span>
             </div>
             <span style={{ color: theme.text, fontWeight: 700, fontSize: '20px' }}>Aureus</span>
-            {streak > 0 && <span style={{ padding: '3px 10px', background: '#f59e0b20', color: '#f59e0b', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>🔥 {streak}-week streak</span>}
+            {streak > 0 && <span style={{ padding: '3px 10px', background: '#D4AF3720', color: '#D4AF37', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>🔥 {streak}-week streak</span>}
             {/* Coach next action — compact header badge */}
             {coachNextAction && activeTab !== 'quickview' && (
               <button
@@ -2468,7 +2424,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
             {/* WHY STATEMENT BANNER */}
             {whyStatement ? (
-              <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #f59e0b15, #10b98115)', borderRadius: '12px', border: '2px solid #f59e0b40', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #D4AF3715, #B68B2E15)', borderRadius: '12px', border: '2px solid #D4AF3740', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Why I\'m Doing This</div>
                   <div style={{ color: theme.text, fontSize: '15px', fontStyle: 'italic' }}>"{whyStatement}"</div>
@@ -2476,7 +2432,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <button onClick={() => { setEditingWhy(true); setWhyDraft(whyStatement) }} style={{ padding: '6px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>Edit</button>
               </div>
             ) : (
-              <button onClick={() => { setEditingWhy(true); setWhyDraft('') }} style={{ padding: '16px 20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '2px dashed ' + theme.border, cursor: 'pointer', textAlign: 'left' as const }}>
+              <button onClick={() => { setEditingWhy(true); setWhyDraft('') }} style={{ padding: '16px 20px', background: darkMode ? 'theme.cardBg' : '#f8fafc', borderRadius: '12px', border: '2px dashed ' + theme.border, cursor: 'pointer', textAlign: 'left' as const }}>
                 <div style={{ color: theme.textMuted, fontSize: '13px' }}>💬 <strong>Set your why</strong> — What are you working toward? (e.g. "Be mortgage-free before my kids finish school")</div>
               </button>
             )}
@@ -2498,7 +2454,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 )
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f', flexShrink: 0 }}>A</div>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#0a0a0a', flexShrink: 0 }}>A</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                       <div style={{ color: coachNextAction.urgency === 'high' ? theme.warning : coachNextAction.urgency === 'medium' ? theme.accent : theme.success, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>
@@ -2558,7 +2514,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
             {/* PERSONALITY QUIZ PROMPT — shown until completed */}
             {!moneyPersonality && (
-              <div style={{ padding: '20px', background: 'linear-gradient(135deg, #8b5cf620, #3b82f615)', borderRadius: '14px', border: '2px solid ' + theme.purple + '50' }}>
+              <div style={{ padding: '20px', background: 'linear-gradient(135deg, #D4AF3720, #D4AF3715)', borderRadius: '14px', border: '2px solid ' + theme.purple + '50' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
                   <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: theme.purple + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', flexShrink: 0 }}>🧠</div>
                   <div>
@@ -2581,7 +2537,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             {/* AUREUS CHAT WIDGET */}
             <div style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#0a0a0a' }}>A</div>
                 <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{currentBabyStep.title}</div></div>
               </div>
               {chatMessages.length > 0 && (
@@ -2617,25 +2573,25 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
             {/* MORTGAGE FREE DATE HERO */}
             {mortgageAccel.balance && mortgageResult ? (
-              <div style={{ padding: '24px', background: 'linear-gradient(135deg, #0f2027, #203a43, #2c5364)', borderRadius: '16px', border: '2px solid #3b82f6' }}>
-                <div style={{ color: '#94a3b8', fontSize: '11px', letterSpacing: '3px', marginBottom: '12px', textAlign: 'center' as const }}>🏠 MORTGAGE PAYOFF COUNTDOWN</div>
+              <div style={{ padding: '24px', background: 'linear-gradient(135deg, #0a0a0a, #1a1208, #231a08)', borderRadius: '16px', border: '2px solid #D4AF37' }}>
+                <div style={{ color: 'theme.textMuted', fontSize: '11px', letterSpacing: '3px', marginBottom: '12px', textAlign: 'center' as const }}>🏠 MORTGAGE PAYOFF COUNTDOWN</div>
                 <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' as const, marginBottom: '16px' }}>
                   <div>
-                    <div style={{ color: '#ef4444', fontSize: '11px', marginBottom: '4px' }}>Without changes</div>
-                    <div style={{ color: '#f1f5f9', fontSize: '36px', fontWeight: 800 }}>{mortgageResult.standard.freeYear}</div>
+                    <div style={{ color: '#c0392b', fontSize: '11px', marginBottom: '4px' }}>Without changes</div>
+                    <div style={{ color: 'theme.text', fontSize: '36px', fontWeight: 800 }}>{mortgageResult.standard.freeYear}</div>
                     <div style={{ color: '#64748b', fontSize: '11px' }}>{mortgageResult.standard.years.toFixed(1)} yrs · ${Math.round(mortgageResult.standard.interest / 1000)}k interest</div>
                   </div>
                   {parseFloat(mortgageAccel.extraRepayment || '0') > 0 && (
                     <div>
-                      <div style={{ color: '#10b981', fontSize: '11px', marginBottom: '4px' }}>With your extra payments</div>
-                      <div style={{ color: '#10b981', fontSize: '36px', fontWeight: 800 }}>{mortgageResult.withExtra.freeYear}</div>
-                      <div style={{ color: '#10b981', fontSize: '11px' }}>🎉 {mortgageResult.withExtra.yearsSaved.toFixed(1)} yrs earlier · ${Math.round(mortgageResult.withExtra.interestSaved / 1000)}k saved</div>
+                      <div style={{ color: '#B68B2E', fontSize: '11px', marginBottom: '4px' }}>With your extra payments</div>
+                      <div style={{ color: '#B68B2E', fontSize: '36px', fontWeight: 800 }}>{mortgageResult.withExtra.freeYear}</div>
+                      <div style={{ color: '#B68B2E', fontSize: '11px' }}>🎉 {mortgageResult.withExtra.yearsSaved.toFixed(1)} yrs earlier · ${Math.round(mortgageResult.withExtra.interestSaved / 1000)}k saved</div>
                     </div>
                   )}
                 </div>
                 {/* What-if slider */}
                 <div style={{ padding: '12px 0' }}>
-                  <div style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '8px', textAlign: 'center' as const }}>💡 What if you paid extra per {mortgageAccel.repaymentFrequency === 'weekly' ? 'week' : mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'}?</div>
+                  <div style={{ color: 'theme.textMuted', fontSize: '11px', marginBottom: '8px', textAlign: 'center' as const }}>💡 What if you paid extra per {mortgageAccel.repaymentFrequency === 'weekly' ? 'week' : mortgageAccel.repaymentFrequency === 'fortnightly' ? 'fortnight' : 'month'}?</div>
                   {[100, 200, 500, 1000].map(extra => {
                     const freq = mortgageAccel.repaymentFrequency === 'weekly' ? 52 : mortgageAccel.repaymentFrequency === 'fortnightly' ? 26 : 12
                     const r = parseFloat(mortgageAccel.rate || '0') / 100 / freq
@@ -2648,9 +2604,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     const interestSaved = mortgageResult.standard.interest - (repayment * periods - bal)
                     return (
                       <div key={extra} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', marginBottom: '4px' }}>
-                        <span style={{ color: '#94a3b8', fontSize: '12px' }}>+${extra}</span>
-                        <span style={{ color: '#10b981', fontSize: '12px', fontWeight: 600 }}>{saved.toFixed(1)} yrs earlier</span>
-                        <span style={{ color: '#f59e0b', fontSize: '12px' }}>${Math.round(interestSaved / 1000)}k saved</span>
+                        <span style={{ color: 'theme.textMuted', fontSize: '12px' }}>+${extra}</span>
+                        <span style={{ color: '#B68B2E', fontSize: '12px', fontWeight: 600 }}>{saved.toFixed(1)} yrs earlier</span>
+                        <span style={{ color: '#D4AF37', fontSize: '12px' }}>${Math.round(interestSaved / 1000)}k saved</span>
                       </div>
                     )
                   })}
@@ -2658,15 +2614,15 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <button onClick={() => setActiveTab('mortgage')} style={{ width: '100%', marginTop: '8px', padding: '10px', background: theme.accent, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>Open Mortgage Accelerator →</button>
               </div>
             ) : (
-              <button onClick={() => setActiveTab('mortgage')} style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #1e3a5f, #0f172a)', borderRadius: '12px', border: '2px dashed #3b82f6', cursor: 'pointer', width: '100%', textAlign: 'left' as const }}>
-                <div style={{ color: '#f1f5f9', fontWeight: 600, marginBottom: '4px' }}>🏠 See your mortgage-free date</div>
+              <button onClick={() => setActiveTab('mortgage')} style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #1a1208, #0a0a0a)', borderRadius: '12px', border: '2px dashed #D4AF37', cursor: 'pointer', width: '100%', textAlign: 'left' as const }}>
+                <div style={{ color: 'theme.text', fontWeight: 600, marginBottom: '4px' }}>🏠 See your mortgage-free date</div>
                 <div style={{ color: '#64748b', fontSize: '13px' }}>Enter your mortgage details to see how quickly you could be debt-free →</div>
               </button>
             )}
 
             {/* IDENTITY STATEMENTS */}
             {identityStatements.length > 0 && (
-              <div style={{ padding: '16px 20px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
+              <div style={{ padding: '16px 20px', background: darkMode ? 'theme.cardBg' : '#f8fafc', borderRadius: '12px', border: '1px solid ' + theme.border }}>
                 <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '10px' }}>⚡ Who I Am Becoming</div>
                 {identityStatements.map((stmt, i) => (
                   <div key={i} style={{ color: theme.text, fontSize: '14px', fontStyle: 'italic', padding: '6px 0', borderBottom: i < identityStatements.length - 1 ? '1px solid ' + theme.border : 'none' }}>
@@ -2678,8 +2634,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
             {/* THE ONE DECISION */}
             {oneDecision && (
-              <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #f59e0b15, #f97316 15)', borderRadius: '12px', border: '2px solid #f59e0b40' }}>
-                <div style={{ color: '#f59e0b', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>🎯 Your ONE Financial Move This Week</div>
+              <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #D4AF3715, #D4AF37 15)', borderRadius: '12px', border: '2px solid #D4AF3740' }}>
+                <div style={{ color: '#D4AF37', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '8px' }}>🎯 Your ONE Financial Move This Week</div>
                 <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6 }}>{oneDecision}</div>
                 <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '6px' }}>{oneDecisionDate && `Generated ${new Date(oneDecisionDate).toLocaleDateString('en-AU')}`}</div>
               </div>
@@ -2718,8 +2674,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           <div style={{ maxWidth: '800px', margin: '0 auto' }}>
             <div style={{ background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, border: '2px solid ' + theme.success, borderRadius: '20px', padding: '24px', minHeight: '70vh', display: 'flex', flexDirection: 'column' as const }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid ' + theme.border }}>
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #fcd34d' }}>
-                  <span style={{ color: '#78350f', fontWeight: 800, fontSize: '28px' }}>A</span>
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #D4AF37 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #D4AF37' }}>
+                  <span style={{ color: '#0a0a0a', fontWeight: 800, fontSize: '28px' }}>A</span>
                 </div>
                 <div>
                   <div style={{ color: theme.text, fontWeight: 700, fontSize: '22px' }}>Aureus</div>
@@ -2748,7 +2704,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
                     {/* Personality quiz CTA - most prominent when not done */}
                     {!moneyPersonality ? (
-                      <div style={{ marginBottom: '24px', padding: '24px', background: 'linear-gradient(135deg, #8b5cf615, #3b82f615)', borderRadius: '16px', border: '2px solid ' + theme.purple + '50', textAlign: 'center' as const }}>
+                      <div style={{ marginBottom: '24px', padding: '24px', background: 'linear-gradient(135deg, #D4AF3715, #D4AF3715)', borderRadius: '16px', border: '2px solid ' + theme.purple + '50', textAlign: 'center' as const }}>
                         <div style={{ fontSize: '44px', marginBottom: '12px' }}>🧠</div>
                         <div style={{ color: theme.text, fontWeight: 700, fontSize: '17px', marginBottom: '8px' }}>First, let me get to know you.</div>
                         <div style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, marginBottom: '16px' }}>
@@ -2877,7 +2833,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>
                   {incomeStreams.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No income streams yet</p> : incomeStreams.map(inc => (
                     editingItem?.type === 'income' && editingItem.id === inc.id ? (
-                      <div key={inc.id} style={{ padding: '10px', marginBottom: '8px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px' }}>
+                      <div key={inc.id} style={{ padding: '10px', marginBottom: '8px', background: theme.bg, borderRadius: '8px' }}>
                         <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
                           <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} style={{...inputStyle, flex: 1, minWidth: '80px'}} />
                           <input type="number" value={editingItem.data.amount} onChange={e => updateEditField('amount', e.target.value)} style={{...inputStyle, width: '80px'}} />
@@ -2894,7 +2850,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         <div style={{ display: 'flex', gap: '8px' }}><button onClick={saveEdit} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Save</button><button onClick={cancelEdit} style={{...btnDanger, padding: '6px 12px', fontSize: '12px'}}>Cancel</button></div>
                       </div>
                     ) : (
-                      <div key={inc.id} style={{ padding: '10px 12px', marginBottom: '6px', background: darkMode ? '#1e3a32' : '#f0fdf4', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div key={inc.id} style={{ padding: '10px 12px', marginBottom: '6px', background: theme.bg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                           <div style={{ color: theme.text, fontWeight: 600 }}>{inc.name}</div>
                           <div style={{ color: theme.textMuted, fontSize: '12px' }}>
@@ -3010,9 +2966,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   const items = getCalendarItemsForDay(day)
                   const isToday = day === new Date().getDate() && calendarMonth.getMonth() === new Date().getMonth() && calendarMonth.getFullYear() === new Date().getFullYear()
                   return (
-                    <div key={day} onClick={() => items.length > 0 && setExpandedDay({ day, items })} style={{ minHeight: '70px', padding: '4px', background: isToday ? theme.accent + '20' : darkMode ? '#1e293b' : '#f8fafc', borderRadius: '8px', border: isToday ? '2px solid ' + theme.accent : '1px solid ' + theme.border, cursor: items.length > 0 ? 'pointer' : 'default' }}>
+                    <div key={day} onClick={() => items.length > 0 && setExpandedDay({ day, items })} style={{ minHeight: '70px', padding: '4px', background: isToday ? theme.accent + '20' : darkMode ? 'theme.cardBg' : '#f8fafc', borderRadius: '8px', border: isToday ? '2px solid ' + theme.accent : '1px solid ' + theme.border, cursor: items.length > 0 ? 'pointer' : 'default' }}>
                       <div style={{ fontWeight: 600, color: theme.text, marginBottom: '2px', fontSize: '12px' }}>{day}</div>
-                      {items.slice(0, 2).map(item => <div key={item.itemId} style={{ fontSize: '9px', padding: '1px 4px', marginBottom: '2px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'goal' ? '#ede9fe' : item.itemType === 'expense' ? '#dbeafe' : '#fee2e2', color: '#1e293b', borderRadius: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, opacity: item.isPaid ? 0.5 : 1 }}>{item.name}</div>)}
+                      {items.slice(0, 2).map(item => <div key={item.itemId} style={{ fontSize: '9px', padding: '1px 4px', marginBottom: '2px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'goal' ? '#ede9fe' : item.itemType === 'expense' ? '#dbeafe' : '#fee2e2', color: 'theme.cardBg', borderRadius: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, opacity: item.isPaid ? 0.5 : 1 }}>{item.name}</div>)}
                       {items.length > 2 && <div style={{ fontSize: '9px', color: theme.accent }}>+{items.length - 2}</div>}
                     </div>
                   )
@@ -3111,22 +3067,48 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               </div>
               <div style={cardStyle} data-section="goals">
                 <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🎯 Goals</h3>
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' as const }}>
-                  <input placeholder="Goal name" value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '80px'}} />
-                  <input placeholder="Target $" type="number" value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})} style={{...inputStyle, width: '80px'}} />
-                  <input placeholder="Saved $" type="number" value={newGoal.saved} onChange={e => setNewGoal({...newGoal, saved: e.target.value})} style={{...inputStyle, width: '70px'}} />
-                  <button onClick={addGoal} style={btnPurple}>+</button>
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', marginBottom: '12px', padding: '12px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
+                    <input placeholder="Goal name" value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '120px'}} />
+                    <input placeholder="Target $" type="number" value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})} style={{...inputStyle, width: '90px'}} />
+                    <input placeholder="Saved $" type="number" value={newGoal.saved} onChange={e => setNewGoal({...newGoal, saved: e.target.value})} style={{...inputStyle, width: '80px'}} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', flex: 1, minWidth: '140px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>START DATE</label>
+                      <input type="date" value={newGoal.startDate} onChange={e => setNewGoal({...newGoal, startDate: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', flex: 1, minWidth: '140px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>TARGET DATE</label>
+                      <input type="date" value={newGoal.deadline} onChange={e => setNewGoal({...newGoal, deadline: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', minWidth: '110px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>FREQUENCY</label>
+                      <select value={newGoal.savingsFrequency} onChange={e => setNewGoal({...newGoal, savingsFrequency: e.target.value})} style={inputStyle}>
+                        <option value="weekly">Weekly</option>
+                        <option value="fortnightly">Fortnightly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button onClick={addGoal} style={{...btnPurple, alignSelf: 'flex-start' as const, padding: '8px 20px'}}>+ Add Goal</button>
                 </div>
                 <div style={{ maxHeight: '250px', overflowY: 'auto' as const }}>
                   {goals.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No goals yet</p> : goals.map(goal => {
                     const pct = (parseFloat(goal.saved || '0') / parseFloat(goal.target || '1')) * 100
                     return (
-                      <div key={goal.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#2e1e3a' : '#faf5ff', borderRadius: '10px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div key={goal.id} style={{ padding: '12px', marginBottom: '8px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                           <div><div style={{ color: theme.text, fontWeight: 600 }}>{goal.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${parseFloat(goal.saved || '0').toFixed(0)} / ${parseFloat(goal.target || '0').toFixed(0)}</div></div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: theme.purple, fontWeight: 700 }}>{pct.toFixed(0)}%</span><button onClick={() => deleteGoal(goal.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button></div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: theme.accent, fontWeight: 700 }}>{pct.toFixed(0)}%</span><button onClick={() => deleteGoal(goal.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button></div>
                         </div>
-                        <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: theme.purple }} /></div>
+                        {(goal.startDate || goal.deadline) && (
+                          <div style={{ display: 'flex', gap: '12px', marginBottom: '6px' }}>
+                            {goal.startDate && <span style={{ color: theme.textMuted, fontSize: '11px' }}>📅 Start: {new Date(goal.startDate + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                            {goal.deadline && <span style={{ color: theme.accent, fontSize: '11px' }}>🏁 Target: {new Date(goal.deadline + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                          </div>
+                        )}
+                        <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: 'linear-gradient(90deg, #D4AF37, #B68B2E)' }} /></div>
                       </div>
                     )
                   })}
@@ -3164,43 +3146,43 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             </div>
 
             {/* HERO: Mortgage Free Date */}
-            <div style={{ padding: '32px', background: 'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)', borderRadius: '20px', border: '2px solid #3b82f6', textAlign: 'center' as const }}>
-              <div style={{ color: '#94a3b8', fontSize: '12px', letterSpacing: '3px', marginBottom: '8px' }}>🏠 MORTGAGE FREE TARGET</div>
+            <div style={{ padding: '32px', background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1208 50%, #231a08 100%)', borderRadius: '20px', border: '2px solid #D4AF37', textAlign: 'center' as const }}>
+              <div style={{ color: 'theme.textMuted', fontSize: '12px', letterSpacing: '3px', marginBottom: '8px' }}>🏠 MORTGAGE FREE TARGET</div>
               {mortgageResult ? (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', flexWrap: 'wrap' as const }}>
                     <div>
-                      <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '4px' }}>At current rate</div>
-                      <div style={{ color: '#ef4444', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.standard.freeYear}</div>
-                      <div style={{ color: '#94a3b8', fontSize: '12px' }}>{mortgageResult.standard.years.toFixed(1)} yrs · ${Math.round(mortgageResult.standard.interest).toLocaleString()} interest</div>
+                      <div style={{ color: 'theme.textMuted', fontSize: '12px', marginBottom: '4px' }}>At current rate</div>
+                      <div style={{ color: '#c0392b', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.standard.freeYear}</div>
+                      <div style={{ color: 'theme.textMuted', fontSize: '12px' }}>{mortgageResult.standard.years.toFixed(1)} yrs · ${Math.round(mortgageResult.standard.interest).toLocaleString()} interest</div>
                     </div>
                     {parseFloat(mortgageAccel.extraRepayment || '0') > 0 && (
                       <div>
-                        <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '4px' }}>With extra ${mortgageAccel.extraRepayment}/{mortgageAccel.repaymentFrequency}</div>
-                        <div style={{ color: '#10b981', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.withExtra.freeYear}</div>
-                        <div style={{ color: '#10b981', fontSize: '13px' }}>🎉 {mortgageResult.withExtra.yearsSaved.toFixed(1)} yrs earlier · saving ${Math.round(mortgageResult.withExtra.interestSaved).toLocaleString()}</div>
+                        <div style={{ color: 'theme.textMuted', fontSize: '12px', marginBottom: '4px' }}>With extra ${mortgageAccel.extraRepayment}/{mortgageAccel.repaymentFrequency}</div>
+                        <div style={{ color: '#B68B2E', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.withExtra.freeYear}</div>
+                        <div style={{ color: '#B68B2E', fontSize: '13px' }}>🎉 {mortgageResult.withExtra.yearsSaved.toFixed(1)} yrs earlier · saving ${Math.round(mortgageResult.withExtra.interestSaved).toLocaleString()}</div>
                       </div>
                     )}
                     {parseFloat(mortgageAccel.offsetBalance || '0') > 0 && (
                       <div>
-                        <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '4px' }}>With ${mortgageAccel.offsetBalance} offset</div>
-                        <div style={{ color: '#f59e0b', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.withOffset.freeYear}</div>
-                        <div style={{ color: '#f59e0b', fontSize: '13px' }}>💡 {mortgageResult.withOffset.yearsSaved.toFixed(1)} yrs saved · ${Math.round(mortgageResult.withOffset.interestSaved).toLocaleString()} saved</div>
+                        <div style={{ color: 'theme.textMuted', fontSize: '12px', marginBottom: '4px' }}>With ${mortgageAccel.offsetBalance} offset</div>
+                        <div style={{ color: '#D4AF37', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.withOffset.freeYear}</div>
+                        <div style={{ color: '#D4AF37', fontSize: '13px' }}>💡 {mortgageResult.withOffset.yearsSaved.toFixed(1)} yrs saved · ${Math.round(mortgageResult.withOffset.interestSaved).toLocaleString()} saved</div>
                       </div>
                     )}
                     {parseFloat(mortgageAccel.extraRepayment || '0') > 0 && parseFloat(mortgageAccel.offsetBalance || '0') > 0 && (
                       <div>
-                        <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '4px' }}>Extra payments + offset</div>
-                        <div style={{ color: '#8b5cf6', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.withBoth.freeYear}</div>
-                        <div style={{ color: '#8b5cf6', fontSize: '13px' }}>🚀 {mortgageResult.withBoth.yearsSaved.toFixed(1)} yrs saved · ${Math.round(mortgageResult.withBoth.interestSaved).toLocaleString()} saved</div>
+                        <div style={{ color: 'theme.textMuted', fontSize: '12px', marginBottom: '4px' }}>Extra payments + offset</div>
+                        <div style={{ color: '#D4AF37', fontSize: '40px', fontWeight: 800 }}>{mortgageResult.withBoth.freeYear}</div>
+                        <div style={{ color: '#D4AF37', fontSize: '13px' }}>🚀 {mortgageResult.withBoth.yearsSaved.toFixed(1)} yrs saved · ${Math.round(mortgageResult.withBoth.interestSaved).toLocaleString()} saved</div>
                       </div>
                     )}
                   </div>
                 </>
               ) : (
                 <div>
-                  <div style={{ color: '#f1f5f9', fontSize: '20px', marginBottom: '8px' }}>Enter your mortgage details below</div>
-                  <div style={{ color: '#94a3b8', fontSize: '14px' }}>See how extra payments could save you years and tens of thousands in interest</div>
+                  <div style={{ color: 'theme.text', fontSize: '20px', marginBottom: '8px' }}>Enter your mortgage details below</div>
+                  <div style={{ color: 'theme.textMuted', fontSize: '14px' }}>See how extra payments could save you years and tens of thousands in interest</div>
                 </div>
               )}
             </div>
@@ -3412,12 +3394,12 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         {/* ==================== FINANCIAL LITERACY HUB ==================== */}
         {activeTab === 'learn' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e3a5f, #0f172a)', borderRadius: '16px', border: '2px solid #3b82f6' }}>
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1a1208, #0a0a0a)', borderRadius: '16px', border: '2px solid #D4AF37' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{ fontSize: '48px' }}>🎓</div>
                 <div>
-                  <h2 style={{ margin: 0, color: '#f1f5f9', fontSize: '24px' }}>Financial Literacy Hub</h2>
-                  <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '14px' }}>Real knowledge behind real money moves. Tap any topic to learn — then ask Aureus to apply it to your situation.</p>
+                  <h2 style={{ margin: 0, color: 'theme.text', fontSize: '24px' }}>Financial Literacy Hub</h2>
+                  <p style={{ margin: '4px 0 0 0', color: 'theme.textMuted', fontSize: '14px' }}>Real knowledge behind real money moves. Tap any topic to learn — then ask Aureus to apply it to your situation.</p>
                 </div>
               </div>
             </div>
@@ -3470,8 +3452,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
 
             {/* WHY STATEMENT */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e3a32, #0f172a)', borderRadius: '16px', border: '2px solid #10b981' }}>
-              <div style={{ color: '#94a3b8', fontSize: '12px', letterSpacing: '2px', marginBottom: '12px' }}>❤️ YOUR WHY</div>
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e3a32, theme.bg)', borderRadius: '16px', border: '2px solid #B68B2E' }}>
+              <div style={{ color: 'theme.textMuted', fontSize: '12px', letterSpacing: '2px', marginBottom: '12px' }}>❤️ YOUR WHY</div>
               {editingWhy ? (
                 <div>
                   <textarea value={whyDraft} onChange={e => setWhyDraft(e.target.value)} placeholder="e.g. 'I want to be mortgage-free before my kids start high school so I can work less and be more present.'" style={{ ...inputStyle, width: '100%', minHeight: '80px', resize: 'vertical' as const, marginBottom: '12px' }} />
@@ -3482,11 +3464,11 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
               ) : whyStatement ? (
                 <div>
-                  <div style={{ color: '#f1f5f9', fontSize: '18px', fontStyle: 'italic', lineHeight: 1.6, marginBottom: '12px' }}>"{whyStatement}"</div>
-                  <button onClick={() => { setEditingWhy(true); setWhyDraft(whyStatement) }} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.1)', color: '#94a3b8', border: '1px solid #334155', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>Edit</button>
+                  <div style={{ color: 'theme.text', fontSize: '18px', fontStyle: 'italic', lineHeight: 1.6, marginBottom: '12px' }}>"{whyStatement}"</div>
+                  <button onClick={() => { setEditingWhy(true); setWhyDraft(whyStatement) }} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.1)', color: 'theme.textMuted', border: '1px solid theme.border', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>Edit</button>
                 </div>
               ) : (
-                <button onClick={() => setEditingWhy(true)} style={{ padding: '16px', background: 'transparent', border: '2px dashed #334155', borderRadius: '10px', color: '#94a3b8', cursor: 'pointer', textAlign: 'left' as const, width: '100%', fontSize: '14px' }}>
+                <button onClick={() => setEditingWhy(true)} style={{ padding: '16px', background: 'transparent', border: '2px dashed theme.border', borderRadius: '10px', color: 'theme.textMuted', cursor: 'pointer', textAlign: 'left' as const, width: '100%', fontSize: '14px' }}>
                   + Set your why — the emotional anchor that keeps you on track when things get tough
                 </button>
               )}
@@ -3532,7 +3514,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
                   {[...wins].reverse().map(win => (
-                    <div key={win.id} style={{ padding: '14px 16px', background: win.auto ? (darkMode ? '#1e3a32' : '#f0fdf4') : (darkMode ? '#2e2a1e' : '#fefce8'), borderRadius: '10px', display: 'flex', alignItems: 'flex-start', gap: '14px', border: '1px solid ' + (win.auto ? theme.success + '30' : theme.warning + '30') }}>
+                    <div key={win.id} style={{ padding: '14px 16px', background: win.auto ? (theme.bg) : (darkMode ? '#2e2a1e' : '#fefce8'), borderRadius: '10px', display: 'flex', alignItems: 'flex-start', gap: '14px', border: '1px solid ' + (win.auto ? theme.success + '30' : theme.warning + '30') }}>
                       <div style={{ fontSize: '24px', flexShrink: 0 }}>{win.icon}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ color: theme.text, fontWeight: 600, marginBottom: '2px' }}>{win.title}</div>
@@ -3550,7 +3532,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             </div>
 
             {/* ACCOUNTABILITY SCORECARD */}
-            <div style={{ ...cardStyle, background: 'linear-gradient(135deg, #1e293b, #0f172a)', border: '1px solid #334155' }}>
+            <div style={{ ...cardStyle, background: 'linear-gradient(135deg, theme.cardBg, theme.bg)', border: '1px solid theme.border' }}>
               <h3 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '20px' }}>📊 Accountability Scorecard</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
                 {[
@@ -3561,8 +3543,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   { label: 'Monthly Surplus', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus > 0 ? theme.success : theme.danger, desc: 'After all bills' },
                   { label: 'Check-In Streak', value: `${streak} wk${streak !== 1 ? 's' : ''}`, color: streak >= 4 ? theme.success : streak >= 1 ? theme.warning : theme.textMuted, desc: 'Consistency score' },
                 ].map(metric => (
-                  <div key={metric.label} style={{ padding: '16px', background: '#1e293b', borderRadius: '10px' }}>
-                    <div style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '4px' }}>{metric.label}</div>
+                  <div key={metric.label} style={{ padding: '16px', background: 'theme.cardBg', borderRadius: '10px' }}>
+                    <div style={{ color: 'theme.textMuted', fontSize: '11px', marginBottom: '4px' }}>{metric.label}</div>
                     <div style={{ color: metric.color, fontSize: '22px', fontWeight: 700, marginBottom: '2px' }}>{metric.value}</div>
                     <div style={{ color: '#64748b', fontSize: '11px' }}>{metric.desc}</div>
                   </div>
@@ -3583,7 +3565,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             {/* Aureus Chat Widget */}
             <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#78350f' }}>A</div>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#0a0a0a' }}>A</div>
                 <div>
                   <div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div>
                   <div style={{ color: theme.textMuted, fontSize: '11px' }}>
@@ -3615,7 +3597,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             </div>
 
             {/* ===== ROADMAP — MOVED TO TOP ===== */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: '20px', border: '2px solid ' + theme.purple }}>
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, theme.cardBg, theme.bg)', borderRadius: '20px', border: '2px solid ' + theme.purple }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
                 <div>
                   <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🗺️ My Roadmap</h2>
@@ -3644,7 +3626,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               )}
 
               {roadmapMilestones.length === 0 ? (
-                <div style={{ textAlign: 'center' as const, padding: '32px', color: theme.textMuted, border: '2px dashed #334155', borderRadius: '12px' }}>
+                <div style={{ textAlign: 'center' as const, padding: '32px', color: theme.textMuted, border: '2px dashed theme.border', borderRadius: '12px' }}>
                   <div style={{ fontSize: '40px', marginBottom: '12px' }}>🎯</div>
                   <div style={{ color: theme.text, fontWeight: 600, marginBottom: '8px' }}>Your roadmap is empty</div>
                   <div style={{ fontSize: '13px', lineHeight: 1.7, marginBottom: '16px' }}>Add milestones using the <strong style={{ color: theme.purple }}>+ Add to Roadmap</strong> buttons throughout this page, or click below to add your first one.</div>
@@ -3678,7 +3660,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                               </div>
                             </div>
                             {/* Progress bar */}
-                            <div style={{ height: '6px', background: '#334155', borderRadius: '3px', overflow: 'hidden', marginBottom: '4px' }}>
+                            <div style={{ height: '6px', background: 'theme.border', borderRadius: '3px', overflow: 'hidden', marginBottom: '4px' }}>
                               <div style={{ width: Math.min(pct, 100) + '%', height: '100%', background: `linear-gradient(90deg, ${theme.purple}, ${theme.success})` }} />
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -3741,7 +3723,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                     </div>
                                     <div style={{ flex: 1 }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                                        <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 600 }}>DAY {idx + 1}</span>
+                                        <span style={{ color: 'theme.textMuted', fontSize: '11px', fontWeight: 600 }}>DAY {idx + 1}</span>
                                         {isActionStep && !step.done && <span style={{ padding: '1px 6px', background: (isAddDebtStep ? theme.warning : theme.purple) + '30', color: isAddDebtStep ? theme.warning : theme.purple, borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>{isAddDebtStep ? 'ACTION IN AUREUS — DEBTS' : 'ACTION IN AUREUS — GOALS'}</span>}
                                       </div>
                                       <div style={{ color: step.done ? theme.textMuted : theme.text, fontSize: '14px', lineHeight: 1.5, textDecoration: step.done ? 'line-through' : 'none' }}>{step.text}</div>
@@ -3825,7 +3807,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   const isCurrent = item.step === currentBabyStep.step
                   const done = item.step < currentBabyStep.step
                   return (
-                    <div key={item.step} style={{ padding: '16px', background: done ? (darkMode ? '#1e3a32' : '#f0fdf4') : isCurrent ? (darkMode ? '#2e2a1e' : '#fefce8') : (darkMode ? '#334155' : '#f8fafc'), borderRadius: '12px', border: done ? '2px solid ' + theme.success : isCurrent ? '2px solid ' + theme.warning : '1px solid ' + theme.border }}>
+                    <div key={item.step} style={{ padding: '16px', background: done ? (theme.bg) : isCurrent ? (darkMode ? '#2e2a1e' : '#fefce8') : (darkMode ? 'theme.border' : '#f8fafc'), borderRadius: '12px', border: done ? '2px solid ' + theme.success : isCurrent ? '2px solid ' + theme.warning : '1px solid ' + theme.border }}>
                       <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                         <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px', flexShrink: 0 }}>{done ? '✓' : item.icon}</div>
                         <div onClick={() => setSelectedBabyStep(item.step)} style={{ flex: 1, cursor: 'pointer' }}>
@@ -3873,7 +3855,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
             {/* Set & Forget Automation */}
             {incomeStreams.length > 0 && (
-              <div style={{ padding: '24px', background: 'linear-gradient(135deg, #3b82f615, #8b5cf615)', borderRadius: '16px', border: '2px solid ' + theme.accent }}>
+              <div style={{ padding: '24px', background: 'linear-gradient(135deg, #D4AF3715, #D4AF3715)', borderRadius: '16px', border: '2px solid ' + theme.accent }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                   <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🤖 Set & Forget Automation</h2>
                   <button onClick={() => addToRoadmapQuick('Set Up 3-Account Automation', '🤖', '', 'Automate bills, savings, and spending split every payday')} style={{ padding: '8px 14px', background: theme.accent + '20', color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>+ Add to Roadmap</button>
@@ -3916,7 +3898,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             )}
 
             {/* Passive Income Quests */}
-            <div style={{ padding: '24px', background: darkMode ? '#1e293b' : '#f8fafc', borderRadius: '16px', border: '1px solid ' + theme.border }}>
+            <div style={{ padding: '24px', background: darkMode ? 'theme.cardBg' : '#f8fafc', borderRadius: '16px', border: '1px solid ' + theme.border }}>
               <h2 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>💰 Automated Revenue Strategies</h2>
               <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>Step-by-step guides to build passive income. Use + Add to Roadmap to track your progress.</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -3926,7 +3908,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     <div key={quest.id} style={{ padding: '20px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                          <div style={{ width: '44px', height: '44px', background: darkMode ? '#334155' : '#e2e8f0', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>{quest.icon}</div>
+                          <div style={{ width: '44px', height: '44px', background: darkMode ? 'theme.border' : '#e2e8f0', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>{quest.icon}</div>
                           <div><div style={{ fontWeight: 600, color: theme.text, fontSize: '15px' }}>{quest.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>{quest.description}</div></div>
                         </div>
                         <span style={{ padding: '3px 8px', background: theme.success + '20', color: theme.success, borderRadius: '4px', fontSize: '11px', fontWeight: 600, flexShrink: 0 }}>{quest.potentialIncome}</span>
@@ -3940,7 +3922,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         <button onClick={() => addToRoadmapQuick(`Start: ${quest.name}`, quest.icon, '', `${quest.description} — potential ${quest.potentialIncome}`)} style={{ padding: '4px 10px', background: theme.purple + '20', color: theme.purple, border: '1px solid ' + theme.purple + '40', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>+ Roadmap</button>
                       </div>
                       {isExp && (
-                        <div style={{ marginTop: '14px', padding: '14px', background: darkMode ? '#0f172a' : '#f1f5f9', borderRadius: '8px' }}>
+                        <div style={{ marginTop: '14px', padding: '14px', background: darkMode ? 'theme.bg' : 'theme.text', borderRadius: '8px' }}>
                           <div style={{ background: theme.success + '15', padding: '10px', borderRadius: '8px', marginBottom: '12px', borderLeft: '3px solid ' + theme.success }}>
                             <p style={{ margin: 0, color: theme.text, fontSize: '13px', lineHeight: 1.6 }}>💡 {quest.aureusAdvice}</p>
                           </div>
@@ -3960,28 +3942,28 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             </div>
 
             {/* Rat Race Escape Tracker */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, theme.cardBg 0%, theme.bg 100%)', borderRadius: '20px', border: '1px solid theme.border' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                 <div>
                   <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px' }}>🐀 RAT RACE ESCAPE TRACKER</div>
-                  <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>Passive income as % of monthly expenses</div>
+                  <div style={{ color: 'theme.textMuted', fontSize: '12px', marginTop: '4px' }}>Passive income as % of monthly expenses</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ fontSize: '44px', fontWeight: 'bold', color: (passiveIncome + totalPassiveQuestIncome) >= fiPath.monthlyNeed ? theme.success : '#f59e0b' }}>
+                  <div style={{ fontSize: '44px', fontWeight: 'bold', color: (passiveIncome + totalPassiveQuestIncome) >= fiPath.monthlyNeed ? theme.success : '#D4AF37' }}>
                     {fiPath.monthlyNeed > 0 ? (((passiveIncome + totalPassiveQuestIncome) / fiPath.monthlyNeed) * 100).toFixed(1) : '0.0'}%
                   </div>
                   <button onClick={() => addToRoadmapQuick('Escape the Rat Race', '🐀', (fiPath.monthlyNeed * 12 * 25).toFixed(0), 'Build passive income to cover 100% of expenses')} style={{ padding: '8px 12px', background: theme.warning + '20', color: theme.warning, border: '1px solid ' + theme.warning + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>+ Roadmap</button>
                 </div>
               </div>
-              <div style={{ height: '14px', background: '#334155', borderRadius: '7px', overflow: 'hidden', marginBottom: '12px' }}>
-                <div style={{ width: Math.min(((passiveIncome + totalPassiveQuestIncome) / Math.max(fiPath.monthlyNeed, 1)) * 100, 100) + '%', height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #10b981)', borderRadius: '7px' }} />
+              <div style={{ height: '14px', background: 'theme.border', borderRadius: '7px', overflow: 'hidden', marginBottom: '12px' }}>
+                <div style={{ width: Math.min(((passiveIncome + totalPassiveQuestIncome) / Math.max(fiPath.monthlyNeed, 1)) * 100, 100) + '%', height: '100%', background: 'linear-gradient(90deg, #D4AF37, #B68B2E)', borderRadius: '7px' }} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-                {[{ pct: 25, label: 'Side income', color: '#94a3b8' }, { pct: 50, label: 'Half covered', color: '#f59e0b' }, { pct: 75, label: 'Almost free', color: '#8b5cf6' }, { pct: 100, label: 'Escaped! 🎉', color: '#10b981' }].map(ms => {
+                {[{ pct: 25, label: 'Side income', color: 'theme.textMuted' }, { pct: 50, label: 'Half covered', color: '#D4AF37' }, { pct: 75, label: 'Almost free', color: '#D4AF37' }, { pct: 100, label: 'Escaped! 🎉', color: '#B68B2E' }].map(ms => {
                   const current = fiPath.monthlyNeed > 0 ? ((passiveIncome + totalPassiveQuestIncome) / fiPath.monthlyNeed) * 100 : 0
                   const reached = current >= ms.pct
                   return (
-                    <div key={ms.pct} style={{ padding: '10px', background: reached ? ms.color + '20' : '#1e293b', borderRadius: '8px', border: '1px solid ' + (reached ? ms.color : '#334155'), textAlign: 'center' as const }}>
+                    <div key={ms.pct} style={{ padding: '10px', background: reached ? ms.color + '20' : 'theme.cardBg', borderRadius: '8px', border: '1px solid ' + (reached ? ms.color : 'theme.border'), textAlign: 'center' as const }}>
                       <div style={{ color: reached ? ms.color : '#64748b', fontWeight: 700 }}>{ms.pct}%</div>
                       <div style={{ color: reached ? ms.color : '#64748b', fontSize: '10px', marginTop: '2px' }}>{reached ? '✓ ' : ''}{ms.label}</div>
                     </div>
@@ -3991,13 +3973,13 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             </div>
 
             {/* Australian Home Buying Roadmap */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '20px', border: '1px solid #334155' }}>
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, theme.cardBg 0%, theme.bg 100%)', borderRadius: '20px', border: '1px solid theme.border' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: 'linear-gradient(135deg, #f59e0b, #10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>🏠</div>
+                  <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: 'linear-gradient(135deg, #D4AF37, #B68B2E)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>🏠</div>
                   <div>
-                    <h2 style={{ margin: 0, color: '#f1f5f9', fontSize: '22px' }}>Australian Home Buying Roadmap</h2>
-                    <p style={{ margin: '4px 0 0 0', color: '#94a3b8', fontSize: '13px' }}>Expand each phase · Add phases to your personal roadmap</p>
+                    <h2 style={{ margin: 0, color: 'theme.text', fontSize: '22px' }}>Australian Home Buying Roadmap</h2>
+                    <p style={{ margin: '4px 0 0 0', color: 'theme.textMuted', fontSize: '13px' }}>Expand each phase · Add phases to your personal roadmap</p>
                   </div>
                 </div>
                 <button onClick={() => addToRoadmapQuick('Buy My First Home', '🏠', '120000', 'Deposit + costs for property purchase')} style={{ padding: '8px 14px', background: theme.warning + '20', color: theme.warning, border: '1px solid ' + theme.warning + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>+ Add to Roadmap</button>
@@ -4010,9 +3992,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 { id: 'phase4', num: '4', icon: '🏦', title: 'Get Pre-Approved', color: theme.success, items: ['Pre-approval shows sellers you\'re serious — valid ~90 days', 'Use a mortgage broker: access 40+ lenders, free to you (paid by bank)', 'Bring: 3 months payslips, 3 months bank statements, tax returns, ID', 'Understand variable (flexible) vs fixed rate (certainty)', 'Ask about offset accounts — critical for accelerating payoff', 'Compare comparison rates, not just advertised rates', 'Get pre-approval BEFORE falling in love with a property'] },
                 { id: 'phase5', num: '5', icon: '🎯', title: 'Buy Smart & Pay It Off Fast', color: theme.danger, items: ['Research suburbs: price trends, yield, infrastructure, school catchments', 'Buy slightly below your max borrowing capacity — buffer for rate rises', 'Switch to fortnightly repayments immediately — saves 3–4 years', 'Open an offset account and park all savings there from day one', 'Direct tax returns, bonuses, and windfalls straight to mortgage', 'Review your rate every 2 years — don\'t pay the loyalty tax', 'Use the Mortgage Accelerator tab to see exactly what extra payments save you'] },
               ].map(phase => (
-                <div key={phase.id} style={{ marginBottom: '10px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + (homeGuideExpanded === phase.id ? phase.color : '#334155') }}>
+                <div key={phase.id} style={{ marginBottom: '10px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + (homeGuideExpanded === phase.id ? phase.color : 'theme.border') }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px 0 0' }}>
-                    <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === phase.id ? null : phase.id)} style={{ flex: 1, padding: '14px 16px', background: homeGuideExpanded === phase.id ? phase.color + '20' : '#1e293b', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left' as const }}>
+                    <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === phase.id ? null : phase.id)} style={{ flex: 1, padding: '14px 16px', background: homeGuideExpanded === phase.id ? phase.color + '20' : 'theme.cardBg', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left' as const }}>
                       <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: phase.color + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{phase.icon}</div>
                       <div>
                         <div style={{ color: phase.color, fontWeight: 700, fontSize: '14px' }}>Phase {phase.num}: {phase.title}</div>
@@ -4023,11 +4005,11 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     <button onClick={() => addToRoadmapQuick(`Home Buying Phase ${phase.num}: ${phase.title}`, phase.icon, '', phase.items[0])} style={{ padding: '6px 10px', background: phase.color + '20', color: phase.color, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, flexShrink: 0 }}>+ Roadmap</button>
                   </div>
                   {homeGuideExpanded === phase.id && (
-                    <div style={{ padding: '0 16px 16px 16px', background: '#0f172a' }}>
-                      <div style={{ height: '1px', background: '#334155', marginBottom: '14px' }} />
+                    <div style={{ padding: '0 16px 16px 16px', background: 'theme.bg' }}>
+                      <div style={{ height: '1px', background: 'theme.border', marginBottom: '14px' }} />
                       <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
                         {phase.items.map((item, i) => (
-                          <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', background: '#1e293b', borderRadius: '8px' }}>
+                          <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', background: 'theme.cardBg', borderRadius: '8px' }}>
                             <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: phase.color + '30', color: phase.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', flexShrink: 0 }}>{i + 1}</div>
                             <div style={{ color: '#e2e8f0', fontSize: '13px', lineHeight: 1.5 }}>{item}</div>
                           </div>
@@ -4035,11 +4017,11 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       </div>
                       {phase.id === 'phase5' && <button onClick={() => setActiveTab('mortgage')} style={{ ...btnSuccess, width: '100%', marginTop: '12px' }}>🚀 Open Mortgage Accelerator →</button>}
                       {phase.id === 'phase3' && (
-                        <div style={{ marginTop: '12px', padding: '12px', background: '#1e293b', borderRadius: '8px' }}>
-                          <div style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 600, marginBottom: '8px' }}>📊 Stamp Duty Quick Reference</div>
+                        <div style={{ marginTop: '12px', padding: '12px', background: 'theme.cardBg', borderRadius: '8px' }}>
+                          <div style={{ color: 'theme.textMuted', fontSize: '11px', fontWeight: 600, marginBottom: '8px' }}>📊 Stamp Duty Quick Reference</div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                             {Object.entries(australianHomeData.stampDuty).map(([state, data]: [string, any]) => (
-                              <div key={state} style={{ padding: '8px', background: '#0f172a', borderRadius: '6px' }}>
+                              <div key={state} style={{ padding: '8px', background: 'theme.bg', borderRadius: '6px' }}>
                                 <div style={{ color: theme.accent, fontWeight: 700, fontSize: '12px', marginBottom: '2px' }}>{state}</div>
                                 <div style={{ color: '#64748b', fontSize: '11px' }}>{data.firstHome}</div>
                               </div>
@@ -4235,8 +4217,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             </div>
 
             {/* COMMUNITY STATS */}
-            <div style={{ padding: '20px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: '16px', border: '1px solid #334155' }}>
-              <h3 style={{ margin: '0 0 16px 0', color: '#f1f5f9', fontSize: '18px' }}>🌏 You're Not Alone</h3>
+            <div style={{ padding: '20px', background: 'linear-gradient(135deg, theme.cardBg, theme.bg)', borderRadius: '16px', border: '1px solid theme.border' }}>
+              <h3 style={{ margin: '0 0 16px 0', color: 'theme.text', fontSize: '18px' }}>🌏 You're Not Alone</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
                 {[
                   { stat: '847', label: 'users on Baby Step 2 right now', sub: 'Average completion: 14 months' },
@@ -4244,7 +4226,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   { stat: '4.2×', label: 'faster debt payoff with weekly check-ins', sub: 'vs. users who skip them' },
                   { stat: '91%', label: 'of users feel less stressed after 30 days', sub: 'Based on check-in data' },
                 ].map((item, i) => (
-                  <div key={i} style={{ padding: '14px', background: '#1e293b', borderRadius: '10px' }}>
+                  <div key={i} style={{ padding: '14px', background: 'theme.cardBg', borderRadius: '10px' }}>
                     <div style={{ color: theme.success, fontSize: '22px', fontWeight: 800, marginBottom: '4px' }}>{item.stat}</div>
                     <div style={{ color: '#e2e8f0', fontSize: '13px', marginBottom: '2px' }}>{item.label}</div>
                     <div style={{ color: '#64748b', fontSize: '11px' }}>{item.sub}</div>
@@ -4295,20 +4277,20 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
                     <defs>
                       <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10b981" stopOpacity="0.3"/>
-                        <stop offset="100%" stopColor="#10b981" stopOpacity="0"/>
+                        <stop offset="0%" stopColor="#B68B2E" stopOpacity="0.3"/>
+                        <stop offset="100%" stopColor="#B68B2E" stopOpacity="0"/>
                       </linearGradient>
                     </defs>
                     <path d={`${pathD} L${points[points.length-1].x},${H-PAD} L${points[0].x},${H-PAD} Z`} fill="url(#chartGrad)" />
-                    <path d={pathD} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
+                    <path d={pathD} fill="none" stroke="#B68B2E" strokeWidth="2.5" strokeLinecap="round" />
                     {points.map((p, i) => (
                       <g key={i}>
-                        <circle cx={p.x} cy={p.y} r="5" fill={p.projected ? '#f59e0b' : '#10b981'} />
+                        <circle cx={p.x} cy={p.y} r="5" fill={p.projected ? '#D4AF37' : '#B68B2E'} />
                         <text x={p.x} y={H - 8} textAnchor="middle" fill="#64748b" fontSize="11">{p.date}</text>
-                        <text x={p.x} y={p.y - 10} textAnchor="middle" fill={p.projected ? '#f59e0b' : '#10b981'} fontSize="10">${Math.round(p.value / 1000)}k</text>
+                        <text x={p.x} y={p.y - 10} textAnchor="middle" fill={p.projected ? '#D4AF37' : '#B68B2E'} fontSize="10">${Math.round(p.value / 1000)}k</text>
                       </g>
                     ))}
-                    <line x1={PAD} y1={H-PAD} x2={W-PAD} y2={H-PAD} stroke="#334155" strokeWidth="1"/>
+                    <line x1={PAD} y1={H-PAD} x2={W-PAD} y2={H-PAD} stroke="theme.border" strokeWidth="1"/>
                   </svg>
                 )
               })()}
@@ -4433,25 +4415,27 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
                     <div>
                       <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px', fontWeight: 600 }}>💰 WEEKLY MONEY DATE</div>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
-                        {['sunday','monday','tuesday','wednesday','thursday','friday','saturday'].map(day => (
-                          <button key={day} onClick={() => setCheckInSchedule(s => ({ ...s, moneyDateDay: day }))}
-                            style={{ padding: '6px 12px', background: checkInSchedule.moneyDateDay === day ? theme.success : theme.cardBg, color: checkInSchedule.moneyDateDay === day ? 'white' : theme.textMuted, border: '1px solid ' + (checkInSchedule.moneyDateDay === day ? theme.success : theme.border), borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, textTransform: 'capitalize' as const }}>
-                            {day.slice(0,3)}
-                          </button>
-                        ))}
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const, alignItems: 'center', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px' }}>
+                          <label style={{ color: theme.textMuted, fontSize: '11px' }}>Day of week</label>
+                          <select value={checkInSchedule.moneyDateDay} onChange={e => setCheckInSchedule(s => ({ ...s, moneyDateDay: e.target.value }))} style={{ ...inputStyle, minWidth: '130px' }}>
+                            {['sunday','monday','tuesday','wednesday','thursday','friday','saturday'].map(day => (
+                              <option key={day} value={day}>{day.charAt(0).toUpperCase() + day.slice(1)}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px' }}>
+                          <label style={{ color: theme.textMuted, fontSize: '11px' }}>Time</label>
+                          <input type="time" value={checkInSchedule.moneyDateTime} onChange={e => setCheckInSchedule(s => ({ ...s, moneyDateTime: e.target.value }))} style={{ ...inputStyle, width: '130px' }} />
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <label style={{ color: theme.textMuted, fontSize: '12px', flexShrink: 0 }}>At time:</label>
-                        <input type="time" value={checkInSchedule.moneyDateTime} onChange={e => setCheckInSchedule(s => ({ ...s, moneyDateTime: e.target.value }))} style={{ ...inputStyle, width: '130px' }} />
-                        <span style={{ color: theme.textMuted, fontSize: '11px' }}>shown as badge when due</span>
-                      </div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px' }}>A badge appears in the header when your money date is due</div>
                     </div>
                     <div style={{ borderTop: '1px solid ' + theme.border, paddingTop: '14px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                         <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>✅ DAILY CHECK-IN</div>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                          <input type="checkbox" checked={checkInSchedule.dailyEnabled} onChange={e => setCheckInSchedule(s => ({ ...s, dailyEnabled: e.target.checked }))} style={{ accentColor: theme.accent }} />
+                          <input type="checkbox" checked={checkInSchedule.dailyEnabled} onChange={e => setCheckInSchedule(s => ({ ...s, dailyEnabled: e.target.checked }))} style={{ #D4AF37 }} />
                           <span style={{ color: theme.text, fontSize: '12px' }}>{checkInSchedule.dailyEnabled ? 'Enabled' : 'Disabled'}</span>
                         </label>
                       </div>
@@ -4643,7 +4627,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         {/* OVERVIEW */}
         {activeTab === 'overview' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: '20px', border: '1px solid #334155' }}>
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, theme.cardBg, theme.bg)', borderRadius: '20px', border: '1px solid theme.border' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px' }}>FINANCIAL HEALTH SCORE</div>
                 <div style={{ fontSize: '48px', fontWeight: 700, color: financialHealthScore >= 70 ? theme.success : financialHealthScore >= 40 ? theme.warning : theme.danger }}>{financialHealthScore}</div>
@@ -4747,7 +4731,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             <h3 style={{ margin: '0 0 16px 0', color: theme.text }}>{calendarMonth.toLocaleDateString('en-AU', { month: 'long' })} {expandedDay.day}</h3>
             {expandedDay.items.map(item => (
               <div key={item.itemId} style={{ padding: '12px', marginBottom: '8px', background: item.itemType === 'income' ? '#d1fae5' : item.itemType === 'goal' ? '#ede9fe' : item.itemType === 'expense' ? '#dbeafe' : '#fee2e2', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: item.isPaid ? 0.6 : 1 }}>
-                <div><div style={{ fontWeight: 600, color: '#1e293b' }}>{item.name}</div><div style={{ fontSize: '12px', color: '#64748b' }}>${item.amount}{item.itemType === 'goal' && !item.isPaid ? <span style={{ color: '#8b5cf6', marginLeft: '6px' }}>→ adds to progress</span> : null}</div></div>
+                <div><div style={{ fontWeight: 600, color: 'theme.cardBg' }}>{item.name}</div><div style={{ fontSize: '12px', color: '#64748b' }}>${item.amount}{item.itemType === 'goal' && !item.isPaid ? <span style={{ color: '#D4AF37', marginLeft: '6px' }}>→ adds to progress</span> : null}</div></div>
                 <button onClick={() => togglePaid(item.itemId, item)} style={{ padding: '8px 16px', background: item.isPaid ? '#6b7280' : theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{item.isPaid ? '✓ Done' : 'Mark Done'}</button>
               </div>
             ))}
@@ -4791,7 +4775,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
                 <button onClick={() => setSelectedBabyStep(null)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
               </div>
-              <div style={{ background: darkMode ? '#1e293b' : '#f0fdf4', borderRadius: '12px', padding: '16px', marginBottom: '20px', borderLeft: '4px solid ' + theme.success }}>
+              <div style={{ background: darkMode ? 'theme.cardBg' : '#f0fdf4', borderRadius: '12px', padding: '16px', marginBottom: '20px', borderLeft: '4px solid ' + theme.success }}>
                 <p style={{ margin: 0, color: theme.text, fontSize: '14px', lineHeight: 1.7 }}>💡 <strong>Aureus says:</strong> {step.aureusAdvice}</p>
               </div>
               <h4 style={{ color: theme.text, margin: '0 0 12px 0' }}>✅ Key tips:</h4>
@@ -4861,7 +4845,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             {/* Step 0: Welcome */}
             {onboardingStep === 0 && (
               <div style={{ textAlign: 'center' as const }}>
-                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: '40px', fontWeight: 800, color: '#78350f' }}>A</div>
+                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: '40px', fontWeight: 800, color: '#0a0a0a' }}>A</div>
                 <h2 style={{ color: theme.text, fontSize: '28px', margin: '0 0 12px 0' }}>G'day! I'm Aureus.</h2>
                 <p style={{ color: theme.textMuted, fontSize: '16px', lineHeight: 1.7, marginBottom: '24px' }}>Your AI financial coach — built to help you pay your mortgage off faster, eliminate debt, and build real wealth. Let me learn about how you think about money so I can coach you properly.</p>
                 <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '28px' }}>Takes about 5 minutes. Everything is stored only on your device.</p>
@@ -5558,10 +5542,13 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
       </footer>
 
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #0a0a0a; }
+        h1, h2, h3, .aureus-heading { font-family: 'Cinzel', serif; }
         @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
         @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #3a2e1e; border-radius: 3px; }
       `}</style>
     </div>
   )
