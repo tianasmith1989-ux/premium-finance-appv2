@@ -2853,9 +2853,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       const freq = e.target.value
                       // Pre-select next Monday for weekly/fortnightly, 1st for monthly
                       const defaultDate = freq === 'weekly' || freq === 'fortnightly'
-                        ? dateForDayOfWeek(1) // next Monday
+                        ? nextDayOfWeek(1) // next Monday
                         : freq === 'monthly' || freq === 'yearly'
-                        ? dateForDayOfMonth(1)
+                        ? nextDayOfMonth(1)
                         : new Date().toISOString().split('T')[0]
                       setNewIncome({...newIncome, frequency: freq, startDate: defaultDate})
                     }} style={inputStyle}>
@@ -2935,8 +2935,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     <select value={newExpense.frequency} onChange={e => {
                       const freq = e.target.value
                       const defaultDate = freq === 'weekly' || freq === 'fortnightly'
-                        ? dateForDayOfWeek(1)
-                        : dateForDayOfMonth(1)
+                        ? nextDayOfWeek(1)
+                        : nextDayOfMonth(1)
                       setNewExpense({...newExpense, frequency: freq, dueDate: defaultDate})
                     }} style={inputStyle}>
                       <option value="weekly">Weekly</option>
@@ -3036,8 +3036,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     <select value={newDebt.frequency} onChange={e => {
                       const freq = e.target.value
                       const defaultDate = freq === 'weekly' || freq === 'fortnightly'
-                        ? dateForDayOfWeek(1)
-                        : dateForDayOfMonth(1)
+                        ? nextDayOfWeek(1)
+                        : nextDayOfMonth(1)
                       setNewDebt({...newDebt, frequency: freq, paymentDate: defaultDate})
                     }} style={inputStyle}>
                       <option value="weekly">Weekly</option>
