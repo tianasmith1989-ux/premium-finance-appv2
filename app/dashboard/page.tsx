@@ -366,7 +366,18 @@ export default function Dashboard() {
       if (data.chatMessages) setChatMessages(data.chatMessages)
       if (data.userCountry) setUserCountry(data.userCountry)
       // New fields
-      if (data.wins) setWins(data.wins)
+      if (data.wins) {
+        // Clean up any stale auto-wins that fired before expenses were entered (e.g. "saving 100% of income")
+        const cleanedWins = data.wins.filter((w: any) => {
+          if (w.title === '20% savings rate achieved' && w.desc && /saving \d+% of your income/.test(w.desc)) {
+            const pct = parseInt(w.desc.match(/saving (\d+)%/)?.[1] || '0')
+            return pct < 95 // remove if suspiciously high (was fired before expenses set)
+          }
+          if (w.title === 'Positive monthly surplus' && w.desc && !/bills/.test(w.desc)) return false // old format
+          return true
+        })
+        setWins(cleanedWins)
+      }
       if (data.streak !== undefined) setStreak(data.streak)
       if (data.lastCheckIn) setLastCheckIn(data.lastCheckIn)
       if (data.whyStatement) setWhyStatement(data.whyStatement)
@@ -420,7 +431,11 @@ export default function Dashboard() {
   const totalAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || '0'), 0)
   const totalLiabilities = liabilities.reduce((sum, l) => sum + parseFloat(l.value || '0'), 0)
   const netWorth = totalAssets - totalLiabilities - totalDebtBalance
-  const savingsRate = monthlyIncome > 0 ? (monthlySurplus / monthlyIncome * 100) : 0
+  // savingsRate = intentional savings rate: goal contributions as % of income
+  // surplus rate (unspent) is tracked separately
+  const intentionalSavingsRate = monthlyIncome > 0 ? (monthlyGoalSavings / monthlyIncome * 100) : 0
+  const surplusRate = monthlyIncome > 0 ? (Math.max(0, monthlySurplus) / monthlyIncome * 100) : 0
+  const savingsRate = monthlyIncome > 0 ? ((monthlyGoalSavings + Math.max(0, monthlySurplus)) / monthlyIncome * 100) : 0
   const passiveCoverage = monthlyExpenses > 0 ? (passiveIncome / monthlyExpenses * 100) : 0
   const emergencyFund = assets.filter(a => a.type === 'savings').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
   const emergencyMonths = monthlyExpenses > 0 ? emergencyFund / monthlyExpenses : 0
@@ -555,8 +570,8 @@ export default function Dashboard() {
     const existingTitles = wins.map(w => w.title)
 
     if (incomeStreams.length >= 1 && !existingTitles.includes('First income added')) newWinsList.push({ id: Date.now() + 1, title: 'First income added', desc: 'You set up your financial picture — that\'s step one!', icon: '💰', auto: true, date: new Date().toISOString() })
-    if (monthlySurplus > 0 && incomeStreams.length > 0 && !existingTitles.includes('Positive monthly surplus')) newWinsList.push({ id: Date.now() + 2, title: 'Positive monthly surplus', desc: `You have $${monthlySurplus.toFixed(0)}/month left over — that's money working for you.`, icon: '🟢', auto: true, date: new Date().toISOString() })
-    if (savingsRate >= 20 && !existingTitles.includes('20% savings rate achieved')) newWinsList.push({ id: Date.now() + 3, title: '20% savings rate achieved', desc: `You're saving ${savingsRate.toFixed(0)}% of your income — well above the average Australian!`, icon: '🏆', auto: true, date: new Date().toISOString() })
+    if (monthlySurplus > 0 && incomeStreams.length > 0 && expenses.length > 0 && !existingTitles.includes('Positive monthly surplus')) newWinsList.push({ id: Date.now() + 2, title: 'Positive monthly surplus', desc: `You have $${monthlySurplus.toFixed(0)}/month left over after all bills, debts and goals — that's money working for you.`, icon: '🟢', auto: true, date: new Date().toISOString() })
+    if (intentionalSavingsRate >= 20 && expenses.length > 0 && !existingTitles.includes('20% savings rate achieved')) newWinsList.push({ id: Date.now() + 3, title: '20% savings rate achieved', desc: `You're directing ${intentionalSavingsRate.toFixed(0)}% of your income to savings goals — well above the average Australian!`, icon: '🏆', auto: true, date: new Date().toISOString() })
     if (emergencyFund >= 2000 && !existingTitles.includes('Starter emergency fund complete')) newWinsList.push({ id: Date.now() + 4, title: 'Starter emergency fund complete', desc: 'Your $2,000 financial airbag is in place. You\'re protected.', icon: '🛡️', auto: true, date: new Date().toISOString() })
     if (emergencyMonths >= 3 && !existingTitles.includes('3-month emergency fund reached')) newWinsList.push({ id: Date.now() + 5, title: '3-month emergency fund reached', desc: `${emergencyMonths.toFixed(1)} months of expenses saved — that's real security.`, icon: '🏦', auto: true, date: new Date().toISOString() })
     if (netWorth > 0 && !existingTitles.includes('Positive net worth')) newWinsList.push({ id: Date.now() + 6, title: 'Positive net worth', desc: `You own more than you owe. Net worth: $${netWorth.toLocaleString()}`, icon: '📈', auto: true, date: new Date().toISOString() })
@@ -570,7 +585,7 @@ export default function Dashboard() {
       setCelebrationWin(newWinsList[0].title)
       setTimeout(() => setCelebrationWin(null), 4000)
     }
-  }, [incomeStreams, monthlySurplus, savingsRate, emergencyFund, emergencyMonths, netWorth, goals, debts, assets, roadmapMilestones, wins])
+  }, [incomeStreams, monthlySurplus, savingsRate, intentionalSavingsRate, emergencyFund, emergencyMonths, netWorth, goals, debts, assets, roadmapMilestones, wins])
 
   useEffect(() => {
     if (incomeStreams.length > 0) detectAutoWins()
