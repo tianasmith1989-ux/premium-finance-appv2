@@ -4295,7 +4295,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                               savingsFrequency: 'monthly',
                                               startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(),
                                               deadline: m.targetDate || '',
-                                              addedToCalendar: true
+                                              addedToCalendar: true,
+                                              interestRate: ''
                                             })
                                             togglePlanStep(m.id, step.id)
                                             setActiveTab('dashboard')
