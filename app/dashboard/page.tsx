@@ -245,20 +245,20 @@ export default function Dashboard() {
 
   // ==================== THEME ====================
   const theme = {
-    bg: darkMode ? '#0f172a' : '#f8fafc',
-    cardBg: darkMode ? '#1e293b' : 'white',
-    text: darkMode ? '#f1f5f9' : '#1e293b',
-    textMuted: darkMode ? '#94a3b8' : '#64748b',
-    border: darkMode ? '#334155' : '#e2e8f0',
-    input: darkMode ? '#334155' : '#ffffff',
-    inputBorder: darkMode ? '#475569' : '#cbd5e1',
-    accent: '#3b82f6',
-    success: '#10b981',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    purple: '#8b5cf6',
-    teal: '#14b8a6',
-    orange: '#f97316'
+    bg: '#0a0e27',
+    cardBg: '#1a1f3a',
+    text: '#f5f1e8',
+    textMuted: '#b8a878',
+    border: '#2d2416',
+    input: '#1a1f3a',
+    inputBorder: '#4a3f2f',
+    accent: '#d4af37',
+    success: '#b8a878',
+    warning: '#d4af37',
+    danger: '#c41e3a',
+    purple: '#8b7355',
+    teal: '#6b5b4a',
+    orange: '#d4af37'
   }
 
   const inputStyle: React.CSSProperties = { padding: '10px 14px', border: '2px solid ' + theme.inputBorder, borderRadius: '8px', fontSize: '14px', background: theme.input, color: theme.text, outline: 'none' }
