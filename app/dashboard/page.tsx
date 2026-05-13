@@ -148,7 +148,7 @@ export default function Dashboard() {
   const [payoffMethod, setPayoffMethod] = useState<'snowball' | 'avalanche'>('avalanche')
   const [debtExtraPayment, setDebtExtraPayment] = useState('')
   const [goals, setGoals] = useState<any[]>([])
-  const [newGoal, setNewGoal] = useState({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'weekly', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(), paymentAmount: '' })
+  const [newGoal, setNewGoal] = useState({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(), paymentAmount: '', addedToCalendar: true })
   const [assets, setAssets] = useState<any[]>([])
   const [newAsset, setNewAsset] = useState({ name: '', value: '', type: 'savings' })
   const [liabilities, setLiabilities] = useState<any[]>([])
@@ -744,7 +744,7 @@ export default function Dashboard() {
     }
     return { months, totalInterest, years: (months / 12) }
   }
-  const addGoal = () => { if (!newGoal.name || !newGoal.target) return; setGoals([...goals, { ...newGoal, id: Date.now() }]); setNewGoal({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(), paymentAmount: '' }) }
+  const addGoal = () => { if (!newGoal.name || !newGoal.target) return; setGoals([...goals, { ...newGoal, id: Date.now(), addedToCalendar: true }]); setNewGoal({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(), paymentAmount: '', addedToCalendar: true }) }
   const deleteGoal = (id: number) => setGoals(goals.filter(g => g.id !== id))
   const addAsset = () => { if (!newAsset.name || !newAsset.value) return; setAssets([...assets, { ...newAsset, id: Date.now() }]); setNewAsset({ name: '', value: '', type: 'savings' }) }
   const deleteAsset = (id: number) => setAssets(assets.filter(a => a.id !== id))
@@ -3427,23 +3427,19 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 })()}
               </div>
               <div style={cardStyle} data-section="goals">
-                <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🎯 Goals</h3>
+                <h3 style={{ margin: '0 0 16px 0', color: theme.accent, fontSize: '18px' }}>🎯 Goals</h3>
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', marginBottom: '12px', padding: '12px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
                     <input placeholder="Goal name" value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '120px'}} />
                     <input placeholder="Target $" type="number" value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})} style={{...inputStyle, width: '90px'}} />
-                    <input placeholder="Saved $" type="number" value={newGoal.saved} onChange={e => setNewGoal({...newGoal, saved: e.target.value})} style={{...inputStyle, width: '80px'}} />
+                    <input placeholder="Already saved $" type="number" value={newGoal.saved} onChange={e => setNewGoal({...newGoal, saved: e.target.value})} style={{...inputStyle, width: '100px'}} />
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, alignItems: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', flex: 1, minWidth: '140px' }}>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>START DATE</label>
-                      <input type="date" value={newGoal.startDate} onChange={e => setNewGoal({...newGoal, startDate: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, alignItems: 'flex-end' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', flex: 1, minWidth: '100px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>PAYMENT AMOUNT $</label>
+                      <input type="number" placeholder="e.g. 100" value={newGoal.paymentAmount} onChange={e => setNewGoal({...newGoal, paymentAmount: e.target.value})} style={{...inputStyle, width: '100%'}} />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', flex: 1, minWidth: '140px' }}>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>TARGET DATE</label>
-                      <input type="date" value={newGoal.deadline} onChange={e => setNewGoal({...newGoal, deadline: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', minWidth: '110px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', minWidth: '120px' }}>
                       <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>FREQUENCY</label>
                       <select value={newGoal.savingsFrequency} onChange={e => setNewGoal({...newGoal, savingsFrequency: e.target.value})} style={inputStyle}>
                         <option value="weekly">Weekly</option>
@@ -3451,17 +3447,41 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         <option value="monthly">Monthly</option>
                       </select>
                     </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', flex: 1, minWidth: '120px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>START DATE</label>
+                      <input type="date" value={newGoal.startDate} onChange={e => setNewGoal({...newGoal, startDate: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', flex: 1, minWidth: '120px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>TARGET DATE</label>
+                      <input type="date" value={newGoal.deadline} onChange={e => setNewGoal({...newGoal, deadline: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    </div>
                   </div>
-                  <button onClick={addGoal} style={{...btnPurple, alignSelf: 'flex-start' as const, padding: '8px 20px'}}>+ Add Goal</button>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: theme.textMuted, fontSize: '12px' }}>
+                      <input type="checkbox" checked={newGoal.addedToCalendar !== false} onChange={e => setNewGoal({...newGoal, addedToCalendar: e.target.checked})} style={{ accentColor: theme.accent, width: '14px', height: '14px' }} />
+                      📅 Show payments on calendar
+                    </label>
+                    <button onClick={addGoal} style={{...btnPurple, padding: '8px 20px'}}>+ Add Goal</button>
+                  </div>
                 </div>
-                <div style={{ maxHeight: '250px', overflowY: 'auto' as const }}>
+                <div style={{ maxHeight: '300px', overflowY: 'auto' as const }}>
                   {goals.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No goals yet</p> : goals.map(goal => {
                     const pct = (parseFloat(goal.saved || '0') / parseFloat(goal.target || '1')) * 100
                     return (
                       <div key={goal.id} style={{ padding: '12px', marginBottom: '8px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                          <div><div style={{ color: theme.text, fontWeight: 600 }}>{goal.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${parseFloat(goal.saved || '0').toFixed(0)} / ${parseFloat(goal.target || '0').toFixed(0)}</div></div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: theme.accent, fontWeight: 700 }}>{pct.toFixed(0)}%</span><button onClick={() => deleteGoal(goal.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button></div>
+                          <div>
+                            <div style={{ color: theme.text, fontWeight: 600 }}>{goal.name}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px' }}>
+                              ${parseFloat(goal.saved || '0').toFixed(0)} / ${parseFloat(goal.target || '0').toFixed(0)}
+                              {goal.paymentAmount && <span> · ${goal.paymentAmount}/{goal.savingsFrequency || 'monthly'}</span>}
+                              {goal.addedToCalendar ? <span style={{ color: theme.accent, marginLeft: '6px' }}>📅</span> : <span style={{ color: theme.textMuted, marginLeft: '6px' }}>no calendar</span>}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: theme.accent, fontWeight: 700 }}>{pct.toFixed(0)}%</span>
+                            <button onClick={() => deleteGoal(goal.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button>
+                          </div>
                         </div>
                         {(goal.startDate || goal.deadline) && (
                           <div style={{ display: 'flex', gap: '12px', marginBottom: '6px' }}>
@@ -4124,11 +4144,12 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                             setNewGoal({
                                               name: m.name,
                                               target: amt,
-                                              saved: m.currentAmount?.toString() || '0',
+                                              saved: '0',
                                               paymentAmount: suggestedPayment,
-                                              savingsFrequency: 'weekly',
+                                              savingsFrequency: 'monthly',
                                               startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(),
-                                              deadline: m.targetDate || ''
+                                              deadline: m.targetDate || '',
+                                              addedToCalendar: true
                                             })
                                             togglePlanStep(m.id, step.id)
                                             setActiveTab('dashboard')
