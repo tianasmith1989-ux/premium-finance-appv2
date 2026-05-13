@@ -146,6 +146,7 @@ export default function Dashboard() {
   const [debts, setDebts] = useState<any[]>([])
   const [newDebt, setNewDebt] = useState({ name: '', balance: '', interestRate: '', minPayment: '', frequency: 'monthly', paymentDate: (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })() })
   const [payoffMethod, setPayoffMethod] = useState<'snowball' | 'avalanche'>('avalanche')
+  const [debtExtraPayment, setDebtExtraPayment] = useState('')
   const [goals, setGoals] = useState<any[]>([])
   const [newGoal, setNewGoal] = useState({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'weekly', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(), paymentAmount: '' })
   const [assets, setAssets] = useState<any[]>([])
@@ -690,6 +691,59 @@ export default function Dashboard() {
   const deleteExpense = (id: number) => setExpenses(expenses.filter(e => e.id !== id))
   const addDebt = () => { if (!newDebt.name || !newDebt.balance) return; setDebts([...debts, { ...newDebt, id: Date.now(), originalBalance: newDebt.balance }]); setNewDebt({ name: '', balance: '', interestRate: '', minPayment: '', frequency: 'monthly', paymentDate: (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })() }) }
   const deleteDebt = (id: number) => setDebts(debts.filter(d => d.id !== id))
+
+  // ==================== DEBT PAYOFF SIMULATOR ====================
+  const simulateDebtPayoff = (extraMonthly: number, method: 'avalanche' | 'snowball') => {
+    if (debts.length === 0) return null
+    const toMonthly = (amt: number, freq: string) => {
+      if (freq === 'weekly') return amt * (52/12)
+      if (freq === 'fortnightly') return amt * (26/12)
+      return amt
+    }
+    // Build working copy of debts
+    let stack = debts
+      .filter(d => parseFloat(d.balance || '0') > 0)
+      .map(d => ({
+        name: d.name,
+        balance: parseFloat(d.balance || '0'),
+        rate: parseFloat(d.interestRate || '0') / 100 / 12,
+        minPayment: toMonthly(parseFloat(d.minPayment || '0'), d.frequency || 'monthly'),
+        interestPaid: 0
+      }))
+    if (stack.length === 0) return null
+
+    // Sort by method
+    stack = method === 'avalanche'
+      ? [...stack].sort((a, b) => b.rate - a.rate)
+      : [...stack].sort((a, b) => a.balance - b.balance)
+
+    let months = 0
+    let totalInterest = 0
+    const MAX_MONTHS = 600 // 50 year cap
+
+    while (stack.length > 0 && months < MAX_MONTHS) {
+      months++
+      let extra = extraMonthly
+      // Apply interest + min payments
+      for (const d of stack) {
+        const interest = d.balance * d.rate
+        d.interestPaid += interest
+        totalInterest += interest
+        d.balance += interest - d.minPayment
+        if (d.balance < 0) d.balance = 0
+      }
+      // Apply extra to focus debt (first in stack after sorting)
+      if (extra > 0 && stack[0]) {
+        stack[0].balance -= extra
+        if (stack[0].balance < 0) stack[0].balance = 0
+      }
+      // Remove paid-off debts, roll their payment into extra for next month
+      const paid = stack.filter(d => d.balance <= 0)
+      paid.forEach(d => { extra += d.minPayment }) // snowball/avalanche roll
+      stack = stack.filter(d => d.balance > 0)
+    }
+    return { months, totalInterest, years: (months / 12) }
+  }
   const addGoal = () => { if (!newGoal.name || !newGoal.target) return; setGoals([...goals, { ...newGoal, id: Date.now() }]); setNewGoal({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(), paymentAmount: '' }) }
   const deleteGoal = (id: number) => setGoals(goals.filter(g => g.id !== id))
   const addAsset = () => { if (!newAsset.name || !newAsset.value) return; setAssets([...assets, { ...newAsset, id: Date.now() }]); setNewAsset({ name: '', value: '', type: 'savings' }) }
@@ -2011,14 +2065,24 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     </div>
                     <div>
                       <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Paid</label>
-                      <select value={newIncome.frequency} onChange={e => setNewIncome({...newIncome, frequency: e.target.value})} style={{...inputStyle, width: '100%'}}>
+                      <select value={newIncome.frequency} onChange={e => {
+                        const freq = e.target.value
+                        const defaultDate = freq === 'weekly' || freq === 'fortnightly' ? nextDayOfWeek(1) : nextDayOfMonth(1)
+                        setNewIncome({...newIncome, frequency: freq, startDate: defaultDate})
+                      }} style={{...inputStyle, width: '100%'}}>
                         <option value="weekly">Weekly</option>
                         <option value="fortnightly">Fortnightly</option>
                         <option value="monthly">Monthly</option>
                       </select>
                     </div>
                   </div>
-                  <button onClick={() => { if (newIncome.name && newIncome.amount) { setIncomeStreams(prev => [...prev, { ...newIncome, id: Date.now(), type: 'active', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })() }]); setNewIncome({ name: '', amount: '', frequency: 'fortnightly', type: 'active', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })() }) } }} style={{ ...btnSuccess, padding: '12px' }}>
+                  <SmartDatePicker
+                    frequency={newIncome.frequency || 'fortnightly'}
+                    value={newIncome.startDate}
+                    onChange={v => setNewIncome({...newIncome, startDate: v})}
+                    label="When is your next payday?"
+                  />
+                  <button onClick={() => { if (newIncome.name && newIncome.amount) { setIncomeStreams(prev => [...prev, { ...newIncome, id: Date.now(), type: 'active' }]); setNewIncome({ name: '', amount: '', frequency: 'fortnightly', type: 'active', startDate: nextDayOfWeek(1) }) } }} style={{ ...btnSuccess, padding: '12px' }}>
                     + Add income source
                   </button>
                 </div>
@@ -2094,15 +2158,32 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
               {/* Custom expense */}
               <div style={{ width: '100%', padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, marginBottom: '20px' }}>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                  <input placeholder="Bill name" value={newExpense.name} onChange={e => setNewExpense({...newExpense, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
-                  <input type="number" placeholder="$" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{...inputStyle, width: '80px'}} />
-                  <select value={newExpense.frequency} onChange={e => setNewExpense({...newExpense, frequency: e.target.value})} style={inputStyle}>
-                    <option value="weekly">Weekly</option>
-                    <option value="fortnightly">Fortnightly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                  <button onClick={() => { if (newExpense.name && newExpense.amount) { setExpenses(prev => [...prev, { ...newExpense, id: Date.now(), dueDate: (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })() }]); setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })() }) } }} style={btnDanger}>+</button>
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                    <input placeholder="Bill name" value={newExpense.name} onChange={e => setNewExpense({...newExpense, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
+                    <input type="number" placeholder="$" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{...inputStyle, width: '80px'}} />
+                    <select value={newExpense.frequency} onChange={e => {
+                      const freq = e.target.value
+                      const defaultDate = freq === 'weekly' || freq === 'fortnightly' ? nextDayOfWeek(1) : nextDayOfMonth(1)
+                      setNewExpense({...newExpense, frequency: freq, dueDate: defaultDate})
+                    }} style={inputStyle}>
+                      <option value="weekly">Weekly</option>
+                      <option value="fortnightly">Fortnightly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                  <SmartDatePicker
+                    frequency={newExpense.frequency || 'monthly'}
+                    value={newExpense.dueDate}
+                    onChange={v => setNewExpense({...newExpense, dueDate: v})}
+                    label="When is this bill due?"
+                  />
+                  <button onClick={() => {
+                    if (newExpense.name && newExpense.amount) {
+                      setExpenses(prev => [...prev, { ...newExpense, id: Date.now() }])
+                      setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: nextDayOfMonth(1) })
+                    }
+                  }} style={btnDanger}>+ Add bill</button>
                 </div>
               </div>
 
@@ -3022,7 +3103,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
                 <div style={{ maxHeight: '250px', overflowY: 'auto' as const }}>
                   {debts.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No debts — 🎉</p> : debts.map(debt => (
-                    <div key={debt.id} style={{ padding: '12px', marginBottom: '8px', background: darkMode ? '#3a2e1e' : '#fefce8', borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                    <div key={debt.id} style={{ padding: '12px', marginBottom: '8px', background: '#2a1a08', borderRadius: '10px', border: '1px solid ' + theme.border }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                         <div>
                           <div style={{ color: theme.text, fontWeight: 600 }}>{debt.name}</div>
@@ -3040,7 +3121,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         <div style={{ textAlign: 'right' as const, display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '4px' }}>
                           <div style={{ color: theme.warning, fontWeight: 700 }}>${parseFloat(debt.balance).toFixed(0)}</div>
                           <div style={{ display: 'flex', gap: '4px' }}>
-                            <button onClick={() => startEdit('debt', debt)} style={{ padding: '2px 6px', background: theme.accent, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>✏️</button>
+                            <button onClick={() => startEdit('debt', debt)} style={{ padding: '2px 6px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>✏️</button>
                             <button onClick={() => deleteDebt(debt.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button>
                           </div>
                         </div>
@@ -3075,6 +3156,105 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     </div>
                   ))}
                 </div>
+
+                {/* ── DEBT PAYOFF ACCELERATOR ── */}
+                {debts.length > 0 && (() => {
+                  const extra = parseFloat(debtExtraPayment || '0')
+                  const baseline = simulateDebtPayoff(0, payoffMethod)
+                  const withExtra = extra > 0 ? simulateDebtPayoff(extra, payoffMethod) : null
+                  const monthsSaved = withExtra ? (baseline?.months || 0) - withExtra.months : 0
+                  const interestSaved = withExtra ? (baseline?.totalInterest || 0) - withExtra.totalInterest : 0
+                  const fmtMo = (m: number) => m >= 12 ? `${Math.floor(m/12)}y ${m%12}m` : `${m}m`
+                  return (
+                    <div style={{ marginTop: '16px', padding: '16px', background: 'linear-gradient(135deg, #1a1208 0%, #0a0a0a 100%)', borderRadius: '12px', border: '1px solid ' + theme.accent + '40' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <div style={{ color: theme.accent, fontWeight: 700, fontSize: '13px', letterSpacing: '1px' }}>⚡ PAYOFF ACCELERATOR</div>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {(['avalanche', 'snowball'] as const).map(m => (
+                            <button key={m} onClick={() => setPayoffMethod(m)}
+                              style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 600, border: 'none', borderRadius: '6px', cursor: 'pointer', background: payoffMethod === m ? theme.accent : theme.border, color: payoffMethod === m ? '#0a0a0a' : theme.textMuted, textTransform: 'capitalize' as const }}>
+                              {m}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Baseline */}
+                      {baseline && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                          <div style={{ padding: '10px', background: theme.bg, borderRadius: '8px', textAlign: 'center' as const }}>
+                            <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '3px' }}>PAYOFF TIME</div>
+                            <div style={{ color: theme.warning, fontWeight: 700, fontSize: '18px' }}>{fmtMo(baseline.months)}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '10px' }}>min payments only</div>
+                          </div>
+                          <div style={{ padding: '10px', background: theme.bg, borderRadius: '8px', textAlign: 'center' as const }}>
+                            <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '3px' }}>TOTAL INTEREST</div>
+                            <div style={{ color: theme.danger, fontWeight: 700, fontSize: '18px' }}>${Math.round(baseline.totalInterest).toLocaleString()}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '10px' }}>min payments only</div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Extra payment input */}
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', flexShrink: 0 }}>+ Extra/mo:</div>
+                        <div style={{ position: 'relative' as const, flex: 1 }}>
+                          <span style={{ position: 'absolute' as const, left: '10px', top: '50%', transform: 'translateY(-50%)', color: theme.textMuted, fontSize: '13px' }}>$</span>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={debtExtraPayment}
+                            onChange={e => setDebtExtraPayment(e.target.value)}
+                            style={{ ...inputStyle, width: '100%', paddingLeft: '22px' }}
+                          />
+                        </div>
+                        {monthlySurplus > 0 && (
+                          <button onClick={() => setDebtExtraPayment(Math.floor(monthlySurplus * 0.5).toString())}
+                            style={{ padding: '6px 10px', background: theme.accent + '20', color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' as const }}>
+                            Use 50% surplus
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Results with extra */}
+                      {withExtra && monthsSaved > 0 && (
+                        <div style={{ padding: '14px', background: theme.accent + '10', borderRadius: '10px', border: '1px solid ' + theme.accent + '30' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                            <div style={{ textAlign: 'center' as const }}>
+                              <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>NEW PAYOFF TIME</div>
+                              <div style={{ color: theme.accent, fontWeight: 800, fontSize: '20px' }}>{fmtMo(withExtra.months)}</div>
+                            </div>
+                            <div style={{ textAlign: 'center' as const }}>
+                              <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>INTEREST SAVED</div>
+                              <div style={{ color: theme.accent, fontWeight: 800, fontSize: '20px' }}>${Math.round(interestSaved).toLocaleString()}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <div style={{ padding: '4px 10px', background: theme.accent + '20', borderRadius: '20px', color: theme.accent, fontSize: '12px', fontWeight: 600 }}>
+                              🗓️ {fmtMo(monthsSaved)} faster
+                            </div>
+                            <div style={{ padding: '4px 10px', background: theme.accent + '20', borderRadius: '20px', color: theme.accent, fontSize: '12px', fontWeight: 600 }}>
+                              💰 ${Math.round(interestSaved).toLocaleString()} saved
+                            </div>
+                          </div>
+                          <div style={{ marginTop: '10px', color: theme.textMuted, fontSize: '11px', textAlign: 'center' as const, lineHeight: 1.5 }}>
+                            Adding ${extra}/mo using <strong style={{ color: theme.accent }}>{payoffMethod}</strong> method — highest {payoffMethod === 'avalanche' ? 'interest rate' : 'momentum'} debt first
+                          </div>
+                        </div>
+                      )}
+
+                      {extra > 0 && monthsSaved <= 0 && withExtra && (
+                        <div style={{ padding: '10px', background: theme.success + '10', borderRadius: '8px', color: theme.success, fontSize: '12px', textAlign: 'center' as const }}>
+                          🎉 You're already paying ahead — debt cleared in {fmtMo(withExtra.months)}
+                        </div>
+                      )}
+
+                      <div style={{ marginTop: '10px', color: theme.textMuted, fontSize: '10px', textAlign: 'center' as const }}>
+                        ⚠️ Estimate only · assumes fixed rates & balances · not financial advice
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
               <div style={cardStyle} data-section="goals">
                 <h3 style={{ margin: '0 0 16px 0', color: theme.purple, fontSize: '18px' }}>🎯 Goals</h3>
