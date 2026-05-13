@@ -27,6 +27,9 @@ export default function Dashboard() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState(0)
   const [onboardingComplete, setOnboardingComplete] = useState(false)
+  const [houseStatus, setHouseStatus] = useState<string | null>(null)   // 'own' | 'buying' | 'planning' | 'renting'
+  const [fireGoal, setFireGoal] = useState(false)
+  const [hasAutomatedPayments, setHasAutomatedPayments] = useState(false)
 
   // Money Personality Quiz
   const [moneyPersonality, setMoneyPersonality] = useState<string | null>(null)
@@ -86,10 +89,18 @@ export default function Dashboard() {
 
   // Check-in Schedule
   const [checkInSchedule, setCheckInSchedule] = useState({
-    moneyDateDay: 'sunday',        // day of week for weekly money date
-    moneyDateTime: '19:00',        // time for weekly money date
+    moneyDateDay: 'sunday',
+    moneyDateTime: '19:00',
     dailyEnabled: true,
-    dailyTime: '08:00',            // suggested daily check-in time
+    dailyTime: '08:00',
+    weeklyEnabled: true,
+    monthlyEnabled: true,
+    monthlyDay: '1',
+    monthlyTime: '09:00',
+    sixMonthlyEnabled: true,
+    sixMonthlyDate: '',
+    yearlyEnabled: true,
+    yearlyDate: '',
     showScheduleSetup: false
   })
   const [lastDailyCheckIn, setLastDailyCheckIn] = useState<string | null>(null)
@@ -148,7 +159,7 @@ export default function Dashboard() {
   const [payoffMethod, setPayoffMethod] = useState<'snowball' | 'avalanche'>('avalanche')
   const [debtExtraPayment, setDebtExtraPayment] = useState('')
   const [goals, setGoals] = useState<any[]>([])
-  const [newGoal, setNewGoal] = useState({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(), paymentAmount: '', addedToCalendar: true })
+  const [newGoal, setNewGoal] = useState({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(), paymentAmount: '', addedToCalendar: true, interestRate: '' })
   const [assets, setAssets] = useState<any[]>([])
   const [newAsset, setNewAsset] = useState({ name: '', value: '', type: 'savings' })
   const [liabilities, setLiabilities] = useState<any[]>([])
@@ -323,6 +334,9 @@ export default function Dashboard() {
       if (data.fearAuditAnswers) setFearAuditAnswers(data.fearAuditAnswers)
       if (data.fearAuditComplete) setFearAuditComplete(data.fearAuditComplete)
       if (data.onboardingComplete) setOnboardingComplete(data.onboardingComplete)
+      if (data.houseStatus) setHouseStatus(data.houseStatus)
+      if (data.fireGoal !== undefined) setFireGoal(data.fireGoal)
+      if (data.hasAutomatedPayments !== undefined) setHasAutomatedPayments(data.hasAutomatedPayments)
       if (data.missionPhase) setMissionPhase(data.missionPhase)
       if (data.missionStep !== undefined) setMissionStep(data.missionStep)
       if (data.missionComplete) setMissionComplete(data.missionComplete)
@@ -371,7 +385,7 @@ export default function Dashboard() {
       missionPhase, missionStep, missionComplete, missionNavLocked,
       missionP2Proposals, missionP2Confirmed, missionP2Step,
       moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete,
-      fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights,
+      fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, proactiveInsights,
       insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog,
       annualReviews, superData, netWorthHistory, personalityAnswers
     }
@@ -692,6 +706,31 @@ export default function Dashboard() {
   const addDebt = () => { if (!newDebt.name || !newDebt.balance) return; setDebts([...debts, { ...newDebt, id: Date.now(), originalBalance: newDebt.balance }]); setNewDebt({ name: '', balance: '', interestRate: '', minPayment: '', frequency: 'monthly', paymentDate: (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })() }) }
   const deleteDebt = (id: number) => setDebts(debts.filter(d => d.id !== id))
 
+  // ==================== GOAL INTEREST SIMULATOR ====================
+  const simulateGoalSavings = (target: number, saved: number, payment: number, freq: string, annualRate: number) => {
+    if (target <= 0 || payment <= 0) return null
+    const toMonthly = (amt: number, f: string) => f === 'weekly' ? amt * (52/12) : f === 'fortnightly' ? amt * (26/12) : amt
+    const monthlyPayment = toMonthly(payment, freq)
+    const monthlyRate = annualRate / 100 / 12
+    let balance = saved
+    let totalContributed = saved
+    let months = 0
+    const MAX = 600
+    while (balance < target && months < MAX) {
+      months++
+      balance = balance * (1 + monthlyRate) + monthlyPayment
+      totalContributed += monthlyPayment
+    }
+    if (months >= MAX) return null
+    const interestEarned = balance - totalContributed
+    const deadline = new Date()
+    deadline.setMonth(deadline.getMonth() + months)
+    const deadlineStr = deadline.toISOString().split('T')[0]
+    // Without interest comparison
+    let monthsNoInterest = Math.ceil((target - saved) / monthlyPayment)
+    return { months, years: months / 12, deadline: deadlineStr, interestEarned: Math.max(0, interestEarned), totalContributed, monthsNoInterest, monthsSaved: Math.max(0, monthsNoInterest - months) }
+  }
+
   // ==================== DEBT PAYOFF SIMULATOR ====================
   const simulateDebtPayoff = (extraMonthly: number, method: 'avalanche' | 'snowball') => {
     if (debts.length === 0) return null
@@ -744,7 +783,7 @@ export default function Dashboard() {
     }
     return { months, totalInterest, years: (months / 12) }
   }
-  const addGoal = () => { if (!newGoal.name || !newGoal.target) return; setGoals([...goals, { ...newGoal, id: Date.now(), addedToCalendar: true }]); setNewGoal({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(), paymentAmount: '', addedToCalendar: true }) }
+  const addGoal = () => { if (!newGoal.name || !newGoal.target) return; setGoals([...goals, { ...newGoal, id: Date.now(), addedToCalendar: true }]); setNewGoal({ name: '', target: '', saved: '0', deadline: '', savingsFrequency: 'monthly', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(), paymentAmount: '', addedToCalendar: true, interestRate: '' }) }
   const deleteGoal = (id: number) => setGoals(goals.filter(g => g.id !== id))
   const addAsset = () => { if (!newAsset.name || !newAsset.value) return; setAssets([...assets, { ...newAsset, id: Date.now() }]); setNewAsset({ name: '', value: '', type: 'savings' }) }
   const deleteAsset = (id: number) => setAssets(assets.filter(a => a.id !== id))
@@ -2018,6 +2057,48 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       placeholder="I am someone who..."
                       style={{ ...inputStyle, width: '100%' }}
                     />
+                  </div>
+
+                  <div style={{ marginBottom: '24px' }}>
+                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '6px' }}>🏠 Your housing situation</div>
+                    <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>This shapes your entire financial roadmap.</p>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                      {[
+                        { value: 'own', emoji: '🏡', label: 'I own a home', sub: 'I want to pay it off faster' },
+                        { value: 'buying', emoji: '📝', label: 'I\'m in the process of buying', sub: 'Currently going through the purchase process' },
+                        { value: 'planning', emoji: '🎯', label: 'I\'m saving to buy', sub: 'Building my deposit — not quite there yet' },
+                        { value: 'renting', emoji: '🏢', label: 'I\'m renting / not buying yet', sub: 'No property plans right now' },
+                      ].map(opt => (
+                        <button key={opt.value} onClick={() => setHouseStatus(opt.value)}
+                          style={{ padding: '12px 16px', background: houseStatus === opt.value ? theme.accent + '20' : theme.bg, border: '2px solid ' + (houseStatus === opt.value ? theme.accent : theme.border), borderRadius: '10px', cursor: 'pointer', color: theme.text, textAlign: 'left' as const, display: 'flex', gap: '12px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '24px' }}>{opt.emoji}</span>
+                          <div>
+                            <div style={{ fontWeight: 600, color: houseStatus === opt.value ? theme.accent : theme.text }}>{opt.label}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px' }}>{opt.sub}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '24px', padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '16px' }}>🔥 What are you building toward?</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
+                      <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', padding: '12px', background: fireGoal ? theme.accent + '15' : theme.bg, borderRadius: '10px', border: '2px solid ' + (fireGoal ? theme.accent : theme.border) }}>
+                        <input type="checkbox" checked={fireGoal} onChange={e => setFireGoal(e.target.checked)} style={{ accentColor: theme.accent, width: '18px', height: '18px', marginTop: '2px', flexShrink: 0 }} />
+                        <div>
+                          <div style={{ color: theme.text, fontWeight: 600 }}>🏝️ Financial Independence / FIRE</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>I want to calculate my FIRE number and build passive income to cover my expenses</div>
+                        </div>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', padding: '12px', background: hasAutomatedPayments ? theme.accent + '15' : theme.bg, borderRadius: '10px', border: '2px solid ' + (hasAutomatedPayments ? theme.accent : theme.border) }}>
+                        <input type="checkbox" checked={hasAutomatedPayments} onChange={e => setHasAutomatedPayments(e.target.checked)} style={{ accentColor: theme.accent, width: '18px', height: '18px', marginTop: '2px', flexShrink: 0 }} />
+                        <div>
+                          <div style={{ color: theme.text, fontWeight: 600 }}>⚙️ I have automated payments/savings set up</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Direct debits, auto-transfers or scheduled savings already running</div>
+                        </div>
+                      </label>
+                    </div>
                   </div>
 
                   <button
@@ -3428,34 +3509,99 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               </div>
               <div style={cardStyle} data-section="goals">
                 <h3 style={{ margin: '0 0 16px 0', color: theme.accent, fontSize: '18px' }}>🎯 Goals</h3>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', marginBottom: '12px', padding: '12px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '12px', padding: '14px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                  {/* Row 1: name + target + already saved */}
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-                    <input placeholder="Goal name" value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '120px'}} />
-                    <input placeholder="Target $" type="number" value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})} style={{...inputStyle, width: '90px'}} />
-                    <input placeholder="Already saved $" type="number" value={newGoal.saved} onChange={e => setNewGoal({...newGoal, saved: e.target.value})} style={{...inputStyle, width: '100px'}} />
+                    <input placeholder="Goal name" value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})} style={{...inputStyle, flex: 2, minWidth: '120px'}} />
+                    <input placeholder="Target $" type="number" value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})} style={{...inputStyle, width: '95px'}} />
+                    <input placeholder="Already saved $" type="number" value={newGoal.saved} onChange={e => setNewGoal({...newGoal, saved: e.target.value})} style={{...inputStyle, width: '115px'}} />
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, alignItems: 'flex-end' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', flex: 1, minWidth: '100px' }}>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>PAYMENT AMOUNT $</label>
-                      <input type="number" placeholder="e.g. 100" value={newGoal.paymentAmount} onChange={e => setNewGoal({...newGoal, paymentAmount: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  {/* Row 2: payment + frequency + interest rate */}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '2px', flex: 1, minWidth: '90px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 600 }}>PAYMENT AMOUNT $</label>
+                      <input type="number" placeholder="e.g. 100" value={newGoal.paymentAmount}
+                        onChange={e => {
+                          const payment = e.target.value
+                          const sim = simulateGoalSavings(parseFloat(newGoal.target||'0'), parseFloat(newGoal.saved||'0'), parseFloat(payment||'0'), newGoal.savingsFrequency, parseFloat(newGoal.interestRate||'0'))
+                          setNewGoal({...newGoal, paymentAmount: payment, deadline: sim ? sim.deadline : newGoal.deadline})
+                        }} style={{...inputStyle, width: '100%'}} />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', minWidth: '120px' }}>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>FREQUENCY</label>
-                      <select value={newGoal.savingsFrequency} onChange={e => setNewGoal({...newGoal, savingsFrequency: e.target.value})} style={inputStyle}>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '2px', minWidth: '115px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 600 }}>FREQUENCY</label>
+                      <select value={newGoal.savingsFrequency}
+                        onChange={e => {
+                          const freq = e.target.value
+                          const sim = simulateGoalSavings(parseFloat(newGoal.target||'0'), parseFloat(newGoal.saved||'0'), parseFloat(newGoal.paymentAmount||'0'), freq, parseFloat(newGoal.interestRate||'0'))
+                          setNewGoal({...newGoal, savingsFrequency: freq, deadline: sim ? sim.deadline : newGoal.deadline})
+                        }} style={inputStyle}>
                         <option value="weekly">Weekly</option>
                         <option value="fortnightly">Fortnightly</option>
                         <option value="monthly">Monthly</option>
                       </select>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', flex: 1, minWidth: '120px' }}>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>START DATE</label>
-                      <input type="date" value={newGoal.startDate} onChange={e => setNewGoal({...newGoal, startDate: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px', flex: 1, minWidth: '120px' }}>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>TARGET DATE</label>
-                      <input type="date" value={newGoal.deadline} onChange={e => setNewGoal({...newGoal, deadline: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '2px', minWidth: '100px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 600 }}>SAVINGS RATE % p.a.</label>
+                      <input type="number" placeholder="e.g. 4.5" step="0.1" value={newGoal.interestRate}
+                        onChange={e => {
+                          const rate = e.target.value
+                          const sim = simulateGoalSavings(parseFloat(newGoal.target||'0'), parseFloat(newGoal.saved||'0'), parseFloat(newGoal.paymentAmount||'0'), newGoal.savingsFrequency, parseFloat(rate||'0'))
+                          setNewGoal({...newGoal, interestRate: rate, deadline: sim ? sim.deadline : newGoal.deadline})
+                        }} style={{...inputStyle, width: '100%'}} />
                     </div>
                   </div>
+                  {/* Row 3: start + auto-computed end date */}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '2px', flex: 1, minWidth: '130px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 600 }}>START DATE</label>
+                      <input type="date" value={newGoal.startDate} onChange={e => setNewGoal({...newGoal, startDate: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '2px', flex: 1, minWidth: '130px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 600 }}>TARGET DATE {newGoal.deadline && newGoal.paymentAmount ? '(auto-calculated)' : ''}</label>
+                      <input type="date" value={newGoal.deadline} onChange={e => setNewGoal({...newGoal, deadline: e.target.value})} style={{...inputStyle, width: '100%', borderColor: newGoal.deadline && newGoal.paymentAmount ? theme.accent : theme.inputBorder}} />
+                    </div>
+                  </div>
+
+                  {/* Interest calculator preview */}
+                  {(() => {
+                    const sim = simulateGoalSavings(parseFloat(newGoal.target||'0'), parseFloat(newGoal.saved||'0'), parseFloat(newGoal.paymentAmount||'0'), newGoal.savingsFrequency, parseFloat(newGoal.interestRate||'0'))
+                    if (!sim) return null
+                    const fmtMo = (m: number) => m >= 12 ? `${Math.floor(m/12)}y ${m%12}m` : `${m}m`
+                    const rate = parseFloat(newGoal.interestRate || '0')
+                    return (
+                      <div style={{ padding: '12px', background: 'linear-gradient(135deg, #1a1208 0%, #0a0a0a 100%)', borderRadius: '10px', border: '1px solid ' + theme.accent + '40' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: rate > 0 ? '10px' : 0 }}>
+                          <div style={{ textAlign: 'center' as const }}>
+                            <div style={{ color: theme.textMuted, fontSize: '9px', marginBottom: '2px' }}>GOAL DATE</div>
+                            <div style={{ color: theme.accent, fontWeight: 700, fontSize: '14px' }}>{new Date(sim.deadline + 'T12:00:00').toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}</div>
+                          </div>
+                          <div style={{ textAlign: 'center' as const }}>
+                            <div style={{ color: theme.textMuted, fontSize: '9px', marginBottom: '2px' }}>TIME TO GOAL</div>
+                            <div style={{ color: theme.accent, fontWeight: 700, fontSize: '14px' }}>{fmtMo(sim.months)}</div>
+                          </div>
+                          <div style={{ textAlign: 'center' as const }}>
+                            <div style={{ color: theme.textMuted, fontSize: '9px', marginBottom: '2px' }}>TOTAL CONTRIBUTED</div>
+                            <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px' }}>${Math.round(sim.totalContributed).toLocaleString()}</div>
+                          </div>
+                        </div>
+                        {rate > 0 && sim.interestEarned > 0 && (
+                          <div style={{ padding: '8px', background: theme.accent + '15', borderRadius: '8px', border: '1px solid ' + theme.accent + '30', display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'center' }}>
+                            <div style={{ textAlign: 'center' as const }}>
+                              <div style={{ color: theme.textMuted, fontSize: '9px' }}>INTEREST EARNED</div>
+                              <div style={{ color: theme.accent, fontWeight: 800, fontSize: '16px' }}>+${Math.round(sim.interestEarned).toLocaleString()}</div>
+                            </div>
+                            {sim.monthsSaved > 0 && (
+                              <div style={{ textAlign: 'center' as const }}>
+                                <div style={{ color: theme.textMuted, fontSize: '9px' }}>TIME SAVED VS NO INTEREST</div>
+                                <div style={{ color: theme.success, fontWeight: 700, fontSize: '14px' }}>{fmtMo(sim.monthsSaved)} faster</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: theme.textMuted, fontSize: '12px' }}>
                       <input type="checkbox" checked={newGoal.addedToCalendar !== false} onChange={e => setNewGoal({...newGoal, addedToCalendar: e.target.checked})} style={{ accentColor: theme.accent, width: '14px', height: '14px' }} />
@@ -4790,18 +4936,49 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               {/* Schedule Setup */}
               <div style={{ padding: '16px', background: theme.bg, borderRadius: '12px', marginBottom: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>📅 Your Schedule</div>
+                  <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>📅 Your Check-In Schedule</div>
                   <button onClick={() => setCheckInSchedule(s => ({ ...s, showScheduleSetup: !s.showScheduleSetup }))} style={{ padding: '4px 10px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '6px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>
                     {checkInSchedule.showScheduleSetup ? 'Done' : 'Edit'}
                   </button>
                 </div>
                 {checkInSchedule.showScheduleSetup ? (
                   <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
-                    <div>
-                      <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px', fontWeight: 600 }}>💰 WEEKLY MONEY DATE</div>
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const, alignItems: 'center', marginBottom: '8px' }}>
+
+                    {/* Daily */}
+                    <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: checkInSchedule.dailyEnabled ? '10px' : 0 }}>
+                        <div>
+                          <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>☀️ Daily check-in</div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Quick win log &amp; spending pulse</div>
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={checkInSchedule.dailyEnabled} onChange={e => setCheckInSchedule(s => ({ ...s, dailyEnabled: e.target.checked }))} style={{ accentColor: theme.accent }} />
+                          <span style={{ color: theme.text, fontSize: '12px' }}>{checkInSchedule.dailyEnabled ? 'On' : 'Off'}</span>
+                        </label>
+                      </div>
+                      {checkInSchedule.dailyEnabled && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <label style={{ color: theme.textMuted, fontSize: '11px' }}>Preferred time</label>
+                          <input type="time" value={checkInSchedule.dailyTime} onChange={e => setCheckInSchedule(s => ({ ...s, dailyTime: e.target.value }))} style={{ ...inputStyle, width: '120px' }} />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Weekly Money Date */}
+                    <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <div>
+                          <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>💰 Weekly Money Date</div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Budget review, bills, goals progress</div>
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={checkInSchedule.weeklyEnabled !== false} onChange={e => setCheckInSchedule(s => ({ ...s, weeklyEnabled: e.target.checked }))} style={{ accentColor: theme.accent }} />
+                          <span style={{ color: theme.text, fontSize: '12px' }}>{checkInSchedule.weeklyEnabled !== false ? 'On' : 'Off'}</span>
+                        </label>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const }}>
                         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px' }}>
-                          <label style={{ color: theme.textMuted, fontSize: '11px' }}>Day of week</label>
+                          <label style={{ color: theme.textMuted, fontSize: '11px' }}>Day</label>
                           <select value={checkInSchedule.moneyDateDay} onChange={e => setCheckInSchedule(s => ({ ...s, moneyDateDay: e.target.value }))} style={{ ...inputStyle, minWidth: '130px' }}>
                             {['sunday','monday','tuesday','wednesday','thursday','friday','saturday'].map(day => (
                               <option key={day} value={day}>{day.charAt(0).toUpperCase() + day.slice(1)}</option>
@@ -4810,40 +4987,100 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px' }}>
                           <label style={{ color: theme.textMuted, fontSize: '11px' }}>Time</label>
-                          <input type="time" value={checkInSchedule.moneyDateTime} onChange={e => setCheckInSchedule(s => ({ ...s, moneyDateTime: e.target.value }))} style={{ ...inputStyle, width: '130px' }} />
+                          <input type="time" value={checkInSchedule.moneyDateTime} onChange={e => setCheckInSchedule(s => ({ ...s, moneyDateTime: e.target.value }))} style={{ ...inputStyle, width: '120px' }} />
                         </div>
                       </div>
-                      <div style={{ color: theme.textMuted, fontSize: '11px' }}>A badge appears in the header when your money date is due</div>
                     </div>
-                    <div style={{ borderTop: '1px solid ' + theme.border, paddingTop: '14px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>✅ DAILY CHECK-IN</div>
+
+                    {/* Monthly */}
+                    <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: checkInSchedule.monthlyEnabled ? '10px' : 0 }}>
+                        <div>
+                          <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>📊 Monthly Review</div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Net worth, debt progress, goal tracking</div>
+                        </div>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                          <input type="checkbox" checked={checkInSchedule.dailyEnabled} onChange={e => setCheckInSchedule(s => ({ ...s, dailyEnabled: e.target.checked }))} style={{ accentColor: theme.accent }} />
-                          <span style={{ color: theme.text, fontSize: '12px' }}>{checkInSchedule.dailyEnabled ? 'Enabled' : 'Disabled'}</span>
+                          <input type="checkbox" checked={checkInSchedule.monthlyEnabled} onChange={e => setCheckInSchedule(s => ({ ...s, monthlyEnabled: e.target.checked }))} style={{ accentColor: theme.accent }} />
+                          <span style={{ color: theme.text, fontSize: '12px' }}>{checkInSchedule.monthlyEnabled ? 'On' : 'Off'}</span>
                         </label>
                       </div>
-                      {checkInSchedule.dailyEnabled && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <label style={{ color: theme.textMuted, fontSize: '12px', flexShrink: 0 }}>Preferred time:</label>
-                          <input type="time" value={checkInSchedule.dailyTime} onChange={e => setCheckInSchedule(s => ({ ...s, dailyTime: e.target.value }))} style={{ ...inputStyle, width: '130px' }} />
-                          <span style={{ color: theme.textMuted, fontSize: '11px' }}>do it anytime — this is just your preference</span>
+                      {checkInSchedule.monthlyEnabled && (
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const }}>
+                          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px' }}>
+                            <label style={{ color: theme.textMuted, fontSize: '11px' }}>Day of month</label>
+                            <select value={checkInSchedule.monthlyDay} onChange={e => setCheckInSchedule(s => ({ ...s, monthlyDay: e.target.value }))} style={{ ...inputStyle, minWidth: '100px' }}>
+                              {Array.from({length: 28}, (_,i) => i+1).map(d => <option key={d} value={d.toString()}>{d}{d===1?'st':d===2?'nd':d===3?'rd':'th'}</option>)}
+                            </select>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px' }}>
+                            <label style={{ color: theme.textMuted, fontSize: '11px' }}>Time</label>
+                            <input type="time" value={checkInSchedule.monthlyTime} onChange={e => setCheckInSchedule(s => ({ ...s, monthlyTime: e.target.value }))} style={{ ...inputStyle, width: '120px' }} />
+                          </div>
                         </div>
                       )}
                     </div>
+
+                    {/* 6-Monthly */}
+                    <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: checkInSchedule.sixMonthlyEnabled ? '10px' : 0 }}>
+                        <div>
+                          <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>🗓️ 6-Month Deep Dive</div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Strategy reset, insurance, investments</div>
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={checkInSchedule.sixMonthlyEnabled} onChange={e => setCheckInSchedule(s => ({ ...s, sixMonthlyEnabled: e.target.checked }))} style={{ accentColor: theme.accent }} />
+                          <span style={{ color: theme.text, fontSize: '12px' }}>{checkInSchedule.sixMonthlyEnabled ? 'On' : 'Off'}</span>
+                        </label>
+                      </div>
+                      {checkInSchedule.sixMonthlyEnabled && (
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px' }}>
+                          <label style={{ color: theme.textMuted, fontSize: '11px' }}>First check-in date (then every 6 months)</label>
+                          <input type="date" value={checkInSchedule.sixMonthlyDate} onChange={e => setCheckInSchedule(s => ({ ...s, sixMonthlyDate: e.target.value }))} style={{ ...inputStyle, maxWidth: '200px' }} />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Yearly */}
+                    <div style={{ padding: '12px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: checkInSchedule.yearlyEnabled ? '10px' : 0 }}>
+                        <div>
+                          <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>🏆 Annual Empire Review</div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px' }}>Full year retrospective &amp; next year plan</div>
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={checkInSchedule.yearlyEnabled} onChange={e => setCheckInSchedule(s => ({ ...s, yearlyEnabled: e.target.checked }))} style={{ accentColor: theme.accent }} />
+                          <span style={{ color: theme.text, fontSize: '12px' }}>{checkInSchedule.yearlyEnabled ? 'On' : 'Off'}</span>
+                        </label>
+                      </div>
+                      {checkInSchedule.yearlyEnabled && (
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '3px' }}>
+                          <label style={{ color: theme.textMuted, fontSize: '11px' }}>Anniversary date</label>
+                          <input type="date" value={checkInSchedule.yearlyDate} onChange={e => setCheckInSchedule(s => ({ ...s, yearlyDate: e.target.value }))} style={{ ...inputStyle, maxWidth: '200px' }} />
+                        </div>
+                      )}
+                    </div>
+
                     <div style={{ padding: '10px 12px', background: theme.accent + '15', borderRadius: '8px', color: theme.textMuted, fontSize: '12px', lineHeight: 1.5 }}>
-                      💡 Aureus shows a "due" badge in the header when your scheduled check-in day arrives. Add Aureus to your phone home screen for the best mobile experience.
+                      💡 Aureus shows a badge in the header when any scheduled check-in is due. Add Aureus to your phone home screen for the best experience.
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', gap: '24px' }}>
-                    <div>
-                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '2px' }}>MONEY DATE</div>
-                      <div style={{ color: theme.text, fontWeight: 600, textTransform: 'capitalize' as const }}>{checkInSchedule.moneyDateDay}s at {checkInSchedule.moneyDateTime}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div style={{ padding: '8px 10px', background: theme.cardBg, borderRadius: '8px' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>DAILY</div>
+                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '12px' }}>{checkInSchedule.dailyEnabled ? `On · ${checkInSchedule.dailyTime}` : 'Off'}</div>
                     </div>
-                    <div>
-                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '2px' }}>DAILY CHECK-IN</div>
-                      <div style={{ color: theme.text, fontWeight: 600 }}>{checkInSchedule.dailyEnabled ? `Enabled · preferred ${checkInSchedule.dailyTime}` : 'Disabled'}</div>
+                    <div style={{ padding: '8px 10px', background: theme.cardBg, borderRadius: '8px' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>WEEKLY MONEY DATE</div>
+                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '12px', textTransform: 'capitalize' as const }}>{checkInSchedule.weeklyEnabled !== false ? `${checkInSchedule.moneyDateDay}s · ${checkInSchedule.moneyDateTime}` : 'Off'}</div>
+                    </div>
+                    <div style={{ padding: '8px 10px', background: theme.cardBg, borderRadius: '8px' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>MONTHLY</div>
+                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '12px' }}>{checkInSchedule.monthlyEnabled ? `${checkInSchedule.monthlyDay}${parseInt(checkInSchedule.monthlyDay)===1?'st':parseInt(checkInSchedule.monthlyDay)===2?'nd':parseInt(checkInSchedule.monthlyDay)===3?'rd':'th'} of month` : 'Off'}</div>
+                    </div>
+                    <div style={{ padding: '8px 10px', background: theme.cardBg, borderRadius: '8px' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>6-MONTH / YEARLY</div>
+                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '12px' }}>{[checkInSchedule.sixMonthlyEnabled && '6mo', checkInSchedule.yearlyEnabled && 'Annual'].filter(Boolean).join(' · ') || 'Off'}</div>
                     </div>
                   </div>
                 )}
