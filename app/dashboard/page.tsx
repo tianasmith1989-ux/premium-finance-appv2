@@ -3924,50 +3924,52 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                   {isActionStep && !step.done && (
                                     <div style={{ padding: '0 14px 12px 50px' }}>
                                       {isAddDebtStep ? (
-                                        // Debt milestone — scroll to Debts section in Budget tab
+                                        // Debt milestone — pre-fill debt form and navigate to Budget > Debts
                                         <button
                                           onClick={e => {
                                             e.stopPropagation()
+                                            setNewDebt(d => ({ ...d, name: m.name, balance: m.targetAmount || '' }))
                                             setActiveTab('dashboard')
                                             togglePlanStep(m.id, step.id)
                                             setTimeout(() => {
                                               const el = document.querySelector('[data-section="debts"]')
                                               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                                            }, 300)
+                                            }, 350)
                                           }}
-                                          style={{ padding: '8px 16px', background: theme.warning, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
+                                          style={{ padding: '8px 16px', background: theme.warning, color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
                                         >
                                           💳 Add to Debts in Budget →
                                         </button>
                                       ) : (
-                                        // Savings milestone — open goal setup modal
+                                        // Savings milestone — pre-fill goals form and navigate to Budget > Goals
                                         <button
                                           onClick={e => {
                                             e.stopPropagation()
                                             const weeks = m.targetDate
                                               ? Math.max(1, Math.ceil((new Date(m.targetDate).getTime() - Date.now()) / (7 * 86400000)))
                                               : 26
-                                            const suggestedPayment = m.targetAmount
-                                              ? Math.ceil(parseFloat(m.targetAmount) / weeks).toString()
-                                              : ''
-                                            setGoalSetupMilestone(m)
-                                            setGoalSetupStepId(step.id)
-                                            setGoalSetupForm({
+                                            const amt = m.targetAmount && parseFloat(m.targetAmount) > 0 ? m.targetAmount : ''
+                                            const suggestedPayment = amt ? Math.ceil(parseFloat(amt) / weeks).toString() : ''
+                                            // Pre-fill the new goal form so user lands ready to submit
+                                            setNewGoal({
                                               name: m.name,
-                                              target: m.targetAmount || '',
+                                              target: amt,
                                               saved: m.currentAmount?.toString() || '0',
                                               paymentAmount: suggestedPayment,
                                               savingsFrequency: 'weekly',
                                               startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(),
-                                              deadline: m.targetDate || '',
-                                              addToCalendar: true,
-                                              addCheckIn: true
+                                              deadline: m.targetDate || ''
                                             })
-                                            setShowGoalSetup(true)
+                                            togglePlanStep(m.id, step.id)
+                                            setActiveTab('dashboard')
+                                            setTimeout(() => {
+                                              const el = document.querySelector('[data-section="goals"]')
+                                              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                            }, 350)
                                           }}
-                                          style={{ padding: '8px 16px', background: theme.purple, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
+                                          style={{ padding: '8px 16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
                                         >
-                                          🎯 Set up in Goals & Calendar →
+                                          🎯 Set up in Goals →
                                         </button>
                                       )}
                                     </div>
