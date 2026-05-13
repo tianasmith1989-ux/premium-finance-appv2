@@ -778,7 +778,7 @@ Rules:
 - Each action must be specific, concrete, and doable in under 30 minutes
 - One sentence per step
 - Never suggest downloading another app or creating a spreadsheet — the user is already in Aureus
-- Day 5 MUST always be: ${isDebtMilestone ? '"Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically."' : '"Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders."'}
+- MILESTONE TYPE: This is ${isDebtMilestone ? 'a DEBT PAYOFF milestone. Day 5 MUST be EXACTLY this word for word: "Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically." Do NOT change a single word.' : 'a SAVINGS GOAL milestone — NOT a debt. Do NOT use the word "debt" anywhere in your plan. Day 5 MUST be EXACTLY this word for word: "Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders." Do NOT change a single word.'}
 - Start directly with "Day 1:"${getPersonalityCoachingContext()}`,
           financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities },
           memory: budgetMemory,
@@ -807,12 +807,18 @@ Rules:
                !stripped.startsWith("of course") && l.length > 20
       })
 
-      const parsed = sourceLines.slice(0, 7).map((l: string, i: number) => ({
-        id: Date.now() + i,
-        // Strip the "Day N:" / "1." / "Step N:" prefix AND any markdown from the text
-        text: stripMd(l.replace(/^(day\s*\d+[:.\-]?\s*|step\s*\d+[:.\-]?\s*|\d+[).\-]\s*)/i, '').trim()),
-        done: false
-      })).filter((s: any) => s.text.length > 10) // skip any empty/too-short results
+      const goalDay5 = 'Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders.'
+      const debtDay5 = 'Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically.'
+
+      const parsed = sourceLines.slice(0, 7).map((l: string, i: number) => {
+        let text = stripMd(l.replace(/^(day\s*\d+[:.\-]?\s*|step\s*\d+[:.\-]?\s*|\d+[).\-]\s*)/i, '').trim())
+        // Safety net: if AI hallucinated wrong Day 5, override it
+        if (i === 4) {
+          if (!isDebtMilestone && /add this debt|debts section/i.test(text)) text = goalDay5
+          if (isDebtMilestone && /add this goal|savings goals/i.test(text)) text = debtDay5
+        }
+        return { id: Date.now() + i, text, done: false }
+      }).filter((s: any) => s.text.length > 10)
       setRoadmapMilestones(prev => prev.map(m =>
         m.id === milestoneId ? { ...m, weeklyPlan: parsed, planGeneratedAt: new Date().toISOString() } : m
       ))
@@ -1315,7 +1321,7 @@ Rules:
 - Each action must be specific, concrete, and doable in under 30 minutes
 - One sentence per step
 - Never suggest downloading another app — the user is in Aureus
-- Day 5 MUST always be: "${isDebtMilestone ? 'Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically.' : 'Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders.'}"
+- MILESTONE TYPE: This is ${isDebtMilestone ? 'a DEBT PAYOFF milestone. Day 5 MUST be EXACTLY this word for word: "Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically." Do NOT change a single word.' : 'a SAVINGS GOAL milestone — NOT a debt. Do NOT use the word "debt" anywhere in your plan. Day 5 MUST be EXACTLY this word for word: "Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders." Do NOT change a single word.'}
 - Start directly with "Day 1:"${getPersonalityCoachingContext()}`,
             financialData: { income: incomeStreams, expenses, debts, goals, assets },
             memory: budgetMemory,
@@ -1331,11 +1337,16 @@ Rules:
           const s = stripMd(l).toLowerCase()
           return !s.startsWith("here's") && !s.startsWith("here is") && !s.startsWith("below") && !s.startsWith("sure") && l.length > 20
         })
-        const parsed = sourceLines.slice(0, 7).map((l: string, i: number) => ({
-          id: now + 100 + i,
-          text: stripMd(l.replace(/^(day\s*\d+[:.\-]?\s*|step\s*\d+[:.\-]?\s*|\d+[).\-]\s*)/i, '').trim()),
-          done: false
-        })).filter((s: any) => s.text.length > 10)
+        const goalDay5 = 'Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders.'
+        const debtDay5 = 'Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically.'
+        const parsed = sourceLines.slice(0, 7).map((l: string, i: number) => {
+          let text = stripMd(l.replace(/^(day\s*\d+[:.\-]?\s*|step\s*\d+[:.\-]?\s*|\d+[).\-]\s*)/i, '').trim())
+          if (i === 4) {
+            if (!isDebtMilestone && /add this debt|debts section/i.test(text)) text = goalDay5
+            if (isDebtMilestone && /add this goal|savings goals/i.test(text)) text = debtDay5
+          }
+          return { id: now + 100 + i, text, done: false }
+        }).filter((s: any) => s.text.length > 10)
 
         if (parsed.length > 0) {
           setRoadmapMilestones(prev => prev.map(m =>
