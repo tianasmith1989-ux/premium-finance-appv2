@@ -12,8 +12,8 @@ export default function Dashboard() {
 
   // ==================== MISSION SYSTEM ====================
   const [missionPhase, setMissionPhase] = useState<1 | 2 | 3>(1)
-  const [missionStep, setMissionStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6>(0)
-  // 0 = not started, 1 = personality, 2 = income, 3 = expenses, 4 = debts, 5 = assets, 6 = mortgage
+  const [missionStep, setMissionStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7>(0)
+  // 0 = not started, 1 = personality, 2 = income, 3 = expenses, 4 = debts, 5 = assets, 6 = mortgage, 7 = schedule
   const [missionComplete, setMissionComplete] = useState(false)
   const [missionP2Step, setMissionP2Step] = useState<'analyse' | 'propose' | 'confirm' | 'plan'>('analyse')
   const [missionP2Loading, setMissionP2Loading] = useState(false)
