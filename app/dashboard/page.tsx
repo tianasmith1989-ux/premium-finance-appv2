@@ -162,6 +162,13 @@ export default function Dashboard() {
   const [newIncome, setNewIncome] = useState({ name: '', amount: '', frequency: 'fortnightly', type: 'active', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })() })
   const [expenses, setExpenses] = useState<any[]>([])
   const [newExpense, setNewExpense] = useState({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })() })
+  // Projected vs Actual tracking
+  const [categoryBudgets, setCategoryBudgets] = useState<{[cat: string]: string}>({})
+  const [actualSpend, setActualSpend] = useState<{[monthKey: string]: {[cat: string]: number}}>({})
+  const [showReceiptScanner, setShowReceiptScanner] = useState(false)
+  const [receiptScanLoading, setReceiptScanLoading] = useState(false)
+  const [receiptScanResult, setReceiptScanResult] = useState<any>(null)
+  const [showProjectedActual, setShowProjectedActual] = useState(false)
   const [debts, setDebts] = useState<any[]>([])
   const [newDebt, setNewDebt] = useState({ name: '', balance: '', interestRate: '', minPayment: '', frequency: 'monthly', paymentDate: (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })() })
   const [payoffMethod, setPayoffMethod] = useState<'snowball' | 'avalanche'>('avalanche')
@@ -328,6 +335,8 @@ export default function Dashboard() {
       if (data.liabilities) setLiabilities(data.liabilities)
       if (data.budgetMemory) setBudgetMemory(data.budgetMemory)
       if (data.paidOccurrences) setPaidOccurrences(new Set(data.paidOccurrences))
+      if (data.categoryBudgets) setCategoryBudgets(data.categoryBudgets)
+      if (data.actualSpend) setActualSpend(data.actualSpend)
       if (data.roadmapMilestones) setRoadmapMilestones(data.roadmapMilestones)
       if (data.coachNextAction) setCoachNextAction(data.coachNextAction)
       if (data.dismissedTriggers) setDismissedTriggers(data.dismissedTriggers)
@@ -399,7 +408,7 @@ export default function Dashboard() {
   useEffect(() => {
     const data = {
       incomeStreams, expenses, debts, goals, assets, liabilities,
-      budgetMemory, paidOccurrences: Array.from(paidOccurrences),
+      budgetMemory, paidOccurrences: Array.from(paidOccurrences), categoryBudgets, actualSpend,
       roadmapMilestones, budgetOnboarding, chatMessages, userCountry,
       wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns,
       checkInSchedule, lastDailyCheckIn, dailyCheckInLog,
@@ -412,7 +421,7 @@ export default function Dashboard() {
       annualReviews, superData, netWorthHistory, personalityAnswers
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, coachNextAction, dismissedTriggers, lastAppOpen, missionPhase, missionStep, missionComplete, missionNavLocked, missionP2Proposals, missionP2Confirmed, missionP2Step, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, categoryBudgets, actualSpend, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, coachNextAction, dismissedTriggers, lastAppOpen, missionPhase, missionStep, missionComplete, missionNavLocked, missionP2Proposals, missionP2Confirmed, missionP2Step, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
 
   // Chat scroll
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -813,6 +822,127 @@ export default function Dashboard() {
   const deleteGoal = (id: number) => setGoals(goals.filter(g => g.id !== id))
   const addAsset = () => { if (!newAsset.name || !newAsset.value) return; setAssets([...assets, { ...newAsset, id: Date.now() }]); setNewAsset({ name: '', value: '', type: 'savings' }) }
   const deleteAsset = (id: number) => setAssets(assets.filter(a => a.id !== id))
+
+  // ==================== PROJECTED VS ACTUAL ====================
+  const EXPENSE_CATEGORIES = [
+    { id: 'housing',       label: 'Housing',       icon: '🏠' },
+    { id: 'food',          label: 'Groceries',     icon: '🛒' },
+    { id: 'eating_out',    label: 'Eating Out',    icon: '🍽️' },
+    { id: 'transport',     label: 'Transport',     icon: '🚗' },
+    { id: 'utilities',     label: 'Utilities',     icon: '⚡' },
+    { id: 'health',        label: 'Health',        icon: '❤️' },
+    { id: 'entertainment', label: 'Entertainment', icon: '🎬' },
+    { id: 'clothing',      label: 'Clothing',      icon: '👕' },
+    { id: 'personal',      label: 'Personal Care', icon: '✨' },
+    { id: 'education',     label: 'Education',     icon: '📚' },
+    { id: 'subscriptions', label: 'Subscriptions', icon: '📱' },
+    { id: 'other',         label: 'Other',         icon: '📦' },
+  ]
+
+  const getMonthKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+
+  // Calculate this month's projected spend per category from fixed expenses
+  const getProjectedByCategory = () => {
+    const proj: {[cat: string]: number} = {}
+    const toMonthly = (amt: number, freq: string) => {
+      if (freq === 'weekly') return amt * (52/12)
+      if (freq === 'fortnightly') return amt * (26/12)
+      if (freq === 'quarterly') return amt / 3
+      if (freq === 'yearly') return amt / 12
+      return amt
+    }
+    expenses.forEach((e: any) => {
+      const cat = e.category || 'other'
+      proj[cat] = (proj[cat] || 0) + toMonthly(parseFloat(e.amount || '0'), e.frequency)
+    })
+    // Override with manually set category budgets
+    Object.entries(categoryBudgets).forEach(([cat, amt]) => {
+      if (amt) proj[cat] = parseFloat(amt)
+    })
+    return proj
+  }
+
+  const addActualSpend = (cat: string, amount: number, monthKey?: string) => {
+    const key = monthKey || getMonthKey()
+    setActualSpend(prev => ({
+      ...prev,
+      [key]: { ...(prev[key] || {}), [cat]: ((prev[key] || {})[cat] || 0) + amount }
+    }))
+  }
+
+  const setActualForCategory = (cat: string, amount: number, monthKey?: string) => {
+    const key = monthKey || getMonthKey()
+    setActualSpend(prev => ({
+      ...prev,
+      [key]: { ...(prev[key] || {}), [cat]: amount }
+    }))
+  }
+
+  // ==================== RECEIPT SCANNER ====================
+  const scanReceipt = async (imageBase64: string, mediaType: string) => {
+    setReceiptScanLoading(true)
+    setReceiptScanResult(null)
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: mediaType, data: imageBase64 }
+              },
+              {
+                type: 'text',
+                text: `You are reading a shopping receipt. Extract all information and respond ONLY with valid JSON, no other text:
+{
+  "store": "store name",
+  "date": "YYYY-MM-DD or null",
+  "total": 00.00,
+  "categories": {
+    "food": 00.00,
+    "eating_out": 00.00,
+    "transport": 00.00,
+    "utilities": 00.00,
+    "health": 00.00,
+    "entertainment": 00.00,
+    "clothing": 00.00,
+    "personal": 00.00,
+    "subscriptions": 00.00,
+    "other": 00.00
+  },
+  "items": [
+    {"name": "item name", "amount": 0.00, "category": "food"}
+  ],
+  "summary": "1-sentence summary of what was purchased"
+}
+Rules: Only include categories with non-zero amounts. Classify groceries/supermarket items as "food". Cafes/restaurants as "eating_out". Classify each item intelligently. Amounts in AUD.`
+              }
+            ]
+          }]
+        })
+      })
+      const data = await response.json()
+      const text = data.content?.find((c: any) => c.type === 'text')?.text || ''
+      const clean = text.replace(/```json|```/g, '').trim()
+      const parsed = JSON.parse(clean)
+      setReceiptScanResult(parsed)
+    } catch (e) {
+      setReceiptScanResult({ error: 'Could not read receipt. Please try a clearer photo.' })
+    }
+    setReceiptScanLoading(false)
+  }
+
+  const applyReceiptToActuals = (result: any, monthKey: string) => {
+    if (!result?.categories) return
+    Object.entries(result.categories).forEach(([cat, amt]) => {
+      if (amt && parseFloat(amt as string) > 0) addActualSpend(cat, parseFloat(amt as string), monthKey)
+    })
+  }
   const addLiability = () => { if (!newLiability.name || !newLiability.value) return; setLiabilities([...liabilities, { ...newLiability, id: Date.now() }]); setNewLiability({ name: '', value: '', type: 'loan' }) }
 
   // ==================== AUTOMATION CALCULATOR ====================
@@ -3839,6 +3969,245 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
               ))}
             </div>
+
+            {/* ── PROJECTED VS ACTUAL ── */}
+            {(() => {
+              const now = new Date()
+              const monthKey = getMonthKey()
+              const proj = getProjectedByCategory()
+              const actual = actualSpend[monthKey] || {}
+              const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+              const dayOfMonth = now.getDate()
+              const monthProgress = dayOfMonth / daysInMonth
+              // Which categories have data
+              const activeCategories = EXPENSE_CATEGORIES.filter(c => proj[c.id] > 0 || (actual[c.id] || 0) > 0)
+              const totalProjected = activeCategories.reduce((s, c) => s + (proj[c.id] || 0), 0)
+              const totalActual = activeCategories.reduce((s, c) => s + (actual[c.id] || 0), 0)
+              const pacePct = monthProgress > 0 ? totalActual / (totalProjected * monthProgress) : 0
+              const leaking = activeCategories.filter(c => (actual[c.id] || 0) > (proj[c.id] || 0) * monthProgress * 1.1 && (actual[c.id] || 0) > 0)
+
+              return (
+                <div style={{ background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border, overflow: 'hidden' }}>
+                  {/* Header */}
+                  <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: showProjectedActual ? '1px solid ' + theme.border : 'none', cursor: 'pointer' }} onClick={() => setShowProjectedActual(!showProjectedActual)}>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '18px' }}>📊</span>
+                      <div>
+                        <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Projected vs Actual — {now.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>Day {dayOfMonth} of {daysInMonth} · {Math.round(monthProgress * 100)}% through month</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                      {leaking.length > 0 && (
+                        <div style={{ padding: '4px 10px', background: theme.danger + '20', border: '1px solid ' + theme.danger + '40', borderRadius: '20px', color: theme.danger, fontSize: '12px', fontWeight: 600 }}>
+                          ⚠️ {leaking.length} categor{leaking.length === 1 ? 'y' : 'ies'} over budget
+                        </div>
+                      )}
+                      {pacePct > 0 && pacePct <= 1.05 && leaking.length === 0 && (
+                        <div style={{ padding: '4px 10px', background: theme.success + '20', border: '1px solid ' + theme.success + '40', borderRadius: '20px', color: theme.success, fontSize: '12px', fontWeight: 600 }}>
+                          ✅ On track
+                        </div>
+                      )}
+                      <div style={{ color: theme.textMuted, fontSize: '18px' }}>{showProjectedActual ? '▲' : '▼'}</div>
+                    </div>
+                  </div>
+
+                  {showProjectedActual && (
+                    <div style={{ padding: '20px' }}>
+                      {/* Total bar */}
+                      {totalProjected > 0 && (
+                        <div style={{ marginBottom: '20px', padding: '14px', background: theme.bg, borderRadius: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <div>
+                              <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>TOTAL SPENDING</div>
+                              <div style={{ color: theme.text, fontSize: '20px', fontWeight: 800 }}>${totalActual.toFixed(0)} <span style={{ color: theme.textMuted, fontWeight: 400, fontSize: '14px' }}>of ${totalProjected.toFixed(0)}</span></div>
+                            </div>
+                            <div style={{ textAlign: 'right' as const }}>
+                              <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>EXPECTED BY NOW</div>
+                              <div style={{ color: theme.accent, fontSize: '16px', fontWeight: 700 }}>${(totalProjected * monthProgress).toFixed(0)}</div>
+                            </div>
+                          </div>
+                          <div style={{ height: '10px', background: theme.border, borderRadius: '5px', overflow: 'hidden', position: 'relative' as const }}>
+                            <div style={{ position: 'absolute' as const, left: 0, top: 0, height: '100%', width: Math.min(100, (totalActual / totalProjected) * 100) + '%', background: totalActual > totalProjected ? theme.danger : totalActual > totalProjected * monthProgress * 1.1 ? theme.warning : theme.success, borderRadius: '5px', transition: 'width 0.5s' }} />
+                            {/* Expected pace marker */}
+                            <div style={{ position: 'absolute' as const, left: (monthProgress * 100) + '%', top: '-3px', width: '2px', height: '16px', background: theme.accent, borderRadius: '1px' }} />
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                            <span style={{ color: theme.textMuted, fontSize: '10px' }}>│ expected pace</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Per-category breakdown */}
+                      {activeCategories.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '16px' }}>
+                          {activeCategories.map(cat => {
+                            const p = proj[cat.id] || 0
+                            const a = actual[cat.id] || 0
+                            const expectedSoFar = p * monthProgress
+                            const pct = p > 0 ? (a / p) * 100 : 0
+                            const isOver = a > p
+                            const isAheadOfPace = a > expectedSoFar * 1.15 && !isOver
+                            const barColor = isOver ? theme.danger : isAheadOfPace ? theme.warning : theme.success
+                            const remaining = p - a
+                            return (
+                              <div key={cat.id} style={{ padding: '12px 14px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + (isOver ? theme.danger + '40' : theme.border) }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '16px' }}>{cat.icon}</span>
+                                    <div>
+                                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{cat.label}</div>
+                                      <div style={{ color: theme.textMuted, fontSize: '11px' }}>
+                                        ${a.toFixed(0)} spent
+                                        {p > 0 && <span> · ${p.toFixed(0)} budget · {remaining >= 0 ? <span style={{ color: theme.success }}>${remaining.toFixed(0)} left</span> : <span style={{ color: theme.danger }}>${Math.abs(remaining).toFixed(0)} over</span>}</span>}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    {isOver && <span style={{ color: theme.danger, fontSize: '11px', fontWeight: 700 }}>⚠️ OVER</span>}
+                                    {isAheadOfPace && <span style={{ color: theme.warning, fontSize: '11px', fontWeight: 700 }}>📈 PACE</span>}
+                                    {/* Manual actual input */}
+                                    <button onClick={e => { e.stopPropagation(); const val = window.prompt(`Set actual spend for ${cat.label} this month ($):`, a.toFixed(0)); if (val !== null && !isNaN(parseFloat(val))) setActualForCategory(cat.id, parseFloat(val)) }}
+                                      style={{ padding: '3px 8px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '6px', cursor: 'pointer', color: theme.textMuted, fontSize: '11px' }}>
+                                      ✏️ Edit
+                                    </button>
+                                  </div>
+                                </div>
+                                {p > 0 && (
+                                  <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden', position: 'relative' as const }}>
+                                    <div style={{ width: Math.min(100, pct) + '%', height: '100%', background: barColor, borderRadius: '3px', transition: 'width 0.4s' }} />
+                                    <div style={{ position: 'absolute' as const, left: (monthProgress * 100) + '%', top: '-2px', width: '2px', height: '10px', background: theme.accent }} />
+                                  </div>
+                                )}
+                                {/* Manual budget override */}
+                                {p === 0 && (
+                                  <button onClick={e => { e.stopPropagation(); const val = window.prompt(`Set monthly budget for ${cat.label} ($):`); if (val !== null && !isNaN(parseFloat(val))) setCategoryBudgets(prev => ({ ...prev, [cat.id]: val })) }}
+                                    style={{ marginTop: '4px', padding: '3px 8px', background: theme.accent + '15', border: '1px solid ' + theme.accent + '30', borderRadius: '6px', cursor: 'pointer', color: theme.accent, fontSize: '11px' }}>
+                                    + Set budget
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ padding: '20px', textAlign: 'center' as const, color: theme.textMuted, fontSize: '14px', marginBottom: '16px' }}>
+                          Add expenses to your budget to see projected spending by category
+                        </div>
+                      )}
+
+                      {/* Receipt Scanner & Manual Add */}
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const }}>
+                        <button onClick={() => setShowReceiptScanner(!showReceiptScanner)}
+                          style={{ padding: '10px 16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>
+                          📸 Scan Receipt
+                        </button>
+                        <button onClick={() => {
+                          const cat = window.prompt('Category (food/transport/eating_out/utilities/health/entertainment/clothing/personal/subscriptions/other):')
+                          if (!cat) return
+                          const amt = window.prompt(`Amount spent on ${cat} ($):`)
+                          if (amt && !isNaN(parseFloat(amt))) addActualSpend(cat, parseFloat(amt))
+                        }} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '10px', cursor: 'pointer', color: theme.text, fontSize: '13px' }}>
+                          + Add spend manually
+                        </button>
+                        <button onClick={() => {
+                          if (window.confirm('Reset all actual spend for this month?')) setActualSpend(prev => ({ ...prev, [monthKey]: {} }))
+                        }} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '10px', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>
+                          Reset month
+                        </button>
+                      </div>
+
+                      {/* Receipt Scanner UI */}
+                      {showReceiptScanner && (
+                        <div style={{ marginTop: '16px', padding: '16px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                          <div style={{ color: theme.accent, fontWeight: 700, fontSize: '13px', marginBottom: '10px' }}>📸 Receipt Scanner</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '12px', lineHeight: 1.6 }}>
+                            Take a photo or upload an image of your receipt. Aureus will read it and extract the spend by category automatically.
+                          </div>
+                          <input type="file" accept="image/*" capture="environment"
+                            onChange={async e => {
+                              const file = e.target.files?.[0]
+                              if (!file) return
+                              const reader = new FileReader()
+                              reader.onload = async ev => {
+                                const result = ev.target?.result as string
+                                const base64 = result.split(',')[1]
+                                const mediaType = file.type as 'image/jpeg' | 'image/png' | 'image/webp'
+                                await scanReceipt(base64, mediaType)
+                              }
+                              reader.readAsDataURL(file)
+                            }}
+                            style={{ display: 'block', marginBottom: '12px', color: theme.text, fontSize: '13px' }} />
+
+                          {receiptScanLoading && (
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', padding: '14px', background: theme.cardBg, borderRadius: '10px' }}>
+                              <div style={{ width: '18px', height: '18px', borderRadius: '50%', border: '3px solid ' + theme.accent, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+                              <span style={{ color: theme.textMuted, fontSize: '13px' }}>Reading receipt...</span>
+                            </div>
+                          )}
+
+                          {receiptScanResult && !receiptScanResult.error && (
+                            <div style={{ padding: '14px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.success + '40' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                                <div>
+                                  <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px' }}>{receiptScanResult.store || 'Receipt'}</div>
+                                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>{receiptScanResult.summary}</div>
+                                  {receiptScanResult.date && <div style={{ color: theme.textMuted, fontSize: '11px' }}>{receiptScanResult.date}</div>}
+                                </div>
+                                <div style={{ color: theme.accent, fontWeight: 800, fontSize: '18px' }}>${receiptScanResult.total?.toFixed(2)}</div>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px', marginBottom: '12px' }}>
+                                {Object.entries(receiptScanResult.categories || {}).map(([cat, amt]: [string, any]) => {
+                                  const catInfo = EXPENSE_CATEGORIES.find(c => c.id === cat)
+                                  return (
+                                    <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: theme.bg, borderRadius: '6px' }}>
+                                      <span style={{ color: theme.text, fontSize: '12px' }}>{catInfo?.icon} {catInfo?.label || cat}</span>
+                                      <span style={{ color: theme.success, fontWeight: 600, fontSize: '12px' }}>${parseFloat(amt).toFixed(2)}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <button onClick={() => { applyReceiptToActuals(receiptScanResult, monthKey); setReceiptScanResult(null); setShowReceiptScanner(false) }}
+                                  style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
+                                  ✓ Add to {now.toLocaleDateString('en-AU', { month: 'long' })} actuals
+                                </button>
+                                <button onClick={() => setReceiptScanResult(null)}
+                                  style={{ padding: '10px 14px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          {receiptScanResult?.error && (
+                            <div style={{ padding: '12px', background: theme.danger + '15', borderRadius: '10px', color: theme.danger, fontSize: '13px' }}>
+                              {receiptScanResult.error}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Leak insights */}
+                      {leaking.length > 0 && (
+                        <div style={{ marginTop: '14px', padding: '14px', background: theme.danger + '10', borderRadius: '10px', border: '1px solid ' + theme.danger + '30' }}>
+                          <div style={{ color: theme.danger, fontWeight: 700, fontSize: '13px', marginBottom: '8px' }}>💸 Money leak detected</div>
+                          {leaking.map(cat => {
+                            const p = proj[cat.id] || 0
+                            const a = actual[cat.id] || 0
+                            const over = a - p
+                            return (
+                              <div key={cat.id} style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px', lineHeight: 1.6 }}>
+                                {cat.icon} <strong style={{ color: theme.text }}>{cat.label}</strong> — ${a.toFixed(0)} spent vs ${p.toFixed(0)} budget (${over.toFixed(0)} over). At this rate: ${(a / (getMonthKey() === monthKey ? dayOfMonth : daysInMonth) * daysInMonth).toFixed(0)} by month end.
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Income & Expenses */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
@@ -7113,6 +7482,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         h1, h2, h3, .aureus-heading { font-family: 'Cinzel', serif; }
         @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
         @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #3a2e1e; border-radius: 3px; }
       `}</style>
