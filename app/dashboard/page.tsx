@@ -224,6 +224,7 @@ export default function Dashboard() {
   // Presets
   const [showPresets, setShowPresets] = useState(false)
   const [showMoreTabs, setShowMoreTabs] = useState(false)
+  const [showHelpGuide, setShowHelpGuide] = useState(false)
 
   // Misc
   const moneyQuotes = [
@@ -1476,12 +1477,7 @@ Rules:
     }
 
     setMissionP2Loading(false)
-
-    // Transition to phase 3 after a beat so user sees the success screen
-    setTimeout(() => {
-      advanceMission(null, 3)
-      setActiveTab('path')
-    }, 2500)
+    // User clicks "Enter Your Empire →" to advance — no auto-transition
   }
 
   // ==================== SMART DATE HELPERS ====================
@@ -2908,6 +2904,262 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           </div>
         </div>
       )}
+      {/* ==================== INTERACTIVE TOUR ==================== */}
+      {showTour && (() => {
+        const tourSteps = [
+          {
+            tab: 'home', icon: '🏠', title: 'Home — Your Daily Driver',
+            desc: 'This is where you start every day. See your greeting, key stats, Aureus\'s next action for you, upcoming calendar events, and your active roadmap mission — all in one place. Click any stat card to jump straight to that section.',
+            highlight: 'Empire Snapshot, Next Action card, This Week panel'
+          },
+          {
+            tab: 'chat', icon: '💬', title: 'Aureus — Your AI Coach',
+            desc: 'Ask Aureus anything about your money. It knows your full financial picture — income, debts, goals, personality, mortgage. Ask "Should I pay off my car or save first?" and get a personalised answer, not generic advice.',
+            highlight: 'Fully personalised to your data and money personality'
+          },
+          {
+            tab: 'dashboard', icon: '🎛️', title: 'Budget — Your Financial Engine',
+            desc: 'Track every dollar in and out. Add income streams (salary, side income), bills and expenses with due dates, debts with a payoff accelerator that shows how much you\'ll save by adding extra payments, savings goals with an interest calculator, and your assets. The calendar shows everything plotted by date.',
+            highlight: 'Income · Bills · Debts + Accelerator · Goals + Interest calc · Assets · Calendar'
+          },
+          {
+            tab: 'path', icon: '🛤️', title: 'Roadmap — Your Financial Path',
+            desc: 'Your personalised milestones — built by Aureus from your data. Each milestone gets a 7-step action plan. Tick off steps as you complete them. When you finish, Aureus generates a new plan. Add milestones from the roadmap or let Aureus propose them.',
+            highlight: 'Baby Steps · Milestones · 7-step plans · Ask Aureus about any milestone'
+          },
+          {
+            tab: 'mortgage', icon: '🚀', title: 'Mortgage Accelerator',
+            desc: 'Enter your mortgage details and see your exact payoff date. Then see how much earlier you\'d be mortgage-free by adding even small extra repayments — with the interest saved shown in dollars. Offset account and lump sum tools also included.',
+            highlight: 'Payoff date · Years saved · Interest saved · Australian offset calculator'
+          },
+          {
+            tab: 'property', icon: '🏘️', title: 'Investment Property Portfolio',
+            desc: 'Track every investment property in one place. Enter purchase price, current value, mortgage, weekly rent, and running costs (management fee, council, insurance, maintenance). Aureus calculates equity, LVR, gross yield, net yield, monthly cash flow, and capital gain per property — plus a portfolio summary.',
+            highlight: 'Per-property: equity, LVR, gross/net yield, cash flow, capital gain · Portfolio total'
+          },
+          {
+            tab: 'grow', icon: '📈', title: 'Grow & FIRE',
+            desc: 'Calculate your FIRE number (Financial Independence, Retire Early) using your actual monthly expenses. Track your super balance, investment portfolio, and passive income. See how many years to financial independence based on your current savings rate.',
+            highlight: 'FIRE number · Superannuation · Investments · Passive income · Years to FI'
+          },
+          {
+            tab: 'insights', icon: '🧠', title: 'Insights — AI Financial Analysis',
+            desc: 'Aureus analyses your full financial picture and surfaces insights you might have missed — spending patterns, savings opportunities, debt ordering, risk flags. Refreshed regularly based on your latest data.',
+            highlight: 'Proactive analysis · Spending patterns · Opportunities · Risk alerts'
+          },
+          {
+            tab: 'review', icon: '🔄', title: 'Monthly Review',
+            desc: 'Your structured monthly check-in. Update net worth, check progress on every goal, review the month\'s wins and misses, and get Aureus\'s monthly coaching message. Takes about 10 minutes.',
+            highlight: 'Net worth update · Goal progress · Wins & misses · Coach feedback'
+          },
+          {
+            tab: 'overview', icon: '📊', title: 'Metrics — Your Financial Health',
+            desc: 'A birds-eye view of your financial health score, net worth history chart, debt-to-income ratio, savings rate, emergency fund status, and all your assets vs liabilities. Great for your monthly review.',
+            highlight: 'Health score · Net worth history · Savings rate · Emergency fund months'
+          },
+          {
+            tab: 'wins', icon: '🏆', title: 'Wins — Your Progress Log',
+            desc: 'Every win is recorded here — automatically (when you hit milestones like positive surplus, 20% savings rate, first debt paid off) or manually (you can add anything). Your streak is tracked. This is your proof that it\'s working.',
+            highlight: 'Auto-wins · Manual wins · Streak tracking'
+          },
+          {
+            tab: 'learn', icon: '🎓', title: 'Learn — Financial Education',
+            desc: 'Core financial concepts explained clearly. Baby Steps, the avalanche vs snowball method, how compound interest works, Australian-specific content (super, offset accounts, negative gearing). Learn as you go.',
+            highlight: 'Baby Steps · Debt methods · Compound interest · Australian concepts'
+          },
+        ]
+        const step = tourSteps[tourStep]
+        return (
+          <div style={{ position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 8000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ background: theme.cardBg, borderRadius: '20px', border: '2px solid ' + theme.accent + '50', maxWidth: '560px', width: '100%', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
+              {/* Tour header */}
+              <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #1a1208, #0a0a0a)', borderBottom: '1px solid ' + theme.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {tourSteps.map((_, i) => (
+                    <div key={i} onClick={() => setTourStep(i)} style={{ width: i === tourStep ? '20px' : '7px', height: '7px', borderRadius: '4px', background: i < tourStep ? theme.success : i === tourStep ? theme.accent : theme.border, cursor: 'pointer', transition: 'all 0.2s' }} />
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>{tourStep + 1} of {tourSteps.length}</span>
+                  <button onClick={() => setShowTour(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '20px', lineHeight: 1 }}>×</button>
+                </div>
+              </div>
+              {/* Tour content */}
+              <div style={{ padding: '28px 28px 20px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '14px' }}>{step.icon}</div>
+                <h3 style={{ color: theme.accent, fontSize: '22px', fontWeight: 800, margin: '0 0 12px 0', fontFamily: 'Cinzel, serif' }}>{step.title}</h3>
+                <p style={{ color: theme.text, fontSize: '15px', lineHeight: 1.7, margin: '0 0 16px 0' }}>{step.desc}</p>
+                <div style={{ padding: '10px 14px', background: theme.accent + '12', borderRadius: '8px', border: '1px solid ' + theme.accent + '30', color: theme.textMuted, fontSize: '12px', lineHeight: 1.6 }}>
+                  <span style={{ color: theme.accent, fontWeight: 600 }}>Includes: </span>{step.highlight}
+                </div>
+              </div>
+              {/* Tour footer */}
+              <div style={{ padding: '16px 28px 24px', display: 'flex', gap: '10px' }}>
+                {tourStep > 0 && (
+                  <button onClick={() => { setTourStep(tourStep - 1); setActiveTab(tourSteps[tourStep - 1].tab as any) }}
+                    style={{ padding: '10px 18px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '10px', cursor: 'pointer', color: theme.textMuted, fontSize: '14px' }}>
+                    ← Back
+                  </button>
+                )}
+                <button
+                  onClick={() => { setActiveTab(step.tab as any); setShowMoreTabs(false) }}
+                  style={{ padding: '10px 18px', background: theme.accent + '20', border: '1px solid ' + theme.accent + '50', borderRadius: '10px', cursor: 'pointer', color: theme.accent, fontSize: '13px', fontWeight: 600 }}>
+                  Open {step.icon}
+                </button>
+                {tourStep < tourSteps.length - 1 ? (
+                  <button onClick={() => { setTourStep(tourStep + 1); setActiveTab(tourSteps[tourStep + 1].tab as any) }}
+                    style={{ flex: 1, padding: '10px 18px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', border: 'none', borderRadius: '10px', cursor: 'pointer', color: '#0a0a0a', fontSize: '14px', fontWeight: 700 }}>
+                    Next →
+                  </button>
+                ) : (
+                  <button onClick={() => { setShowTour(false); setActiveTab('home' as any) }}
+                    style={{ flex: 1, padding: '10px 18px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', border: 'none', borderRadius: '10px', cursor: 'pointer', color: '#0a0a0a', fontSize: '14px', fontWeight: 700 }}>
+                    🏠 Start building →
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ==================== QUICK HELP GUIDE ==================== */}
+      {showHelpGuide && (
+        <div style={{ position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 8000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowHelpGuide(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '20px', border: '1px solid ' + theme.border, maxWidth: '620px', width: '100%', maxHeight: '85vh', overflow: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid ' + theme.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky' as const, top: 0, background: theme.cardBg, zIndex: 1 }}>
+              <div>
+                <div style={{ color: theme.accent, fontWeight: 800, fontSize: '18px', fontFamily: 'Cinzel, serif' }}>❓ Aureus Help Guide</div>
+                <div style={{ color: theme.textMuted, fontSize: '12px' }}>Everything you need to know</div>
+              </div>
+              <button onClick={() => setShowHelpGuide(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '22px' }}>×</button>
+            </div>
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
+              {[
+                {
+                  icon: '📋', title: 'Your Daily Routine',
+                  items: [
+                    'Open Home tab every morning — check your Next Action and any calendar events due today',
+                    'Tick off calendar items when you pay them (Budget tab → Calendar)',
+                    'Log a win when something goes right (Wins tab → + Add)',
+                    'Ask Aureus when you\'re unsure what to do next',
+                  ]
+                },
+                {
+                  icon: '💰', title: 'Weekly Money Date',
+                  items: [
+                    'Sit down for 15 minutes on your chosen day (see Settings → Schedule)',
+                    'Review your Budget — any bills unpaid? Any overspending?',
+                    'Check your Goals — on track? Adjust if needed',
+                    'Open Roadmap — tick off any completed steps, generate a new plan if ready',
+                    'Record your weekly win',
+                  ]
+                },
+                {
+                  icon: '📊', title: 'Monthly Review (10 min)',
+                  items: [
+                    'Open Review tab on your chosen date each month',
+                    'Update your debt balances to what they actually are now',
+                    'Update your goal "already saved" amounts',
+                    'Snapshot your net worth (Metrics tab)',
+                    'Ask Aureus: "How did my month go?" for a full AI analysis',
+                  ]
+                },
+                {
+                  icon: '🛤️', title: 'Working Your Roadmap',
+                  items: [
+                    'Focus on ONE milestone at a time — the top of the list',
+                    'Tick off steps as you complete them — no fixed deadline per step',
+                    'When all 7 steps are done, hit "New Plan" for a fresh 7-step set',
+                    'Click "Set up in Goals →" on Step 5 to connect the goal to your budget',
+                    'Ask Aureus about any milestone for specific coaching',
+                  ]
+                },
+                {
+                  icon: '💳', title: 'Debt Payoff',
+                  items: [
+                    'Add all debts in Budget → Debts with balance, rate, and minimum payment',
+                    'Aureus uses Avalanche method by default (highest rate first = most interest saved)',
+                    'Switch to Snowball (smallest balance first) if you need quick wins for motivation',
+                    'Use the Payoff Accelerator to see how much extra payments save you',
+                    '"Use 50% surplus" auto-fills a smart extra payment from your monthly surplus',
+                  ]
+                },
+                {
+                  icon: '🎯', title: 'Goals & Interest',
+                  items: [
+                    'Enter your savings account interest rate to see how much interest you\'ll earn',
+                    'The Target Date auto-calculates as you type your payment amount',
+                    'Tick "Show on calendar" to see payment reminders plotted on your calendar',
+                    'Tick off goal payments in the calendar as you make them — this fills the progress bar',
+                    'Link a goal from your Roadmap using "Set up in Goals →" on Step 5',
+                  ]
+                },
+                {
+                  icon: '🏘️', title: 'Investment Properties',
+                  items: [
+                    'Add each IP with purchase price, current value, mortgage balance, and weekly rent',
+                    'Enter running costs: management fee %, council rates, insurance, maintenance',
+                    'Aureus calculates gross yield, net yield, equity, LVR, and monthly cash flow',
+                    'Negatively geared = cash flow is negative but may be tax deductible — see your accountant',
+                    'Update current value periodically (e.g. after a valuation) to track capital growth',
+                  ]
+                },
+                {
+                  icon: '🔥', title: 'FIRE & Financial Independence',
+                  items: [
+                    'Your FIRE number = annual expenses × 25 (the 4% rule)',
+                    'Aureus calculates this from your actual expense data in Budget',
+                    'Track super in Grow tab — it counts toward your FIRE number from age 60',
+                    'Passive income (dividends, rent profit) reduces how much you need to save',
+                    'Years to FI shown live based on your current savings rate',
+                  ]
+                },
+                {
+                  icon: '💬', title: 'Getting the Most from Aureus Chat',
+                  items: [
+                    'Ask specific questions: "Should I pay off my credit card or save for a house deposit?"',
+                    'Ask for explanations: "Explain offset accounts in simple terms"',
+                    'Ask for a plan: "Give me a 3-month plan to pay off my car loan faster"',
+                    'Ask about your data: "What\'s my biggest financial risk right now?"',
+                    'Aureus knows your personality — it coaches you accordingly',
+                  ]
+                },
+              ].map(section => (
+                <div key={section.title}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '20px' }}>{section.icon}</span>
+                    <div style={{ color: theme.accent, fontWeight: 700, fontSize: '14px', letterSpacing: '0.3px' }}>{section.title}</div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px', paddingLeft: '30px' }}>
+                    {section.items.map((item, i) => (
+                      <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                        <span style={{ color: theme.accent, fontSize: '12px', marginTop: '3px', flexShrink: 0 }}>→</span>
+                        <span style={{ color: theme.text, fontSize: '13px', lineHeight: 1.6 }}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div style={{ padding: '14px', background: theme.accent + '12', borderRadius: '10px', border: '1px solid ' + theme.accent + '30' }}>
+                <div style={{ color: theme.accent, fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>💡 Pro tip</div>
+                <div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6 }}>Click <strong style={{ color: theme.text }}>▶ Tour</strong> in the header to get a full walkthrough of every tab with descriptions of what each one does. You can jump to any tab directly from the tour.</div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => { setShowHelpGuide(false); setTourStep(0); setShowTour(true) }}
+                  style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }}>
+                  ▶ Take the Tour
+                </button>
+                <button onClick={() => setShowHelpGuide(false)}
+                  style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '10px', cursor: 'pointer', color: theme.textMuted, fontSize: '14px' }}>
+                  Got it ✓
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {celebrationWin && (
         <div style={{ position: 'fixed' as const, top: '20px', right: '20px', zIndex: 9999, padding: '16px 20px', background: 'linear-gradient(135deg, #D4AF37, #B68B2E)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(212,175,55,0.3)', color: 'white', maxWidth: '320px', animation: 'slideIn 0.3s ease' }}>
           <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>🏆 New Win Unlocked!</div>
@@ -2947,6 +3199,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             )}
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button onClick={() => { setTourStep(0); setShowTour(true) }} title="Take a tour" style={{ padding: '7px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.accent, fontWeight: 700, fontSize: '13px' }}>▶ Tour</button>
+            <button onClick={() => setShowHelpGuide(true)} title="Help guide" style={{ padding: '7px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text, fontWeight: 700, fontSize: '14px' }}>?</button>
             <button onClick={() => setDarkMode(!darkMode)} style={{ padding: '7px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>{darkMode ? '☀️' : '🌙'}</button>
             <select value={userCountry} onChange={e => setUserCountry(e.target.value as any)} style={{ padding: '6px 10px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text, fontSize: '14px' }}>
               <option value="AU">🇦🇺 AU</option><option value="US">🇺🇸 US</option><option value="UK">🇬🇧 UK</option><option value="NZ">🇳🇿 NZ</option><option value="CA">🇨🇦 CA</option>
