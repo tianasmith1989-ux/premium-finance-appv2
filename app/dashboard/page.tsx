@@ -825,18 +825,20 @@ export default function Dashboard() {
 
   // ==================== PROJECTED VS ACTUAL ====================
   const EXPENSE_CATEGORIES = [
-    { id: 'housing',       label: 'Housing',       icon: '🏠' },
-    { id: 'food',          label: 'Groceries',     icon: '🛒' },
-    { id: 'eating_out',    label: 'Eating Out',    icon: '🍽️' },
-    { id: 'transport',     label: 'Transport',     icon: '🚗' },
-    { id: 'utilities',     label: 'Utilities',     icon: '⚡' },
-    { id: 'health',        label: 'Health',        icon: '❤️' },
-    { id: 'entertainment', label: 'Entertainment', icon: '🎬' },
-    { id: 'clothing',      label: 'Clothing',      icon: '👕' },
-    { id: 'personal',      label: 'Personal Care', icon: '✨' },
-    { id: 'education',     label: 'Education',     icon: '📚' },
-    { id: 'subscriptions', label: 'Subscriptions', icon: '📱' },
-    { id: 'other',         label: 'Other',         icon: '📦' },
+    { id: 'housing',        label: 'Housing',        icon: '🏠' },
+    { id: 'food',           label: 'Groceries',      icon: '🛒' },
+    { id: 'eating_out',     label: 'Eating Out',     icon: '🍽️' },
+    { id: 'transport',      label: 'Transport',      icon: '🚗' },
+    { id: 'utilities',      label: 'Utilities',      icon: '⚡' },
+    { id: 'health',         label: 'Health',         icon: '❤️' },
+    { id: 'entertainment',  label: 'Entertainment',  icon: '🎬' },
+    { id: 'clothing',       label: 'Clothing',       icon: '👕' },
+    { id: 'personal',       label: 'Personal Care',  icon: '✨' },
+    { id: 'education',      label: 'Education',      icon: '📚' },
+    { id: 'subscriptions',  label: 'Subscriptions',  icon: '📱' },
+    { id: 'debt_payments',  label: 'Debt Payments',  icon: '💳' },
+    { id: 'goal_savings',   label: 'Goal Savings',   icon: '🎯' },
+    { id: 'other',          label: 'Other',          icon: '📦' },
   ]
 
   const getMonthKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
@@ -851,9 +853,22 @@ export default function Dashboard() {
       if (freq === 'yearly') return amt / 12
       return amt
     }
+    // Bills & expenses
     expenses.forEach((e: any) => {
       const cat = e.category || 'other'
       proj[cat] = (proj[cat] || 0) + toMonthly(parseFloat(e.amount || '0'), e.frequency)
+    })
+    // Debt minimum payments
+    debts.forEach((d: any) => {
+      const monthly = toMonthly(parseFloat(d.minPayment || '0'), d.frequency || 'monthly')
+      proj['debt_payments'] = (proj['debt_payments'] || 0) + monthly
+    })
+    // Goal savings contributions
+    goals.forEach((g: any) => {
+      if (g.paymentAmount) {
+        const monthly = toMonthly(parseFloat(g.paymentAmount || '0'), g.savingsFrequency || 'monthly')
+        proj['goal_savings'] = (proj['goal_savings'] || 0) + monthly
+      }
     })
     // Override with manually set category budgets
     Object.entries(categoryBudgets).forEach(([cat, amt]) => {
@@ -4329,6 +4344,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       <option value="quarterly">Quarterly</option>
                       <option value="yearly">Yearly</option>
                     </select>
+                    <select value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value})} style={inputStyle}>
+                      {EXPENSE_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+                    </select>
                   </div>
                   <SmartDatePicker
                     frequency={newExpense.frequency}
@@ -4341,11 +4359,14 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>
                   {expenses.filter(e => !e.targetDebtId && !e.targetGoalId).length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No expenses yet</p> : expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(exp => (
                     editingItem?.type === 'expense' && editingItem.id === exp.id ? (
-                      <div key={exp.id} style={{ padding: '10px', marginBottom: '6px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '8px' }}>
+                      <div key={exp.id} style={{ padding: '10px', marginBottom: '6px', background: '#2a1010', borderRadius: '8px' }}>
                         <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
                           <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} style={{...inputStyle, flex: 1, minWidth: '80px'}} />
                           <input type="number" value={editingItem.data.amount} onChange={e => updateEditField('amount', e.target.value)} style={{...inputStyle, width: '80px'}} />
                           <select value={editingItem.data.frequency} onChange={e => updateEditField('frequency', e.target.value)} style={inputStyle}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option></select>
+                          <select value={editingItem.data.category || 'other'} onChange={e => updateEditField('category', e.target.value)} style={inputStyle}>
+                            {EXPENSE_CATEGORIES.filter(c => !['debt_payments','goal_savings'].includes(c.id)).map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+                          </select>
                         </div>
                         <div style={{ marginBottom: '8px' }}>
                           <SmartDatePicker
@@ -4358,9 +4379,12 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         <div style={{ display: 'flex', gap: '8px' }}><button onClick={saveEdit} style={{...btnSuccess, padding: '6px 12px', fontSize: '12px'}}>Save</button><button onClick={cancelEdit} style={{...btnDanger, padding: '6px 12px', fontSize: '12px'}}>Cancel</button></div>
                       </div>
                     ) : (
-                      <div key={exp.id} style={{ padding: '10px 12px', marginBottom: '6px', background: darkMode ? '#3a1e1e' : '#fef2f2', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div key={exp.id} style={{ padding: '10px 12px', marginBottom: '6px', background: '#1a0808', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                          <div style={{ color: theme.text, fontWeight: 600 }}>{exp.name}</div>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <div style={{ color: theme.text, fontWeight: 600 }}>{exp.name}</div>
+                            {exp.category && exp.category !== 'other' && (() => { const cat = EXPENSE_CATEGORIES.find(c => c.id === exp.category); return cat ? <span style={{ fontSize: '10px', padding: '1px 6px', background: theme.accent + '20', color: theme.accent, borderRadius: '10px' }}>{cat.icon} {cat.label}</span> : null })()}
+                          </div>
                           <div style={{ color: theme.textMuted, fontSize: '12px' }}>
                             {exp.frequency}
                             {exp.dueDate && (() => {
