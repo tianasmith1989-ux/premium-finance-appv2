@@ -1323,6 +1323,7 @@ Always reference who they said they're becoming when relevant. Coach them as the
       setMissionComplete(true)
       setMissionNavLocked(false)
       setOnboardingComplete(true)
+      setActiveTab('home' as any)
     } else {
       setMissionStep((toStep ?? missionStep + 1) as any)
     }
@@ -2009,18 +2010,52 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#0a0a0a', fontSize: '16px' }}>A</div>
               <div>
                 <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Aureus Setup</div>
-                <div style={{ color: theme.textMuted, fontSize: '11px' }}>Step {missionStep} of 6</div>
+                <div style={{ color: theme.textMuted, fontSize: '11px' }}>{missionStep === 0 ? 'Welcome' : `Step ${missionStep} of 7`}</div>
               </div>
             </div>
-            {/* Progress bar */}
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              {[1,2,3,4,5,6].map(s => (
-                <div key={s} style={{ width: s === missionStep ? '24px' : '8px', height: '8px', borderRadius: '4px', background: s < missionStep ? theme.success : s === missionStep ? theme.accent : theme.border, transition: 'all 0.3s' }} />
-              ))}
-            </div>
+            {/* Progress bar — only show after step 0 */}
+            {missionStep > 0 && (
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                {[1,2,3,4,5,6,7].map(s => (
+                  <div key={s} style={{ width: s === missionStep ? '24px' : '8px', height: '8px', borderRadius: '4px', background: s < missionStep ? theme.success : s === missionStep ? theme.accent : theme.border, transition: 'all 0.3s' }} />
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* STEP 1 — Personality + Why */}
+          {/* STEP 0 — Welcome */}
+          {missionStep === 0 && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '40px 24px', maxWidth: '560px', margin: '0 auto', width: '100%', textAlign: 'center' as const }}>
+              <div style={{ width: '90px', height: '90px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 28px', fontSize: '44px', fontWeight: 800, color: '#0a0a0a', boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}>A</div>
+              <h1 style={{ color: theme.text, fontSize: '32px', fontWeight: 800, margin: '0 0 12px 0', fontFamily: 'Cinzel, serif' }}>G'day, I'm Aureus.</h1>
+              <p style={{ color: theme.textMuted, fontSize: '16px', lineHeight: 1.8, margin: '0 0 12px 0', maxWidth: '420px' }}>
+                Your personal AI financial coach — built for Australians who want to pay off debt faster, build real wealth, and stop wondering what to do next.
+              </p>
+              <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 32px 0' }}>Takes about 5 minutes. Your data never leaves your device.</p>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', width: '100%', maxWidth: '400px', marginBottom: '28px' }}>
+                {[
+                  { icon: '🧠', text: 'Understand your money personality' },
+                  { icon: '💰', text: 'Map your income, bills, debts & savings' },
+                  { icon: '📅', text: 'Set up your check-in schedule' },
+                  { icon: '🛤️', text: 'Build your personalised roadmap' },
+                ].map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                    <span style={{ fontSize: '20px' }}>{item.icon}</span>
+                    <span style={{ color: theme.text, fontSize: '14px' }}>{item.text}</span>
+                    <span style={{ marginLeft: 'auto', color: theme.success, fontSize: '12px' }}>→</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => advanceMission(1)}
+                style={{ width: '100%', maxWidth: '400px', padding: '18px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '18px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
+                Begin →
+              </button>
+              <button onClick={() => { setMissionComplete(true); setMissionNavLocked(false); setOnboardingComplete(true); setActiveTab('home' as any) }}
+                style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', marginTop: '14px', fontSize: '13px' }}>
+                Skip setup — I'll do this later
+              </button>
+            </div>
+          )}
           {missionStep === 1 && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
               <div style={{ fontSize: '56px', marginBottom: '16px' }}>🧠</div>
@@ -2552,15 +2587,145 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               })()}
 
               <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                <button onClick={() => advanceMission(null, 2)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
+                <button onClick={() => advanceMission(7)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
                   Skip — I'll add this later
                 </button>
                 <button
-                  onClick={() => advanceMission(null, 2)}
+                  onClick={() => advanceMission(7)}
                   style={{ flex: 1, padding: '16px', background: mortgageAccel.balance ? theme.success : theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
-                  {mortgageAccel.balance ? "I can see my date. Build my roadmap →" : "Build my roadmap →"}
+                  {mortgageAccel.balance ? "I can see my date. Next →" : "Next →"}
                 </button>
               </div>
+            </div>
+          )}
+          {/* STEP 7 — Schedule & Automation */}
+          {missionStep === 7 && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '580px', margin: '0 auto', width: '100%' }}>
+              <div style={{ fontSize: '56px', marginBottom: '16px' }}>📅</div>
+              <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>Set up your money rhythm.</h2>
+              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 24px 0' }}>
+                Consistent check-ins are what separate people who build wealth from those who don't. Let's schedule yours now.
+              </p>
+
+              {/* Weekly Money Date */}
+              <div style={{ width: '100%', padding: '18px', background: theme.cardBg, borderRadius: '14px', border: '2px solid ' + theme.accent + '40', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '14px' }}>
+                  <span style={{ fontSize: '24px' }}>💰</span>
+                  <div>
+                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Weekly Money Date</div>
+                    <div style={{ color: theme.textMuted, fontSize: '12px', lineHeight: 1.5 }}>15 mins every week — review spending, check bills, celebrate wins. This single habit is worth thousands.</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const }}>
+                  <div style={{ flex: 1, minWidth: '130px' }}>
+                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Day</label>
+                    <select value={checkInSchedule.moneyDateDay} onChange={e => setCheckInSchedule(s => ({ ...s, moneyDateDay: e.target.value }))} style={{ ...inputStyle, width: '100%' }}>
+                      {['sunday','monday','tuesday','wednesday','thursday','friday','saturday'].map(day => (
+                        <option key={day} value={day}>{day.charAt(0).toUpperCase() + day.slice(1)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ flex: 1, minWidth: '120px' }}>
+                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Time</label>
+                    <input type="time" value={checkInSchedule.moneyDateTime} onChange={e => setCheckInSchedule(s => ({ ...s, moneyDateTime: e.target.value }))} style={{ ...inputStyle, width: '100%' }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Daily check-in */}
+              <div style={{ width: '100%', padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: checkInSchedule.dailyEnabled ? '10px' : 0 }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '20px' }}>☀️</span>
+                    <div>
+                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Daily check-in</div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px' }}>Quick win log — 2 minutes a day</div>
+                    </div>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={checkInSchedule.dailyEnabled} onChange={e => setCheckInSchedule(s => ({ ...s, dailyEnabled: e.target.checked }))} style={{ accentColor: theme.accent, width: '16px', height: '16px' }} />
+                    <span style={{ color: theme.text, fontSize: '13px' }}>{checkInSchedule.dailyEnabled ? 'On' : 'Off'}</span>
+                  </label>
+                </div>
+                {checkInSchedule.dailyEnabled && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                    <label style={{ color: theme.textMuted, fontSize: '12px' }}>Preferred time</label>
+                    <input type="time" value={checkInSchedule.dailyTime} onChange={e => setCheckInSchedule(s => ({ ...s, dailyTime: e.target.value }))} style={{ ...inputStyle, width: '120px' }} />
+                  </div>
+                )}
+              </div>
+
+              {/* Monthly review */}
+              <div style={{ width: '100%', padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '20px' }}>📊</span>
+                    <div>
+                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Monthly Review</div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px' }}>Net worth, goal progress, debt update</div>
+                    </div>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={checkInSchedule.monthlyEnabled} onChange={e => setCheckInSchedule(s => ({ ...s, monthlyEnabled: e.target.checked }))} style={{ accentColor: theme.accent, width: '16px', height: '16px' }} />
+                    <span style={{ color: theme.text, fontSize: '13px' }}>{checkInSchedule.monthlyEnabled ? 'On' : 'Off'}</span>
+                  </label>
+                </div>
+                {checkInSchedule.monthlyEnabled && (
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const }}>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '3px' }}>Day of month</label>
+                      <select value={checkInSchedule.monthlyDay} onChange={e => setCheckInSchedule(s => ({ ...s, monthlyDay: e.target.value }))} style={{ ...inputStyle }}>
+                        {Array.from({length: 28}, (_,i) => i+1).map(d => <option key={d} value={d.toString()}>{d}{d===1?'st':d===2?'nd':d===3?'rd':'th'}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '3px' }}>Time</label>
+                      <input type="time" value={checkInSchedule.monthlyTime} onChange={e => setCheckInSchedule(s => ({ ...s, monthlyTime: e.target.value }))} style={{ ...inputStyle, width: '120px' }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Automated payments */}
+              {!hasAutomatedPayments && (
+                <div style={{ width: '100%', padding: '16px', background: theme.warning + '12', borderRadius: '12px', border: '2px solid ' + theme.warning + '40', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '22px' }}>⚙️</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: theme.warning, fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>Set up automated payments</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px', lineHeight: 1.6, marginBottom: '12px' }}>
+                        The #1 thing that separates people who build wealth from those who don't — automated transfers. Log in to your bank and set up auto-transfers for each of these before continuing:
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px', marginBottom: '10px' }}>
+                        {[
+                          ...goals.filter((g: any) => g.paymentAmount).map((g: any) => ({ label: `${g.name} — $${g.paymentAmount}/${g.savingsFrequency || 'mo'}`, done: false })),
+                          ...debts.map((d: any) => ({ label: `${d.name} min payment — $${d.minPayment}/${d.frequency || 'mo'}`, done: false })),
+                        ].slice(0, 5).map((item, i) => (
+                          <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '8px 10px', background: theme.bg, borderRadius: '8px' }}>
+                            <span style={{ color: theme.warning, fontSize: '13px' }}>→</span>
+                            <span style={{ color: theme.text, fontSize: '12px' }}>{item.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={hasAutomatedPayments} onChange={e => setHasAutomatedPayments(e.target.checked)} style={{ accentColor: theme.accent, width: '16px', height: '16px' }} />
+                        <span style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>I've set up (or will set up) automated transfers ✓</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {hasAutomatedPayments && (
+                <div style={{ width: '100%', padding: '12px 16px', background: theme.success + '15', borderRadius: '10px', border: '1px solid ' + theme.success + '30', marginBottom: '14px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '20px' }}>✅</span>
+                  <span style={{ color: theme.success, fontSize: '13px', fontWeight: 600 }}>Automated payments set up — your money works while you sleep.</span>
+                </div>
+              )}
+
+              <button onClick={() => advanceMission(null, 2)}
+                style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '16px', fontWeight: 800, fontFamily: 'Cinzel, serif', marginTop: '8px' }}>
+                Build my roadmap →
+              </button>
             </div>
           )}
         </div>
@@ -2691,17 +2856,51 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   </>
                 ) : (
                   <>
-                    <div style={{ fontSize: '64px', marginBottom: '20px' }}>🎉</div>
-                    <h2 style={{ color: theme.success, fontSize: '26px', margin: '0 0 12px 0' }}>You're set up!</h2>
+                    <div style={{ fontSize: '64px', marginBottom: '20px' }}>🏛️</div>
+                    <h2 style={{ color: theme.accent, fontSize: '28px', margin: '0 0 6px 0', fontFamily: 'Cinzel, serif' }}>Your Empire Begins.</h2>
                     <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, marginBottom: '24px' }}>
-                      Your roadmap is built and your first weekly action plan is ready.<br/>Aureus is now fully personalised to you.<br/><br/>I'll tell you exactly what to do next — every day.
+                      Your roadmap is built. Aureus knows your numbers, your personality, and your goals.
                     </p>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', alignItems: 'center', marginBottom: '28px' }}>
-                      <div style={{ padding: '8px 16px', background: theme.success + '20', color: theme.success, borderRadius: '8px', fontSize: '13px' }}>✓ {missionP2Confirmed.filter(Boolean).length} milestones added to your roadmap</div>
-                      <div style={{ padding: '8px 16px', background: theme.accent + '20', color: theme.accent, borderRadius: '8px', fontSize: '13px' }}>✓ First weekly action plan generated</div>
-                      <div style={{ padding: '8px 16px', background: theme.purple + '20', color: theme.purple, borderRadius: '8px', fontSize: '13px' }}>✓ Coaching personalised to your {moneyPersonality && personalityProfiles[moneyPersonality]?.label}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', marginBottom: '28px', textAlign: 'left' as const }}>
+                      <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px', textAlign: 'center' as const }}>✅ WHAT JUST HAPPENED</div>
+                      {[
+                        { icon: '✓', text: `${missionP2Confirmed.filter(Boolean).length} milestones added to your roadmap`, color: theme.success },
+                        { icon: '✓', text: 'First 7-step action plan generated for your #1 milestone', color: theme.success },
+                        { icon: '✓', text: `Coaching personalised to your ${moneyPersonality ? personalityProfiles[moneyPersonality]?.label : 'profile'}`, color: theme.success },
+                        { icon: '✓', text: `Money date scheduled for every ${checkInSchedule.moneyDateDay} at ${checkInSchedule.moneyDateTime}`, color: theme.success },
+                        ...(checkInSchedule.dailyEnabled ? [{ icon: '✓', text: 'Daily check-in enabled', color: theme.success }] : []),
+                      ].map((item, i) => (
+                        <div key={i} style={{ display: 'flex', gap: '10px', padding: '10px 14px', background: item.color + '15', borderRadius: '10px', border: '1px solid ' + item.color + '30' }}>
+                          <span style={{ color: item.color, fontWeight: 700 }}>{item.icon}</span>
+                          <span style={{ color: theme.text, fontSize: '13px' }}>{item.text}</span>
+                        </div>
+                      ))}
                     </div>
-                    <p style={{ color: theme.textMuted, fontSize: '13px' }}>Taking you to your roadmap now...</p>
+
+                    <div style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #1a1208, #0a0a0a)', borderRadius: '14px', border: '1px solid ' + theme.accent + '40', marginBottom: '24px', textAlign: 'left' as const }}>
+                      <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>📋 YOUR ORDER OF OPERATIONS</div>
+                      {[
+                        { step: '1', icon: '☀️', title: 'Daily (2 min)', desc: 'Log one win. Note one improvement. Check your calendar events for today.', tab: 'home' },
+                        { step: '2', icon: '💰', title: `Every ${checkInSchedule.moneyDateDay} — Money Date`, desc: `${checkInSchedule.moneyDateTime} · Review your week's spending, tick off paid bills, check goal progress.`, tab: 'dashboard' },
+                        { step: '3', icon: '🛤️', title: 'Work your roadmap steps', desc: 'Open Roadmap → tick off steps as you complete them. Aureus generates a new plan when you need one.', tab: 'path' },
+                        { step: '4', icon: '📊', title: `${checkInSchedule.monthlyEnabled ? parseInt(checkInSchedule.monthlyDay) : 1}${checkInSchedule.monthlyEnabled && parseInt(checkInSchedule.monthlyDay)===1?'st':parseInt(checkInSchedule.monthlyDay)===2?'nd':parseInt(checkInSchedule.monthlyDay)===3?'rd':'th'} of each month`, desc: 'Update your net worth, debt balances, and goal progress. Runs in 10 minutes.', tab: 'review' },
+                        { step: '5', icon: '💬', title: 'Ask Aureus anything', desc: 'Not sure what to do? Ask Aureus. It knows your full financial picture.', tab: 'chat' },
+                      ].map((item) => (
+                        <div key={item.step} style={{ display: 'flex', gap: '12px', padding: '10px 0', borderBottom: '1px solid ' + theme.border + '80' }}>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: theme.accent + '25', border: '1px solid ' + theme.accent + '50', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '13px', fontWeight: 800, color: theme.accent }}>{item.step}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{item.icon} {item.title}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '11px', lineHeight: 1.5, marginTop: '2px' }}>{item.desc}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => advanceMission(null, 3)}
+                      style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '18px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
+                      Enter Your Empire →
+                    </button>
                   </>
                 )}
               </div>
