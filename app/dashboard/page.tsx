@@ -20,7 +20,7 @@ export default function Dashboard() {
   const [missionP2Proposals, setMissionP2Proposals] = useState<any[]>([])
   const [missionP2Confirmed, setMissionP2Confirmed] = useState<boolean[]>([])
   const [missionNavLocked, setMissionNavLocked] = useState(true) // locks nav during phase 1
-  const [activeTab, setActiveTab] = useState<'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'learn' | 'wins' | 'mortgage' | 'insights' | 'grow' | 'review' | 'property'>('chat')
+  const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'learn' | 'wins' | 'mortgage' | 'insights' | 'grow' | 'review' | 'property'>('home')
   const [darkMode, setDarkMode] = useState(true)
 
   // ==================== ONBOARDING FLOW ====================
@@ -223,6 +223,7 @@ export default function Dashboard() {
 
   // Presets
   const [showPresets, setShowPresets] = useState(false)
+  const [showMoreTabs, setShowMoreTabs] = useState(false)
 
   // Misc
   const moneyQuotes = [
@@ -2753,28 +2754,58 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             </select>
           </div>
         </div>
-        {/* NAV TABS - scrollable */}
-        <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' as const, paddingBottom: '2px' }}>
+        {/* NAV TABS - primary always visible, secondary in More drawer */}
+        <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' as const, paddingBottom: '2px', alignItems: 'center' }}>
           {[
-            { id: 'chat', label: '💬 Aureus' },
-            { id: 'quickview', label: '⚡ Quick' },
+            { id: 'home',      label: '🏠 Home' },
+            { id: 'chat',      label: '💬 Aureus' },
             { id: 'dashboard', label: '🎛️ Budget' },
-            { id: 'mortgage', label: '🚀 Mortgage' },
-            { id: 'property', label: '🏘️ Property' },
-            { id: 'insights', label: '🧠 Insights' },
-            { id: 'path', label: '🛤️ Path' },
-            { id: 'grow', label: '📈 Grow' },
-            { id: 'review', label: '🔄 Review' },
-            { id: 'overview', label: '📊 Metrics' },
-            { id: 'learn', label: '🎓 Learn' },
-            { id: 'wins', label: `🏆 Wins${wins.length > 0 ? ` (${wins.length})` : ''}` },
+            { id: 'path',      label: '🛤️ Roadmap' },
+            { id: 'wins',      label: `🏆 Wins${wins.length > 0 ? ` (${wins.length})` : ''}` },
           ].map(tab => (
             <button key={tab.id}
-              onClick={() => { if (missionNavLocked) return; setActiveTab(tab.id as any) }}
-              style={{ padding: '7px 14px', background: activeTab === tab.id ? theme.accent : 'transparent', color: activeTab === tab.id ? 'white' : missionNavLocked ? theme.textMuted + '60' : theme.text, border: '1px solid ' + (activeTab === tab.id ? theme.accent : theme.border), borderRadius: '8px', cursor: missionNavLocked ? 'default' : 'pointer', fontSize: '12px', fontWeight: 500, whiteSpace: 'nowrap' as const, flexShrink: 0, opacity: missionNavLocked ? 0.4 : 1 }}>
+              onClick={() => { if (missionNavLocked) return; setActiveTab(tab.id as any); setShowMoreTabs(false) }}
+              style={{ padding: '7px 14px', background: activeTab === tab.id ? theme.accent : 'transparent', color: activeTab === tab.id ? '#0a0a0a' : missionNavLocked ? theme.textMuted + '60' : theme.text, border: '1px solid ' + (activeTab === tab.id ? theme.accent : theme.border), borderRadius: '8px', cursor: missionNavLocked ? 'default' : 'pointer', fontSize: '12px', fontWeight: activeTab === tab.id ? 700 : 500, whiteSpace: 'nowrap' as const, flexShrink: 0, opacity: missionNavLocked ? 0.4 : 1 }}>
               {tab.label}
             </button>
           ))}
+
+          {/* MORE DROPDOWN */}
+          <div style={{ position: 'relative' as const, flexShrink: 0 }}>
+            <button onClick={() => setShowMoreTabs(!showMoreTabs)}
+              style={{ padding: '7px 14px', background: ['mortgage','property','insights','grow','review','overview','learn','quickview'].includes(activeTab) ? theme.accent + '25' : 'transparent', color: ['mortgage','property','insights','grow','review','overview','learn','quickview'].includes(activeTab) ? theme.accent : theme.textMuted, border: '1px solid ' + (showMoreTabs ? theme.accent + '60' : theme.border), borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 500, whiteSpace: 'nowrap' as const }}>
+              {['mortgage','property','insights','grow','review','overview','learn','quickview'].includes(activeTab) ? '● More ▾' : 'More ▾'}
+            </button>
+            {showMoreTabs && (
+              <div style={{ position: 'absolute' as const, top: 'calc(100% + 6px)', left: 0, background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', padding: '8px', zIndex: 300, minWidth: '210px', boxShadow: '0 12px 40px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
+                <div style={{ color: theme.accent, fontSize: '10px', fontWeight: 700, padding: '4px 10px 8px', letterSpacing: '1px' }}>BUILD WEALTH</div>
+                {[
+                  { id: 'mortgage',  label: '🚀 Mortgage Accelerator' },
+                  { id: 'property',  label: '🏘️ Property Portfolio' },
+                  { id: 'grow',      label: '📈 Grow & FIRE' },
+                ].map(tab => (
+                  <button key={tab.id} onClick={() => { setActiveTab(tab.id as any); setShowMoreTabs(false) }}
+                    style={{ display: 'block', width: '100%', padding: '9px 10px', background: activeTab === tab.id ? theme.accent + '20' : 'transparent', color: activeTab === tab.id ? theme.accent : theme.text, border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' as const, fontWeight: activeTab === tab.id ? 700 : 400 }}>
+                    {tab.label}
+                  </button>
+                ))}
+                <div style={{ color: theme.accent, fontSize: '10px', fontWeight: 700, padding: '10px 10px 8px', letterSpacing: '1px', borderTop: '1px solid ' + theme.border, marginTop: '4px' }}>REVIEW & LEARN</div>
+                {[
+                  { id: 'insights',  label: '🧠 Insights' },
+                  { id: 'review',    label: '🔄 Monthly Review' },
+                  { id: 'overview',  label: '📊 Metrics' },
+                  { id: 'learn',     label: '🎓 Learn' },
+                  { id: 'quickview', label: '⚡ Quick View' },
+                ].map(tab => (
+                  <button key={tab.id} onClick={() => { setActiveTab(tab.id as any); setShowMoreTabs(false) }}
+                    style={{ display: 'block', width: '100%', padding: '9px 10px', background: activeTab === tab.id ? theme.accent + '20' : 'transparent', color: activeTab === tab.id ? theme.accent : theme.text, border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' as const, fontWeight: activeTab === tab.id ? 700 : 400 }}>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Phase 1 locked nav banner */}
           {missionNavLocked && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', background: theme.accent + '20', borderRadius: '8px', border: '1px solid ' + theme.accent + '40', flexShrink: 0 }}>
@@ -2786,9 +2817,215 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         </div>
       </header>
 
+      {/* Close More drawer on outside click */}
+      {showMoreTabs && <div style={{ position: 'fixed' as const, inset: 0, zIndex: 299 }} onClick={() => setShowMoreTabs(false)} />}
+
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
 
         {/* QUICK VIEW */}
+        {/* ============================================================
+            HOME TAB — Daily Driver (Option A+D)
+        ============================================================ */}
+        {activeTab === 'home' && (() => {
+          // Build next 7 days of calendar events
+          const today = new Date()
+          const upcoming: any[] = []
+          for (let d = 0; d < 7; d++) {
+            const dt = new Date(today); dt.setDate(today.getDate() + d)
+            const day = dt.getDate(); const month = dt.getMonth() + 1; const year = dt.getFullYear()
+            incomeStreams.forEach(inc => { if (shouldShowItem(inc.startDate, inc.frequency, day, month, year)) upcoming.push({ ...inc, date: dt, itemType: 'income', dayOffset: d }) })
+            expenses.filter((e: any) => !e.targetDebtId && !e.targetGoalId).forEach((exp: any) => { if (shouldShowItem(exp.dueDate, exp.frequency, day, month, year)) upcoming.push({ ...exp, date: dt, itemType: 'expense', dayOffset: d }) })
+            debts.forEach((debt: any) => { if (shouldShowItem(debt.paymentDate, debt.frequency || 'monthly', day, month, year)) upcoming.push({ ...debt, amount: debt.minPayment, date: dt, itemType: 'debt', dayOffset: d }) })
+            goals.filter((g: any) => g.addedToCalendar && g.paymentAmount).forEach((g: any) => { if (shouldShowItem(g.startDate, g.savingsFrequency || 'monthly', day, month, year)) upcoming.push({ ...g, amount: g.paymentAmount, date: dt, itemType: 'goal', dayOffset: d }) })
+          }
+          // Active roadmap milestone
+          const activeMilestone = roadmapMilestones.find((m: any) => (m.currentAmount || 0) < parseFloat(m.targetAmount || '99999'))
+          const hourOfDay = new Date().getHours()
+          const greeting = hourOfDay < 12 ? 'Good morning' : hourOfDay < 17 ? 'Good afternoon' : 'Good evening'
+          const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][today.getDay()]
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
+
+              {/* ── GREETING HERO ── */}
+              <div style={{ padding: '28px 28px 20px', background: 'linear-gradient(135deg, #1a1208 0%, #0f0c04 60%, #0a0a0a 100%)', borderRadius: '20px', border: '1px solid ' + theme.accent + '30', position: 'relative' as const, overflow: 'hidden' }}>
+                <div style={{ position: 'absolute' as const, top: 0, right: 0, width: '300px', height: '100%', background: 'radial-gradient(ellipse at 80% 50%, ' + theme.accent + '08 0%, transparent 70%)', pointerEvents: 'none' as const }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' as const, gap: '12px' }}>
+                  <div>
+                    <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, letterSpacing: '1px', marginBottom: '4px' }}>{dayName.toUpperCase()} · {today.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                    <h2 style={{ color: theme.text, fontSize: '26px', fontWeight: 800, margin: '0 0 6px 0', fontFamily: 'Cinzel, serif' }}>{greeting}, Builder.</h2>
+                    <div style={{ color: theme.textMuted, fontSize: '14px', fontStyle: 'italic' }}>"{currentQuote.quote}"</div>
+                    {whyStatement && <div style={{ marginTop: '10px', padding: '8px 12px', background: theme.accent + '15', borderRadius: '8px', border: '1px solid ' + theme.accent + '30', color: theme.accent, fontSize: '13px', fontStyle: 'italic' }}>🎯 {whyStatement}</div>}
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const }}>
+                    {streak > 0 && <div style={{ padding: '10px 16px', background: theme.accent + '20', borderRadius: '12px', border: '1px solid ' + theme.accent + '40', textAlign: 'center' as const }}>
+                      <div style={{ fontSize: '22px' }}>🔥</div>
+                      <div style={{ color: theme.accent, fontWeight: 800, fontSize: '18px' }}>{streak}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '10px' }}>day streak</div>
+                    </div>}
+                    <button onClick={() => setActiveTab('chat')} style={{ padding: '10px 18px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
+                      💬 Ask Aureus
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── 4-STAT SNAPSHOT ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
+                {[
+                  { label: 'Monthly Income', value: '$' + monthlyIncome.toFixed(0), color: theme.success, icon: '💰', tab: 'dashboard' },
+                  { label: 'Monthly Surplus', value: (monthlySurplus >= 0 ? '+$' : '-$') + Math.abs(monthlySurplus).toFixed(0), color: monthlySurplus >= 0 ? theme.success : theme.danger, icon: '📊', tab: 'dashboard' },
+                  { label: 'Net Worth', value: '$' + netWorth.toLocaleString(), color: netWorth >= 0 ? theme.accent : theme.danger, icon: '🏛️', tab: 'overview' },
+                  { label: 'Goal Savings', value: '$' + monthlyGoalSavings.toFixed(0) + '/mo', color: theme.accent, icon: '🎯', tab: 'dashboard' },
+                ].map(stat => (
+                  <button key={stat.label} onClick={() => setActiveTab(stat.tab as any)}
+                    style={{ padding: '18px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border, cursor: 'pointer', textAlign: 'left' as const, transition: 'border-color 0.2s' }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = theme.accent + '60')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = theme.border)}>
+                    <div style={{ fontSize: '20px', marginBottom: '8px' }}>{stat.icon}</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, marginBottom: '4px', letterSpacing: '0.5px' }}>{stat.label.toUpperCase()}</div>
+                    <div style={{ color: stat.color, fontSize: '22px', fontWeight: 800 }}>{stat.value}</div>
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+
+                {/* ── NEXT ACTION FROM AUREUS ── */}
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                  {coachNextAction ? (
+                    <div style={{ padding: '20px', background: coachNextAction.urgency === 'high' ? theme.danger + '15' : theme.accent + '12', borderRadius: '16px', border: '2px solid ' + (coachNextAction.urgency === 'high' ? theme.danger + '50' : theme.accent + '40') }}>
+                      <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>⚡ YOUR NEXT ACTION</div>
+                      <div style={{ fontSize: '28px', marginBottom: '8px' }}>{coachNextAction.icon}</div>
+                      <div style={{ color: theme.text, fontSize: '15px', fontWeight: 600, lineHeight: 1.5, marginBottom: '14px' }}>{coachNextAction.message}</div>
+                      <button onClick={() => { setActiveTab(coachNextAction.tab as any); setShowMoreTabs(false) }}
+                        style={{ padding: '10px 18px', background: coachNextAction.urgency === 'high' ? theme.danger : theme.accent, color: coachNextAction.urgency === 'high' ? 'white' : '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
+                        {coachNextAction.action} →
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ padding: '20px', background: theme.success + '12', borderRadius: '16px', border: '2px solid ' + theme.success + '30' }}>
+                      <div style={{ color: theme.success, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>✅ ALL GOOD</div>
+                      <div style={{ color: theme.text, fontSize: '15px', fontWeight: 600, lineHeight: 1.5 }}>You're on track. Your empire is building itself. Keep going.</div>
+                    </div>
+                  )}
+
+                  {/* Active Roadmap Milestone */}
+                  {activeMilestone && (
+                    <div style={{ padding: '18px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '10px' }}>🛤️ ACTIVE MISSION</div>
+                      <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>{activeMilestone.icon} {activeMilestone.name}</div>
+                      {activeMilestone.targetAmount && (
+                        <>
+                          <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>${(activeMilestone.currentAmount || 0).toLocaleString()} of ${parseFloat(activeMilestone.targetAmount).toLocaleString()}</div>
+                          <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden', marginBottom: '12px' }}>
+                            <div style={{ width: Math.min(100, ((activeMilestone.currentAmount || 0) / parseFloat(activeMilestone.targetAmount)) * 100) + '%', height: '100%', background: 'linear-gradient(90deg, #D4AF37, #B68B2E)' }} />
+                          </div>
+                        </>
+                      )}
+                      {activeMilestone.weeklyPlan && activeMilestone.weeklyPlan.some((s: any) => !s.done) && (
+                        <div style={{ padding: '10px', background: theme.bg, borderRadius: '8px' }}>
+                          <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 600, marginBottom: '4px' }}>NEXT STEP</div>
+                          <div style={{ color: theme.text, fontSize: '13px', lineHeight: 1.5 }}>{activeMilestone.weeklyPlan.find((s: any) => !s.done)?.text}</div>
+                        </div>
+                      )}
+                      <button onClick={() => setActiveTab('path')} style={{ marginTop: '12px', padding: '8px 14px', background: theme.accent + '20', color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>View Full Roadmap →</button>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                  {/* This Week */}
+                  <div style={{ padding: '18px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '12px' }}>📅 THIS WEEK</div>
+                    {upcoming.length === 0 ? (
+                      <div style={{ color: theme.textMuted, fontSize: '13px' }}>No upcoming events in the next 7 days</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
+                        {upcoming.slice(0, 6).map((item, i) => {
+                          const isIncome = item.itemType === 'income'
+                          const isGoal = item.itemType === 'goal'
+                          const label = item.dayOffset === 0 ? 'Today' : item.dayOffset === 1 ? 'Tomorrow' : item.date.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric' })
+                          const icon = isIncome ? '💰' : isGoal ? '🎯' : item.itemType === 'debt' ? '💳' : '📋'
+                          const color = isIncome ? theme.success : isGoal ? theme.accent : item.itemType === 'debt' ? theme.warning : theme.textMuted
+                          return (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: theme.bg, borderRadius: '8px' }}>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <span style={{ fontSize: '14px' }}>{icon}</span>
+                                <div>
+                                  <div style={{ color: theme.text, fontSize: '12px', fontWeight: 600 }}>{item.name}</div>
+                                  <div style={{ color: theme.textMuted, fontSize: '10px' }}>{label}</div>
+                                </div>
+                              </div>
+                              <div style={{ color, fontWeight: 700, fontSize: '13px' }}>{isIncome ? '+' : '-'}${parseFloat(item.amount || '0').toFixed(0)}</div>
+                            </div>
+                          )
+                        })}
+                        {upcoming.length > 6 && <div style={{ color: theme.textMuted, fontSize: '11px', textAlign: 'center' as const, paddingTop: '4px' }}>+{upcoming.length - 6} more — <span style={{ color: theme.accent, cursor: 'pointer' }} onClick={() => setActiveTab('dashboard')}>view calendar</span></div>}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Goals */}
+                  {goals.length > 0 && (
+                    <div style={{ padding: '18px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '12px' }}>🎯 GOALS</div>
+                      {goals.slice(0, 3).map((g: any) => {
+                        const pct = Math.min(100, (parseFloat(g.saved || '0') / parseFloat(g.target || '1')) * 100)
+                        return (
+                          <div key={g.id} style={{ marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span style={{ color: theme.text, fontSize: '12px', fontWeight: 600 }}>{g.name}</span>
+                              <span style={{ color: theme.accent, fontSize: '12px', fontWeight: 700 }}>{pct.toFixed(0)}%</span>
+                            </div>
+                            <div style={{ height: '5px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: pct + '%', height: '100%', background: 'linear-gradient(90deg, #D4AF37, #B68B2E)' }} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                      <button onClick={() => setActiveTab('dashboard')} style={{ marginTop: '4px', padding: '7px 14px', background: 'transparent', color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        Manage Goals →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── QUICK JUMP GRID ── */}
+              <div style={{ padding: '18px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}>
+                <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '14px' }}>QUICK ACCESS — EVERYTHING IN AUREUS</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px' }}>
+                  {[
+                    { id: 'chat',      icon: '💬', label: 'Ask Aureus',    desc: 'AI coach' },
+                    { id: 'dashboard', icon: '🎛️', label: 'Budget',        desc: 'Income, bills, goals' },
+                    { id: 'path',      icon: '🛤️', label: 'Roadmap',       desc: 'Baby steps & milestones' },
+                    { id: 'wins',      icon: '🏆', label: 'Wins',          desc: 'Your progress log' },
+                    { id: 'mortgage',  icon: '🚀', label: 'Mortgage',      desc: 'Pay off faster' },
+                    { id: 'property',  icon: '🏘️', label: 'Property',      desc: 'IP portfolio' },
+                    { id: 'grow',      icon: '📈', label: 'Grow & FIRE',   desc: 'Investments & FI' },
+                    { id: 'insights',  icon: '🧠', label: 'Insights',      desc: 'AI analysis' },
+                    { id: 'review',    icon: '🔄', label: 'Review',        desc: 'Monthly check-in' },
+                    { id: 'overview',  icon: '📊', label: 'Metrics',       desc: 'Net worth & health' },
+                    { id: 'learn',     icon: '🎓', label: 'Learn',         desc: 'Financial education' },
+                    { id: 'quickview', icon: '⚡', label: 'Quick View',    desc: 'All-in-one snapshot' },
+                  ].map(item => (
+                    <button key={item.id} onClick={() => { setActiveTab(item.id as any); setShowMoreTabs(false) }}
+                      style={{ padding: '12px', background: activeTab === item.id ? theme.accent + '20' : theme.bg, border: '1px solid ' + (activeTab === item.id ? theme.accent + '60' : theme.border), borderRadius: '10px', cursor: 'pointer', textAlign: 'left' as const }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = theme.accent + '50')}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = activeTab === item.id ? theme.accent + '60' : theme.border)}>
+                      <div style={{ fontSize: '20px', marginBottom: '4px' }}>{item.icon}</div>
+                      <div style={{ color: theme.text, fontSize: '12px', fontWeight: 600, marginBottom: '2px' }}>{item.label}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '10px' }}>{item.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          )
+        })()}
+
         {activeTab === 'quickview' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
             {/* WHY STATEMENT BANNER */}
