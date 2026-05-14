@@ -2760,6 +2760,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             { id: 'quickview', label: '⚡ Quick' },
             { id: 'dashboard', label: '🎛️ Budget' },
             { id: 'mortgage', label: '🚀 Mortgage' },
+            { id: 'property', label: '🏘️ Property' },
             { id: 'insights', label: '🧠 Insights' },
             { id: 'path', label: '🛤️ Path' },
             { id: 'grow', label: '📈 Grow' },
@@ -5297,8 +5298,21 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               <div style={cardStyle}><h3 style={{ margin: '0 0 16px 0', color: theme.success }}>📈 Assets (${totalAssets.toLocaleString()})</h3>{assets.map(a => <div key={a.id} style={{ padding: '10px', marginBottom: '6px', background: theme.bg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.text }}>{a.name}</span><span style={{ color: theme.success, fontWeight: 700 }}>${parseFloat(a.value).toLocaleString()}</span></div>)}{assets.length === 0 && <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No assets added</p>}</div>
               <div style={cardStyle}><h3 style={{ margin: '0 0 16px 0', color: theme.danger }}>📉 Liabilities (${(totalLiabilities + totalDebtBalance).toFixed(0)})</h3>{debts.map(d => <div key={d.id} style={{ padding: '10px', marginBottom: '6px', background: theme.bg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}><span style={{ color: theme.text }}>💳 {d.name}</span><span style={{ color: theme.danger, fontWeight: 700 }}>${parseFloat(d.balance).toFixed(0)}</span></div>)}{debts.length === 0 && <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No debts</p>}</div>
             </div>
+            {investmentProperties.length > 0 && (
+              <div style={{ padding: '14px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.accent + '30', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ color: theme.accent, fontWeight: 700, fontSize: '14px' }}>🏘️ Investment Portfolio</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>{investmentProperties.length} propert{investmentProperties.length === 1 ? 'y' : 'ies'} · ${investmentProperties.reduce((s, p) => s + parseFloat(p.currentValue || p.purchasePrice || '0'), 0).toLocaleString()} total value</div>
+                </div>
+                <button onClick={() => setActiveTab('property' as any)} style={{ padding: '7px 14px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>View Portfolio →</button>
+              </div>
+            )}
+          </div>
+        )}
 
-            {/* ==================== INVESTMENT PROPERTY PORTFOLIO ==================== */}
+        {/* PROPERTY PORTFOLIO TAB */}
+        {activeTab === 'property' && (
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             {(() => {
               const calcProperty = (p: any) => {
                 const val = parseFloat(p.currentValue || p.purchasePrice || '0')
@@ -5329,11 +5343,11 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               const portfolioGrossYield = portfolioValue > 0 ? (portfolioAnnualRent / portfolioValue) * 100 : 0
 
               return (
-                <div style={{ ...cardStyle, marginTop: '0' }}>
+                <div style={cardStyle}>
                   {/* Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                     <div>
-                      <h3 style={{ margin: '0 0 2px 0', color: theme.accent, fontSize: '18px' }}>🏘️ Investment Property Portfolio</h3>
+                      <h3 style={{ margin: '0 0 2px 0', color: theme.accent, fontSize: '20px' }}>🏘️ Investment Property Portfolio</h3>
                       {investmentProperties.length > 0 && <div style={{ color: theme.textMuted, fontSize: '12px' }}>{investmentProperties.length} propert{investmentProperties.length === 1 ? 'y' : 'ies'}</div>}
                     </div>
                     <button onClick={() => setShowAddProperty(!showAddProperty)}
@@ -5342,9 +5356,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     </button>
                   </div>
 
-                  {/* Portfolio summary — only if properties exist */}
+                  {/* Portfolio summary */}
                   {investmentProperties.length > 0 && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginBottom: '20px', padding: '14px', background: 'linear-gradient(135deg, #1a1208 0%, #0a0a0a 100%)', borderRadius: '12px', border: '1px solid ' + theme.accent + '30' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginBottom: '20px', padding: '16px', background: 'linear-gradient(135deg, #1a1208 0%, #0a0a0a 100%)', borderRadius: '12px', border: '1px solid ' + theme.accent + '30' }}>
                       {[
                         { label: 'PORTFOLIO VALUE', value: '$' + portfolioValue.toLocaleString(), color: theme.accent },
                         { label: 'TOTAL EQUITY', value: '$' + portfolioEquity.toLocaleString(), color: theme.success },
@@ -5360,7 +5374,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       ))}
                       {portfolioCashFlow < 0 && (
                         <div style={{ gridColumn: '1 / -1', padding: '6px 10px', background: theme.warning + '15', borderRadius: '6px', border: '1px solid ' + theme.warning + '30', color: theme.warning, fontSize: '11px', textAlign: 'center' as const }}>
-                          ⚖️ Portfolio is negatively geared — ${Math.abs(portfolioCashFlow).toFixed(0)}/mo deductible against income tax
+                          ⚖️ Negatively geared — ${Math.abs(portfolioCashFlow).toFixed(0)}/mo shortfall is potentially tax-deductible
                         </div>
                       )}
                     </div>
@@ -5375,32 +5389,32 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                           <input placeholder="Property name (e.g. Brisbane Unit)" value={newProperty.name} onChange={e => setNewProperty({...newProperty, name: e.target.value})} style={{...inputStyle, flex: 2, minWidth: '160px'}} />
                           <input placeholder="Address (optional)" value={newProperty.address} onChange={e => setNewProperty({...newProperty, address: e.target.value})} style={{...inputStyle, flex: 3, minWidth: '180px'}} />
                         </div>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, marginBottom: '-4px' }}>PROPERTY VALUE</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>PROPERTY VALUE</div>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                          <div style={{ flex: 1, minWidth: '120px' }}>
+                          <div style={{ flex: 1, minWidth: '130px' }}>
                             <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>Purchase price $</label>
                             <input type="number" placeholder="e.g. 550000" value={newProperty.purchasePrice} onChange={e => setNewProperty({...newProperty, purchasePrice: e.target.value})} style={{...inputStyle, width: '100%'}} />
                           </div>
-                          <div style={{ flex: 1, minWidth: '120px' }}>
+                          <div style={{ flex: 1, minWidth: '130px' }}>
                             <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>Current value $ (estimate)</label>
                             <input type="number" placeholder="e.g. 620000" value={newProperty.currentValue} onChange={e => setNewProperty({...newProperty, currentValue: e.target.value})} style={{...inputStyle, width: '100%'}} />
                           </div>
-                          <div style={{ flex: 1, minWidth: '120px' }}>
+                          <div style={{ flex: 1, minWidth: '130px' }}>
                             <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>Purchase date</label>
                             <input type="date" value={newProperty.purchaseDate} onChange={e => setNewProperty({...newProperty, purchaseDate: e.target.value})} style={{...inputStyle, width: '100%'}} />
                           </div>
                         </div>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, marginBottom: '-4px' }}>LOAN</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>LOAN</div>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                          <div style={{ flex: 1, minWidth: '110px' }}>
+                          <div style={{ flex: 1, minWidth: '120px' }}>
                             <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>Mortgage balance $</label>
                             <input type="number" placeholder="e.g. 420000" value={newProperty.mortgageBalance} onChange={e => setNewProperty({...newProperty, mortgageBalance: e.target.value})} style={{...inputStyle, width: '100%'}} />
                           </div>
-                          <div style={{ flex: 1, minWidth: '100px' }}>
+                          <div style={{ flex: 1, minWidth: '110px' }}>
                             <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>Interest rate % p.a.</label>
                             <input type="number" step="0.01" placeholder="e.g. 6.14" value={newProperty.interestRate} onChange={e => setNewProperty({...newProperty, interestRate: e.target.value})} style={{...inputStyle, width: '100%'}} />
                           </div>
-                          <div style={{ flex: 1, minWidth: '110px' }}>
+                          <div style={{ flex: 1, minWidth: '120px' }}>
                             <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>Monthly repayment $</label>
                             <input type="number" placeholder="e.g. 2400" value={newProperty.monthlyRepayment} onChange={e => setNewProperty({...newProperty, monthlyRepayment: e.target.value})} style={{...inputStyle, width: '100%'}} />
                           </div>
@@ -5412,7 +5426,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                             </select>
                           </div>
                         </div>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, marginBottom: '-4px' }}>RENTAL INCOME & RUNNING COSTS</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>RENTAL INCOME &amp; RUNNING COSTS</div>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
                           <div style={{ flex: 1, minWidth: '110px' }}>
                             <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>Weekly rent $</label>
@@ -5435,8 +5449,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                             <input type="number" placeholder="e.g. 100" value={newProperty.maintenance} onChange={e => setNewProperty({...newProperty, maintenance: e.target.value})} style={{...inputStyle, width: '100%'}} />
                           </div>
                           <div style={{ flex: 1, minWidth: '100px' }}>
-                            <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>Other expenses $/mo</label>
-                            <input type="number" placeholder="e.g. strata" value={newProperty.otherExpenses} onChange={e => setNewProperty({...newProperty, otherExpenses: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                            <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>Other $/mo (strata etc.)</label>
+                            <input type="number" placeholder="e.g. 200" value={newProperty.otherExpenses} onChange={e => setNewProperty({...newProperty, otherExpenses: e.target.value})} style={{...inputStyle, width: '100%'}} />
                           </div>
                         </div>
                         <button onClick={() => {
@@ -5449,48 +5463,53 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     </div>
                   )}
 
-                  {/* Property cards */}
+                  {/* Empty state */}
                   {investmentProperties.length === 0 && !showAddProperty && (
-                    <div style={{ textAlign: 'center' as const, padding: '32px', color: theme.textMuted }}>
-                      <div style={{ fontSize: '40px', marginBottom: '10px' }}>🏘️</div>
-                      <div style={{ fontSize: '14px', marginBottom: '6px' }}>No investment properties yet</div>
-                      <div style={{ fontSize: '12px' }}>Add properties to track yield, equity, cash flow and capital growth across your portfolio</div>
+                    <div style={{ textAlign: 'center' as const, padding: '48px 20px', color: theme.textMuted }}>
+                      <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏘️</div>
+                      <div style={{ color: theme.text, fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>No investment properties yet</div>
+                      <div style={{ fontSize: '13px', maxWidth: '380px', margin: '0 auto', lineHeight: 1.6 }}>Add properties to track equity, yield, cash flow and capital growth across your whole portfolio in one place.</div>
+                      <button onClick={() => setShowAddProperty(true)} style={{ ...btnPrimary, marginTop: '20px', padding: '12px 28px' }}>+ Add Your First Property</button>
                     </div>
                   )}
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+
+                  {/* Property cards */}
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
                     {investmentProperties.map(p => {
                       const c = calcProperty(p)
                       return (
-                        <div key={p.id} style={{ padding: '16px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                        <div key={p.id} style={{ padding: '18px', background: theme.bg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
                             <div>
-                              <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>{p.name}</div>
-                              {p.address && <div style={{ color: theme.textMuted, fontSize: '12px' }}>{p.address}</div>}
-                              <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '2px' }}>
-                                {p.loanType} · {p.interestRate}% p.a.
+                              <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px' }}>{p.name}</div>
+                              {p.address && <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>{p.address}</div>}
+                              <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '3px' }}>
+                                {p.loanType === 'IO' ? 'Interest Only' : 'Principal & Interest'} · {p.interestRate}% p.a.
                                 {p.purchaseDate && ` · Purchased ${new Date(p.purchaseDate + 'T12:00:00').toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}`}
                               </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                              <div style={{ padding: '3px 10px', background: c.monthlyCashFlow >= 0 ? theme.success + '20' : theme.danger + '20', borderRadius: '20px', color: c.monthlyCashFlow >= 0 ? theme.success : theme.danger, fontSize: '12px', fontWeight: 700 }}>
-                                {c.monthlyCashFlow >= 0 ? '✅ +$' + c.monthlyCashFlow.toFixed(0) + '/mo' : '⚠️ -$' + Math.abs(c.monthlyCashFlow).toFixed(0) + '/mo'}
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <div style={{ padding: '4px 12px', background: c.monthlyCashFlow >= 0 ? theme.success + '20' : theme.danger + '20', borderRadius: '20px', color: c.monthlyCashFlow >= 0 ? theme.success : theme.danger, fontSize: '13px', fontWeight: 700 }}>
+                                {c.monthlyCashFlow >= 0 ? '✅' : '⚠️'} {c.monthlyCashFlow >= 0 ? '+' : '-'}${Math.abs(c.monthlyCashFlow).toFixed(0)}/mo
                               </div>
-                              <button onClick={() => setInvestmentProperties(prev => prev.filter(x => x.id !== p.id))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}>×</button>
+                              <button onClick={() => setInvestmentProperties(prev => prev.filter(x => x.id !== p.id))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '18px', padding: '2px 6px' }}>×</button>
                             </div>
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
                             {[
                               { label: 'Current Value', value: '$' + c.val.toLocaleString(), color: theme.text },
+                              { label: 'Mortgage', value: '$' + c.mortgage.toLocaleString(), color: theme.danger },
                               { label: 'Equity', value: '$' + c.equity.toLocaleString(), color: theme.success },
                               { label: 'LVR', value: c.lvr.toFixed(1) + '%', color: c.lvr > 80 ? theme.danger : c.lvr > 60 ? theme.warning : theme.success },
                               { label: 'Weekly Rent', value: '$' + parseFloat(p.weeklyRent || '0').toFixed(0), color: theme.text },
                               { label: 'Gross Yield', value: c.grossYield.toFixed(2) + '%', color: theme.accent },
                               { label: 'Net Yield', value: c.netYield.toFixed(2) + '%', color: theme.accent },
-                              ...(c.capitalGain !== 0 ? [{ label: 'Capital Gain', value: (c.capitalGain >= 0 ? '+$' : '-$') + Math.abs(c.capitalGain).toLocaleString() + ' (' + c.capitalGainPct.toFixed(1) + '%)', color: c.capitalGain >= 0 ? theme.success : theme.danger }] : []),
+                              ...(c.capitalGain !== 0 ? [{ label: 'Capital Gain', value: (c.capitalGain >= 0 ? '+' : '-') + '$' + Math.abs(c.capitalGain).toLocaleString() + ' (' + Math.abs(c.capitalGainPct).toFixed(1) + '%)', color: c.capitalGain >= 0 ? theme.success : theme.danger }] : []),
+                              { label: 'Annual Expenses', value: '$' + Math.round(c.annualExpenses).toLocaleString(), color: theme.textMuted },
                             ].map(stat => (
-                              <div key={stat.label} style={{ padding: '8px 10px', background: theme.cardBg, borderRadius: '8px' }}>
-                                <div style={{ color: theme.textMuted, fontSize: '9px', fontWeight: 600, marginBottom: '3px' }}>{stat.label.toUpperCase()}</div>
-                                <div style={{ color: stat.color, fontWeight: 700, fontSize: '13px' }}>{stat.value}</div>
+                              <div key={stat.label} style={{ padding: '10px 12px', background: theme.cardBg, borderRadius: '8px' }}>
+                                <div style={{ color: theme.textMuted, fontSize: '9px', fontWeight: 600, marginBottom: '4px', letterSpacing: '0.3px' }}>{stat.label.toUpperCase()}</div>
+                                <div style={{ color: stat.color, fontWeight: 700, fontSize: '14px' }}>{stat.value}</div>
                               </div>
                             ))}
                           </div>
@@ -5498,9 +5517,10 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       )
                     })}
                   </div>
+
                   {investmentProperties.length > 0 && (
-                    <div style={{ marginTop: '12px', padding: '10px 12px', background: theme.accent + '10', borderRadius: '8px', color: theme.textMuted, fontSize: '11px', lineHeight: 1.6 }}>
-                      ⚠️ Yields and cash flow are estimates only · Consult your accountant for depreciation, tax deductibility, and CGT calculations · Not financial advice
+                    <div style={{ marginTop: '8px', padding: '10px 14px', background: theme.accent + '10', borderRadius: '8px', color: theme.textMuted, fontSize: '11px', lineHeight: 1.6 }}>
+                      ⚠️ Estimates only · Does not include depreciation, land tax, or CGT · Consult your accountant for tax deductibility calculations · Not financial advice
                     </div>
                   )}
                 </div>
