@@ -20,7 +20,7 @@ export default function Dashboard() {
   const [missionP2Proposals, setMissionP2Proposals] = useState<any[]>([])
   const [missionP2Confirmed, setMissionP2Confirmed] = useState<boolean[]>([])
   const [missionNavLocked, setMissionNavLocked] = useState(true) // locks nav during phase 1
-  const [activeTab, setActiveTab] = useState<'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'learn' | 'wins' | 'mortgage' | 'insights' | 'grow' | 'review'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'learn' | 'wins' | 'mortgage' | 'insights' | 'grow' | 'review' | 'property'>('chat')
   const [darkMode, setDarkMode] = useState(true)
 
   // ==================== ONBOARDING FLOW ====================
