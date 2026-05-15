@@ -161,14 +161,14 @@ export default function Dashboard() {
   const [incomeStreams, setIncomeStreams] = useState<any[]>([])
   const [newIncome, setNewIncome] = useState({ name: '', amount: '', frequency: 'fortnightly', type: 'active', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })() })
   const [expenses, setExpenses] = useState<any[]>([])
-  const [newExpense, setNewExpense] = useState({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })() })
+  const [newExpense, setNewExpense] = useState({ name: '', amount: '', frequency: 'monthly', category: '', dueDate: (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })() })
   // Projected vs Actual tracking
   const [categoryBudgets, setCategoryBudgets] = useState<{[cat: string]: string}>({})
   const [actualSpend, setActualSpend] = useState<{[monthKey: string]: {[cat: string]: number}}>({})
   const [showReceiptScanner, setShowReceiptScanner] = useState(false)
   const [receiptScanLoading, setReceiptScanLoading] = useState(false)
   const [receiptScanResult, setReceiptScanResult] = useState<any>(null)
-  const [showProjectedActual, setShowProjectedActual] = useState(false)
+  const [showProjectedActual, setShowProjectedActual] = useState(true)
   const [debts, setDebts] = useState<any[]>([])
   const [newDebt, setNewDebt] = useState({ name: '', balance: '', interestRate: '', minPayment: '', frequency: 'monthly', paymentDate: (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })() })
   const [payoffMethod, setPayoffMethod] = useState<'snowball' | 'avalanche'>('avalanche')
@@ -736,7 +736,7 @@ export default function Dashboard() {
   // ==================== CRUD ====================
   const addIncome = () => { if (!newIncome.name || !newIncome.amount) return; setIncomeStreams([...incomeStreams, { ...newIncome, id: Date.now() }]); setNewIncome({ name: '', amount: '', frequency: 'fortnightly', type: 'active', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })() }) }
   const deleteIncome = (id: number) => setIncomeStreams(incomeStreams.filter(i => i.id !== id))
-  const addExpense = () => { if (!newExpense.name || !newExpense.amount) return; setExpenses([...expenses, { ...newExpense, id: Date.now() }]); setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })() }) }
+  const addExpense = () => { if (!newExpense.name || !newExpense.amount) return; setExpenses([...expenses, { ...newExpense, id: Date.now(), category: newExpense.category || 'other' }]); setNewExpense({ name: '', amount: '', frequency: 'monthly', category: '', dueDate: (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })() }) }
   const deleteExpense = (id: number) => setExpenses(expenses.filter(e => e.id !== id))
   const addDebt = () => { if (!newDebt.name || !newDebt.balance) return; setDebts([...debts, { ...newDebt, id: Date.now(), originalBalance: newDebt.balance }]); setNewDebt({ name: '', balance: '', interestRate: '', minPayment: '', frequency: 'monthly', paymentDate: (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })() }) }
   const deleteDebt = (id: number) => setDebts(debts.filter(d => d.id !== id))
@@ -2464,7 +2464,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <button onClick={() => {
                     if (newExpense.name && newExpense.amount) {
                       setExpenses(prev => [...prev, { ...newExpense, id: Date.now() }])
-                      setNewExpense({ name: '', amount: '', frequency: 'monthly', category: 'other', dueDate: nextDayOfMonth(1) })
+                      setNewExpense({ name: '', amount: '', frequency: 'monthly', category: '', dueDate: nextDayOfMonth(1) })
                     }
                   }} style={btnDanger}>+ Add bill</button>
                 </div>
@@ -3994,12 +3994,14 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
               const dayOfMonth = now.getDate()
               const monthProgress = dayOfMonth / daysInMonth
-              // Which categories have data
               const activeCategories = EXPENSE_CATEGORIES.filter(c => proj[c.id] > 0 || (actual[c.id] || 0) > 0)
               const totalProjected = activeCategories.reduce((s, c) => s + (proj[c.id] || 0), 0)
               const totalActual = activeCategories.reduce((s, c) => s + (actual[c.id] || 0), 0)
               const pacePct = monthProgress > 0 ? totalActual / (totalProjected * monthProgress) : 0
               const leaking = activeCategories.filter(c => (actual[c.id] || 0) > (proj[c.id] || 0) * monthProgress * 1.1 && (actual[c.id] || 0) > 0)
+              // Check for uncategorised expenses
+              const uncategorisedExpenses = expenses.filter((e: any) => !e.category || e.category === 'other')
+              const hasOtherBucket = uncategorisedExpenses.length > 0 && proj['other'] > 0
 
               return (
                 <div style={{ background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border, overflow: 'hidden' }}>
@@ -4029,6 +4031,20 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
                   {showProjectedActual && (
                     <div style={{ padding: '20px' }}>
+                      {/* Uncategorised notice */}
+                      {hasOtherBucket && (
+                        <div style={{ marginBottom: '14px', padding: '12px 14px', background: theme.warning + '15', borderRadius: '10px', border: '1px solid ' + theme.warning + '40', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ color: theme.warning, fontWeight: 700, fontSize: '13px', marginBottom: '2px' }}>
+                              📂 {uncategorisedExpenses.length} expense{uncategorisedExpenses.length > 1 ? 's' : ''} uncategorised — showing as "Other"
+                            </div>
+                            <div style={{ color: theme.textMuted, fontSize: '11px' }}>
+                              {uncategorisedExpenses.slice(0,3).map((e: any) => e.name).join(', ')}{uncategorisedExpenses.length > 3 ? ` +${uncategorisedExpenses.length - 3} more` : ''} — click ✏️ to assign categories
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Total bar */}
                       {totalProjected > 0 && (
                         <div style={{ marginBottom: '20px', padding: '14px', background: theme.bg, borderRadius: '12px' }}>
@@ -4344,8 +4360,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       <option value="quarterly">Quarterly</option>
                       <option value="yearly">Yearly</option>
                     </select>
-                    <select value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value})} style={inputStyle}>
-                      {EXPENSE_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+                    <select value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value})} style={{...inputStyle, color: newExpense.category === '' ? theme.textMuted : theme.text}}>
+                      <option value="">📂 Category…</option>
+                      {EXPENSE_CATEGORIES.filter(c => !['debt_payments','goal_savings'].includes(c.id)).map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
                     </select>
                   </div>
                   <SmartDatePicker
