@@ -432,9 +432,11 @@ export default function Dashboard() {
   }, [chatMessages])
 
   // ==================== CALCULATIONS ====================
+  // Single source of truth for frequency → monthly conversion
+  // Uses accurate annual averages: 52 weeks/yr, 26 fortnights/yr divided by 12 months
   const convertToMonthly = (amount: number, frequency: string) => {
-    if (frequency === 'weekly') return amount * 4
-    if (frequency === 'fortnightly') return amount * 2
+    if (frequency === 'weekly') return amount * (52 / 12)       // 4.333 — accurate annual average
+    if (frequency === 'fortnightly') return amount * (26 / 12)  // 2.167 — accurate annual average
     if (frequency === 'quarterly') return amount / 3
     if (frequency === 'yearly') return amount / 12
     return amount
@@ -966,10 +968,11 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
     const payAmount = parseFloat(incomeStreams[0]?.amount || '0')
     const convertToPayPeriod = (amount: number, freq: string) => {
       if (freq === payFrequency) return amount
-      if (payFrequency === 'fortnightly') { if (freq === 'weekly') return amount * 2; if (freq === 'monthly') return amount / 2 }
-      if (payFrequency === 'weekly') { if (freq === 'fortnightly') return amount / 2; if (freq === 'monthly') return amount / 4 }
-      if (payFrequency === 'monthly') { if (freq === 'weekly') return amount * 4; if (freq === 'fortnightly') return amount * 2 }
-      return amount
+      // Convert via monthly as common unit
+      const monthly = convertToMonthly(amount, freq)
+      if (payFrequency === 'weekly') return monthly / (52/12)
+      if (payFrequency === 'fortnightly') return monthly / (26/12)
+      return monthly
     }
     const billsTotal = expenses.filter(e => !e.targetDebtId && !e.targetGoalId).reduce((sum, exp) => sum + convertToPayPeriod(parseFloat(exp.amount || '0'), exp.frequency), 0)
     const debtTotal = debts.reduce((sum, debt) => sum + convertToPayPeriod(parseFloat(debt.minPayment || '0'), debt.frequency || 'monthly'), 0)
@@ -1922,8 +1925,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
   // ==================== LATTE FACTOR CALCULATOR ====================
   const latteFreqToMonthly = (freq: string, amount: number) => {
-    if (freq === 'daily') return amount * 30
-    if (freq === 'weekly') return amount * 4.33
+    if (freq === 'daily') return amount * (365/12)
+    if (freq === 'weekly') return amount * (52/12)
     if (freq === 'monthly') return amount
     return amount
   }
