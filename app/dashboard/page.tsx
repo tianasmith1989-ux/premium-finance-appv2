@@ -432,11 +432,21 @@ export default function Dashboard() {
   }, [chatMessages])
 
   // ==================== CALCULATIONS ====================
-  // Single source of truth for frequency → monthly conversion
-  // Uses accurate annual averages: 52 weeks/yr, 26 fortnights/yr divided by 12 months
+  // TWO converters - different purposes:
+  // convertToMonthly = budget display (what you actually receive in a normal month)
+  //   weekly × 4, fortnightly × 2 — reflects real cash flow, 3rd-fortnight months are a bonus
+  // convertToMonthlyExact = simulations only (debt payoff, goal calc, mortgage)
+  //   uses annual averages (52/12, 26/12) for mathematically precise multi-year projections
   const convertToMonthly = (amount: number, frequency: string) => {
-    if (frequency === 'weekly') return amount * (52 / 12)       // 4.333 — accurate annual average
-    if (frequency === 'fortnightly') return amount * (26 / 12)  // 2.167 — accurate annual average
+    if (frequency === 'weekly') return amount * 4
+    if (frequency === 'fortnightly') return amount * 2
+    if (frequency === 'quarterly') return amount / 3
+    if (frequency === 'yearly') return amount / 12
+    return amount
+  }
+  const convertToMonthlyExact = (amount: number, frequency: string) => {
+    if (frequency === 'weekly') return amount * (52 / 12)
+    if (frequency === 'fortnightly') return amount * (26 / 12)
     if (frequency === 'quarterly') return amount / 3
     if (frequency === 'yearly') return amount / 12
     return amount
@@ -522,6 +532,30 @@ export default function Dashboard() {
     if (r === 0) return bal / n
     return (bal * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1)
   }
+
+  // ==================== LIVE MILESTONE SYNC ====================
+  // Keeps emergency fund milestones in sync with actual savings assets automatically
+  useEffect(() => {
+    if (roadmapMilestones.length === 0) return
+    let changed = false
+    const updated = roadmapMilestones.map((m: any) => {
+      const name = (m.name || '').toLowerCase()
+      const target = parseFloat(m.targetAmount || '0')
+      if (target <= 0) return m
+
+      if (name.includes('emergency') || name.includes('safety net') || name.includes('starter fund')) {
+        const newProgress = Math.min(emergencyFund, target)
+        const newCompleted = emergencyFund >= target
+        if (Math.abs(newProgress - (m.currentAmount || 0)) > 0.5 || newCompleted !== m.completed) {
+          changed = true
+          return { ...m, currentAmount: newProgress, completed: newCompleted }
+        }
+      }
+      return m
+    })
+    if (changed) setRoadmapMilestones(updated)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emergencyFund, assets.length])
 
   const calculateMortgagePayoff = () => {
     const balance = parseFloat(mortgageAccel.balance || '0')
@@ -849,8 +883,9 @@ export default function Dashboard() {
   const getProjectedByCategory = () => {
     const proj: {[cat: string]: number} = {}
     const toMonthly = (amt: number, freq: string) => {
-      if (freq === 'weekly') return amt * (52/12)
-      if (freq === 'fortnightly') return amt * (26/12)
+      // Budget display: use simple multipliers (normal month = 4 weeks, 2 fortnights)
+      if (freq === 'weekly') return amt * 4
+      if (freq === 'fortnightly') return amt * 2
       if (freq === 'quarterly') return amt / 3
       if (freq === 'yearly') return amt / 12
       return amt
@@ -968,10 +1003,10 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
     const payAmount = parseFloat(incomeStreams[0]?.amount || '0')
     const convertToPayPeriod = (amount: number, freq: string) => {
       if (freq === payFrequency) return amount
-      // Convert via monthly as common unit
+      // Convert via monthly (budget display) as common unit
       const monthly = convertToMonthly(amount, freq)
-      if (payFrequency === 'weekly') return monthly / (52/12)
-      if (payFrequency === 'fortnightly') return monthly / (26/12)
+      if (payFrequency === 'weekly') return monthly / 4
+      if (payFrequency === 'fortnightly') return monthly / 2
       return monthly
     }
     const billsTotal = expenses.filter(e => !e.targetDebtId && !e.targetGoalId).reduce((sum, exp) => sum + convertToPayPeriod(parseFloat(exp.amount || '0'), exp.frequency), 0)
@@ -1493,11 +1528,19 @@ Their data:
 - Monthly income: $${monthlyIncome.toFixed(0)}
 - Monthly expenses: $${monthlyExpenses.toFixed(0)}  
 - Monthly surplus: $${monthlySurplus.toFixed(0)}
-- Emergency fund: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months)
-- Total debt: $${totalDebtBalance.toFixed(0)}
+- Existing savings: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months of expenses covered)
+- Total bad debt: $${totalDebtBalance.toFixed(0)}
 - Mortgage: ${mortgageAccel.balance ? `$${mortgageAccel.balance} at ${mortgageAccel.rate}%` : 'not entered'}
 - Baby Step: ${currentBabyStep.step} — ${currentBabyStep.title}
 - Money personality: ${moneyPersonality ? personalityProfiles[moneyPersonality]?.label : 'not assessed'}
+- House status: ${houseStatus || 'not specified'}
+- FIRE goal: ${fireGoal ? 'Yes' : 'No'}
+
+CRITICAL RULES:
+- If existing savings >= $2000, do NOT propose "Build $2,000 Emergency Fund" — they already have it. Acknowledge they're ahead and propose the NEXT step.
+- If existing savings >= monthly expenses × 3, do NOT propose any emergency fund milestone — focus on debt/investing/mortgage.
+- The 3 milestones must reflect where they ACTUALLY are, not where a default user would be.
+- Each milestone must be something they have NOT already achieved.
 
 Respond in this EXACT JSON format, no other text:
 [
@@ -1522,30 +1565,34 @@ Respond in this EXACT JSON format, no other text:
         throw new Error('No JSON in response')
       }
     } catch {
-      // Fallback proposals based on user's actual data
-      const fallback = [
-        {
-          name: emergencyFund < 2000 ? 'Build $2,000 Emergency Fund' : emergencyMonths < 3 ? `Build ${Math.round(monthlyExpenses * 3)} Emergency Fund` : 'Starter Safety Net',
-          icon: '🛡️',
-          target: emergencyFund < 2000 ? 2000 : Math.round(monthlyExpenses * 3),
-          notes: 'Your financial airbag — prevents going into debt when life throws surprises. This is the foundation everything else is built on.',
-          priority: 1
-        },
-        {
-          name: totalDebtBalance > 0 ? `Pay Off $${totalDebtBalance.toFixed(0)} Bad Debt` : mortgageAccel.balance ? `Accelerate Mortgage Payoff` : 'Build 3-Month Emergency Fund',
-          icon: totalDebtBalance > 0 ? '💳' : '🚀',
-          target: totalDebtBalance > 0 ? Math.round(totalDebtBalance) : 0,
-          notes: totalDebtBalance > 0 ? `Every dollar of bad debt is costing you in interest. Clearing this is a guaranteed return equal to your interest rate.` : `Extra repayments early in your mortgage save 3-4× that amount in interest.`,
-          priority: 2
-        },
-        {
-          name: mortgageAccel.balance ? `Be Mortgage-Free by ${new Date().getFullYear() + 8}` : 'Reach Financial Independence',
-          icon: '🏠',
-          target: 0,
-          notes: 'The ultimate finish line. When your mortgage is gone, every dollar you were paying the bank goes back into your life.',
-          priority: 3
-        }
-      ]
+      // Fallback proposals based on user's actual data — respects what's already achieved
+      const hasEmergencyFund = emergencyFund >= 2000
+      const hasFullEmergencyFund = emergencyMonths >= 3
+      const monthlyExpenses3 = monthlyExpenses * 3
+
+      const milestone1 = !hasEmergencyFund
+        ? { name: 'Build $2,000 Emergency Fund', icon: '🛡️', target: 2000, notes: 'Your financial airbag — prevents going into debt when life throws surprises. This is the foundation everything else is built on.', priority: 1 }
+        : !hasFullEmergencyFund
+        ? { name: `Build ${Math.round(monthlyExpenses3)> 0 ? Math.round(monthlyExpenses3) : 6000} Full Emergency Fund`, icon: '🏦', target: Math.max(Math.round(monthlyExpenses3), 6000), notes: `You already have your $2,000 starter fund — great start. Now build 3 months of expenses ($${Math.round(monthlyExpenses3).toLocaleString()}) for true financial security.`, priority: 1 }
+        : totalDebtBalance > 0
+        ? { name: `Pay Off $${totalDebtBalance.toFixed(0)} Bad Debt`, icon: '💳', target: Math.round(totalDebtBalance), notes: 'Your emergency fund is solid. Now clear bad debt — every dollar of interest you stop paying is a guaranteed return.', priority: 1 }
+        : { name: 'Grow Investments to $50,000', icon: '📈', target: 50000, notes: 'Debt-free with a solid emergency fund — now it\'s time to build real wealth through investing.', priority: 1 }
+
+      const milestone2 = totalDebtBalance > 0 && hasEmergencyFund
+        ? { name: `Pay Off $${totalDebtBalance.toFixed(0)} Bad Debt`, icon: '💳', target: Math.round(totalDebtBalance), notes: `Every dollar of bad debt is costing you in interest. Clearing this is a guaranteed return equal to your interest rate.`, priority: 2 }
+        : mortgageAccel.balance
+        ? { name: `Accelerate Mortgage Payoff`, icon: '🚀', target: 0, notes: `Extra repayments early in your mortgage save 3-4× that amount in interest.`, priority: 2 }
+        : { name: 'Build 6-Month Emergency Fund', icon: '🏦', target: Math.round(monthlyExpenses * 6) || 12000, notes: 'Extend your safety net to 6 months for maximum financial resilience.', priority: 2 }
+
+      const milestone3 = {
+        name: mortgageAccel.balance ? `Be Mortgage-Free by ${new Date().getFullYear() + 8}` : fireGoal ? 'Reach Financial Independence' : 'Grow Wealth to $100,000',
+        icon: mortgageAccel.balance ? '🏠' : '🔥',
+        target: 0,
+        notes: mortgageAccel.balance ? 'The ultimate finish line. When your mortgage is gone, every dollar you were paying the bank goes back into your life.' : 'Financial independence — when your passive income covers your lifestyle.',
+        priority: 3
+      }
+
+      const fallback = [milestone1, milestone2, milestone3]
       setMissionP2Proposals(fallback)
       setMissionP2Confirmed(fallback.map(() => true))
       setMissionP2Step('propose')
@@ -1559,14 +1606,42 @@ Respond in this EXACT JSON format, no other text:
 
     const toAdd = missionP2Proposals.filter((_, i) => missionP2Confirmed[i])
     const now = Date.now()
-    const newMilestones = toAdd.map((p, i) => ({
-      id: now + i,
-      name: p.name, icon: p.icon,
-      targetAmount: p.target?.toString() || '0',
-      currentAmount: 0, targetDate: '', notes: p.notes,
-      category: 'savings', completed: false,
-      createdAt: new Date().toISOString(), weeklyPlan: null
-    }))
+
+    // Calculate starting currentAmount from actual assets for each milestone type
+    const getInitialProgress = (p: any) => {
+      const name = (p.name || '').toLowerCase()
+      const target = parseFloat(p.target || '0')
+      // Emergency fund milestones — use actual savings
+      if (name.includes('emergency') || name.includes('safety net') || name.includes('starter fund')) {
+        return Math.min(emergencyFund, target)
+      }
+      // Debt milestones — currentAmount represents amount paid off (starts at 0, target is original balance)
+      if (name.includes('debt') || name.includes('credit card') || name.includes('pay off') || name.includes('loan')) {
+        return 0
+      }
+      // Savings goals — use assets if matching name exists
+      const matchingAsset = assets.find((a: any) =>
+        a.type === 'savings' && (a.name || '').toLowerCase().includes(name.split(' ')[0].toLowerCase())
+      )
+      return matchingAsset ? Math.min(parseFloat(matchingAsset.value || '0'), target) : 0
+    }
+
+    const newMilestones = toAdd.map((p, i) => {
+      const initialProgress = getInitialProgress(p)
+      const target = parseFloat(p.target?.toString() || '0')
+      const isAlreadyDone = target > 0 && initialProgress >= target
+      return {
+        id: now + i,
+        name: p.name, icon: p.icon,
+        targetAmount: p.target?.toString() || '0',
+        currentAmount: initialProgress,
+        targetDate: '', notes: p.notes,
+        category: 'savings',
+        completed: isAlreadyDone,
+        createdAt: new Date().toISOString(),
+        weeklyPlan: null
+      }
+    })
 
     // Add all milestones to roadmap
     setRoadmapMilestones(prev => [...prev, ...newMilestones])
@@ -1925,8 +2000,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
   // ==================== LATTE FACTOR CALCULATOR ====================
   const latteFreqToMonthly = (freq: string, amount: number) => {
-    if (freq === 'daily') return amount * (365/12)
-    if (freq === 'weekly') return amount * (52/12)
+    if (freq === 'daily') return amount * 30
+    if (freq === 'weekly') return amount * 4
     if (freq === 'monthly') return amount
     return amount
   }
@@ -2926,13 +3001,14 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                           { label: 'Monthly income', value: `$${monthlyIncome.toFixed(0)}`, color: theme.success },
                           { label: 'Monthly expenses', value: `$${monthlyExpenses.toFixed(0)}`, color: theme.danger },
                           { label: 'Monthly surplus', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus > 0 ? theme.success : theme.danger },
+                          { label: 'Savings / Emergency fund', value: `$${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)}mo)`, color: emergencyFund >= 2000 ? theme.success : theme.warning },
                           { label: 'Baby Step', value: `Step ${currentBabyStep.step}`, color: theme.accent },
                           ...(mortgageAccel.balance ? [{ label: 'Mortgage balance', value: `$${parseInt(mortgageAccel.balance).toLocaleString()}`, color: theme.warning }] : []),
                           ...(totalDebtBalance > 0 ? [{ label: 'Total debt', value: `$${totalDebtBalance.toFixed(0)}`, color: theme.danger }] : []),
                         ].map(item => (
                           <div key={item.label} style={{ padding: '12px', background: theme.bg, borderRadius: '8px' }}>
                             <div style={{ color: theme.textMuted, fontSize: '11px' }}>{item.label}</div>
-                            <div style={{ color: item.color, fontWeight: 700, fontSize: '18px' }}>{item.value}</div>
+                            <div style={{ color: item.color, fontWeight: 700, fontSize: '16px' }}>{item.value}</div>
                           </div>
                         ))}
                       </div>
@@ -6424,7 +6500,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 const lvr = val > 0 ? (mortgage / val) * 100 : 0
                 const weeklyRent = parseFloat(p.weeklyRent || '0')
                 const annualRent = weeklyRent * 52
-                const monthlyRent = weeklyRent * (52/12)
+                const monthlyRent = weeklyRent * (52/12)  // annual average for yield calculation
                 const mgmtFee = annualRent * (parseFloat(p.managementFeePercent || '0') / 100)
                 const annualExpenses = mgmtFee + parseFloat(p.councilRates || '0') + parseFloat(p.insurance || '0') + (parseFloat(p.maintenance || '0') * 12) + (parseFloat(p.otherExpenses || '0') * 12)
                 const monthlyExpensesIP = annualExpenses / 12
