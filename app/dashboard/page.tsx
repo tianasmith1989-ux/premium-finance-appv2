@@ -232,6 +232,16 @@ export default function Dashboard() {
   const [showPresets, setShowPresets] = useState(false)
   const [showMoreTabs, setShowMoreTabs] = useState(false)
   const [showHelpGuide, setShowHelpGuide] = useState(false)
+  // ── Coaching improvements state ──
+  const [dailyBriefing, setDailyBriefing] = useState<{text: string, generatedDate: string} | null>(null)
+  const [dailyBriefingLoading, setDailyBriefingLoading] = useState(false)
+  const [stepReaction, setStepReaction] = useState<{step: number, message: string, nextSuggestion: string} | null>(null)
+  const [prevBabyStep, setPrevBabyStep] = useState<number | null>(null)
+  const [chatContext, setChatContext] = useState<string | null>(null)
+  const [overdueItems, setOverdueItems] = useState<any[]>([])
+  const [daysSinceMoneyDate, setDaysSinceMoneyDate] = useState(0)
+  const [stepTickReaction, setStepTickReaction] = useState<{milestoneId: number, stepId: number, message: string} | null>(null)
+  const [spendingPatterns, setSpendingPatterns] = useState<string[]>([])
 
   // Misc
   const moneyQuotes = [
@@ -502,24 +512,73 @@ export default function Dashboard() {
     const badDebt = debts.filter(d => parseFloat(d.interestRate || '0') > 5)
     const mortgageDebt = debts.filter(d => d.name?.toLowerCase().includes('mortgage'))
     const monthlyExpenses3 = monthlyExpenses * 3
+
+    // Already owns home (with or without mortgage) → Step 5 (deposit) is DONE, skip it
+    const alreadyOwnsHome = ['own', 'paid_off', 'buying'].includes(houseStatus || '')
+    // Paid off home → Step 6 (mortgage) is also DONE
+    const mortgageFree = houseStatus === 'paid_off' || (alreadyOwnsHome && mortgageDebt.length === 0 && !mortgageAccel.balance)
+
     if (emergencyFund < 2000) return { step: 1, title: 'Starter Emergency Fund', desc: 'Save $2,000 for emergencies', progress: (emergencyFund / 2000) * 100, icon: '🛡️', target: 2000, current: emergencyFund }
     if (badDebt.length > 0) { const totalBadDebt = badDebt.reduce((s, d) => s + parseFloat(d.balance || '0'), 0); return { step: 2, title: 'Kill Bad Debt', desc: 'Pay off credit cards, personal loans, BNPL', progress: 0, icon: '💳', target: totalBadDebt, current: 0, debts: badDebt } }
     if (emergencyFund < monthlyExpenses3) return { step: 3, title: 'Full Emergency Fund', desc: '3-6 months expenses saved', progress: (emergencyFund / monthlyExpenses3) * 100, icon: '🏦', target: monthlyExpenses3, current: emergencyFund }
-    const investmentGoalMet = passiveIncome > 0 || assets.filter(a => a.type === 'investment').length > 0
-    if (!investmentGoalMet) return { step: 4, title: 'Invest 15% + Super', desc: 'Salary sacrifice + investments', progress: 50, icon: '📈', target: monthlyIncome * 0.15, current: 0 }
-    if (mortgageDebt.length === 0 && !assets.some(a => a.type === 'property')) { const depositGoal = 100000; const currentDeposit = assets.filter(a => a.name?.toLowerCase().includes('deposit') || a.name?.toLowerCase().includes('house')).reduce((s, a) => s + parseFloat(a.value || '0'), 0); return { step: 5, title: 'Home Deposit', desc: 'Save 10-20% for your home', progress: (currentDeposit / depositGoal) * 100, icon: '🏠', target: depositGoal, current: currentDeposit } }
-    if (mortgageDebt.length > 0) { const mortgageBalance = mortgageDebt.reduce((s, d) => s + parseFloat(d.balance || '0'), 0); return { step: 6, title: 'Accelerate Your Mortgage', desc: 'Pay it off in 7-10 years, not 30', progress: 0, icon: '🚀', target: mortgageBalance, current: 0 } }
+    // Step 4: Invest 15% — check they're ACTUALLY investing meaningfully, not just have $100 in shares
+    const totalInvestmentValue = assets.filter(a => a.type === 'investment').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
+    const superBalance = assets.filter(a => a.type === 'super' || a.name?.toLowerCase().includes('super')).reduce((s, a) => s + parseFloat(a.value || '0'), 0)
+    const monthlyInvestingViaGoals = goals.filter((g: any) => {
+      const name = (g.name || '').toLowerCase()
+      return name.includes('invest') || name.includes('etf') || name.includes('share') || name.includes('super') || name.includes('retirement')
+    }).reduce((s: number, g: any) => s + convertToMonthly(parseFloat(g.paymentAmount || '0'), g.savingsFrequency || 'monthly'), 0)
+    const targetMonthly15pct = monthlyIncome * 0.15
+    // Met if: investing ≥ 15% of income via goals, OR has substantial investment portfolio (≥ 6 months income), OR has passive income
+    const investmentGoalMet = passiveIncome > 0
+      || (monthlyInvestingViaGoals >= targetMonthly15pct * 0.8 && totalInvestmentValue > 0)
+      || (totalInvestmentValue + superBalance >= monthlyIncome * 6 && monthlyInvestingViaGoals > 0)
+    if (!investmentGoalMet) {
+      const progressPct = targetMonthly15pct > 0 ? Math.min(100, (monthlyInvestingViaGoals / targetMonthly15pct) * 100) : 0
+      return { step: 4, title: 'Invest 15% + Super', desc: `Target: $${Math.round(targetMonthly15pct)}/mo (15% of income). Currently investing: $${Math.round(monthlyInvestingViaGoals)}/mo via goals`, progress: progressPct, icon: '📈', target: targetMonthly15pct, current: monthlyInvestingViaGoals }
+    }
+
+    // Step 5 — Home Deposit: only show if they DON'T own/aren't buying
+    if (!alreadyOwnsHome) {
+      const depositGoal = 100000
+      const currentDeposit = assets.filter(a => a.name?.toLowerCase().includes('deposit') || a.name?.toLowerCase().includes('house')).reduce((s, a) => s + parseFloat(a.value || '0'), 0)
+      return { step: 5, title: 'Home Deposit', desc: 'Save 10-20% for your home', progress: (currentDeposit / depositGoal) * 100, icon: '🏠', target: depositGoal, current: currentDeposit }
+    }
+
+    // Step 6 — Mortgage: only if they have one
+    if (!mortgageFree) {
+      const mortgageBalance = parseFloat(mortgageAccel.balance || '0') || mortgageDebt.reduce((s, d) => s + parseFloat(d.balance || '0'), 0)
+      return { step: 6, title: 'Accelerate Your Mortgage', desc: 'Pay it off in 7-10 years, not 30', progress: 0, icon: '🚀', target: mortgageBalance, current: 0 }
+    }
+
     return { step: 7, title: 'Build Wealth & Give', desc: 'Invest, enjoy, and be generous', progress: 100, icon: '💎', target: 0, current: 0 }
   }
   const currentBabyStep = getBabyStep()
+
+  // ── FIRE NUMBER: Tax-adjusted gross-up ──
+  // Logic: the portfolio earns returns that are TAXED. You need enough that after-tax income covers expenses.
+  // Formula: if you need $X/yr after tax, and tax rate is T%, you need $X/(1-T) pre-tax earnings.
+  // At 4% safe withdrawal rate: portfolio = pre-tax need / 0.04
+  // Default AU tax estimate: 32.5% marginal on investment income (for earnings > $18,200)
+  // Users can override the tax rate in the Grow tab.
+  const fireTaxRate = 0.325  // 32.5% default — AU middle marginal rate
+  const annualNeedAfterTax = totalOutgoing * 12
+  const annualNeedPreTax = annualNeedAfterTax / (1 - fireTaxRate)  // gross up for tax
+  const fireNumber = Math.ceil(annualNeedPreTax / 0.04)  // 4% rule on pre-tax need
+  // Weekly equivalent: portfolio × 4% / 52 / (1 - taxRate) = weekly after-tax
+  const weeklyAfterTax = (fireNumber * 0.04 * (1 - fireTaxRate)) / 52
 
   const fiPath = {
     monthlyNeed: totalOutgoing,
     passiveGap: totalOutgoing - passiveIncome,
     passiveCoverage,
-    fireNumber: (totalOutgoing * 12) * 25,
+    fireNumber,
+    fireTaxRate,
+    annualNeedAfterTax,
+    annualNeedPreTax,
+    weeklyAfterTax,
     currentInvestments: assets.filter(a => a.type === 'investment').reduce((sum, a) => sum + parseFloat(a.value || '0'), 0),
-    yearsToFI: monthlySurplus > 0 ? Math.ceil(((totalOutgoing * 12) * 25) / (monthlySurplus * 12)) : 999
+    yearsToFI: monthlySurplus > 0 ? Math.ceil((fireNumber - assets.filter(a => a.type === 'investment').reduce((sum, a) => sum + parseFloat(a.value || '0'), 0)) / (monthlySurplus * 12)) : 999
   }
 
   // ==================== NEW: MORTGAGE ACCELERATOR CALCULATION ====================
@@ -556,6 +615,233 @@ export default function Dashboard() {
     if (changed) setRoadmapMilestones(updated)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emergencyFund, assets.length])
+
+  // ══════════════════════════════════════════════════════════════
+  // COACHING IMPROVEMENT #1 — DAILY AI BRIEFING
+  // ══════════════════════════════════════════════════════════════
+  const generateDailyBriefing = async () => {
+    if (monthlyIncome === 0) return // not set up yet
+    const today = new Date().toDateString()
+    if (dailyBriefing?.generatedDate === today) return // already generated today
+    setDailyBriefingLoading(true)
+    try {
+      const overdueBills = expenses.filter((e: any) => {
+        if (!e.dueDate) return false
+        const due = new Date(e.dueDate + 'T12:00:00')
+        return due <= new Date() && !Array.from(paidOccurrences).some(k => k.includes(e.id))
+      })
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 200,
+          messages: [{
+            role: 'user',
+            content: `You are Aureus, a personal financial coach. Write a 2-3 sentence morning briefing for this user. Be specific, warm, and direct — like a coach who knows them well. No generic advice.
+
+User's situation:
+- Monthly income: $${monthlyIncome.toFixed(0)}, surplus: $${monthlySurplus.toFixed(0)}
+- Emergency fund: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months)
+- Active debts: ${debts.length > 0 ? debts.map((d: any) => `${d.name} $${d.balance}`).join(', ') : 'none'}
+- Active goals: ${goals.length > 0 ? goals.map((g: any) => `${g.name} ${Math.round((parseFloat(g.saved||'0')/parseFloat(g.target||'1'))*100)}% done`).join(', ') : 'none'}
+- Current baby step: ${currentBabyStep.step} — ${currentBabyStep.title}
+- Overdue bills today: ${overdueBills.length > 0 ? overdueBills.map((e: any) => `${e.name} $${e.amount}`).join(', ') : 'none'}
+- Streak: ${streak} days
+- Day of week: ${new Date().toLocaleDateString('en-AU', { weekday: 'long' })}
+${moneyPersonality ? `- Money personality: ${personalityProfiles[moneyPersonality]?.label}` : ''}
+
+Write 2-3 sentences only. Start with something specific to their situation — not "Good morning!" Be honest if things are tight. Be excited if things are going well. End with one concrete thing to focus on today. No markdown, no lists.`
+          }]
+        })
+      })
+      const data = await response.json()
+      const text = data.content?.find((c: any) => c.type === 'text')?.text?.trim() || ''
+      if (text) setDailyBriefing({ text, generatedDate: today })
+    } catch (e) {
+      // silent fail — fallback shown in UI
+    }
+    setDailyBriefingLoading(false)
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // COACHING IMPROVEMENT #2 — CONTEXT SENTENCES ON NUMBERS
+  // ══════════════════════════════════════════════════════════════
+  const getStatContext = (statType: string): string => {
+    switch (statType) {
+      case 'surplus': {
+        if (monthlySurplus <= 0) return 'Spending exceeds income this month — let\'s find the leak'
+        const debtMonths = totalDebtBalance > 0 ? Math.ceil(totalDebtBalance / monthlySurplus) : 0
+        if (totalDebtBalance > 0 && debtMonths < 36) return `= ${debtMonths} months to debt-free if redirected`
+        const efMonths = monthlyExpenses > 0 ? Math.ceil(Math.max(0, 2000 - emergencyFund) / monthlySurplus) : 0
+        if (emergencyFund < 2000) return `= ${efMonths} months to your $2,000 safety net`
+        return `= $${(monthlySurplus * 12).toFixed(0)}/year compounding toward freedom`
+      }
+      case 'income': {
+        const savePct = monthlyIncome > 0 ? Math.round((monthlyGoalSavings / monthlyIncome) * 100) : 0
+        const investPct = monthlyIncome > 0 ? Math.round(((monthlyGoalSavings) / monthlyIncome) * 100) : 0
+        if (savePct >= 20) return `Saving ${savePct}% of income — above average 🏆`
+        if (savePct > 0) return `Saving ${savePct}% — target is 20% ($${Math.round(monthlyIncome * 0.2)}/mo)`
+        return `Set up automated savings to make every pay count`
+      }
+      case 'networth': {
+        if (netWorth < 0) return `Getting this positive is the first wealth milestone`
+        const years = netWorth > 0 && monthlySurplus > 0 ? (netWorth / (monthlySurplus * 12)).toFixed(1) : null
+        return years ? `= ${years} years of your current surplus` : `Your empire\'s foundation`
+      }
+      case 'goals': {
+        if (monthlyGoalSavings === 0) return `Set up goals to track your savings progress`
+        const pct = monthlyIncome > 0 ? Math.round((monthlyGoalSavings / monthlyIncome) * 100) : 0
+        return `${pct}% of income going to purpose — keep building`
+      }
+      default: return ''
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // COACHING IMPROVEMENT #3 — BABY STEP ADVANCEMENT REACTION
+  // ══════════════════════════════════════════════════════════════
+  useEffect(() => {
+    if (prevBabyStep === null) { setPrevBabyStep(currentBabyStep.step); return }
+    if (currentBabyStep.step <= prevBabyStep) return
+    // Step advanced — generate a reaction
+    const generateStepReaction = async () => {
+      try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 150,
+            messages: [{
+              role: 'user',
+              content: `The user just advanced from Baby Step ${prevBabyStep} to Baby Step ${currentBabyStep.step} (${currentBabyStep.title}). Write 2 things:
+1. A 1-sentence celebration of what they just achieved (specific, genuine, not generic)
+2. A 1-sentence description of what Baby Step ${currentBabyStep.step} means for their life specifically
+
+Their data: income $${monthlyIncome.toFixed(0)}/mo, surplus $${monthlySurplus.toFixed(0)}/mo, ${debts.length} debts, emergency fund $${emergencyFund.toFixed(0)}
+
+Respond as JSON: {"celebration": "...", "nextFocus": "..."}`
+            }]
+          })
+        })
+        const data = await response.json()
+        const text = data.content?.find((c: any) => c.type === 'text')?.text || ''
+        const clean = text.replace(/```json|```/g, '').trim()
+        const parsed = JSON.parse(clean)
+        setStepReaction({ step: currentBabyStep.step, message: parsed.celebration, nextSuggestion: parsed.nextFocus })
+        // Auto-fire a win
+        setWins((prev: any[]) => [...prev, {
+          id: Date.now(), title: `Baby Step ${prevBabyStep} Complete!`,
+          desc: parsed.celebration, icon: '🏆', auto: true, date: new Date().toISOString()
+        }])
+      } catch {}
+    }
+    generateStepReaction()
+    setPrevBabyStep(currentBabyStep.step)
+  }, [currentBabyStep.step])
+
+  // ══════════════════════════════════════════════════════════════
+  // COACHING IMPROVEMENT #5 — ACCOUNTABILITY CHECK-INS
+  // ══════════════════════════════════════════════════════════════
+  useEffect(() => {
+    // Days since last money date
+    if (moneyDateLog && moneyDateLog.length > 0) {
+      const last = new Date(moneyDateLog[moneyDateLog.length - 1])
+      const days = Math.floor((Date.now() - last.getTime()) / 86400000)
+      setDaysSinceMoneyDate(days)
+    } else {
+      setDaysSinceMoneyDate(999)
+    }
+    // Overdue items — payments that were due and not ticked
+    const today = new Date()
+    const overdue: any[] = []
+    goals.forEach((g: any) => {
+      if (!g.addedToCalendar || !g.paymentAmount || !g.startDate) return
+      const due = new Date(g.startDate + 'T12:00:00')
+      if (due < today) {
+        const key = `goal-${g.id}-${due.getFullYear()}-${due.getMonth()}-${due.getDate()}`
+        if (!Array.from(paidOccurrences).includes(key)) {
+          overdue.push({ name: g.name, amount: g.paymentAmount, type: 'goal', daysAgo: Math.floor((today.getTime() - due.getTime()) / 86400000) })
+        }
+      }
+    })
+    setOverdueItems(overdue)
+  }, [moneyDateLog, goals, paidOccurrences])
+
+  // ══════════════════════════════════════════════════════════════
+  // COACHING IMPROVEMENT #6 — PATTERN DETECTION
+  // ══════════════════════════════════════════════════════════════
+  useEffect(() => {
+    if (Object.keys(actualSpend).length < 2) return
+    const patterns: string[] = []
+    const monthKeys = Object.keys(actualSpend).sort()
+    if (monthKeys.length >= 2) {
+      const cats = EXPENSE_CATEGORIES.map(c => c.id)
+      cats.forEach(cat => {
+        const catInfo = EXPENSE_CATEGORIES.find(c => c.id === cat)
+        const monthly = monthKeys.map(k => actualSpend[k][cat] || 0)
+        const avg = monthly.reduce((s, v) => s + v, 0) / monthly.length
+        const proj = getProjectedByCategory()[cat] || 0
+        if (avg > 0 && proj > 0 && avg > proj * 1.2 && monthly.length >= 2) {
+          patterns.push(`${catInfo?.icon} ${catInfo?.label} has been ${Math.round((avg/proj - 1) * 100)}% over budget on average across ${monthly.length} months — running $${Math.round(avg - proj)}/mo over`)
+        }
+        // Increasing trend
+        if (monthly.length >= 3) {
+          const last3 = monthly.slice(-3)
+          if (last3[2] > last3[1] && last3[1] > last3[0] && last3[2] > 0) {
+            patterns.push(`${catInfo?.icon} ${catInfo?.label} spending has increased every month for 3 months — up $${Math.round(last3[2] - last3[0])} from ${monthKeys[monthKeys.length-3]} to now`)
+          }
+        }
+      })
+    }
+    setSpendingPatterns(patterns.slice(0, 3))
+  }, [actualSpend])
+
+  // ══════════════════════════════════════════════════════════════
+  // COACHING IMPROVEMENT #7 — ROADMAP STEP TICK REACTION
+  // ══════════════════════════════════════════════════════════════
+  const tickPlanStepWithReaction = async (milestoneId: number, stepId: number, milestone: any, step: any) => {
+    // First toggle the step as normal
+    setRoadmapMilestones((prev: any[]) => prev.map(m =>
+      m.id === milestoneId
+        ? { ...m, weeklyPlan: m.weeklyPlan?.map((s: any) => s.id === stepId ? { ...s, done: !s.done } : s) }
+        : m
+    ))
+    if (step.done) return // unticking — no reaction needed
+    // Generate a reaction for completing this step
+    try {
+      const remainingSteps = milestone.weeklyPlan?.filter((s: any) => !s.done && s.id !== stepId) || []
+      const nextStep = remainingSteps[0]
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 100,
+          messages: [{
+            role: 'user',
+            content: `User just completed this step toward their goal "${milestone.name}": "${step.text}". ${nextStep ? `Next step is: "${nextStep.text}"` : 'This was the last step!'}
+
+Write ONE sentence: brief celebration + what to expect from the next step (or final celebration if last step). Warm, specific, coach-like. No markdown.`
+          }]
+        })
+      })
+      const data = await response.json()
+      const text = data.content?.find((c: any) => c.type === 'text')?.text?.trim()
+      if (text) {
+        setStepTickReaction({ milestoneId, stepId, message: text })
+        setTimeout(() => setStepTickReaction(null), 6000)
+      }
+    } catch {}
+  }
+
+  // Trigger daily briefing on mount + when data changes enough
+  useEffect(() => {
+    if (onboardingComplete && monthlyIncome > 0) {
+      generateDailyBriefing()
+    }
+  }, [onboardingComplete, currentBabyStep.step])
 
   const calculateMortgagePayoff = () => {
     const balance = parseFloat(mortgageAccel.balance || '0')
@@ -1127,6 +1413,15 @@ Rules:
       setExpandedMilestone(milestoneId)
     } catch { alert('Could not generate plan — please try again.') }
     setGeneratingPlanFor(null)
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // COACHING IMPROVEMENT #4 & #8 — AMBIENT CHAT (Ask Aureus about THIS)
+  // ══════════════════════════════════════════════════════════════
+  const askAureusAbout = (context: string) => {
+    setChatContext(context)
+    setActiveTab('chat')
+    setShowMoreTabs(false)
   }
 
   const togglePlanStep = (milestoneId: number, stepId: number) => {
@@ -3547,24 +3842,135 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
               </div>
 
-              {/* ── 4-STAT SNAPSHOT ── */}
+              {/* ── IMPROVEMENT #1: DAILY AI BRIEFING ── */}
+              <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg, #1a1208 0%, #0f0a04 100%)', borderRadius: '16px', border: '1px solid ' + theme.accent + '40', position: 'relative' as const }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: theme.accent, fontSize: '10px', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>AUREUS — {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}</div>
+                    {dailyBriefingLoading ? (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '2px solid ' + theme.accent, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+                        <span style={{ color: theme.textMuted, fontSize: '14px', fontStyle: 'italic' }}>Reading your numbers...</span>
+                      </div>
+                    ) : dailyBriefing ? (
+                      <p style={{ color: theme.text, fontSize: '15px', lineHeight: 1.7, margin: 0, fontStyle: 'italic' }}>"{dailyBriefing.text}"</p>
+                    ) : onboardingComplete ? (
+                      <div>
+                        <p style={{ color: theme.text, fontSize: '15px', lineHeight: 1.7, margin: '0 0 8px 0' }}>
+                          {monthlySurplus > 0
+                            ? `Your surplus of $${monthlySurplus.toFixed(0)}/month is the engine. Every dollar you don't spend is a brick in your empire.`
+                            : `Money is tight right now — but awareness is the first step. Let's find the leak.`}
+                        </p>
+                        <button onClick={generateDailyBriefing} style={{ background: 'none', border: 'none', color: theme.accent, cursor: 'pointer', fontSize: '12px', padding: 0, textDecoration: 'underline' }}>Generate today's briefing</button>
+                      </div>
+                    ) : (
+                      <p style={{ color: theme.textMuted, fontSize: '14px', margin: 0 }}>Complete your setup to get personalised daily coaching.</p>
+                    )}
+                  </div>
+                  <button onClick={() => askAureusAbout('Give me a detailed coaching session based on my current financial situation')}
+                    style={{ padding: '8px 14px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
+                    💬 Ask Aureus
+                  </button>
+                </div>
+              </div>
+
+              {/* ── IMPROVEMENT #5: ACCOUNTABILITY BANNERS ── */}
+              {daysSinceMoneyDate > 8 && checkInSchedule.weeklyEnabled !== false && (
+                <div style={{ padding: '14px 18px', background: theme.warning + '15', borderRadius: '12px', border: '1px solid ' + theme.warning + '40', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ color: theme.warning, fontWeight: 700, fontSize: '13px' }}>💰 Money date overdue — {daysSinceMoneyDate} days since your last one</div>
+                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>15 minutes now could save you hundreds. Review your week?</div>
+                  </div>
+                  <button onClick={() => setActiveTab('dashboard')} style={{ padding: '8px 14px', background: theme.warning, color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>Do it now →</button>
+                </div>
+              )}
+              {overdueItems.length > 0 && (
+                <div style={{ padding: '14px 18px', background: theme.danger + '12', borderRadius: '12px', border: '1px solid ' + theme.danger + '40' }}>
+                  <div style={{ color: theme.danger, fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>⚠️ {overdueItems.length} payment{overdueItems.length > 1 ? 's' : ''} not yet ticked off</div>
+                  {overdueItems.slice(0, 2).map((item, i) => (
+                    <div key={i} style={{ color: theme.textMuted, fontSize: '12px' }}>→ {item.name} ${item.amount} — due {item.daysAgo} day{item.daysAgo !== 1 ? 's' : ''} ago</div>
+                  ))}
+                  <button onClick={() => setActiveTab('dashboard')} style={{ marginTop: '8px', padding: '6px 12px', background: 'transparent', border: '1px solid ' + theme.danger + '50', borderRadius: '6px', color: theme.danger, cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Tick them off →</button>
+                </div>
+              )}
+
+              {/* ── IMPROVEMENT #10: TONE-ADAPTIVE SURPLUS WARNING ── */}
+              {monthlySurplus < 0 && (
+                <div style={{ padding: '16px 20px', background: theme.danger + '12', borderRadius: '14px', border: '2px solid ' + theme.danger + '40' }}>
+                  <div style={{ color: theme.danger, fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>This month's numbers are tight — ${Math.abs(monthlySurplus).toFixed(0)} in the red</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '10px' }}>Here are 3 places to look right now:</div>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '4px', marginBottom: '12px' }}>
+                    <div style={{ color: theme.text, fontSize: '12px' }}>1. 📱 Subscriptions you don't use — quick $20-50 win</div>
+                    <div style={{ color: theme.text, fontSize: '12px' }}>2. 🍽️ Eating out — the biggest variable in most budgets</div>
+                    <div style={{ color: theme.text, fontSize: '12px' }}>3. 💳 Minimum payments — are all debts at minimums?</div>
+                  </div>
+                  <button onClick={() => askAureusAbout(`My budget is $${Math.abs(monthlySurplus).toFixed(0)} in the red this month with income $${monthlyIncome.toFixed(0)} and expenses $${monthlyExpenses.toFixed(0)}. What should I cut first?`)}
+                    style={{ padding: '8px 14px', background: theme.danger, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
+                    Ask Aureus to fix this →
+                  </button>
+                </div>
+              )}
+
+              {/* ── IMPROVEMENT #3: BABY STEP ADVANCEMENT REACTION ── */}
+              {stepReaction && (
+                <div style={{ padding: '20px', background: theme.success + '15', borderRadius: '16px', border: '2px solid ' + theme.success + '50', animation: 'slideIn 0.4s ease' }}>
+                  <div style={{ color: theme.success, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>🏆 BABY STEP {stepReaction.step - 1} COMPLETE</div>
+                  <div style={{ color: theme.text, fontSize: '15px', fontWeight: 600, lineHeight: 1.6, marginBottom: '8px' }}>{stepReaction.message}</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>{stepReaction.nextSuggestion}</div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => askAureusAbout(`I just completed Baby Step ${stepReaction.step - 1} and I'm now on Baby Step ${stepReaction.step} (${currentBabyStep.title}). What should my focus be now?`)}
+                      style={{ padding: '8px 14px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
+                      What's next for me? →
+                    </button>
+                    <button onClick={() => setStepReaction(null)} style={{ padding: '8px 14px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.textMuted, fontSize: '12px' }}>Dismiss</button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── IMPROVEMENT #2: CONTEXT STAT CARDS ── */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
                 {[
-                  { label: 'Monthly Income', value: '$' + monthlyIncome.toFixed(0), color: theme.success, icon: '💰', tab: 'dashboard' },
-                  { label: 'Monthly Surplus', value: (monthlySurplus >= 0 ? '+$' : '-$') + Math.abs(monthlySurplus).toFixed(0), color: monthlySurplus >= 0 ? theme.success : theme.danger, icon: '📊', tab: 'dashboard' },
-                  { label: 'Net Worth', value: '$' + netWorth.toLocaleString(), color: netWorth >= 0 ? theme.accent : theme.danger, icon: '🏛️', tab: 'overview' },
-                  { label: 'Goal Savings', value: '$' + monthlyGoalSavings.toFixed(0) + '/mo', color: theme.accent, icon: '🎯', tab: 'dashboard' },
+                  { key: 'income', label: 'Monthly Income', value: '$' + monthlyIncome.toFixed(0), color: theme.success, icon: '💰', tab: 'dashboard', context: getStatContext('income') },
+                  { key: 'surplus', label: 'Monthly Surplus', value: (monthlySurplus >= 0 ? '+$' : '-$') + Math.abs(monthlySurplus).toFixed(0), color: monthlySurplus >= 0 ? theme.success : theme.danger, icon: '📊', tab: 'dashboard', context: getStatContext('surplus') },
+                  { key: 'networth', label: 'Net Worth', value: '$' + netWorth.toLocaleString(), color: netWorth >= 0 ? theme.accent : theme.danger, icon: '🏛️', tab: 'overview', context: getStatContext('networth') },
+                  { key: 'goals', label: 'Goal Savings', value: '$' + monthlyGoalSavings.toFixed(0) + '/mo', color: theme.accent, icon: '🎯', tab: 'dashboard', context: getStatContext('goals') },
                 ].map(stat => (
                   <button key={stat.label} onClick={() => setActiveTab(stat.tab as any)}
-                    style={{ padding: '18px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border, cursor: 'pointer', textAlign: 'left' as const, transition: 'border-color 0.2s' }}
+                    style={{ padding: '16px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border, cursor: 'pointer', textAlign: 'left' as const, transition: 'border-color 0.2s', position: 'relative' as const }}
                     onMouseEnter={e => (e.currentTarget.style.borderColor = theme.accent + '60')}
                     onMouseLeave={e => (e.currentTarget.style.borderColor = theme.border)}>
-                    <div style={{ fontSize: '20px', marginBottom: '8px' }}>{stat.icon}</div>
-                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, marginBottom: '4px', letterSpacing: '0.5px' }}>{stat.label.toUpperCase()}</div>
-                    <div style={{ color: stat.color, fontSize: '22px', fontWeight: 800 }}>{stat.value}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ fontSize: '20px', marginBottom: '6px' }}>{stat.icon}</div>
+                      <button onClick={e => { e.stopPropagation(); askAureusAbout(`I'm looking at my ${stat.label}: ${stat.value}. ${stat.context} Give me specific advice.`) }}
+                        style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '11px', padding: '2px 6px', borderRadius: '4px', opacity: 0 }}
+                        className="ask-btn"
+                        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                        onMouseLeave={e => (e.currentTarget.style.opacity = '0')}>
+                        Ask ?
+                      </button>
+                    </div>
+                    <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 600, marginBottom: '3px', letterSpacing: '0.5px' }}>{stat.label.toUpperCase()}</div>
+                    <div style={{ color: stat.color, fontSize: '20px', fontWeight: 800, marginBottom: '4px' }}>{stat.value}</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', lineHeight: 1.4 }}>{stat.context}</div>
                   </button>
                 ))}
               </div>
+
+              {/* ── IMPROVEMENT #6: SPENDING PATTERNS ── */}
+              {spendingPatterns.length > 0 && (
+                <div style={{ padding: '16px 20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px' }}>🧠 AUREUS NOTICED</div>
+                    <button onClick={() => askAureusAbout(`I've noticed these spending patterns: ${spendingPatterns.join('. ')}. What should I do?`)}
+                      style={{ padding: '4px 10px', background: theme.accent + '20', color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
+                      Ask Aureus →
+                    </button>
+                  </div>
+                  {spendingPatterns.map((p, i) => (
+                    <div key={i} style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '6px', paddingLeft: '8px', borderLeft: '2px solid ' + theme.accent + '60', lineHeight: 1.5 }}>{p}</div>
+                  ))}
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
 
@@ -3953,7 +4359,12 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         )}
 
         {/* CHAT TAB */}
-        {activeTab === 'chat' && (
+        {activeTab === 'chat' && (() => {
+          // Improvement #8: If we have a context set from "Ask Aureus about this", pre-load it
+          if (chatContext && !chatInput) {
+            setTimeout(() => { setChatInput(chatContext); setChatContext(null) }, 50)
+          }
+          return (
           <div style={{ maxWidth: '800px', margin: '0 auto' }}>
             <div style={{ background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, border: '2px solid ' + theme.success, borderRadius: '20px', padding: '24px', minHeight: '70vh', display: 'flex', flexDirection: 'column' as const }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid ' + theme.border }}>
@@ -4043,7 +4454,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               </div>
             </div>
           </div>
-        )}
+          )
+        })()}
 
         {/* BUDGET DASHBOARD */}
         {activeTab === 'dashboard' && (
@@ -5445,9 +5857,15 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                   key={step.id}
                                   style={{ background: step.done ? theme.success + '15' : theme.bg, borderRadius: '10px', border: '1px solid ' + (step.done ? theme.success + '40' : isActionStep ? (isAddDebtStep ? theme.warning + '60' : theme.purple + '60') : theme.border), overflow: 'hidden' }}
                                 >
+                                  {/* Step tick reaction toast — improvement #7 */}
+                                  {stepTickReaction?.milestoneId === m.id && stepTickReaction?.stepId === step.id && (
+                                    <div style={{ padding: '10px 14px', background: theme.success + '20', borderLeft: '3px solid ' + theme.success, color: theme.text, fontSize: '12px', lineHeight: 1.5, animation: 'slideIn 0.3s ease' }}>
+                                      ✅ {stepTickReaction?.message}
+                                    </div>
+                                  )}
                                   {/* Clickable row */}
                                   <div
-                                    onClick={() => togglePlanStep(m.id, step.id)}
+                                    onClick={() => tickPlanStepWithReaction(m.id, step.id, m, step)}
                                     style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', cursor: 'pointer' }}
                                   >
                                     <div style={{ width: '24px', height: '24px', borderRadius: '6px', border: '2px solid ' + (step.done ? theme.success : theme.border), background: step.done ? theme.success : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
@@ -5540,18 +5958,26 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>👶 Australian Baby Steps</h2>
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
                 {australianBabySteps.map(item => {
-                  const isCurrent = item.step === currentBabyStep.step
-                  const done = item.step < currentBabyStep.step
+                  const alreadyOwnsHome = ['own', 'paid_off', 'buying'].includes(houseStatus || '')
+                  const mortgageFree = houseStatus === 'paid_off'
+                  // Step 5 (home deposit) is done if they own/are buying a home
+                  const isStep5Done = item.step === 5 && alreadyOwnsHome
+                  // Step 6 (mortgage) is done if they've paid it off
+                  const isStep6Done = item.step === 6 && mortgageFree
+                  const done = item.step < currentBabyStep.step || isStep5Done || isStep6Done
+                  const isCurrent = item.step === currentBabyStep.step && !isStep5Done && !isStep6Done
                   return (
                     <div key={item.step} style={{ padding: '16px', background: done ? (theme.bg) : isCurrent ? '#2e2a1e' : theme.border, borderRadius: '12px', border: done ? '2px solid ' + theme.success : isCurrent ? '2px solid ' + theme.warning : '1px solid ' + theme.border }}>
                       <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                         <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: done ? theme.success : isCurrent ? theme.warning : theme.purple, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px', flexShrink: 0 }}>{done ? '✓' : item.icon}</div>
                         <div onClick={() => setSelectedBabyStep(item.step)} style={{ flex: 1, cursor: 'pointer' }}>
                           <div style={{ color: theme.text, fontWeight: 600, fontSize: '16px' }}>{item.title}</div>
-                          <div style={{ color: theme.textMuted, fontSize: '13px' }}>{item.desc}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '13px' }}>
+                            {isStep5Done ? '✅ Already owns home — this step is complete' : isStep6Done ? '✅ Mortgage paid off — this step is complete' : item.desc}
+                          </div>
                         </div>
                         <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                          <button onClick={() => addToRoadmapQuick(item.title, item.icon, '', item.desc)} style={{ padding: '5px 10px', background: theme.purple + '20', color: theme.purple, border: '1px solid ' + theme.purple + '40', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>+ Roadmap</button>
+                          {!isStep5Done && !isStep6Done && <button onClick={() => addToRoadmapQuick(item.title, item.icon, '', item.desc)} style={{ padding: '5px 10px', background: theme.purple + '20', color: theme.purple, border: '1px solid ' + theme.purple + '40', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>+ Roadmap</button>}
                           <div style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, background: done ? theme.success : isCurrent ? theme.warning : theme.border, color: done || isCurrent ? 'white' : theme.textMuted }}>{done ? '✓ Done' : isCurrent ? '→ Now' : 'Later'}</div>
                         </div>
                       </div>
@@ -5565,27 +5991,43 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             <div style={{ padding: '24px', background: `linear-gradient(135deg, ${theme.purple}15, ${theme.success}15)`, borderRadius: '16px', border: '2px solid ' + theme.purple }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🔥 Escape the Rat Race — FIRE Path</h2>
-                <button onClick={() => addToRoadmapQuick('Reach Financial Independence', '🔥', fiPath.fireNumber.toFixed(0), `FIRE number based on ${monthlyIncome > 0 ? `$${monthlyIncome.toFixed(0)}/mo income` : 'current expenses'}`)} style={{ padding: '8px 14px', background: theme.purple + '20', color: theme.purple, border: '1px solid ' + theme.purple + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>+ Add to Roadmap</button>
+                <button onClick={() => askAureusAbout(`My FIRE number is $${fiPath.fireNumber.toLocaleString()} (tax-adjusted at ${Math.round(fireTaxRate*100)}%). I need $${fiPath.monthlyNeed.toFixed(0)}/mo after tax. I currently have $${fiPath.currentInvestments.toLocaleString()} invested. What's my best path to financial independence?`)} style={{ padding: '8px 14px', background: theme.purple + '20', color: theme.purple, border: '1px solid ' + theme.purple + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>💬 Ask Aureus</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <div style={cardStyle}>
                   <h3 style={{ margin: '0 0 12px 0', color: theme.purple }}>🌴 Freedom Target</h3>
                   <div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}>
-                    <div>Monthly need: <strong>${fiPath.monthlyNeed.toFixed(0)}</strong></div>
+                    <div>Monthly need (after tax): <strong>${fiPath.monthlyNeed.toFixed(0)}</strong></div>
                     <div>Passive income: <strong style={{ color: theme.success }}>${(passiveIncome + totalPassiveQuestIncome).toFixed(0)}</strong></div>
                     <div>Passive gap: <strong style={{ color: theme.danger }}>${Math.max(fiPath.passiveGap - totalPassiveQuestIncome, 0).toFixed(0)}</strong></div>
                     <div>Coverage: <strong style={{ color: theme.purple }}>{((passiveIncome + totalPassiveQuestIncome) / Math.max(fiPath.monthlyNeed, 1) * 100).toFixed(1)}%</strong></div>
                   </div>
                 </div>
                 <div style={cardStyle}>
-                  <h3 style={{ margin: '0 0 12px 0', color: theme.success }}>🔥 FIRE Number</h3>
-                  <div style={{ color: theme.text, fontSize: '14px', lineHeight: 2 }}>
-                    <div>25× annual expenses: <strong>${fiPath.fireNumber.toLocaleString()}</strong></div>
-                    <div>Investments + Super: <strong style={{ color: theme.success }}>${fiPath.currentInvestments.toLocaleString()}</strong></div>
-                    <div>Progress: <strong style={{ color: theme.purple }}>{fiPath.fireNumber > 0 ? (fiPath.currentInvestments / fiPath.fireNumber * 100).toFixed(1) : 0}%</strong></div>
-                    <div>Est. years to FI: <strong style={{ color: theme.purple }}>{fiPath.yearsToFI >= 999 ? '∞' : fiPath.yearsToFI}</strong></div>
+                  <h3 style={{ margin: '0 0 12px 0', color: theme.success }}>🔥 FIRE Number (Tax-Adjusted)</h3>
+                  <div style={{ color: theme.text, fontSize: '13px', lineHeight: 1.9 }}>
+                    <div>Annual need after tax: <strong>${fiPath.annualNeedAfterTax.toLocaleString(undefined,{maximumFractionDigits:0})}</strong></div>
+                    <div>Grossed up at {Math.round(fireTaxRate*100)}% tax: <strong style={{ color: theme.warning }}>${fiPath.annualNeedPreTax.toLocaleString(undefined,{maximumFractionDigits:0})}/yr</strong></div>
+                    <div style={{ borderTop: '1px solid ' + theme.border, paddingTop: '6px', marginTop: '4px' }}>
+                      <span style={{ color: theme.textMuted, fontSize: '11px' }}>FIRE NUMBER (pre-tax ÷ 4%)</span>
+                      <div style={{ color: theme.accent, fontWeight: 800, fontSize: '22px' }}>${fiPath.fireNumber.toLocaleString()}</div>
+                    </div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', lineHeight: 1.5, padding: '8px', background: theme.bg, borderRadius: '6px', marginTop: '4px' }}>
+                      Portfolio of ${fiPath.fireNumber.toLocaleString()} × 4% = ${fiPath.annualNeedPreTax.toLocaleString(undefined,{maximumFractionDigits:0})}/yr pre-tax → ${fiPath.annualNeedAfterTax.toLocaleString(undefined,{maximumFractionDigits:0})}/yr after {Math.round(fireTaxRate*100)}% tax → ${(fiPath.annualNeedAfterTax/52).toFixed(0)}/week to live on
+                    </div>
                   </div>
                 </div>
+              </div>
+              {/* Progress toward FIRE */}
+              <div style={{ marginTop: '16px', padding: '14px', background: theme.cardBg, borderRadius: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ color: theme.textMuted, fontSize: '13px' }}>Progress: <strong style={{ color: theme.purple }}>{fiPath.fireNumber > 0 ? (fiPath.currentInvestments / fiPath.fireNumber * 100).toFixed(1) : 0}%</strong></span>
+                  <span style={{ color: theme.textMuted, fontSize: '13px' }}>Est. years to FI: <strong style={{ color: theme.purple }}>{fiPath.yearsToFI >= 999 ? '∞' : fiPath.yearsToFI}</strong></span>
+                </div>
+                <div style={{ height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: Math.min(100, fiPath.fireNumber > 0 ? (fiPath.currentInvestments / fiPath.fireNumber * 100) : 0) + '%', height: '100%', background: 'linear-gradient(90deg, #D4AF37, #B68B2E)' }} />
+                </div>
+                <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px' }}>⚠️ Tax estimate uses 32.5% AU marginal rate — consult your accountant for your exact rate · Not financial advice</div>
               </div>
             </div>
 
