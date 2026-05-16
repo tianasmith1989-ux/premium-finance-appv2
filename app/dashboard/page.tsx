@@ -12,8 +12,8 @@ export default function Dashboard() {
 
   // ==================== MISSION SYSTEM ====================
   const [missionPhase, setMissionPhase] = useState<1 | 2 | 3>(1)
-  const [missionStep, setMissionStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7>(0)
-  // 0 = not started, 1 = personality, 2 = income, 3 = expenses, 4 = debts, 5 = assets, 6 = mortgage, 7 = schedule
+  const [missionStep, setMissionStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>(0)
+  // 0 = not started, 1 = personality, 2 = income, 3 = expenses, 4 = debts, 5 = assets, 6 = mortgage, 7 = schedule, 8 = sinking funds
   const [missionComplete, setMissionComplete] = useState(false)
   const [missionP2Step, setMissionP2Step] = useState<'analyse' | 'propose' | 'confirm' | 'plan'>('analyse')
   const [missionP2Loading, setMissionP2Loading] = useState(false)
@@ -1491,19 +1491,64 @@ Rules:
     if (!chatInput.trim() || isLoading) return
     const message = chatInput.trim()
     const useSearch = shouldUseWebSearch(message)
-    setChatMessages(prev => [...prev, { role: 'user', content: message, usedWebSearch: useSearch }])
+    const newUserMsg = { role: 'user' as const, content: message, usedWebSearch: false }
+    const updatedMessages = [...chatMessages, newUserMsg]
+    setChatMessages(updatedMessages)
     setChatInput('')
     setIsLoading(true)
+
     try {
-      const response = await fetch('/api/budget-coach', {
+      const systemPrompt = `You are Aureus, a personal AI financial coach for Australian users. You know this user's complete financial picture and remember everything from this conversation.
+
+THEIR FINANCIAL DATA:
+• Income: ${incomeStreams.map((i: any) => `${i.name} $${i.amount}/${i.frequency}`).join(', ') || 'not yet set up'}
+• Monthly: income $${monthlyIncome.toFixed(0)} | expenses $${monthlyExpenses.toFixed(0)} | surplus $${monthlySurplus.toFixed(0)}
+• Emergency fund: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months)
+• Debts: ${debts.length > 0 ? debts.map((d: any) => `${d.name} $${d.balance} @ ${d.interestRate}%`).join(', ') : 'none'}
+• Goals: ${goals.length > 0 ? goals.map((g: any) => `${g.name}: $${g.saved}/$${g.target}`).join(', ') : 'none'}
+• Assets: ${assets.length > 0 ? assets.map((a: any) => `${a.name} $${a.value}`).join(', ') : 'none'}
+• Net worth: $${netWorth.toLocaleString()}
+• Baby Step: ${currentBabyStep.step} — ${currentBabyStep.title}
+• House status: ${houseStatus || 'not specified'}${mortgageAccel.balance ? ` | Mortgage: $${mortgageAccel.balance} at ${mortgageAccel.rate}%` : ''}${moneyPersonality ? ` | Personality: ${personalityProfiles[moneyPersonality]?.label}` : ''}
+
+COACHING RULES:
+- Always use their actual numbers — never generic advice
+- Be warm, direct, specific — like a coach who knows them personally  
+- Remember and reference earlier parts of this conversation naturally
+- Australia: use AUD, refer to ATO, super, HECS, Medicare, RBA etc.${getPersonalityCoachingContext()}`
+
+      // Pass full conversation history (last 20 messages = 10 exchanges)
+      const messages = updatedMessages.slice(-20).map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content
+      }))
+
+      const body: any = {
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages
+      }
+
+      if (useSearch) {
+        body.tools = [{ type: 'web_search_20250305', name: 'web_search' }]
+      }
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...buildApiBody(message), useWebSearch: useSearch })
+        body: JSON.stringify(body)
       })
+
       const data = await response.json()
-      const reply = data.message || data.advice || data.raw || "I'm here to help!"
-      setChatMessages(prev => [...prev, { role: 'assistant', content: reply, usedWebSearch: useSearch && data.searchedWeb }])
-    } catch { setChatMessages(prev => [...prev, { role: 'assistant', content: "Sorry, something went wrong." }]) }
+      const textBlocks = (data.content || []).filter((c: any) => c.type === 'text')
+      const reply = textBlocks.map((c: any) => c.text).join('\n').trim() || "I'm here to help — what would you like to know?"
+      const didSearch = (data.content || []).some((c: any) => c.type === 'tool_use')
+
+      setChatMessages(prev => [...prev, { role: 'assistant', content: reply, usedWebSearch: didSearch }])
+    } catch {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong. Please try again.' }])
+    }
     setIsLoading(false)
   }
 
@@ -1533,13 +1578,40 @@ Their deep why: ${deepWhyAnswers[0] ? `"${deepWhyAnswers[0]}"` : 'not completed 
 Always reference who they said they're becoming when relevant. Coach them as their personality type — not generically.`
   }
 
-  const buildApiBody = (question: string, extraContext?: string) => ({
-    mode: 'question',
-    question: question + (extraContext || '') + getPersonalityCoachingContext(),
-    financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones },
-    memory: budgetMemory,
-    countryConfig: currentCountryConfig
-  })
+  const buildApiBody = (question: string, extraContext?: string) => {
+    // Build conversation history — last 20 messages (10 exchanges) for context
+    const history = chatMessages.slice(-20).map(m => ({
+      role: m.role,
+      content: m.content
+    }))
+
+    const systemContext = `You are Aureus, a personal financial coach for Australian users. You know this user's full financial picture:
+
+Income: ${incomeStreams.map(i => `${i.name} $${i.amount}/${i.frequency}`).join(', ') || 'not set'}
+Monthly income: $${monthlyIncome.toFixed(0)} | Monthly expenses: $${monthlyExpenses.toFixed(0)} | Monthly surplus: $${monthlySurplus.toFixed(0)}
+Emergency fund: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months)
+Debts: ${debts.length > 0 ? debts.map(d => `${d.name} $${d.balance} at ${d.interestRate}%`).join(', ') : 'none'}
+Goals: ${goals.length > 0 ? goals.map(g => `${g.name} $${g.saved}/$${g.target}`).join(', ') : 'none'}
+Assets: ${assets.length > 0 ? assets.map(a => `${a.name} $${a.value}`).join(', ') : 'none'}
+Net worth: $${netWorth.toLocaleString()}
+Baby Step: ${currentBabyStep.step} — ${currentBabyStep.title}
+House status: ${houseStatus || 'not specified'}
+${moneyPersonality ? `Money personality: ${personalityProfiles[moneyPersonality]?.label}` : ''}
+${mortgageAccel.balance ? `Mortgage: $${mortgageAccel.balance} at ${mortgageAccel.rate}%` : ''}
+${(extraContext || '')}${getPersonalityCoachingContext()}
+
+Rules: Be specific and use their actual numbers. No generic advice. Be warm but direct — like a coach who knows them well. Keep responses concise unless they ask for detail.`
+
+    return {
+      mode: 'question',
+      question,
+      conversationHistory: history,
+      systemContext,
+      financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones },
+      memory: budgetMemory,
+      countryConfig: currentCountryConfig
+    }
+  }
 
   // ==================== COACH TRIGGER ENGINE ====================
   // Fires whenever meaningful financial state changes.
