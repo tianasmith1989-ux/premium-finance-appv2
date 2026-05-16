@@ -226,7 +226,8 @@ export default function Dashboard() {
   const [budgetMemory, setBudgetMemory] = useState<any>({ name: '', onboardingComplete: false, financialPath: '', bigGoals: {}, lifeEvents: [], patterns: [], preferences: { communicationStyle: 'direct', checkInFrequency: 'when-needed', motivators: [] }, currentStep: 'Baby Step 1', notes: [] })
   const [budgetOnboarding, setBudgetOnboarding] = useState({ isActive: false, step: 'greeting' })
   const [chatInput, setChatInput] = useState('')
-  const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
+  const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string, usedWebSearch?: boolean}>>([])
+
   const [isLoading, setIsLoading] = useState(false)
   const [selectedBabyStep, setSelectedBabyStep] = useState<number | null>(null)
 
