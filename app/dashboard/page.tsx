@@ -132,6 +132,8 @@ export default function Dashboard() {
 
   // ==================== NET WORTH HISTORY ====================
   const [netWorthHistory, setNetWorthHistory] = useState<any[]>([])
+  const [sinkingFunds, setSinkingFunds] = useState<any[]>([])
+  const [newSinkingFund, setNewSinkingFund] = useState({ name: '', targetAmount: '', targetDate: '', weeklyAmount: '', category: 'celebration', notes: '' })
 
   // ==================== SPENDING INSIGHTS ====================
   const [spendingInsights, setSpendingInsights] = useState<any[]>([])
@@ -367,6 +369,7 @@ export default function Dashboard() {
       if (data.fireGoal !== undefined) setFireGoal(data.fireGoal)
       if (data.hasAutomatedPayments !== undefined) setHasAutomatedPayments(data.hasAutomatedPayments)
       if (data.investmentProperties) setInvestmentProperties(data.investmentProperties)
+      if (data.sinkingFunds) setSinkingFunds(data.sinkingFunds)
       if (data.missionPhase) setMissionPhase(data.missionPhase)
       if (data.missionStep !== undefined) setMissionStep(data.missionStep)
       if (data.missionComplete) setMissionComplete(data.missionComplete)
@@ -426,12 +429,12 @@ export default function Dashboard() {
       missionPhase, missionStep, missionComplete, missionNavLocked,
       missionP2Proposals, missionP2Confirmed, missionP2Step,
       moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete,
-      fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, proactiveInsights,
+      fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, sinkingFunds, proactiveInsights,
       insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog,
       annualReviews, superData, netWorthHistory, personalityAnswers
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, categoryBudgets, actualSpend, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, coachNextAction, dismissedTriggers, lastAppOpen, missionPhase, missionStep, missionComplete, missionNavLocked, missionP2Proposals, missionP2Confirmed, missionP2Step, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, categoryBudgets, actualSpend, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, coachNextAction, dismissedTriggers, lastAppOpen, missionPhase, missionStep, missionComplete, missionNavLocked, missionP2Proposals, missionP2Confirmed, missionP2Step, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, sinkingFunds, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
 
   // Chat scroll
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -1446,20 +1449,59 @@ Rules:
     setTimeout(() => setCelebrationWin(null), 3000)
   }
 
+  // ── Web search trigger detection ──
+  const shouldUseWebSearch = (msg: string): boolean => {
+    const lower = msg.toLowerCase()
+    return [
+      /\b(current|today'?s?|latest|now|2025|2026)\b.*\b(rate|price|cost|value|yield)/,
+      /\b(interest rate|cash rate|rba|mortgage rate|home loan rate|savings rate|term deposit|hysa)\b/,
+      /\b(asx|share price|stock price|etf|dividend|market)\b/,
+      /\b(median (house|property|unit) price|rental yield|suburb|corelogic|domain)\b/,
+      /\b(concessional cap|super limit|contribution limit|tax bracket|medicare levy|hecs)\b/,
+      /\b(passive income idea|best savings account|high interest|best rate)\b/,
+      /\b(grocery|supermarket|woolworths|coles|aldi|price of|on special|catalog|meal plan|recipe cost)\b/,
+      /\b(what is the current|what are current|what'?s? the (current|latest)|how much does .* cost (now|today))\b/,
+    ].some(r => r.test(lower))
+  }
+
+  // ── Sinking funds helpers ──
+  const addSinkingFund = () => {
+    if (!newSinkingFund.name || !newSinkingFund.targetAmount) return
+    const target = parseFloat(newSinkingFund.targetAmount)
+    const targetDate = newSinkingFund.targetDate
+    let weeklyAmt = parseFloat(newSinkingFund.weeklyAmount || '0')
+    // Auto-calc weekly if date given and no manual amount
+    if (!weeklyAmt && targetDate) {
+      const weeksLeft = Math.max(1, Math.ceil((new Date(targetDate).getTime() - Date.now()) / (7 * 86400000)))
+      weeklyAmt = parseFloat((target / weeksLeft).toFixed(2))
+    }
+    setSinkingFunds(prev => [...prev, {
+      ...newSinkingFund, id: Date.now(),
+      weeklyAmount: weeklyAmt.toString(),
+      savedAmount: '0',
+      createdAt: new Date().toISOString()
+    }])
+    setNewSinkingFund({ name: '', targetAmount: '', targetDate: '', weeklyAmount: '', category: 'celebration', notes: '' })
+  }
+  const deleteSinkingFund = (id: number) => setSinkingFunds(prev => prev.filter(f => f.id !== id))
+  const addToSinkingFund = (id: number, amount: number) => setSinkingFunds(prev => prev.map(f => f.id === id ? { ...f, savedAmount: (parseFloat(f.savedAmount || '0') + amount).toFixed(2) } : f))
+
   const handleChatMessage = async () => {
     if (!chatInput.trim() || isLoading) return
     const message = chatInput.trim()
-    setChatMessages(prev => [...prev, { role: 'user', content: message }])
+    const useSearch = shouldUseWebSearch(message)
+    setChatMessages(prev => [...prev, { role: 'user', content: message, usedWebSearch: useSearch }])
     setChatInput('')
     setIsLoading(true)
     try {
       const response = await fetch('/api/budget-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildApiBody(message))
+        body: JSON.stringify({ ...buildApiBody(message), useWebSearch: useSearch })
       })
       const data = await response.json()
-      setChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || data.raw || "I'm here to help!" }])
+      const reply = data.message || data.advice || data.raw || "I'm here to help!"
+      setChatMessages(prev => [...prev, { role: 'assistant', content: reply, usedWebSearch: useSearch && data.searchedWeb }])
     } catch { setChatMessages(prev => [...prev, { role: 'assistant', content: "Sorry, something went wrong." }]) }
     setIsLoading(false)
   }
@@ -4443,10 +4485,25 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 )}
                 {chatMessages.map((msg, idx) => (
                   <div key={idx} style={{ marginBottom: '16px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                    <div style={{ maxWidth: '85%', padding: '14px 18px', borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '15px', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
+                    <div style={{ maxWidth: '85%' }}>
+                      <div style={{ padding: '14px 18px', borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? '#0a0a0a' : theme.text, fontSize: '15px', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
+                      {msg.usedWebSearch && (
+                        <div style={{ marginTop: '4px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                          <span style={{ fontSize: '10px', color: theme.accent, padding: '2px 8px', background: theme.accent + '15', borderRadius: '10px', border: '1px solid ' + theme.accent + '30' }}>🔍 Live web data</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
-                {isLoading && <div style={{ padding: '16px', color: theme.textMuted }}>Aureus is thinking...</div>}
+                {isLoading && (
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', padding: '14px 18px', background: theme.cardBg, borderRadius: '18px 18px 18px 4px', maxWidth: '200px' }}>
+                    {shouldUseWebSearch(chatInput) ? (
+                      <><div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '2px solid ' + theme.accent, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} /><span style={{ color: theme.textMuted, fontSize: '13px' }}>Searching the web...</span></>
+                    ) : (
+                      <><div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '2px solid ' + theme.accent, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} /><span style={{ color: theme.textMuted, fontSize: '13px' }}>Aureus is thinking...</span></>
+                    )}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleChatMessage()} placeholder="Ask Aureus anything..." style={{ ...inputStyle, flex: 1, padding: '14px 18px', fontSize: '15px' }} disabled={isLoading} />
@@ -5259,6 +5316,139 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
               </div>
             </div>
+
+            {/* Sinking Funds */}
+            {(() => {
+              const SINKING_CATEGORIES = [
+                { id: 'celebration', label: 'Celebration', icon: '🎉' },
+                { id: 'christmas',   label: 'Christmas',   icon: '🎄' },
+                { id: 'birthday',    label: 'Birthday',    icon: '🎂' },
+                { id: 'holiday',     label: 'Holiday',     icon: '✈️' },
+                { id: 'vehicle',     label: 'Car/Rego',    icon: '🚗' },
+                { id: 'insurance',   label: 'Insurance',   icon: '🛡️' },
+                { id: 'education',   label: 'Education',   icon: '📚' },
+                { id: 'medical',     label: 'Medical',     icon: '🏥' },
+                { id: 'home',        label: 'Home/Renos',  icon: '🏠' },
+                { id: 'other',       label: 'Other',       icon: '📦' },
+              ]
+              const totalSinkingFundWeekly = sinkingFunds.reduce((s, f) => s + parseFloat(f.weeklyAmount || '0'), 0)
+              const totalSinkingFundSaved = sinkingFunds.reduce((s, f) => s + parseFloat(f.savedAmount || '0'), 0)
+
+              return (
+                <div style={cardStyle} data-section="sinking-funds">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 2px 0', color: theme.accent, fontSize: '18px' }}>🎯 Sinking Funds</h3>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>Save weekly for known future expenses — no more surprise blowouts</div>
+                    </div>
+                    {sinkingFunds.length > 0 && (
+                      <div style={{ textAlign: 'right' as const }}>
+                        <div style={{ color: theme.accent, fontWeight: 700, fontSize: '14px' }}>${totalSinkingFundWeekly.toFixed(0)}/wk</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px' }}>${totalSinkingFundSaved.toFixed(0)} saved total</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Aureus tip if no sinking funds */}
+                  {sinkingFunds.length === 0 && (
+                    <div style={{ padding: '14px', background: theme.accent + '10', borderRadius: '10px', border: '1px solid ' + theme.accent + '30', marginBottom: '16px' }}>
+                      <div style={{ color: theme.accent, fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>💡 Aureus tip: The sinking fund secret</div>
+                      <div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6 }}>
+                        Christmas costs $1,200? Set aside $23/week all year — it's already saved by December. 
+                        Car rego $800? $15/week. The trick: decide in advance, automate, forget about it.
+                        Add your first one below.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add form */}
+                  <div style={{ padding: '14px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.border, marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '10px' }}>
+                      <input placeholder="Fund name (e.g. Christmas 2026)" value={newSinkingFund.name} onChange={e => setNewSinkingFund({...newSinkingFund, name: e.target.value})} style={{...inputStyle, flex: 2, minWidth: '150px'}} />
+                      <input type="number" placeholder="Target $" value={newSinkingFund.targetAmount} onChange={e => {
+                        const target = parseFloat(e.target.value || '0')
+                        const weeksLeft = newSinkingFund.targetDate ? Math.max(1, Math.ceil((new Date(newSinkingFund.targetDate).getTime() - Date.now()) / (7 * 86400000))) : 52
+                        const autoWeekly = target > 0 ? (target / weeksLeft).toFixed(2) : ''
+                        setNewSinkingFund({...newSinkingFund, targetAmount: e.target.value, weeklyAmount: autoWeekly})
+                      }} style={{...inputStyle, width: '100px'}} />
+                      <select value={newSinkingFund.category} onChange={e => setNewSinkingFund({...newSinkingFund, category: e.target.value})} style={inputStyle}>
+                        {SINKING_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, alignItems: 'flex-end' }}>
+                      <div style={{ flex: 1, minWidth: '130px' }}>
+                        <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>TARGET DATE</label>
+                        <input type="date" value={newSinkingFund.targetDate} onChange={e => {
+                          const date = e.target.value
+                          const target = parseFloat(newSinkingFund.targetAmount || '0')
+                          const weeksLeft = date ? Math.max(1, Math.ceil((new Date(date).getTime() - Date.now()) / (7 * 86400000))) : 52
+                          const autoWeekly = target > 0 ? (target / weeksLeft).toFixed(2) : newSinkingFund.weeklyAmount
+                          setNewSinkingFund({...newSinkingFund, targetDate: date, weeklyAmount: autoWeekly})
+                        }} style={{...inputStyle, width: '100%'}} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: '110px' }}>
+                        <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>WEEKLY AMOUNT $</label>
+                        <input type="number" placeholder="auto-calc" value={newSinkingFund.weeklyAmount} onChange={e => setNewSinkingFund({...newSinkingFund, weeklyAmount: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                      </div>
+                      <button onClick={addSinkingFund} style={{...btnPrimary, padding: '10px 20px', flexShrink: 0}}>+ Add Fund</button>
+                    </div>
+                    {newSinkingFund.targetAmount && newSinkingFund.targetDate && (
+                      <div style={{ marginTop: '10px', padding: '8px 12px', background: theme.accent + '12', borderRadius: '8px', color: theme.textMuted, fontSize: '12px' }}>
+                        💡 Save <strong style={{ color: theme.accent }}>${(parseFloat(newSinkingFund.weeklyAmount || '0')).toFixed(2)}/week</strong> for {Math.max(1, Math.ceil((new Date(newSinkingFund.targetDate).getTime() - Date.now()) / (7 * 86400000)))} weeks → ${parseFloat(newSinkingFund.targetAmount || '0').toFixed(0)} by {new Date(newSinkingFund.targetDate + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fund cards */}
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
+                    {sinkingFunds.map(fund => {
+                      const target = parseFloat(fund.targetAmount || '0')
+                      const saved = parseFloat(fund.savedAmount || '0')
+                      const pct = target > 0 ? Math.min(100, (saved / target) * 100) : 0
+                      const weeksLeft = fund.targetDate ? Math.max(0, Math.ceil((new Date(fund.targetDate).getTime() - Date.now()) / (7 * 86400000))) : null
+                      const catInfo = SINKING_CATEGORIES.find(c => c.id === fund.category) || SINKING_CATEGORIES[0]
+                      const onTrack = weeksLeft !== null && (saved + parseFloat(fund.weeklyAmount || '0') * weeksLeft) >= target * 0.95
+                      return (
+                        <div key={fund.id} style={{ padding: '14px 16px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + (pct >= 100 ? theme.success + '60' : theme.border) }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                            <div>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <span style={{ fontSize: '18px' }}>{catInfo.icon}</span>
+                                <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px' }}>{fund.name}</div>
+                                {pct >= 100 && <span style={{ padding: '2px 8px', background: theme.success + '20', color: theme.success, borderRadius: '10px', fontSize: '11px', fontWeight: 600 }}>✅ FUNDED</span>}
+                                {!onTrack && weeksLeft !== null && weeksLeft > 0 && pct < 100 && (
+                                  <span style={{ padding: '2px 8px', background: theme.warning + '20', color: theme.warning, borderRadius: '10px', fontSize: '11px', fontWeight: 600 }}>⚠️ Behind pace</span>
+                                )}
+                              </div>
+                              <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>
+                                ${saved.toFixed(0)} of ${target.toFixed(0)} · ${parseFloat(fund.weeklyAmount || '0').toFixed(0)}/week
+                                {weeksLeft !== null && <span> · {weeksLeft} week{weeksLeft !== 1 ? 's' : ''} to go</span>}
+                                {fund.targetDate && <span> · {new Date(fund.targetDate + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span>}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <div style={{ color: theme.accent, fontWeight: 800, fontSize: '16px' }}>{pct.toFixed(0)}%</div>
+                              <button onClick={() => { const amt = window.prompt(`Add to ${fund.name} ($):`); if (amt && !isNaN(parseFloat(amt))) addToSinkingFund(fund.id, parseFloat(amt)) }}
+                                style={{ padding: '4px 10px', background: theme.accent + '20', color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>+ Add</button>
+                              <button onClick={() => deleteSinkingFund(fund.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>×</button>
+                            </div>
+                          </div>
+                          <div style={{ height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ width: pct + '%', height: '100%', background: pct >= 100 ? theme.success : 'linear-gradient(90deg, #D4AF37, #B68B2E)', borderRadius: '4px', transition: 'width 0.4s' }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {sinkingFunds.length > 0 && totalSinkingFundWeekly > 0 && (
+                    <div style={{ marginTop: '12px', padding: '10px 14px', background: theme.cardBg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: theme.textMuted, fontSize: '13px' }}>Total weekly set aside</span>
+                      <span style={{ color: theme.accent, fontWeight: 700 }}>${totalSinkingFundWeekly.toFixed(0)}/week · ${(totalSinkingFundWeekly * 52).toFixed(0)}/year</span>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Assets */}
             <div style={cardStyle}>
@@ -6928,6 +7118,117 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <button onClick={() => setActiveTab('property' as any)} style={{ padding: '7px 14px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>View Portfolio →</button>
               </div>
             )}
+
+            {/* ── NET WORTH HISTORY CHART ── */}
+            {(() => {
+              // Auto-snapshot today's net worth if not already done today
+              const todayKey = new Date().toISOString().split('T')[0]
+              const lastSnap = netWorthHistory[netWorthHistory.length - 1]
+              const historyWithToday = lastSnap?.date === todayKey
+                ? netWorthHistory
+                : [...netWorthHistory, { date: todayKey, value: netWorth, assets: totalAssets, liabilities: totalLiabilities + totalDebtBalance }]
+
+              const snapToday = () => {
+                if (lastSnap?.date === todayKey) return
+                setNetWorthHistory(prev => [...prev, { date: todayKey, value: netWorth, assets: totalAssets, liabilities: totalLiabilities + totalDebtBalance }])
+              }
+
+              if (historyWithToday.length < 2) return (
+                <div style={cardStyle}>
+                  <h3 style={{ margin: '0 0 8px 0', color: theme.accent, fontSize: '16px' }}>📈 Net Worth History</h3>
+                  <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px', lineHeight: 1.6 }}>
+                    Your net worth over time is the most important chart in personal finance. Snapshot your numbers monthly to see the line go up.
+                  </div>
+                  <div style={{ padding: '14px', background: theme.bg, borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px' }}>TODAY'S NET WORTH</div>
+                      <div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontWeight: 800, fontSize: '24px' }}>${netWorth.toLocaleString()}</div>
+                    </div>
+                    <button onClick={snapToday} style={{ ...btnPrimary, padding: '10px 18px' }}>📸 Save Snapshot</button>
+                  </div>
+                </div>
+              )
+
+              const minVal = Math.min(...historyWithToday.map(h => h.value))
+              const maxVal = Math.max(...historyWithToday.map(h => h.value))
+              const range = maxVal - minVal || 1
+              const W = 600, H = 180, PAD = 40
+              const chartW = W - PAD * 2
+              const chartH = H - PAD
+              const points = historyWithToday.map((h, i) => ({
+                x: PAD + (i / Math.max(historyWithToday.length - 1, 1)) * chartW,
+                y: PAD + chartH - ((h.value - minVal) / range) * chartH,
+                ...h
+              }))
+              const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+              const areaD = `${pathD} L ${points[points.length-1].x} ${H} L ${PAD} ${H} Z`
+              const change = historyWithToday.length >= 2 ? historyWithToday[historyWithToday.length-1].value - historyWithToday[0].value : 0
+              const changePct = historyWithToday[0].value !== 0 ? (change / Math.abs(historyWithToday[0].value)) * 100 : 0
+
+              return (
+                <div style={cardStyle}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 4px 0', color: theme.accent, fontSize: '16px' }}>📈 Net Worth History</h3>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>{historyWithToday.length} snapshot{historyWithToday.length !== 1 ? 's' : ''} · {historyWithToday[0].date} → today</div>
+                    </div>
+                    <div style={{ textAlign: 'right' as const }}>
+                      <div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontWeight: 800, fontSize: '20px' }}>${netWorth.toLocaleString()}</div>
+                      <div style={{ color: change >= 0 ? theme.success : theme.danger, fontSize: '13px', fontWeight: 600 }}>
+                        {change >= 0 ? '+' : ''}{change.toLocaleString()} ({changePct.toFixed(1)}%) all time
+                      </div>
+                    </div>
+                  </div>
+
+                  <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+                    {/* Grid lines */}
+                    {[0, 0.25, 0.5, 0.75, 1].map(t => {
+                      const y = PAD + chartH - t * chartH
+                      const val = minVal + t * range
+                      return (
+                        <g key={t}>
+                          <line x1={PAD} y1={y} x2={W - PAD} y2={y} stroke={theme.border} strokeWidth="1" strokeDasharray="4,4" />
+                          <text x={PAD - 6} y={y + 4} textAnchor="end" fill={theme.textMuted} fontSize="10">${val >= 1000 ? (val/1000).toFixed(0)+'k' : val.toFixed(0)}</text>
+                        </g>
+                      )
+                    })}
+                    {/* Zero line if in range */}
+                    {minVal < 0 && maxVal > 0 && (() => {
+                      const y = PAD + chartH - ((0 - minVal) / range) * chartH
+                      return <line x1={PAD} y1={y} x2={W - PAD} y2={y} stroke={theme.textMuted} strokeWidth="1.5" strokeDasharray="6,3" opacity="0.6" />
+                    })()}
+                    {/* Area fill */}
+                    <defs>
+                      <linearGradient id="nwGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={change >= 0 ? theme.success : theme.danger} stopOpacity="0.25" />
+                        <stop offset="100%" stopColor={change >= 0 ? theme.success : theme.danger} stopOpacity="0.02" />
+                      </linearGradient>
+                    </defs>
+                    <path d={areaD} fill="url(#nwGrad)" />
+                    {/* Line */}
+                    <path d={pathD} fill="none" stroke={change >= 0 ? theme.success : theme.danger} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    {/* Data points */}
+                    {points.map((p, i) => (
+                      <g key={i}>
+                        <circle cx={p.x} cy={p.y} r="4" fill={change >= 0 ? theme.success : theme.danger} stroke={theme.cardBg} strokeWidth="2" />
+                        {(i === 0 || i === points.length - 1 || historyWithToday.length <= 6) && (
+                          <text x={p.x} y={p.y - 10} textAnchor="middle" fill={theme.textMuted} fontSize="9">
+                            {new Date(p.date + 'T12:00:00').toLocaleDateString('en-AU', { month: 'short', year: '2-digit' })}
+                          </text>
+                        )}
+                      </g>
+                    ))}
+                  </svg>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px' }}>Snapshot monthly on your review date to track your empire growing</div>
+                    <button onClick={snapToday} style={{ padding: '7px 14px', background: theme.accent + '20', color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                      📸 Snapshot now
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         )}
 
