@@ -20,7 +20,7 @@ export default function Dashboard() {
   const [missionP2Proposals, setMissionP2Proposals] = useState<any[]>([])
   const [missionP2Confirmed, setMissionP2Confirmed] = useState<boolean[]>([])
   const [missionNavLocked, setMissionNavLocked] = useState(true) // locks nav during phase 1
-  const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'learn' | 'wins' | 'mortgage' | 'insights' | 'grow' | 'review' | 'property'>('home')
+  const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'learn' | 'wins' | 'mortgage' | 'insights' | 'grow' | 'review' | 'property' | 'meals'>('home')
   const [darkMode, setDarkMode] = useState(true)
 
   // ==================== ONBOARDING FLOW ====================
@@ -232,7 +232,7 @@ export default function Dashboard() {
   const [selectedBabyStep, setSelectedBabyStep] = useState<number | null>(null)
 
   // Presets
-  const [showPresets, setShowPresets] = useState(false)
+  const [showSnapshotPrompt, setShowSnapshotPrompt] = useState(false)
   const [showMoreTabs, setShowMoreTabs] = useState(false)
   const [showHelpGuide, setShowHelpGuide] = useState(false)
   // ── Coaching improvements state ──
@@ -268,6 +268,15 @@ export default function Dashboard() {
   const [editingWhy, setEditingWhy] = useState(false)
   const [whyDraft, setWhyDraft] = useState('')
   const [celebrationWin, setCelebrationWin] = useState<string | null>(null)
+  const [celebrationData, setCelebrationData] = useState<{title: string, message: string, emoji: string, type: 'win' | 'debt_free' | 'goal_hit' | 'baby_step' | 'streak'} | null>(null)
+  // Meal planning state
+  const [mealPlanTab, setMealPlanTab] = useState<'plan' | 'catalog' | 'history'>('plan')
+  const [mealPlanPrefs, setMealPlanPrefs] = useState({ people: '2', budget: '', dietaryNeeds: '', dislikes: '', useWebSearch: false })
+  const [catalogImages, setCatalogImages] = useState<string[]>([])
+  const [catalogText, setCatalogText] = useState<string>('')
+  const [generatingMealPlan, setGeneratingMealPlan] = useState(false)
+  const [currentMealPlan, setCurrentMealPlan] = useState<any>(null)
+  const [mealPlanHistory, setMealPlanHistory] = useState<any[]>([])
   const [prevNetWorth, setPrevNetWorth] = useState<number | null>(null)
 
   // ==================== NEW: FINANCIAL LITERACY STATE ====================
@@ -370,7 +379,8 @@ export default function Dashboard() {
       if (data.fireGoal !== undefined) setFireGoal(data.fireGoal)
       if (data.hasAutomatedPayments !== undefined) setHasAutomatedPayments(data.hasAutomatedPayments)
       if (data.investmentProperties) setInvestmentProperties(data.investmentProperties)
-      if (data.sinkingFunds) setSinkingFunds(data.sinkingFunds)
+      if (data.mealPlanHistory) setMealPlanHistory(data.mealPlanHistory)
+      if (data.mealPlanPrefs) setMealPlanPrefs(data.mealPlanPrefs)
       if (data.missionPhase) setMissionPhase(data.missionPhase)
       if (data.missionStep !== undefined) setMissionStep(data.missionStep)
       if (data.missionComplete) setMissionComplete(data.missionComplete)
@@ -430,7 +440,7 @@ export default function Dashboard() {
       missionPhase, missionStep, missionComplete, missionNavLocked,
       missionP2Proposals, missionP2Confirmed, missionP2Step,
       moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete,
-      fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, sinkingFunds, proactiveInsights,
+      fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, sinkingFunds, mealPlanHistory, mealPlanPrefs, proactiveInsights,
       insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog,
       annualReviews, superData, netWorthHistory, personalityAnswers
     }
@@ -471,8 +481,9 @@ export default function Dashboard() {
   const monthlyExpenses = expenses.filter(e => !e.targetDebtId && !e.targetGoalId && !e.isDebtPayment).reduce((sum, exp) => sum + convertToMonthly(parseFloat(exp.amount || '0'), exp.frequency), 0)
   const monthlyDebtPayments = debts.reduce((sum, debt) => sum + convertToMonthly(parseFloat(debt.minPayment || '0'), debt.frequency || 'monthly'), 0)
   const monthlyGoalSavings = goals.reduce((sum, goal) => sum + convertToMonthly(parseFloat(goal.paymentAmount || '0'), goal.savingsFrequency || 'monthly'), 0)
+  const monthlySinkingFunds = sinkingFunds.filter(f => parseFloat(f.savedAmount || '0') < parseFloat(f.targetAmount || '0')).reduce((sum, f) => sum + convertToMonthly(parseFloat(f.weeklyAmount || '0'), 'weekly'), 0)
   const totalDebtBalance = debts.reduce((sum, d) => sum + parseFloat(d.balance || '0'), 0)
-  const totalOutgoing = monthlyExpenses + monthlyDebtPayments + monthlyGoalSavings
+  const totalOutgoing = monthlyExpenses + monthlyDebtPayments + monthlyGoalSavings + monthlySinkingFunds
   const monthlySurplus = monthlyIncome - totalOutgoing
   const totalAssets = assets.reduce((sum, a) => sum + parseFloat(a.value || '0'), 0)
   const totalLiabilities = liabilities.reduce((sum, l) => sum + parseFloat(l.value || '0'), 0)
@@ -847,6 +858,28 @@ Write ONE sentence: brief celebration + what to expect from the next step (or fi
     }
   }, [onboardingComplete, currentBabyStep.step])
 
+  // Auto-generate monthly decision on first of month
+  useEffect(() => {
+    if (!onboardingComplete || monthlyIncome === 0) return
+    const thisMonth = new Date().toISOString().substring(0, 7)
+    if (!oneDecisionDate?.startsWith(thisMonth)) {
+      generateMonthlyDecision()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboardingComplete, monthlyIncome])
+
+  // Auto-prompt monthly snapshot on 1st–3rd of each month
+  useEffect(() => {
+    if (!onboardingComplete || monthlyIncome === 0) return
+    const today = new Date()
+    const todayKey = today.toISOString().split('T')[0]
+    const lastSnap = netWorthHistory[netWorthHistory.length - 1]
+    const isFirstOfMonth = today.getDate() <= 3
+    const alreadySnappedThisMonth = lastSnap && lastSnap.date.startsWith(todayKey.substring(0, 7))
+    if (isFirstOfMonth && !alreadySnappedThisMonth) setShowSnapshotPrompt(true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboardingComplete, monthlyIncome])
+
   const calculateMortgagePayoff = () => {
     const balance = parseFloat(mortgageAccel.balance || '0')
     const annualRate = parseFloat(mortgageAccel.rate || '0') / 100
@@ -930,6 +963,11 @@ Write ONE sentence: brief celebration + what to expect from the next step (or fi
       setWins(prev => [...prev, ...newWinsList])
       setCelebrationWin(newWinsList[0].title)
       setTimeout(() => setCelebrationWin(null), 4000)
+      // Full-screen celebration for major milestones
+      const majorWin = newWinsList.find(w => w.title.includes('Baby Step') || w.title.includes('Emergency Fund') || w.title.includes('debt') || w.title.includes('savings rate'))
+      if (majorWin) {
+        triggerCelebration(majorWin.title, majorWin.desc, majorWin.icon || '🏆', majorWin.title.includes('debt') ? 'debt_free' : majorWin.title.includes('Baby Step') ? 'baby_step' : 'win')
+      }
     }
   }, [incomeStreams, monthlySurplus, savingsRate, intentionalSavingsRate, emergencyFund, emergencyMonths, netWorth, goals, debts, assets, roadmapMilestones, wins])
 
@@ -959,8 +997,11 @@ Write ONE sentence: brief celebration + what to expect from the next step (or fi
     setShowWeeklyCheckIn(false)
     setCheckInStep(0)
     setCheckInAnswers({})
-    setCelebrationWin(`Week ${newStreak} check-in complete! 🔥 ${newStreak > 1 ? `${newStreak}-week streak!` : 'Streak started!'}`)
+    setCelebrationWin(`Week ${newStreak} check-in complete! 🔥`)
     setTimeout(() => setCelebrationWin(null), 4000)
+    if ([4, 8, 13, 26, 52].includes(newStreak)) {
+      triggerCelebration(`${newStreak}-Week Streak! 🔥`, `You've checked in ${newStreak} weeks in a row. That's the discipline that builds empires. Most people quit by week 3.`, '🔥', 'streak')
+    }
   }
 
   // ==================== CALENDAR FUNCTIONS ====================
@@ -1054,6 +1095,7 @@ Write ONE sentence: brief celebration + what to expect from the next step (or fi
       case 'expense': setExpenses(prev => prev.map(item => item.id === id ? { ...item, ...data } : item)); break
       case 'debt': setDebts(prev => prev.map(item => item.id === id ? { ...item, ...data } : item)); break
       case 'goal': setGoals(prev => prev.map(item => item.id === id ? { ...item, ...data } : item)); break
+      case 'milestone': setRoadmapMilestones(prev => prev.map(item => item.id === id ? { ...item, ...data, currentAmount: parseFloat(data.currentAmount) || 0 } : item)); break
     }
     setEditingItem(null)
   }
@@ -1486,6 +1528,130 @@ Rules:
   }
   const deleteSinkingFund = (id: number) => setSinkingFunds(prev => prev.filter(f => f.id !== id))
   const addToSinkingFund = (id: number, amount: number) => setSinkingFunds(prev => prev.map(f => f.id === id ? { ...f, savedAmount: (parseFloat(f.savedAmount || '0') + amount).toFixed(2) } : f))
+
+  // ── Trigger full-screen celebration ──
+  const triggerCelebration = (title: string, message: string, emoji: string, type: 'win' | 'debt_free' | 'goal_hit' | 'baby_step' | 'streak' = 'win') => {
+    setCelebrationData({ title, message, emoji, type })
+    setCelebrationWin(message)
+    setTimeout(() => setCelebrationWin(null), 5000)
+  }
+
+  // ── Generate meal plan ──
+  const generateMealPlan = async () => {
+    setGeneratingMealPlan(true)
+    try {
+      const weeklyBudget = mealPlanPrefs.budget || (monthlySurplus > 0 ? Math.round(monthlySurplus * 0.25).toString() : '150')
+
+      const body: any = {
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [{
+          role: 'user',
+          content: [
+            // Include catalog images if uploaded
+            ...catalogImages.map(img => ({
+              type: 'image',
+              source: { type: 'base64', media_type: 'image/jpeg', data: img }
+            })),
+            {
+              type: 'text',
+              text: `Create a practical 7-day meal plan for an Australian household.
+
+HOUSEHOLD: ${mealPlanPrefs.people} people
+WEEKLY BUDGET: $${weeklyBudget} AUD total for groceries
+DIETARY NEEDS: ${mealPlanPrefs.dietaryNeeds || 'none'}
+DISLIKES/AVOID: ${mealPlanPrefs.dislikes || 'none'}
+${catalogImages.length > 0 ? 'SUPERMARKET CATALOG: Images attached — prioritise specials/discounted items for this week.' : ''}
+${catalogText ? `CATALOG SPECIALS: ${catalogText}` : ''}
+
+Create a REALISTIC, BUDGET-CONSCIOUS meal plan. Prioritise:
+1. Using catalog specials where available
+2. Batch cooking (cook once, eat twice)
+3. Cheap protein sources (eggs, legumes, chicken thighs not breasts)
+4. Seasonal AU vegetables
+
+Respond ONLY with valid JSON:
+{
+  "weeklyEstimate": 00.00,
+  "savingsVsEatingOut": 00.00,
+  "days": [
+    {
+      "day": "Monday",
+      "breakfast": {"meal": "...", "estimatedCost": 0.00},
+      "lunch": {"meal": "...", "estimatedCost": 0.00},
+      "dinner": {"meal": "...", "estimatedCost": 0.00, "servings": 4, "batchNote": "optional note about leftovers"}
+    }
+  ],
+  "shoppingList": [
+    {"item": "...", "quantity": "...", "estimatedCost": 0.00, "category": "produce|dairy|meat|pantry|frozen", "onSpecial": true}
+  ],
+  "tipsForBudget": ["tip 1", "tip 2", "tip 3"],
+  "catalogHighlights": ["item on special 1", "item on special 2"]
+}`
+            }
+          ]
+        }]
+      }
+
+      // Add web search for current prices if enabled
+      if (mealPlanPrefs.useWebSearch) {
+        body.tools = [{ type: 'web_search_20250305', name: 'web_search' }]
+      }
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      const data = await response.json()
+      const text = (data.content || []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('')
+      const clean = text.replace(/```json|```/g, '').trim()
+      const parsed = JSON.parse(clean)
+      const plan = { ...parsed, generatedAt: new Date().toISOString(), prefs: { ...mealPlanPrefs }, usedCatalog: catalogImages.length > 0 || !!catalogText }
+      setCurrentMealPlan(plan)
+      setMealPlanHistory(prev => [plan, ...prev.slice(0, 9)])
+    } catch (e) {
+      console.error('Meal plan error:', e)
+    }
+    setGeneratingMealPlan(false)
+  }
+
+  // ── Monthly "One Decision" — surface on home screen ──
+  const generateMonthlyDecision = async () => {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 150,
+          messages: [{
+            role: 'user',
+            content: `You are Aureus. This user's data: income $${monthlyIncome.toFixed(0)}/mo, surplus $${monthlySurplus.toFixed(0)}/mo, debts: ${debts.map((d: any) => `${d.name} $${d.balance} @ ${d.interestRate}%`).join(', ') || 'none'}, emergency fund $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months), baby step ${currentBabyStep.step}, house: ${houseStatus || 'unknown'}.
+
+Give them ONE specific financial action to take THIS MONTH. Not a list. One thing. It must be:
+- Specific and actionable (with a phone number, website, or exact step if relevant)
+- High-leverage for their specific situation
+- Achievable in under 2 hours
+- Australian-specific if relevant
+
+Examples of good ones:
+- "Call your bank on 13 22 43 and ask for a mortgage rate review — rates have dropped and most people who ask get 0.1–0.3% off their rate without refinancing"
+- "Log into MyGov and check your super balance and employer contributions match your payslips — $3.4B goes unpaid each year"
+- "Set up a $50/fortnight automatic transfer to a sinking fund account specifically for Christmas — start now and you'll have $600 by December"
+
+Respond with ONE sentence only. Be specific. Include the actual step.`
+          }]
+        })
+      })
+      const data = await response.json()
+      const text = data.content?.find((c: any) => c.type === 'text')?.text?.trim()
+      if (text) {
+        setOneDecision(text)
+        setOneDecisionDate(new Date().toISOString())
+      }
+    } catch {}
+  }
 
   const handleChatMessage = async () => {
     if (!chatInput.trim() || isLoading) return
@@ -2265,6 +2431,86 @@ Rules:
       keyNumbers: ['3 months expenses = stable employment, no dependants', '6 months = self-employed, variable income, or dependants', 'Keep it in a high-interest savings account at 5%+'],
       mistake: 'Using your offset account as your emergency fund. That works fine — BUT make sure you also have a card or line of credit as backup if the bank ever restricts offset access during a dispute.',
       cta: 'Calculate my emergency fund target'
+    },
+    {
+      id: 'debt-snowball-avalanche',
+      icon: '❄️',
+      title: 'Snowball vs Avalanche: Which Debt Method Wins?',
+      tagline: 'Two strategies — very different outcomes',
+      content: `Both methods work. The question is whether you optimise for maths or psychology.\n\nAvalanche (highest interest first):\n• Pay minimums on everything\n• Throw every extra dollar at the highest-rate debt\n• Mathematically optimal — saves the most money\n• Takes longer to see a debt disappear\n\nSnowball (smallest balance first):\n• Pay minimums on everything\n• Attack the smallest balance first, regardless of rate\n• Psychologically powerful — quick wins keep you motivated\n• Costs more in interest but many people actually finish it\n\nReal example with 3 debts:\n• $800 Afterpay at 0%\n• $3,000 car loan at 9%\n• $6,000 credit card at 20%\n\nAvalanche: Target credit card first → saves ~$800 more in interest\nSnowball: Clear Afterpay first → eliminates a debt in weeks, builds momentum\n\nAureus uses Avalanche by default — but you can switch to Snowball in the Debt Payoff Accelerator if you need motivation wins.`,
+      keyNumbers: ['Avalanche saves more money — typically $500–2,000 on a typical debt load', 'Snowball wins for completion rates — people actually finish it', 'The best method is the one you stick to'],
+      mistake: 'Making minimum payments on everything while carrying a 20% credit card. Every month you delay is ~$60 in interest on a $3,600 card — straight to the bank.',
+      cta: 'Show me my best debt payoff order'
+    },
+    {
+      id: 'tax-return-au',
+      icon: '🧾',
+      title: 'How to Maximise Your AU Tax Return',
+      tagline: 'What the ATO lets you claim that most people miss',
+      content: `Australians lodged $40B in deductions in 2023. Most people leave money on the table.\n\nWork-related deductions (need to be genuinely work-related):\n• Home office: 67 cents/hour (revised fixed rate) or actual cost method\n• Work clothing (with logo) and laundry\n• Self-education related to your CURRENT job\n• Union fees, professional memberships\n• Work tools, equipment, subscriptions\n\nInvestment deductions:\n• Rental property expenses (interest, rates, insurance, repairs, depreciation)\n• Investment advice fees (for existing investments)\n• Margin loan interest\n\nOften missed:\n• Income protection insurance (if paid outside super)\n• Gifts to registered charities ($2+)\n• Tax agent fees\n• Sunscreen, hats for outdoor workers\n\nRecord-keeping: ATO requires receipts. MyDeductions app (free from ATO) tracks throughout the year.`,
+      keyNumbers: ['Average AU refund: ~$2,800', 'Home office 67c/hr for days worked from home × hours', 'Keep records for 5 years after lodgement'],
+      mistake: 'Lodging without seeing a tax agent at least once. A good agent typically finds 2–5× their fee in legitimate deductions you\'d miss.',
+      cta: 'What can I claim based on my job?'
+    },
+    {
+      id: 'negative-gearing',
+      icon: '🏘️',
+      title: 'Negative Gearing Explained Simply',
+      tagline: 'The strategy half of Australia uses — and half misunderstands',
+      content: `Negative gearing means your investment property COSTS you money each year — but you get a tax deduction for the loss.\n\nExample:\n• Rental income: $24,000/year ($462/week)\n• Mortgage interest: $31,200/year\n• Other costs (rates, insurance, mgmt): $5,000\n• Total costs: $36,200\n• Loss (negative gearing): $12,200/year\n\nAt a 37% marginal tax rate:\n• Tax saving: ~$4,514/year (~$87/week)\n• Your actual out-of-pocket: ~$7,686/year (~$148/week)\n\nYou're betting that capital growth exceeds your annual cost. This works brilliantly in rising markets. In flat markets, you're subsidising someone else's rent and getting a tax break that doesn't fully cover your loss.\n\nThe CGT discount (50%): If you hold for 12+ months, you only pay capital gains tax on 50% of the profit. This is the other half of the negative gearing strategy.`,
+      keyNumbers: ['50% CGT discount if held 12+ months', 'Loss × marginal tax rate = your tax saving', 'Negative gearing works best: high income + rising market'],
+      mistake: 'Buying negatively geared property at the wrong time expecting capital growth that doesn\'t materialise. You end up subsidising rent for years with no gain.',
+      cta: 'Is my investment property working for me?'
+    },
+    {
+      id: 'compound-interest',
+      icon: '📈',
+      title: 'Compound Interest: The 8th Wonder of the World',
+      tagline: 'Why time is more valuable than amount',
+      content: `Compound interest means you earn interest on your interest — and the longer it runs, the more explosive it becomes.\n\nThe Rule of 72:\nDivide 72 by your interest rate to find how long it takes to double your money.\n• At 6%: doubles every 12 years\n• At 9%: doubles every 8 years\n• At 12%: doubles every 6 years\n\nReal comparison:\nPerson A starts at 25, invests $500/month until 35, then stops.\nPerson B starts at 35, invests $500/month until 65.\n\nAt 7% returns:\n• Person A (invested $60,000 over 10 years): ~$602,000 at 65\n• Person B (invested $180,000 over 30 years): ~$567,000 at 65\n\nPerson A invested 3× less and ended up with MORE. Starting 10 years earlier matters more than the amount.\n\nThe debt flip: compound interest works against you just as powerfully with credit card debt at 20%.`,
+      keyNumbers: ['Rule of 72: divide 72 by rate = years to double', '10 years earlier > 3× the amount invested', '$500/month from 25 to 65 at 7% = $1.3M'],
+      mistake: 'Waiting until you have "enough" to start investing. $50/month at 25 beats $500/month at 45. The amount matters less than the start date.',
+      cta: 'Show me my compound interest projection'
+    },
+    {
+      id: 'sinking-funds-explained',
+      icon: '🎯',
+      title: 'Sinking Funds: Never Be Surprised Again',
+      tagline: 'The system that eliminates financial stress from known expenses',
+      content: `A sinking fund is money you save regularly for a specific future expense you know is coming.\n\nThe concept is simple:\n• Christmas costs $1,200 every December without fail\n• $1,200 ÷ 52 weeks = $23/week\n• You save $23/week all year and Christmas is already paid for\n\nCommon sinking funds for Australians:\n• Christmas & gifts: $23–50/week\n• Car registration: $17–25/week\n• Annual holiday: $40–100/week\n• Home maintenance (1% of value/yr): $30–80/week\n• Insurance renewals: $20–40/week\n• School expenses: $20–60/week\n• Medical/dental: $15–30/week\n\nThe psychology: by saving in advance, you remove the guilt of spending. When December comes, you're not going into debt — you're using your own pre-saved money. It feels completely different.\n\nIn Aureus: Budget → Sinking Funds. Add each fund, set a weekly amount, and it auto-tracks toward your target.`,
+      keyNumbers: ['Christmas avg Australian spend: $1,200–1,800', 'Car rego + service: $700–1,200/year', 'Home maintenance budget: 1% of property value per year'],
+      mistake: 'Treating these expenses as "unexpected." Nothing about Christmas is unexpected. It\'s on the same date every year.',
+      cta: 'Set up my sinking funds'
+    },
+    {
+      id: 'salary-sacrifice',
+      icon: '💼',
+      title: 'Salary Sacrifice: The Tax Win Most People Miss',
+      tagline: 'Pre-tax super contributions are the most underused financial tool in Australia',
+      content: `Salary sacrifice means asking your employer to redirect part of your pre-tax salary directly into your super. You pay 15% tax on it instead of your marginal rate.\n\nExample at $90,000 salary (marginal rate ~34.5%):\n• Salary sacrifice $10,000/year to super\n• Tax you'd pay at 34.5%: $3,450\n• Tax in super at 15%: $1,500\n• Tax saving: $1,950/year\n• Super gets: $8,500 (after 15% tax)\n• You lose from take-home: $6,550\n• Net benefit: $1,950 less tax + compound growth\n\nThe concessional contribution cap is $30,000/year (including employer SG contributions). Most people under 40 have plenty of headroom.\n\nCarryforward rule: If you've had less than $500k in super and haven't used your full cap in prior years, you can catch up unused amounts for up to 5 years.\n\nHow to set it up: Email your payroll/HR asking to salary sacrifice $X/fortnight to your super fund. Takes one email.`,
+      keyNumbers: ['Save 34.5% vs 15% tax — on every dollar salary sacrificed', '$30,000 total concessional cap (2024–25)', 'One email to HR is all it takes to set up'],
+      mistake: 'Waiting until close to retirement to salary sacrifice. The compounding on early contributions dwarfs the tax saving itself.',
+      cta: 'Calculate my salary sacrifice saving'
+    },
+    {
+      id: 'first-home-schemes',
+      icon: '🏠',
+      title: 'Australian First Home Buyer Schemes',
+      tagline: 'Government help that most first buyers don\'t fully understand',
+      content: `Australia has several schemes to help first home buyers — each with different eligibility and benefits.\n\nFirst Home Guarantee (FHBG):\n• Buy with 5% deposit — no LMI\n• Government guarantees up to 15% of loan\n• Price caps apply by state (e.g., NSW $900k, VIC $800k)\n• 50,000 places per year\n\nFirst Home Super Saver Scheme (FHSS):\n• Save extra into super (salary sacrifice)\n• Withdraw up to $50,000 of voluntary contributions toward deposit\n• Tax saving: your marginal rate vs 15% in super\n• Effective way to build a deposit with a tax advantage\n\nFirst Home Owner Grant (FHOG):\n• State-specific, typically $10,000–$30,000\n• Usually for NEW homes or significantly renovated homes\n• Varies significantly by state and property type\n\nStamp duty concessions:\n• Most states offer stamp duty exemptions or reductions for first home buyers\n• NSW: exempt under $800k, concession up to $1M\n• VIC: exempt under $600k, concession up to $750k\n\nThese schemes can be combined — e.g., FHSS deposit + FHBG (no LMI) + FHOG + stamp duty exemption.`,
+      keyNumbers: ['FHBG: 5% deposit with no LMI — saves $15,000–30,000', 'FHSS: save up to $50,000 in pre-tax super for deposit', 'Stamp duty exemption can save $20,000–40,000'],
+      mistake: 'Not checking scheme eligibility before buying. The FHSS requires contributions BEFORE you sign a contract — you can\'t go back and fix this.',
+      cta: 'Which schemes am I eligible for?'
+    },
+    {
+      id: 'read-payslip',
+      icon: '📋',
+      title: 'How to Read Your Australian Payslip',
+      tagline: 'Understanding every line so you\'re not leaving money on the table',
+      content: `Most Australians have never properly read their payslip. Here\'s what every line means:\n\nGross pay: Your total earnings before tax and deductions.\n\nTax withheld (PAYG): Pay As You Go tax sent to the ATO. This is an estimate — your actual tax is calculated at year end (tax return).\n\nSuper: Should be 11.5% of your ordinary time earnings (OTE). Check this every single pay — underpayment is a $3.4B annual problem in Australia.\n\nNet pay: What hits your account. Gross − tax − other deductions.\n\nYTD (Year to Date): Totals from 1 July. Useful for tracking total tax paid and super contributions.\n\nAllowances: Car, phone, tool, travel — these are usually taxable.\n\nSalary sacrifice: Should show reduction from gross before tax if you have an arrangement.\n\nFAQs:\n• Super not showing? Ask HR immediately — it should appear every pay or at least every quarter.\n• Tax seems high? Check your tax file declaration — ensure you haven\'t selected "No tax-free threshold."\n• Different super fund shown? Could be employer default — you can choose your own.`,
+      keyNumbers: ['11.5% super guarantee rate (2024–25)', 'Super underpayment: $3.4B/year across AU', 'Tax-free threshold: $18,200 — make sure it\'s claimed'],
+      mistake: 'Never checking super on your payslip. Some employers underpay or delay super. The ATO\'s unpaid super hotline: 13 28 61.',
+      cta: 'Is my super being paid correctly?'
     }
   ]
 
@@ -2639,13 +2885,13 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#0a0a0a', fontSize: '16px' }}>A</div>
               <div>
                 <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Aureus Setup</div>
-                <div style={{ color: theme.textMuted, fontSize: '11px' }}>{missionStep === 0 ? 'Welcome' : `Step ${missionStep} of 7`}</div>
+                <div style={{ color: theme.textMuted, fontSize: '11px' }}>{missionStep === 0 ? 'Welcome' : `Step ${missionStep} of 8`}</div>
               </div>
             </div>
             {/* Progress bar — only show after step 0 */}
             {missionStep > 0 && (
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                {[1,2,3,4,5,6,7].map(s => (
+                {[1,2,3,4,5,6,7,8].map(s => (
                   <div key={s} style={{ width: s === missionStep ? '24px' : '8px', height: '8px', borderRadius: '4px', background: s < missionStep ? theme.success : s === missionStep ? theme.accent : theme.border, transition: 'all 0.3s' }} />
                 ))}
               </div>
@@ -3351,12 +3597,117 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
               )}
 
-              <button onClick={() => advanceMission(null, 2)}
+              <button onClick={() => advanceMission(8)}
                 style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '16px', fontWeight: 800, fontFamily: 'Cinzel, serif', marginTop: '8px' }}>
-                Build my roadmap →
+                Next: plan for big expenses →
               </button>
             </div>
           )}
+
+          {/* STEP 8 — Sinking Funds */}
+          {missionStep === 8 && (() => {
+            // Smart suggestions based on their situation
+            const suggestions = [
+              { name: 'Christmas & Gifts', category: 'christmas', target: 1200, weekly: 23, icon: '🎄', reason: 'Avoid the December credit card blowout', alwaysShow: true },
+              { name: 'Car Registration & Service', category: 'vehicle', target: 1000, weekly: 19, icon: '🚗', reason: 'AU avg rego + service = ~$1,000/yr', alwaysShow: true },
+              ...(houseStatus === 'own' || houseStatus === 'paid_off' ? [{ name: 'Home Maintenance', category: 'home', target: 2000, weekly: 38, icon: '🏠', reason: 'Budget 1% of home value per year for maintenance', alwaysShow: false }] : []),
+              { name: 'Annual Holiday', category: 'holiday', target: 3000, weekly: 58, icon: '✈️', reason: 'Most Australians say holidays cause financial stress', alwaysShow: false },
+              { name: 'Birthday Gifts', category: 'birthday', target: 600, weekly: 12, icon: '🎂', reason: '$50/month across family birthdays adds up fast', alwaysShow: false },
+              { name: 'Health & Medical', category: 'medical', target: 800, weekly: 15, icon: '🏥', reason: 'Gap fees, dentist, glasses — always unexpected', alwaysShow: false },
+              { name: 'Insurance Renewals', category: 'insurance', target: 1500, weekly: 29, icon: '🛡️', reason: 'Home, car, health — budget ahead to avoid scrambling', alwaysShow: false },
+            ]
+            const [selectedFunds, setSelectedFunds] = React.useState<Set<number>>(new Set([0, 1]))
+            const [customAmounts, setCustomAmounts] = React.useState<{[i: number]: string}>({})
+
+            const totalWeekly = suggestions.reduce((s, f, i) => {
+              if (!selectedFunds.has(i)) return s
+              return s + parseFloat(customAmounts[i] || f.weekly.toString())
+            }, 0)
+
+            return (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '580px', margin: '0 auto', width: '100%' }}>
+                <div style={{ fontSize: '56px', marginBottom: '16px' }}>🎯</div>
+                <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>Plan for the big expenses.</h2>
+                <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 6px 0' }}>
+                  Every financial blowout was once a predictable expense. Sinking funds mean you save a little every week so you're never caught short.
+                </p>
+                <p style={{ color: theme.textMuted, fontSize: '13px', textAlign: 'center' as const, margin: '0 0 24px 0' }}>
+                  Aureus has pre-selected the ones most relevant to you. Tick what applies — adjust amounts if needed.
+                </p>
+
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '20px' }}>
+                  {suggestions.map((f, i) => {
+                    const selected = selectedFunds.has(i)
+                    const weekly = parseFloat(customAmounts[i] || f.weekly.toString())
+                    const annual = weekly * 52
+                    return (
+                      <div key={i} onClick={() => {
+                        const s = new Set(selectedFunds)
+                        s.has(i) ? s.delete(i) : s.add(i)
+                        setSelectedFunds(s)
+                      }} style={{ padding: '14px 16px', background: selected ? theme.accent + '15' : theme.cardBg, borderRadius: '12px', border: '2px solid ' + (selected ? theme.accent : theme.border), cursor: 'pointer', transition: 'all 0.2s' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flex: 1 }}>
+                            <div style={{ fontSize: '24px', flexShrink: 0, marginTop: '2px' }}>{f.icon}</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px' }}>{f.name}</div>
+                              <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>{f.reason}</div>
+                              {selected && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }} onClick={e => e.stopPropagation()}>
+                                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>$/week:</span>
+                                  <input type="number" value={customAmounts[i] ?? f.weekly.toString()} onChange={e => setCustomAmounts(prev => ({ ...prev, [i]: e.target.value }))}
+                                    style={{ ...inputStyle, width: '80px', padding: '6px 10px', fontSize: '13px' }} />
+                                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>= ${(parseFloat(customAmounts[i] || f.weekly.toString()) * 52).toFixed(0)}/yr</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                            {!selected && <span style={{ color: theme.textMuted, fontSize: '13px' }}>${f.weekly}/wk</span>}
+                            <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: '2px solid ' + (selected ? theme.accent : theme.border), background: selected ? theme.accent : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              {selected && <span style={{ color: '#0a0a0a', fontSize: '13px', fontWeight: 800 }}>✓</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Running total */}
+                {selectedFunds.size > 0 && (
+                  <div style={{ width: '100%', padding: '14px 16px', background: 'linear-gradient(135deg, #1a1208, #0a0a0a)', borderRadius: '12px', border: '1px solid ' + theme.accent + '40', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ color: theme.accent, fontWeight: 700, fontSize: '14px' }}>${totalWeekly.toFixed(0)}/week set aside</div>
+                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>${(totalWeekly * 52).toFixed(0)}/year · automatically factored into your budget</div>
+                      </div>
+                      <div style={{ color: theme.success, fontWeight: 700, fontSize: '13px' }}>✓ {selectedFunds.size} fund{selectedFunds.size !== 1 ? 's' : ''}</div>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                  <button onClick={() => advanceMission(null, 2)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px', flexShrink: 0 }}>
+                    Skip
+                  </button>
+                  <button onClick={() => {
+                    // Save selected sinking funds
+                    const newFunds = suggestions.filter((_, i) => selectedFunds.has(i)).map((f, idx) => {
+                      const weekly = parseFloat(customAmounts[Array.from(selectedFunds)[idx]] || f.weekly.toString())
+                      const targetDate = new Date()
+                      targetDate.setMonth(11); targetDate.setDate(15) // default: Dec 15
+                      return { id: Date.now() + idx, name: f.name, category: f.category, targetAmount: f.target.toString(), weeklyAmount: weekly.toString(), savedAmount: '0', targetDate: targetDate.toISOString().split('T')[0], notes: f.reason, createdAt: new Date().toISOString() }
+                    })
+                    setSinkingFunds(prev => [...prev, ...newFunds])
+                    advanceMission(null, 2)
+                  }} style={{ flex: 1, padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 800 }}>
+                    {selectedFunds.size > 0 ? `Save ${selectedFunds.size} fund${selectedFunds.size !== 1 ? 's' : ''} & build my roadmap →` : 'Build my roadmap →'}
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
         </div>
       )}
 
@@ -3794,10 +4145,36 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         </div>
       )}
 
-      {celebrationWin && (
-        <div style={{ position: 'fixed' as const, top: '20px', right: '20px', zIndex: 9999, padding: '16px 20px', background: 'linear-gradient(135deg, #D4AF37, #B68B2E)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(212,175,55,0.3)', color: 'white', maxWidth: '320px', animation: 'slideIn 0.3s ease' }}>
-          <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>🏆 New Win Unlocked!</div>
-          <div style={{ fontSize: '13px', opacity: 0.9 }}>{celebrationWin}</div>
+      {/* ══════════════════════════════════════════════════
+          FULL-SCREEN CELEBRATION MODAL (Feature 7)
+      ══════════════════════════════════════════════════ */}
+      {celebrationData && (
+        <div style={{ position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', animation: 'fadeIn 0.3s ease' }}
+          onClick={() => setCelebrationData(null)}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px', border: '2px solid ' + theme.accent + '60', maxWidth: '480px', width: '100%', padding: '48px 40px', textAlign: 'center' as const, boxShadow: '0 0 80px ' + theme.accent + '30', animation: 'slideIn 0.4s ease' }}
+            onClick={e => e.stopPropagation()}>
+            {/* Confetti-style emoji burst */}
+            <div style={{ fontSize: '80px', marginBottom: '20px', lineHeight: 1 }}>{celebrationData.emoji}</div>
+            <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '2px', marginBottom: '12px' }}>
+              {celebrationData.type === 'debt_free' ? '🎊 DEBT FREE' :
+               celebrationData.type === 'goal_hit' ? '✅ GOAL REACHED' :
+               celebrationData.type === 'baby_step' ? '🏆 BABY STEP COMPLETE' :
+               celebrationData.type === 'streak' ? '🔥 STREAK MILESTONE' : '🏆 WIN UNLOCKED'}
+            </div>
+            <h2 style={{ color: theme.text, fontSize: '28px', fontWeight: 800, margin: '0 0 16px 0', fontFamily: 'Cinzel, serif', lineHeight: 1.3 }}>{celebrationData.title}</h2>
+            <p style={{ color: theme.textMuted, fontSize: '16px', lineHeight: 1.7, margin: '0 0 28px 0' }}>{celebrationData.message}</p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button onClick={() => { askAureusAbout(`I just ${celebrationData.title.toLowerCase()}. What should I focus on next?`); setCelebrationData(null) }}
+                style={{ padding: '12px 24px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' }}>
+                💬 What's next?
+              </button>
+              <button onClick={() => setCelebrationData(null)}
+                style={{ padding: '12px 24px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', color: theme.textMuted, fontSize: '14px' }}>
+                Keep going →
+              </button>
+            </div>
+            <div style={{ marginTop: '20px', color: theme.textMuted, fontSize: '12px' }}>Tap anywhere to close</div>
+          </div>
         </div>
       )}
 
@@ -3870,6 +4247,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   { id: 'mortgage',  label: '🚀 Mortgage Accelerator' },
                   { id: 'property',  label: '🏘️ Property Portfolio' },
                   { id: 'grow',      label: '📈 Grow & FIRE' },
+                  { id: 'meals',     label: '🍽️ Meal Planning' },
                 ].map(tab => (
                   <button key={tab.id} onClick={() => { setActiveTab(tab.id as any); setShowMoreTabs(false) }}
                     style={{ display: 'block', width: '100%', padding: '9px 10px', background: activeTab === tab.id ? theme.accent + '20' : 'transparent', color: activeTab === tab.id ? theme.accent : theme.text, border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' as const, fontWeight: activeTab === tab.id ? 700 : 400 }}>
@@ -4009,7 +4387,25 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
               )}
 
-              {/* ── IMPROVEMENT #10: TONE-ADAPTIVE SURPLUS WARNING ── */}
+              {/* ── MONTHLY SNAPSHOT PROMPT ── */}
+              {showSnapshotPrompt && (
+                <div style={{ padding: '14px 18px', background: theme.success + '12', borderRadius: '12px', border: '1px solid ' + theme.success + '40', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ color: theme.success, fontWeight: 700, fontSize: '13px' }}>📸 New month — time to snapshot your net worth</div>
+                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>Takes 10 seconds. Watch your wealth grow month by month.</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => {
+                      const todayKey = new Date().toISOString().split('T')[0]
+                      setNetWorthHistory(prev => [...prev, { date: todayKey, value: netWorth, assets: totalAssets, liabilities: totalLiabilities + totalDebtBalance }])
+                      setShowSnapshotPrompt(false)
+                    }} style={{ padding: '8px 14px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
+                      Save now ✓
+                    </button>
+                    <button onClick={() => setShowSnapshotPrompt(false)} style={{ padding: '8px 10px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.textMuted, fontSize: '12px' }}>Later</button>
+                  </div>
+                </div>
+              )}
               {monthlySurplus < 0 && (
                 <div style={{ padding: '16px 20px', background: theme.danger + '12', borderRadius: '14px', border: '2px solid ' + theme.danger + '40' }}>
                   <div style={{ color: theme.danger, fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>This month's numbers are tight — ${Math.abs(monthlySurplus).toFixed(0)} in the red</div>
@@ -4108,7 +4504,33 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     </div>
                   )}
 
-                  {/* Active Roadmap Milestone */}
+                  {/* Debt-free countdown */}
+                  {debts.length > 0 && (() => {
+                    const sim = simulateDebtPayoff(0, 'avalanche')
+                    if (!sim) return null
+                    const freeDate = new Date()
+                    freeDate.setMonth(freeDate.getMonth() + sim.months)
+                    const daysLeft = Math.ceil((freeDate.getTime() - Date.now()) / 86400000)
+                    return (
+                      <div style={{ padding: '16px', background: 'linear-gradient(135deg, #1a1208, #0a0a0a)', borderRadius: '14px', border: '1px solid ' + theme.warning + '40' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '8px' }}>💳 DEBT-FREE COUNTDOWN</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                          <div>
+                            <div style={{ color: theme.warning, fontWeight: 800, fontSize: '32px', lineHeight: 1 }}>{daysLeft.toLocaleString()}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>days · {freeDate.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}</div>
+                          </div>
+                          <div style={{ textAlign: 'right' as const }}>
+                            <div style={{ color: theme.textMuted, fontSize: '11px' }}>Total owed</div>
+                            <div style={{ color: theme.danger, fontWeight: 700, fontSize: '16px' }}>${totalDebtBalance.toFixed(0)}</div>
+                            <button onClick={() => askAureusAbout(`I have $${totalDebtBalance.toFixed(0)} in debt and I'm ${daysLeft} days from being debt-free at minimum payments. How can I cut that time in half?`)}
+                              style={{ marginTop: '6px', padding: '5px 10px', background: 'transparent', border: '1px solid ' + theme.warning + '50', borderRadius: '6px', color: theme.warning, cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
+                              Pay off faster →
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
                   {activeMilestone && (
                     <div style={{ padding: '18px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
                       <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '10px' }}>🛤️ ACTIVE MISSION</div>
@@ -4190,6 +4612,32 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
               </div>
 
+              {/* ── THIS MONTH'S ONE DECISION ── */}
+              {(() => {
+                const thisMonth = new Date().toISOString().substring(0, 7)
+                const decisionIsThisMonth = oneDecisionDate?.startsWith(thisMonth)
+                return (
+                  <div style={{ padding: '18px 20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + (oneDecision ? theme.warning + '50' : theme.border) }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: oneDecision ? '12px' : 0 }}>
+                      <div>
+                        <div style={{ color: theme.warning, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px' }}>⚡ THIS MONTH'S ONE DECISION</div>
+                        {!oneDecision && <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>The single highest-leverage action for your situation right now</div>}
+                      </div>
+                      <button onClick={generateMonthlyDecision}
+                        style={{ padding: '6px 14px', background: oneDecision ? 'transparent' : theme.warning, color: oneDecision ? theme.warning : '#0a0a0a', border: '1px solid ' + theme.warning + '50', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        {oneDecision ? (decisionIsThisMonth ? '🔄 New' : '↻ Refresh') : '⚡ Generate'}
+                      </button>
+                    </div>
+                    {oneDecision && (
+                      <div style={{ padding: '14px 16px', background: theme.warning + '12', borderRadius: '10px', border: '1px solid ' + theme.warning + '30' }}>
+                        <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.7, fontWeight: 500 }}>{oneDecision}</div>
+                        {oneDecisionDate && <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '6px' }}>Generated {new Date(oneDecisionDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</div>}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
               {/* ── QUICK JUMP GRID ── */}
               <div style={{ padding: '18px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}>
                 <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '14px' }}>QUICK ACCESS — EVERYTHING IN AUREUS</div>
@@ -4202,6 +4650,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     { id: 'mortgage',  icon: '🚀', label: 'Mortgage',      desc: 'Pay off faster' },
                     { id: 'property',  icon: '🏘️', label: 'Property',      desc: 'IP portfolio' },
                     { id: 'grow',      icon: '📈', label: 'Grow & FIRE',   desc: 'Investments & FI' },
+                    { id: 'meals',     icon: '🍽️', label: 'Meal Planning', desc: 'Budget meals + catalog' },
                     { id: 'insights',  icon: '🧠', label: 'Insights',      desc: 'AI analysis' },
                     { id: 'review',    icon: '🔄', label: 'Review',        desc: 'Monthly check-in' },
                     { id: 'overview',  icon: '📊', label: 'Metrics',       desc: 'Net worth & health' },
@@ -4597,6 +5046,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 { label: 'Expenses /mo', value: `$${monthlyExpenses.toFixed(0)}`, color: theme.danger },
                 { label: 'Debt Payments', value: `$${monthlyDebtPayments.toFixed(0)}`, color: theme.warning },
                 { label: 'Goal Savings', value: `$${monthlyGoalSavings.toFixed(0)}`, color: theme.purple },
+                { label: 'Sinking Funds', value: `$${monthlySinkingFunds.toFixed(0)}`, color: theme.accent },
                 { label: 'Net /mo', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus >= 0 ? theme.success : theme.danger },
               ].map(m => (
                 <div key={m.label} style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', textAlign: 'center' as const }}>
@@ -6046,9 +6496,36 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     const isOpen = expandedMilestone === m.id
                     const planSteps: any[] = m.weeklyPlan || []
                     const donePct = planSteps.length > 0 ? Math.round((planSteps.filter((s: any) => s.done).length / planSteps.length) * 100) : 0
+                    const isEditing = editingItem?.type === 'milestone' && editingItem?.id === m.id
                     return (
-                      <div key={m.id} style={{ background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + (isOpen ? theme.purple : theme.border), overflow: 'hidden' }}>
+                      <div key={m.id} style={{ background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + (isOpen ? theme.accent : isEditing ? theme.warning : theme.border), overflow: 'hidden' }}>
                         {/* Milestone header */}
+                        {isEditing ? (
+                          <div style={{ padding: '16px 20px', background: theme.bg }}>
+                            <div style={{ color: theme.accent, fontSize: '12px', fontWeight: 700, marginBottom: '12px' }}>✏️ EDITING MILESTONE</div>
+                            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                                <input value={editingItem.data.name} onChange={e => updateEditField('name', e.target.value)} placeholder="Milestone name" style={{...inputStyle, flex: 2, minWidth: '150px'}} />
+                                <input type="number" value={editingItem.data.targetAmount} onChange={e => updateEditField('targetAmount', e.target.value)} placeholder="Target $" style={{...inputStyle, width: '100px'}} />
+                                <input type="number" value={editingItem.data.currentAmount} onChange={e => updateEditField('currentAmount', e.target.value)} placeholder="Current $" style={{...inputStyle, width: '100px'}} />
+                              </div>
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                                <div style={{ flex: 1, minWidth: '140px' }}>
+                                  <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>TARGET DATE (optional)</label>
+                                  <input type="date" value={editingItem.data.targetDate || ''} onChange={e => updateEditField('targetDate', e.target.value)} style={{...inputStyle, width: '100%'}} />
+                                </div>
+                                <div style={{ flex: 2, minWidth: '200px' }}>
+                                  <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>NOTES</label>
+                                  <input value={editingItem.data.notes || ''} onChange={e => updateEditField('notes', e.target.value)} placeholder="Why this matters..." style={{...inputStyle, width: '100%'}} />
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <button onClick={saveEdit} style={{...btnSuccess, padding: '8px 16px', fontSize: '13px'}}>Save changes</button>
+                                <button onClick={cancelEdit} style={{...btnDanger, padding: '8px 16px', fontSize: '13px'}}>Cancel</button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
                         <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -6063,12 +6540,13 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                     {donePct === 100 ? '✓ Week done!' : `${donePct}% done`}
                                   </span>
                                 )}
+                                <button onClick={() => startEdit('milestone', m)} style={{ padding: '3px 8px', background: theme.accent + '20', color: theme.accent, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>✏️</button>
                                 <button onClick={() => setRoadmapMilestones(roadmapMilestones.filter(x => x.id !== m.id))} style={{ padding: '3px 8px', background: theme.danger + '20', color: theme.danger, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>🗑️</button>
                               </div>
                             </div>
                             {/* Progress bar */}
                             <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden', marginBottom: '4px' }}>
-                              <div style={{ width: Math.min(pct, 100) + '%', height: '100%', background: `linear-gradient(90deg, ${theme.purple}, ${theme.success})` }} />
+                              <div style={{ width: Math.min(pct, 100) + '%', height: '100%', background: `linear-gradient(90deg, ${theme.accent}, ${theme.success})` }} />
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span style={{ color: theme.textMuted, fontSize: '11px' }}>
@@ -6078,6 +6556,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                             </div>
                           </div>
                         </div>
+                        )}
 
                         {/* Weekly plan actions */}
                         <div style={{ padding: '0 20px 16px 20px', display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
@@ -6479,6 +6958,245 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         )}
 
         {/* ==================== INSIGHTS TAB ==================== */}
+        {/* ═══════════════════════════════════
+            MEAL PLANNING TAB
+        ═══════════════════════════════════ */}
+        {activeTab === 'meals' && (
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
+            {/* Header */}
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1a1208, #0a0a0a)', borderRadius: '16px', border: '1px solid ' + theme.accent + '40' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' as const, gap: '12px' }}>
+                <div>
+                  <h2 style={{ color: theme.accent, fontSize: '24px', fontWeight: 800, margin: '0 0 6px 0', fontFamily: 'Cinzel, serif' }}>🍽️ Aureus Meal Planner</h2>
+                  <p style={{ color: theme.textMuted, fontSize: '14px', margin: 0 }}>Upload this week's supermarket catalog — Aureus builds a budget meal plan around the specials.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {(['plan', 'catalog', 'history'] as const).map(t => (
+                    <button key={t} onClick={() => setMealPlanTab(t)}
+                      style={{ padding: '7px 14px', background: mealPlanTab === t ? theme.accent : 'transparent', color: mealPlanTab === t ? '#0a0a0a' : theme.textMuted, border: '1px solid ' + (mealPlanTab === t ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, textTransform: 'capitalize' as const }}>
+                      {t === 'plan' ? '🗓️ Plan' : t === 'catalog' ? '📸 Catalog' : '📚 History'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* TAB: CATALOG UPLOAD */}
+            {mealPlanTab === 'catalog' && (
+              <div style={cardStyle}>
+                <h3 style={{ color: theme.accent, margin: '0 0 8px 0' }}>📸 Upload Supermarket Catalog</h3>
+                <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '16px', lineHeight: 1.6 }}>
+                  Take a photo of the specials page from Woolworths, Coles, Aldi, or IGA. Aureus reads what's on sale and builds your meal plan around those items. Works best with the "half price" or "weekly specials" pages.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px', fontWeight: 600 }}>UPLOAD CATALOG IMAGE(S)</label>
+                    <input type="file" accept="image/*" multiple
+                      onChange={async e => {
+                        const files = Array.from(e.target.files || [])
+                        const b64s: string[] = []
+                        for (const file of files) {
+                          const b64 = await new Promise<string>(res => {
+                            const r = new FileReader()
+                            r.onload = ev => res((ev.target?.result as string).split(',')[1])
+                            r.readAsDataURL(file)
+                          })
+                          b64s.push(b64)
+                        }
+                        setCatalogImages(prev => [...prev, ...b64s].slice(0, 6))
+                      }}
+                      style={{ color: theme.text, fontSize: '13px' }} />
+                    {catalogImages.length > 0 && (
+                      <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                        {catalogImages.map((_, i) => (
+                          <div key={i} style={{ padding: '6px 12px', background: theme.success + '20', border: '1px solid ' + theme.success + '40', borderRadius: '8px', color: theme.success, fontSize: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            📸 Image {i + 1}
+                            <button onClick={() => setCatalogImages(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '14px', padding: 0 }}>×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px', fontWeight: 600 }}>OR PASTE SPECIALS TEXT</label>
+                    <textarea value={catalogText} onChange={e => setCatalogText(e.target.value)} placeholder="e.g. Woolworths half price: chicken breast $8/kg, eggs $4.50 doz, broccoli $1.50..."
+                      style={{ ...inputStyle, width: '100%', height: '100px', resize: 'vertical' as const, fontFamily: 'inherit' }} />
+                  </div>
+                  {(catalogImages.length > 0 || catalogText) && (
+                    <div style={{ padding: '10px 14px', background: theme.success + '15', borderRadius: '8px', color: theme.success, fontSize: '13px' }}>
+                      ✅ Catalog ready — switch to Plan tab to generate your meal plan
+                    </div>
+                  )}
+                  <button onClick={() => setMealPlanTab('plan')} style={{ ...btnPrimary, alignSelf: 'flex-start' as const, padding: '10px 20px' }}>
+                    Go to Plan tab →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: MEAL PLAN */}
+            {mealPlanTab === 'plan' && (
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
+                {/* Preferences */}
+                <div style={cardStyle}>
+                  <h3 style={{ color: theme.accent, margin: '0 0 14px 0', fontSize: '16px' }}>⚙️ Your Household</h3>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const, marginBottom: '12px' }}>
+                    <div style={{ flex: 1, minWidth: '100px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>PEOPLE</label>
+                      <input type="number" min="1" max="10" value={mealPlanPrefs.people} onChange={e => setMealPlanPrefs({...mealPlanPrefs, people: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: '120px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>WEEKLY FOOD BUDGET $</label>
+                      <input type="number" placeholder={monthlySurplus > 0 ? `e.g. ${Math.round(monthlySurplus * 0.25)}` : '150'} value={mealPlanPrefs.budget} onChange={e => setMealPlanPrefs({...mealPlanPrefs, budget: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div style={{ flex: 2, minWidth: '160px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>DIETARY NEEDS</label>
+                      <input placeholder="e.g. gluten-free, vegetarian, diabetic..." value={mealPlanPrefs.dietaryNeeds} onChange={e => setMealPlanPrefs({...mealPlanPrefs, dietaryNeeds: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div style={{ flex: 2, minWidth: '160px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>DISLIKES / AVOID</label>
+                      <input placeholder="e.g. seafood, mushrooms, spicy..." value={mealPlanPrefs.dislikes} onChange={e => setMealPlanPrefs({...mealPlanPrefs, dislikes: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' as const }}>
+                    <label style={{ display: 'flex', gap: '8px', alignItems: 'center', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>
+                      <input type="checkbox" checked={mealPlanPrefs.useWebSearch} onChange={e => setMealPlanPrefs({...mealPlanPrefs, useWebSearch: e.target.checked})} style={{ accentColor: theme.accent, width: '14px', height: '14px' }} />
+                      🔍 Search current AU grocery prices (slower but more accurate)
+                    </label>
+                    {(catalogImages.length > 0 || catalogText) && (
+                      <div style={{ padding: '4px 10px', background: theme.success + '20', border: '1px solid ' + theme.success + '40', borderRadius: '8px', color: theme.success, fontSize: '12px' }}>
+                        📸 Using {catalogImages.length > 0 ? `${catalogImages.length} catalog image${catalogImages.length !== 1 ? 's' : ''}` : 'pasted specials'}
+                      </div>
+                    )}
+                    <button onClick={generateMealPlan} disabled={generatingMealPlan}
+                      style={{ ...btnPrimary, padding: '10px 24px', opacity: generatingMealPlan ? 0.7 : 1, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {generatingMealPlan ? (
+                        <><div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '2px solid #0a0a0a', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />Generating...</>
+                      ) : '🍽️ Generate Meal Plan'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Generated plan */}
+                {currentMealPlan && (() => {
+                  const plan = currentMealPlan
+                  const catColors: any = { produce: theme.success, dairy: theme.accent, meat: theme.danger, pantry: theme.warning, frozen: theme.teal }
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
+                      {/* Cost summary */}
+                      <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #1a1208, #0a0a0a)', borderRadius: '14px', border: '1px solid ' + theme.accent + '40', display: 'flex', gap: '24px', flexWrap: 'wrap' as const }}>
+                        <div>
+                          <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>ESTIMATED WEEKLY COST</div>
+                          <div style={{ color: theme.accent, fontSize: '28px', fontWeight: 800 }}>${plan.weeklyEstimate?.toFixed(0) || '—'}</div>
+                        </div>
+                        {plan.savingsVsEatingOut > 0 && (
+                          <div>
+                            <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>SAVED VS EATING OUT</div>
+                            <div style={{ color: theme.success, fontSize: '28px', fontWeight: 800 }}>+${plan.savingsVsEatingOut?.toFixed(0)}</div>
+                          </div>
+                        )}
+                        {plan.usedCatalog && (
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <div style={{ padding: '6px 12px', background: theme.success + '20', border: '1px solid ' + theme.success + '40', borderRadius: '8px', color: theme.success, fontSize: '12px', fontWeight: 600 }}>📸 Built from your catalog specials</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 7-day plan */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '10px' }}>
+                        {(plan.days || []).map((day: any, i: number) => (
+                          <div key={i} style={{ padding: '14px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                            <div style={{ color: theme.accent, fontWeight: 700, fontSize: '12px', marginBottom: '10px', letterSpacing: '0.5px' }}>{day.day?.toUpperCase()}</div>
+                            {['breakfast', 'lunch', 'dinner'].map((meal: string) => day[meal] && (
+                              <div key={meal} style={{ marginBottom: '8px' }}>
+                                <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 600, marginBottom: '2px' }}>{meal.toUpperCase()} · ${day[meal].estimatedCost?.toFixed(2)}</div>
+                                <div style={{ color: theme.text, fontSize: '13px', lineHeight: 1.4 }}>{day[meal].meal}</div>
+                                {day[meal].batchNote && <div style={{ color: theme.success, fontSize: '11px', marginTop: '2px', fontStyle: 'italic' }}>♻️ {day[meal].batchNote}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Shopping list */}
+                      <div style={cardStyle}>
+                        <h3 style={{ color: theme.accent, margin: '0 0 14px 0', fontSize: '16px' }}>🛒 Shopping List</h3>
+                        {plan.catalogHighlights?.length > 0 && (
+                          <div style={{ marginBottom: '12px', padding: '10px 14px', background: theme.success + '15', borderRadius: '10px', border: '1px solid ' + theme.success + '30' }}>
+                            <div style={{ color: theme.success, fontWeight: 700, fontSize: '12px', marginBottom: '6px' }}>🏷️ ON SPECIAL THIS WEEK</div>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
+                              {plan.catalogHighlights.map((h: string, i: number) => (
+                                <span key={i} style={{ padding: '3px 8px', background: theme.success + '20', color: theme.success, borderRadius: '6px', fontSize: '12px' }}>{h}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
+                          {(plan.shoppingList || []).map((item: any, i: number) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: theme.bg, borderRadius: '8px', border: '1px solid ' + (item.onSpecial ? theme.success + '40' : theme.border) }}>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: catColors[item.category] || theme.textMuted, flexShrink: 0 }} />
+                                <div>
+                                  <span style={{ color: theme.text, fontSize: '13px' }}>{item.item}</span>
+                                  <span style={{ color: theme.textMuted, fontSize: '12px', marginLeft: '8px' }}>{item.quantity}</span>
+                                </div>
+                                {item.onSpecial && <span style={{ padding: '1px 6px', background: theme.success + '20', color: theme.success, borderRadius: '10px', fontSize: '10px', fontWeight: 600 }}>SPECIAL</span>}
+                              </div>
+                              <span style={{ color: theme.accent, fontWeight: 600, fontSize: '13px' }}>${item.estimatedCost?.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {plan.tipsForBudget?.length > 0 && (
+                          <div style={{ marginTop: '14px', padding: '12px 14px', background: theme.accent + '10', borderRadius: '10px' }}>
+                            <div style={{ color: theme.accent, fontWeight: 700, fontSize: '12px', marginBottom: '8px' }}>💡 Budget tips from Aureus</div>
+                            {plan.tipsForBudget.map((tip: string, i: number) => (
+                              <div key={i} style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px', lineHeight: 1.5 }}>→ {tip}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {!currentMealPlan && !generatingMealPlan && (
+                  <div style={{ padding: '40px 20px', textAlign: 'center' as const, color: theme.textMuted }}>
+                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>🍽️</div>
+                    <div style={{ color: theme.text, fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>No meal plan yet</div>
+                    <div style={{ fontSize: '13px', maxWidth: '380px', margin: '0 auto', lineHeight: 1.6 }}>
+                      Upload this week's catalog in the Catalog tab for the best results — or just hit Generate and Aureus will build a budget meal plan from scratch.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB: HISTORY */}
+            {mealPlanTab === 'history' && (
+              <div style={cardStyle}>
+                <h3 style={{ color: theme.accent, margin: '0 0 16px 0' }}>📚 Previous Meal Plans</h3>
+                {mealPlanHistory.length === 0 ? (
+                  <div style={{ textAlign: 'center' as const, padding: '32px', color: theme.textMuted }}>No meal plans generated yet</div>
+                ) : mealPlanHistory.map((plan, i) => (
+                  <div key={i} onClick={() => { setCurrentMealPlan(plan); setMealPlanTab('plan') }}
+                    style={{ padding: '14px 16px', marginBottom: '8px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>
+                        Week of {new Date(plan.generatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>
+                        {plan.prefs?.people} people · ${plan.weeklyEstimate?.toFixed(0)}/week
+                        {plan.usedCatalog && ' · 📸 catalog used'}
+                      </div>
+                    </div>
+                    <div style={{ color: theme.accent, fontSize: '12px', fontWeight: 600 }}>View →</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'insights' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
 
@@ -8418,6 +9136,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         h1, h2, h3, .aureus-heading { font-family: 'Cinzel', serif; }
         @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
         @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #3a2e1e; border-radius: 3px; }
