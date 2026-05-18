@@ -233,6 +233,7 @@ export default function Dashboard() {
 
   // Presets
   const [showSnapshotPrompt, setShowSnapshotPrompt] = useState(false)
+  const [showPresets, setShowPresets] = useState(false)
   const [showMoreTabs, setShowMoreTabs] = useState(false)
   const [showHelpGuide, setShowHelpGuide] = useState(false)
   // ── Coaching improvements state ──
