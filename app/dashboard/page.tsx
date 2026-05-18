@@ -134,6 +134,8 @@ export default function Dashboard() {
   const [netWorthHistory, setNetWorthHistory] = useState<any[]>([])
   const [sinkingFunds, setSinkingFunds] = useState<any[]>([])
   const [newSinkingFund, setNewSinkingFund] = useState({ name: '', targetAmount: '', targetDate: '', weeklyAmount: '', category: 'celebration', notes: '' })
+  const [step8SelectedFunds, setStep8SelectedFunds] = useState<Set<number>>(new Set([0, 1]))
+  const [step8CustomAmounts, setStep8CustomAmounts] = useState<{[i: number]: string}>({})
 
   // ==================== SPENDING INSIGHTS ====================
   const [spendingInsights, setSpendingInsights] = useState<any[]>([])
@@ -3622,18 +3624,19 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
           {/* STEP 8 — Sinking Funds */}
           {missionStep === 8 && (() => {
-            // Smart suggestions based on their situation
+            const selectedFunds = step8SelectedFunds
+            const setSelectedFunds = setStep8SelectedFunds
+            const customAmounts = step8CustomAmounts
+            const setCustomAmounts = setStep8CustomAmounts
             const suggestions = [
-              { name: 'Christmas & Gifts', category: 'christmas', target: 1200, weekly: 23, icon: '🎄', reason: 'Avoid the December credit card blowout', alwaysShow: true },
-              { name: 'Car Registration & Service', category: 'vehicle', target: 1000, weekly: 19, icon: '🚗', reason: 'AU avg rego + service = ~$1,000/yr', alwaysShow: true },
-              ...(houseStatus === 'own' || houseStatus === 'paid_off' ? [{ name: 'Home Maintenance', category: 'home', target: 2000, weekly: 38, icon: '🏠', reason: 'Budget 1% of home value per year for maintenance', alwaysShow: false }] : []),
-              { name: 'Annual Holiday', category: 'holiday', target: 3000, weekly: 58, icon: '✈️', reason: 'Most Australians say holidays cause financial stress', alwaysShow: false },
-              { name: 'Birthday Gifts', category: 'birthday', target: 600, weekly: 12, icon: '🎂', reason: '$50/month across family birthdays adds up fast', alwaysShow: false },
-              { name: 'Health & Medical', category: 'medical', target: 800, weekly: 15, icon: '🏥', reason: 'Gap fees, dentist, glasses — always unexpected', alwaysShow: false },
-              { name: 'Insurance Renewals', category: 'insurance', target: 1500, weekly: 29, icon: '🛡️', reason: 'Home, car, health — budget ahead to avoid scrambling', alwaysShow: false },
+              { name: 'Christmas & Gifts', category: 'christmas', target: 1200, weekly: 23, icon: '🎄', reason: 'Avoid the December credit card blowout' },
+              { name: 'Car Registration & Service', category: 'vehicle', target: 1000, weekly: 19, icon: '🚗', reason: 'AU avg rego + service = ~$1,000/yr' },
+              ...(houseStatus === 'own' || houseStatus === 'paid_off' ? [{ name: 'Home Maintenance', category: 'home', target: 2000, weekly: 38, icon: '🏠', reason: 'Budget 1% of home value per year for maintenance' }] : []),
+              { name: 'Annual Holiday', category: 'holiday', target: 3000, weekly: 58, icon: '✈️', reason: 'Most Australians say holidays cause financial stress' },
+              { name: 'Birthday Gifts', category: 'birthday', target: 600, weekly: 12, icon: '🎂', reason: '$50/month across family birthdays adds up fast' },
+              { name: 'Health & Medical', category: 'medical', target: 800, weekly: 15, icon: '🏥', reason: 'Gap fees, dentist, glasses — always unexpected' },
+              { name: 'Insurance Renewals', category: 'insurance', target: 1500, weekly: 29, icon: '🛡️', reason: 'Home, car, health — budget ahead to avoid scrambling' },
             ]
-            const [selectedFunds, setSelectedFunds] = React.useState<Set<number>>(new Set([0, 1]))
-            const [customAmounts, setCustomAmounts] = React.useState<{[i: number]: string}>({})
 
             const totalWeekly = suggestions.reduce((s, f, i) => {
               if (!selectedFunds.has(i)) return s
