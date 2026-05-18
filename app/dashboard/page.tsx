@@ -42,7 +42,7 @@ export default function Dashboard() {
   // Money Personality Quiz
   const [moneyPersonality, setMoneyPersonality] = useState<string | null>(null)
   const [personalityAnswers, setPersonalityAnswers] = useState<{[key: number]: string}>({})
-
+  const [userName, setUserName] = useState('')
   // Identity Statements
   const [identityStatements, setIdentityStatements] = useState<string[]>([])
   const [showIdentityEditor, setShowIdentityEditor] = useState(false)
@@ -404,6 +404,7 @@ export default function Dashboard() {
       if (data.superData) setSuperData(data.superData)
       if (data.netWorthHistory) setNetWorthHistory(data.netWorthHistory)
       if (data.personalityAnswers) setPersonalityAnswers(data.personalityAnswers)
+      if (data.userName) setUserName(data.userName)
       // Show onboarding for new users
       if (!data.onboardingComplete) setShowOnboarding(true)
       if (data.budgetOnboarding) setBudgetOnboarding(data.budgetOnboarding)
@@ -442,7 +443,7 @@ export default function Dashboard() {
       moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete,
       fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, sinkingFunds, mealPlanHistory, mealPlanPrefs, proactiveInsights,
       insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog,
-      annualReviews, superData, netWorthHistory, personalityAnswers
+      annualReviews, superData, netWorthHistory, personalityAnswers, userName
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
   }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, categoryBudgets, actualSpend, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, coachNextAction, dismissedTriggers, lastAppOpen, missionPhase, missionStep, missionComplete, missionNavLocked, missionP2Proposals, missionP2Confirmed, missionP2Step, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, sinkingFunds, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
@@ -653,7 +654,7 @@ export default function Dashboard() {
           max_tokens: 200,
           messages: [{
             role: 'user',
-            content: `You are Aureus, a personal financial coach. Write a 2-3 sentence morning briefing for this user. Be specific, warm, and direct — like a coach who knows them well. No generic advice.
+            content: `You are Aureus, a personal financial coach. Write a 2-3 sentence morning briefing for ${userName || 'this user'}. Be specific, warm, and direct — like a coach who knows them well. Use their name (${userName || 'Builder'}) naturally in the message. No generic advice.
 
 User's situation:
 - Monthly income: $${monthlyIncome.toFixed(0)}, surplus: $${monthlySurplus.toFixed(0)}
@@ -1665,6 +1666,9 @@ Respond with ONE sentence only. Be specific. Include the actual step.`
 
     try {
       const systemPrompt = `You are Aureus, a personal AI financial coach for Australian users. You know this user's complete financial picture and remember everything from this conversation.
+
+USER'S NAME: ${userName || 'not provided — call them "Builder" if you need to'}
+Use their name naturally in conversation — not every message, but when it feels right (encouragement, corrections, celebrations).
 
 THEIR FINANCIAL DATA:
 • Income: ${incomeStreams.map((i: any) => `${i.name} $${i.amount}/${i.frequency}`).join(', ') || 'not yet set up'}
@@ -2921,9 +2925,20 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   </div>
                 ))}
               </div>
+              <div style={{ width: '100%', maxWidth: '400px', marginBottom: '20px' }}>
+                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px', fontWeight: 600 }}>What should Aureus call you?</label>
+                <input
+                  placeholder="Your first name"
+                  value={userName}
+                  onChange={e => setUserName(e.target.value)}
+                  style={{ ...inputStyle, width: '100%', fontSize: '16px', padding: '14px 18px', textAlign: 'center' as const }}
+                  autoFocus
+                />
+              </div>
               <button onClick={() => advanceMission(1)}
-                style={{ width: '100%', maxWidth: '400px', padding: '18px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '18px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
-                Begin →
+                disabled={!userName.trim()}
+                style={{ width: '100%', maxWidth: '400px', padding: '18px', background: userName.trim() ? 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)' : theme.border, color: userName.trim() ? '#0a0a0a' : theme.textMuted, border: 'none', borderRadius: '14px', cursor: userName.trim() ? 'pointer' : 'default', fontSize: '18px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
+                {userName.trim() ? `Let's go, ${userName.trim()} →` : 'Enter your name to begin →'}
               </button>
               <button onClick={() => { setMissionComplete(true); setMissionNavLocked(false); setOnboardingComplete(true); setActiveTab('home' as any) }}
                 style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', marginTop: '14px', fontSize: '13px' }}>
@@ -3838,7 +3853,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 ) : (
                   <>
                     <div style={{ fontSize: '64px', marginBottom: '20px' }}>🏛️</div>
-                    <h2 style={{ color: theme.accent, fontSize: '28px', margin: '0 0 6px 0', fontFamily: 'Cinzel, serif' }}>Your Empire Begins.</h2>
+                    <h2 style={{ color: theme.accent, fontSize: '28px', margin: '0 0 6px 0', fontFamily: 'Cinzel, serif' }}>{userName ? `${userName}'s Empire Begins.` : 'Your Empire Begins.'}</h2>
                     <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, marginBottom: '24px' }}>
                       Your roadmap is built. Aureus knows your numbers, your personality, and your goals.
                     </p>
@@ -4185,7 +4200,10 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #D4AF37 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #D4AF37' }}>
               <span style={{ color: '#0a0a0a', fontWeight: 800, fontSize: '18px' }}>A</span>
             </div>
-            <span style={{ color: theme.text, fontWeight: 700, fontSize: '20px' }}>Aureus</span>
+            <div>
+              <span style={{ color: theme.text, fontWeight: 700, fontSize: '20px' }}>Aureus</span>
+              {userName && <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '-2px' }}>coaching {userName}</div>}
+            </div>
             {streak > 0 && <span style={{ padding: '3px 10px', background: '#D4AF3720', color: '#D4AF37', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>🔥 {streak}-week streak</span>}
             {/* Coach next action — compact header badge */}
             {coachNextAction && activeTab !== 'quickview' && (
@@ -4318,7 +4336,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' as const, gap: '12px' }}>
                   <div>
                     <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, letterSpacing: '1px', marginBottom: '4px' }}>{dayName.toUpperCase()} · {today.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-                    <h2 style={{ color: theme.text, fontSize: '26px', fontWeight: 800, margin: '0 0 6px 0', fontFamily: 'Cinzel, serif' }}>{greeting}, Builder.</h2>
+                    <h2 style={{ color: theme.text, fontSize: '26px', fontWeight: 800, margin: '0 0 6px 0', fontFamily: 'Cinzel, serif' }}>{greeting}, {userName || 'Builder'}.</h2>
                     <div style={{ color: theme.textMuted, fontSize: '14px', fontStyle: 'italic' }}>"{currentQuote.quote}"</div>
                     {whyStatement && <div style={{ marginTop: '10px', padding: '8px 12px', background: theme.accent + '15', borderRadius: '8px', border: '1px solid ' + theme.accent + '30', color: theme.accent, fontSize: '13px', fontStyle: 'italic' }}>🎯 {whyStatement}</div>}
                   </div>
@@ -7560,6 +7578,18 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Your weekly financial ritual — the single biggest predictor of financial progress.</p>
                 </div>
                 <button onClick={() => { setShowMoneyDate(true); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ ...btnSuccess, padding: '10px 18px' }}>Start →</button>
+              </div>
+
+              {/* Profile — name */}
+              <div style={{ padding: '16px', background: theme.bg, borderRadius: '12px', marginBottom: '16px' }}>
+                <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px', marginBottom: '10px' }}>👤 Your Profile</div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>YOUR NAME</label>
+                    <input value={userName} onChange={e => setUserName(e.target.value)} placeholder="What should Aureus call you?" style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  {userName && <div style={{ padding: '10px 14px', background: theme.accent + '15', borderRadius: '10px', color: theme.accent, fontSize: '13px', fontWeight: 600 }}>👋 Hi, {userName}!</div>}
+                </div>
               </div>
 
               {/* Schedule Setup */}
