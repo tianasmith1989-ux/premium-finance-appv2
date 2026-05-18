@@ -1693,12 +1693,13 @@ Be specific, warm, direct. Use their actual numbers. Australia-specific advice. 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'question',
-          question: message,
+          // Prepend name instruction to the question — route always uses this field
+          question: `[COACHING CONTEXT: User's name is "${userName || 'not provided'}". Use their name naturally and warmly — not every message, but when encouraging, celebrating or correcting. Remember this entire conversation history.]\n\nUser message: ${message}`,
           systemContext,
           conversationHistory,
           useWebSearch: useSearch,
           financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones },
-          memory: budgetMemory,
+          memory: { ...budgetMemory, userName: userName || '', coachingNote: `This user's name is ${userName || 'unknown'}. Use their name naturally.` },
           countryConfig: currentCountryConfig
         })
       })
@@ -1769,11 +1770,11 @@ Rules: Be specific and use their actual numbers. No generic advice. Be warm but 
 
     return {
       mode: 'question',
-      question,
+      question: `[COACHING CONTEXT: User's name is "${userName || 'not provided'}". Use their name naturally — not robotically, just when it adds warmth.]\n\n${question}`,
       conversationHistory: history,
       systemContext,
       financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones },
-      memory: budgetMemory,
+      memory: { ...budgetMemory, userName: userName || '', coachingNote: userName ? `This user's name is ${userName}. Use it naturally.` : '' },
       countryConfig: currentCountryConfig
     }
   }
