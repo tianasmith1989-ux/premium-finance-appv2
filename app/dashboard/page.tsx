@@ -1668,59 +1668,49 @@ Respond with ONE sentence only. Be specific. Include the actual step.`
     setIsLoading(true)
 
     try {
-      const systemPrompt = `You are Aureus, a personal AI financial coach for Australian users. You know this user's complete financial picture and remember everything from this conversation.
+      // Build full conversation history for the API route
+      const conversationHistory = updatedMessages.slice(-20).map(m => ({
+        role: m.role,
+        content: m.content
+      }))
 
-USER'S NAME: ${userName || 'not provided — call them "Builder" if you need to'}
-Use their name naturally in conversation — not every message, but when it feels right (encouragement, corrections, celebrations).
+      const systemContext = `You are Aureus, a personal AI financial coach for Australian users.
+USER NAME: ${userName || 'not provided'} — use their name naturally when appropriate (encouragement, celebrating wins, gentle corrections). Not every message.
 
-THEIR FINANCIAL DATA:
-• Income: ${incomeStreams.map((i: any) => `${i.name} $${i.amount}/${i.frequency}`).join(', ') || 'not yet set up'}
+FINANCIAL DATA:
+• Income: ${incomeStreams.map((i: any) => `${i.name} $${i.amount}/${i.frequency}`).join(', ') || 'not set up'}
 • Monthly: income $${monthlyIncome.toFixed(0)} | expenses $${monthlyExpenses.toFixed(0)} | surplus $${monthlySurplus.toFixed(0)}
 • Emergency fund: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months)
 • Debts: ${debts.length > 0 ? debts.map((d: any) => `${d.name} $${d.balance} @ ${d.interestRate}%`).join(', ') : 'none'}
 • Goals: ${goals.length > 0 ? goals.map((g: any) => `${g.name}: $${g.saved}/$${g.target}`).join(', ') : 'none'}
-• Assets: ${assets.length > 0 ? assets.map((a: any) => `${a.name} $${a.value}`).join(', ') : 'none'}
-• Net worth: $${netWorth.toLocaleString()}
-• Baby Step: ${currentBabyStep.step} — ${currentBabyStep.title}
-• House status: ${houseStatus || 'not specified'}${mortgageAccel.balance ? ` | Mortgage: $${mortgageAccel.balance} at ${mortgageAccel.rate}%` : ''}${moneyPersonality ? ` | Personality: ${personalityProfiles[moneyPersonality]?.label}` : ''}
+• Net worth: $${netWorth.toLocaleString()} | Baby Step: ${currentBabyStep.step} — ${currentBabyStep.title}
+• House: ${houseStatus || 'not specified'}${mortgageAccel.balance ? ` | Mortgage: $${mortgageAccel.balance} at ${mortgageAccel.rate}%` : ''}${moneyPersonality ? ` | Personality: ${personalityProfiles[moneyPersonality]?.label}` : ''}
 
-COACHING RULES:
-- Always use their actual numbers — never generic advice
-- Be warm, direct, specific — like a coach who knows them personally  
-- Remember and reference earlier parts of this conversation naturally
-- Australia: use AUD, refer to ATO, super, HECS, Medicare, RBA etc.${getPersonalityCoachingContext()}`
+Be specific, warm, direct. Use their actual numbers. Australia-specific advice. Remember earlier parts of this conversation.${getPersonalityCoachingContext()}`
 
-      // Pass full conversation history (last 20 messages = 10 exchanges)
-      const messages = updatedMessages.slice(-20).map(m => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content
-      }))
-
-      const body: any = {
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages
-      }
-
-      if (useSearch) {
-        body.tools = [{ type: 'web_search_20250305', name: 'web_search' }]
-      }
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/budget-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify({
+          mode: 'question',
+          question: message,
+          systemContext,
+          conversationHistory,
+          useWebSearch: useSearch,
+          financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones },
+          memory: budgetMemory,
+          countryConfig: currentCountryConfig
+        })
       })
 
+      if (!response.ok) throw new Error(`API error: ${response.status}`)
       const data = await response.json()
-      const textBlocks = (data.content || []).filter((c: any) => c.type === 'text')
-      const reply = textBlocks.map((c: any) => c.text).join('\n').trim() || "I'm here to help — what would you like to know?"
-      const didSearch = (data.content || []).some((c: any) => c.type === 'tool_use')
-
+      const reply = data.message || data.advice || data.raw || data.content || "I'm here to help — what would you like to know?"
+      const didSearch = useSearch && (data.usedWebSearch || data.searchedWeb)
       setChatMessages(prev => [...prev, { role: 'assistant', content: reply, usedWebSearch: didSearch }])
-    } catch {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong. Please try again.' }])
+    } catch (e) {
+      console.error('Chat error:', e)
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I had trouble connecting. Please try again.' }])
     }
     setIsLoading(false)
   }
@@ -1758,7 +1748,9 @@ Always reference who they said they're becoming when relevant. Coach them as the
       content: m.content
     }))
 
-    const systemContext = `You are Aureus, a personal financial coach for Australian users. You know this user's full financial picture:
+    const systemContext = `You are Aureus, a personal financial coach for Australian users. You know this user's full financial picture.
+
+USER NAME: ${userName || 'not provided'} — use their name naturally when it fits (encouragement, wins, corrections). Not every message.
 
 Income: ${incomeStreams.map(i => `${i.name} $${i.amount}/${i.frequency}`).join(', ') || 'not set'}
 Monthly income: $${monthlyIncome.toFixed(0)} | Monthly expenses: $${monthlyExpenses.toFixed(0)} | Monthly surplus: $${monthlySurplus.toFixed(0)}
@@ -1773,7 +1765,7 @@ ${moneyPersonality ? `Money personality: ${personalityProfiles[moneyPersonality]
 ${mortgageAccel.balance ? `Mortgage: $${mortgageAccel.balance} at ${mortgageAccel.rate}%` : ''}
 ${(extraContext || '')}${getPersonalityCoachingContext()}
 
-Rules: Be specific and use their actual numbers. No generic advice. Be warm but direct — like a coach who knows them well. Keep responses concise unless they ask for detail.`
+Rules: Be specific and use their actual numbers. No generic advice. Be warm but direct — like a coach who knows them well. Remember earlier parts of this conversation. Keep responses concise unless they ask for detail.`
 
     return {
       mode: 'question',
