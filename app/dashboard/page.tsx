@@ -1584,19 +1584,20 @@ Rules:
   }
 
   // ── Generate meal plan ──
+  const [mealPlanError, setMealPlanError] = useState<string | null>(null)
   const generateMealPlan = async () => {
     setGeneratingMealPlan(true)
+    setMealPlanError(null)
     try {
       const weeklyBudget = mealPlanPrefs.budget || (monthlySurplus > 0 ? Math.round(monthlySurplus * 0.25).toString() : '150')
 
       const body: any = {
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [{
           role: 'user',
           content: [
-            // Include catalog images if uploaded
-            ...catalogImages.map(img => ({
+            ...catalogImages.map((img: string) => ({
               type: 'image',
               source: { type: 'base64', media_type: 'image/jpeg', data: img }
             })),
@@ -1608,39 +1609,19 @@ HOUSEHOLD: ${mealPlanPrefs.people} people
 WEEKLY BUDGET: $${weeklyBudget} AUD total for groceries
 DIETARY NEEDS: ${mealPlanPrefs.dietaryNeeds || 'none'}
 DISLIKES/AVOID: ${mealPlanPrefs.dislikes || 'none'}
-${catalogImages.length > 0 ? 'SUPERMARKET CATALOG: Images attached — prioritise specials/discounted items for this week.' : ''}
+${catalogImages.length > 0 ? 'SUPERMARKET CATALOG: Images attached — prioritise specials/discounted items.' : ''}
 ${catalogText ? `CATALOG SPECIALS: ${catalogText}` : ''}
 
-Create a REALISTIC, BUDGET-CONSCIOUS meal plan. Prioritise:
-1. Using catalog specials where available
-2. Batch cooking (cook once, eat twice)
-3. Cheap protein sources (eggs, legumes, chicken thighs not breasts)
-4. Seasonal AU vegetables
+Create a REALISTIC, BUDGET-CONSCIOUS 7-day meal plan. Prioritise batch cooking, cheap proteins (eggs, legumes, chicken thighs), and seasonal AU vegetables.
 
-Respond ONLY with valid JSON:
-{
-  "weeklyEstimate": 00.00,
-  "savingsVsEatingOut": 00.00,
-  "days": [
-    {
-      "day": "Monday",
-      "breakfast": {"meal": "...", "estimatedCost": 0.00},
-      "lunch": {"meal": "...", "estimatedCost": 0.00},
-      "dinner": {"meal": "...", "estimatedCost": 0.00, "servings": 4, "batchNote": "optional note about leftovers"}
-    }
-  ],
-  "shoppingList": [
-    {"item": "...", "quantity": "...", "estimatedCost": 0.00, "category": "produce|dairy|meat|pantry|frozen", "onSpecial": true}
-  ],
-  "tipsForBudget": ["tip 1", "tip 2", "tip 3"],
-  "catalogHighlights": ["item on special 1", "item on special 2"]
-}`
+CRITICAL: Respond with ONLY a valid JSON object. No preamble, no explanation, no markdown fences. Your entire response must start with { and end with }.
+
+{"weeklyEstimate":0,"savingsVsEatingOut":0,"days":[{"day":"Monday","breakfast":{"meal":"","estimatedCost":0},"lunch":{"meal":"","estimatedCost":0},"dinner":{"meal":"","estimatedCost":0,"servings":4,"batchNote":""}}],"shoppingList":[{"item":"","quantity":"","estimatedCost":0,"category":"produce","onSpecial":false}],"tipsForBudget":[""],"catalogHighlights":[""]}`
             }
           ]
         }]
       }
 
-      // Add web search for current prices if enabled
       if (mealPlanPrefs.useWebSearch) {
         body.tools = [{ type: 'web_search_20250305', name: 'web_search' }]
       }
@@ -1650,15 +1631,44 @@ Respond ONLY with valid JSON:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       })
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error((err as any)?.error?.message || `API error ${response.status}`)
+      }
+
       const data = await response.json()
-      const text = (data.content || []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('')
-      const clean = text.replace(/```json|```/g, '').trim()
-      const parsed = JSON.parse(clean)
+      if ((data as any).error) throw new Error((data as any).error.message || 'API returned an error')
+
+      const text = ((data.content || []) as any[])
+        .filter((c: any) => c.type === 'text')
+        .map((c: any) => c.text)
+        .join('')
+
+      if (!text) throw new Error('No response from AI — please try again.')
+
+      // Robust JSON extraction
+      const jsonStart = text.indexOf('{')
+      const jsonEnd = text.lastIndexOf('}')
+      if (jsonStart === -1 || jsonEnd === -1) throw new Error('Could not parse response. Please try again.')
+      
+      let parsed: any
+      try {
+        parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1))
+      } catch {
+        throw new Error('Response was malformed. Please try again.')
+      }
+
+      if (!parsed.days || !Array.isArray(parsed.days) || parsed.days.length === 0) {
+        throw new Error('Incomplete meal plan returned. Please try again.')
+      }
+
       const plan = { ...parsed, generatedAt: new Date().toISOString(), prefs: { ...mealPlanPrefs }, usedCatalog: catalogImages.length > 0 || !!catalogText }
       setCurrentMealPlan(plan)
-      setMealPlanHistory(prev => [plan, ...prev.slice(0, 9)])
-    } catch (e) {
+      setMealPlanHistory((prev: any[]) => [plan, ...prev.slice(0, 9)])
+    } catch (e: any) {
       console.error('Meal plan error:', e)
+      setMealPlanError(e?.message || 'Something went wrong. Please try again.')
     }
     setGeneratingMealPlan(false)
   }
@@ -1721,8 +1731,8 @@ Respond with ONE sentence only. Be specific. Include the actual step.`
 USER NAME: ${userName || 'not provided'} — use their name naturally when appropriate (encouragement, celebrating wins, gentle corrections). Not every message.
 
 FINANCIAL DATA:
-• Income: ${incomeStreams.map((i: any) => `${i.name} $${i.amount}/${i.frequency}`).join(', ') || 'not set up'}
-• Monthly: income $${monthlyIncome.toFixed(0)} | expenses $${monthlyExpenses.toFixed(0)} | surplus $${monthlySurplus.toFixed(0)}
+• Income: ${incomeStreams.map((i: any) => `${i.name} $${i.amount}/${i.frequency}`).join(', ') || 'not set up'}${coupleMode && partnerName ? ` | Partner (${partnerName}): $${partnerIncome}/${partnerFrequency}` : ''}
+• Monthly: income $${monthlyIncome.toFixed(0)}${coupleMode && partnerName ? ` (combined with ${partnerName})` : ''} | expenses $${monthlyExpenses.toFixed(0)} | surplus $${monthlySurplus.toFixed(0)}
 • Emergency fund: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months)
 • Debts: ${debts.length > 0 ? debts.map((d: any) => `${d.name} $${d.balance} @ ${d.interestRate}%`).join(', ') : 'none'}
 • Goals: ${goals.length > 0 ? goals.map((g: any) => `${g.name}: $${g.saved}/$${g.target}`).join(', ') : 'none'}
@@ -1796,8 +1806,8 @@ Always reference who they said they're becoming when relevant. Coach them as the
 
 USER NAME: ${userName || 'not provided'} — use their name naturally when it fits (encouragement, wins, corrections). Not every message.
 
-Income: ${incomeStreams.map(i => `${i.name} $${i.amount}/${i.frequency}`).join(', ') || 'not set'}
-Monthly income: $${monthlyIncome.toFixed(0)} | Monthly expenses: $${monthlyExpenses.toFixed(0)} | Monthly surplus: $${monthlySurplus.toFixed(0)}
+Income: ${incomeStreams.map(i => `${i.name} $${i.amount}/${i.frequency}`).join(', ') || 'not set'}${coupleMode && partnerName ? ` | Partner (${partnerName}): $${partnerIncome}/${partnerFrequency}` : ''}
+Monthly income: $${monthlyIncome.toFixed(0)}${coupleMode && partnerName ? ` combined` : ''} | Monthly expenses: $${monthlyExpenses.toFixed(0)} | Monthly surplus: $${monthlySurplus.toFixed(0)}
 Emergency fund: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months)
 Debts: ${debts.length > 0 ? debts.map(d => `${d.name} $${d.balance} at ${d.interestRate}%`).join(', ') : 'none'}
 Goals: ${goals.length > 0 ? goals.map(g => `${g.name} $${g.saved}/$${g.target}`).join(', ') : 'none'}
@@ -7166,6 +7176,12 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       ) : '🍽️ Generate Meal Plan'}
                     </button>
                   </div>
+                  {mealPlanError && (
+                    <div style={{ marginTop: '12px', padding: '12px 16px', background: theme.danger + '18', border: '1px solid ' + theme.danger + '40', borderRadius: '10px', color: theme.danger, fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>⚠️ {mealPlanError}</span>
+                      <button onClick={() => setMealPlanError(null)} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '16px', padding: '0 4px' }}>×</button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Generated plan */}
