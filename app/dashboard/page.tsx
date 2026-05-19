@@ -5462,7 +5462,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 {/* COUPLE MODE */}
                 <div style={{ marginTop: '12px', padding: '12px 14px', background: coupleMode ? theme.accent + '10' : theme.bg, borderRadius: '10px', border: '1px solid ' + (coupleMode ? theme.accent + '40' : theme.border) }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: coupleMode ? '12px' : '0' }}>
-                    <div style={{ display: 'flex', align: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>💑 Partner / couple mode</span>
                     </div>
                     <button onClick={() => setCoupleMode(p => !p)} style={{ padding: '4px 12px', background: coupleMode ? theme.accent : 'transparent', color: coupleMode ? '#0a0a0a' : theme.textMuted, border: '1px solid ' + (coupleMode ? theme.accent : theme.border), borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
