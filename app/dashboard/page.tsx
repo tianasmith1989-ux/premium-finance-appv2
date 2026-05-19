@@ -1591,15 +1591,29 @@ Rules:
     try {
       const weeklyBudget = mealPlanPrefs.budget || (monthlySurplus > 0 ? Math.round(monthlySurplus * 0.25).toString() : '150')
 
-      // Compact schema — keeps token count low so budget-coach max_tokens won't truncate it
       const question = [
-        'Generate a 7-day budget meal plan. Reply with ONLY the JSON below — no prose, no explanation.',
-        `People: ${mealPlanPrefs.people} | Weekly budget: $${weeklyBudget} AUD | Avoid: ${mealPlanPrefs.dislikes || 'nothing'}${mealPlanPrefs.dietaryNeeds ? ` | Dietary: ${mealPlanPrefs.dietaryNeeds}` : ''}`,
-        mealPlanPrefs.useWebSearch ? 'Use realistic 2024-25 AU supermarket prices (Woolworths/Coles/Aldi home-brand).' : '',
-        catalogText ? `Catalog specials: ${catalogText.slice(0, 300)}` : '',
+        `Create a 7-day budget meal plan for an Australian family. ${mealPlanPrefs.people} people. Weekly grocery budget: $${weeklyBudget} AUD.`,
+        mealPlanPrefs.dislikes ? `Avoid: ${mealPlanPrefs.dislikes}.` : '',
+        mealPlanPrefs.dietaryNeeds ? `Dietary needs: ${mealPlanPrefs.dietaryNeeds}.` : '',
+        catalogText ? `This week's specials: ${catalogText.slice(0, 400)}` : '',
         '',
-        'JSON schema (fill all 7 days, keep meal names short):',
-        '{"est":0,"saved":0,"tips":["tip1","tip2"],"days":[{"d":"Mon","b":"meal $0.00","l":"meal $0.00","di":"meal $0.00 (batch:note)"},{"d":"Tue","b":"","l":"","di":""},{"d":"Wed","b":"","l":"","di":""},{"d":"Thu","b":"","l":"","di":""},{"d":"Fri","b":"","l":"","di":""},{"d":"Sat","b":"","l":"","di":""},{"d":"Sun","b":"","l":"","di":""}],"shop":[{"i":"item","q":"qty","c":0,"cat":"meat"}]}',
+        'Format your response EXACTLY like this — no extra text before or after:',
+        '',
+        '## 7-Day Meal Plan',
+        '**Estimated weekly cost: $[X] | Savings vs eating out: $[Y]**',
+        '',
+        '**Monday**',
+        '🌅 Breakfast: [meal] ~$[X]',
+        '☀️ Lunch: [meal] ~$[X]',
+        '🌙 Dinner: [meal] ~$[X] _(batch tip if any)_',
+        '',
+        '[repeat for Tue, Wed, Thu, Fri, Sat, Sun]',
+        '',
+        '## Shopping List',
+        '- [item] — [qty] ~$[X]',
+        '',
+        '## Budget Tips',
+        '- [tip]',
       ].filter(Boolean).join('\n')
 
       const response = await fetch('/api/budget-coach', {
@@ -1621,45 +1635,16 @@ Rules:
 
       const data = await response.json()
       const raw: string = data.message || data.advice || data.raw || ''
-      if (!raw) throw new Error('No response — please try again.')
+      if (!raw || raw.trim().length < 50) throw new Error('No response — please try again.')
 
-      // Find the outermost JSON object — handle prose before/after
-      const jsonMatch = raw.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) throw new Error('No JSON in response — please try again.')
-
-      let compact: any
-      try { compact = JSON.parse(jsonMatch[0]) }
-      catch { throw new Error('JSON malformed — please try again.') }
-
-      if (!compact.days || compact.days.length < 7) throw new Error('Incomplete plan — please try again.')
-
-      // Expand compact schema into the full schema the UI expects
-      const parseMeal = (s: string) => {
-        if (!s) return { meal: '', estimatedCost: 0, batchNote: '' }
-        const costMatch = s.match(/\$?([\d.]+)/)
-        const batchMatch = s.match(/\(batch:(.*?)\)/)
-        const meal = s.replace(/\$[\d.]+/, '').replace(/\(batch:.*?\)/, '').trim()
-        return { meal, estimatedCost: costMatch ? parseFloat(costMatch[1]) : 0, batchNote: batchMatch ? batchMatch[1].trim() : '' }
+      // Store as text-based plan (no JSON parsing needed)
+      const plan = {
+        rawText: raw,
+        generatedAt: new Date().toISOString(),
+        prefs: { ...mealPlanPrefs },
+        weeklyBudget,
+        usedCatalog: !!catalogText
       }
-
-      const parsed = {
-        weeklyEstimate: compact.est || 0,
-        savingsVsEatingOut: compact.saved || 0,
-        tipsForBudget: compact.tips || [],
-        catalogHighlights: [],
-        days: compact.days.map((d: any) => ({
-          day: d.d,
-          breakfast: parseMeal(d.b),
-          lunch: parseMeal(d.l),
-          dinner: parseMeal(d.di),
-        })),
-        shoppingList: (compact.shop || []).map((s: any) => ({
-          item: s.i, quantity: s.q, estimatedCost: s.c,
-          category: s.cat || 'pantry', onSpecial: false
-        }))
-      }
-
-      const plan = { ...parsed, generatedAt: new Date().toISOString(), prefs: { ...mealPlanPrefs }, usedCatalog: !!catalogText }
       setCurrentMealPlan(plan)
       setMealPlanHistory((prev: any[]) => [plan, ...prev.slice(0, 9)])
     } catch (e: any) {
@@ -7215,80 +7200,62 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 {/* Generated plan */}
                 {currentMealPlan && (() => {
                   const plan = currentMealPlan
-                  const catColors: any = { produce: theme.success, dairy: theme.accent, meat: theme.danger, pantry: theme.warning, frozen: theme.teal }
+
+                  // Render markdown-style text as styled HTML
+                  const renderMealText = (text: string) => {
+                    return text.split('\n').map((line, i) => {
+                      if (line.startsWith('## ')) return (
+                        <div key={i} style={{ color: theme.accent, fontWeight: 800, fontSize: '16px', marginTop: '18px', marginBottom: '6px', borderBottom: '1px solid ' + theme.accent + '30', paddingBottom: '4px' }}>{line.replace('## ', '')}</div>
+                      )
+                      if (line.startsWith('**') && line.endsWith('**') && !line.slice(2,-2).includes('**')) return (
+                        <div key={i} style={{ color: theme.text, fontWeight: 700, fontSize: '14px', marginTop: '12px', marginBottom: '4px' }}>{line.replace(/\*\*/g, '')}</div>
+                      )
+                      if (line.startsWith('**') && line.includes('**')) return (
+                        <div key={i} style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong style="color:' + theme.accent + '">$1</strong>') }} />
+                      )
+                      if (line.match(/^[🌅☀️🌙]/) ) return (
+                        <div key={i} style={{ color: theme.text, fontSize: '13px', padding: '3px 0', display: 'flex', gap: '8px' }}>
+                          <span>{line.split(' ')[0]}</span>
+                          <span dangerouslySetInnerHTML={{ __html: line.slice(line.indexOf(' ')+1).replace(/_(.*?)_/g, '<em style="color:' + theme.success + ';font-size:11px"> · $1</em>').replace(/~\$([\d.]+)/g, '<span style="color:' + theme.textMuted + ';font-size:11px"> ~$$1</span>') }} />
+                        </div>
+                      )
+                      if (line.startsWith('- ')) return (
+                        <div key={i} style={{ color: theme.textMuted, fontSize: '13px', padding: '2px 0 2px 12px', borderLeft: '2px solid ' + theme.border }}
+                          dangerouslySetInnerHTML={{ __html: line.slice(2).replace(/~\$([\d.]+)/g, '<span style="color:' + theme.accent + '"> ~$$1</span>') }} />
+                      )
+                      if (line.trim() === '') return <div key={i} style={{ height: '4px' }} />
+                      return <div key={i} style={{ color: theme.textMuted, fontSize: '13px' }}>{line}</div>
+                    })
+                  }
+
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
-                      {/* Cost summary */}
-                      <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #1a1208, #0a0a0a)', borderRadius: '14px', border: '1px solid ' + theme.accent + '40', display: 'flex', gap: '24px', flexWrap: 'wrap' as const }}>
+                    <div>
+                      {/* Header bar */}
+                      <div style={{ padding: '14px 18px', background: 'linear-gradient(135deg, #1a1208, #0a0a0a)', borderRadius: '12px', border: '1px solid ' + theme.accent + '40', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: '8px' }}>
                         <div>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>ESTIMATED WEEKLY COST</div>
-                          <div style={{ color: theme.accent, fontSize: '28px', fontWeight: 800 }}>${plan.weeklyEstimate?.toFixed(0) || '—'}</div>
+                          <div style={{ color: theme.accent, fontWeight: 700, fontSize: '15px' }}>🍽️ Your meal plan is ready</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>
+                            {plan.prefs?.people} people · ${plan.weeklyBudget}/wk budget
+                            {plan.prefs?.dislikes ? ` · no ${plan.prefs.dislikes}` : ''}
+                            {plan.usedCatalog ? ' · 📸 catalog used' : ''}
+                          </div>
                         </div>
-                        {plan.savingsVsEatingOut > 0 && (
-                          <div>
-                            <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600 }}>SAVED VS EATING OUT</div>
-                            <div style={{ color: theme.success, fontSize: '28px', fontWeight: 800 }}>+${plan.savingsVsEatingOut?.toFixed(0)}</div>
-                          </div>
-                        )}
-                        {plan.usedCatalog && (
-                          <div style={{ display: 'flex', alignItems: 'center' }}>
-                            <div style={{ padding: '6px 12px', background: theme.success + '20', border: '1px solid ' + theme.success + '40', borderRadius: '8px', color: theme.success, fontSize: '12px', fontWeight: 600 }}>📸 Built from your catalog specials</div>
-                          </div>
-                        )}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={async () => {
+                            await navigator.clipboard.writeText(plan.rawText || '')
+                            alert('Meal plan copied!')
+                          }} style={{ padding: '6px 14px', background: theme.accent + '20', border: '1px solid ' + theme.accent + '40', borderRadius: '8px', color: theme.accent, cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>📋 Copy</button>
+                          <button onClick={() => setCurrentMealPlan(null)} style={{ padding: '6px 10px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>✕ Clear</button>
+                        </div>
                       </div>
 
-                      {/* 7-day plan */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '10px' }}>
-                        {(plan.days || []).map((day: any, i: number) => (
-                          <div key={i} style={{ padding: '14px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
-                            <div style={{ color: theme.accent, fontWeight: 700, fontSize: '12px', marginBottom: '10px', letterSpacing: '0.5px' }}>{day.day?.toUpperCase()}</div>
-                            {['breakfast', 'lunch', 'dinner'].map((meal: string) => day[meal] && (
-                              <div key={meal} style={{ marginBottom: '8px' }}>
-                                <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 600, marginBottom: '2px' }}>{meal.toUpperCase()} · ${day[meal].estimatedCost?.toFixed(2)}</div>
-                                <div style={{ color: theme.text, fontSize: '13px', lineHeight: 1.4 }}>{day[meal].meal}</div>
-                                {day[meal].batchNote && <div style={{ color: theme.success, fontSize: '11px', marginTop: '2px', fontStyle: 'italic' }}>♻️ {day[meal].batchNote}</div>}
-                              </div>
-                            ))}
-                          </div>
-                        ))}
+                      {/* Rendered meal plan text */}
+                      <div style={{ padding: '18px 20px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, lineHeight: 1.7 }}>
+                        {renderMealText(plan.rawText || '')}
                       </div>
 
-                      {/* Shopping list */}
-                      <div style={cardStyle}>
-                        <h3 style={{ color: theme.accent, margin: '0 0 14px 0', fontSize: '16px' }}>🛒 Shopping List</h3>
-                        {plan.catalogHighlights?.length > 0 && (
-                          <div style={{ marginBottom: '12px', padding: '10px 14px', background: theme.success + '15', borderRadius: '10px', border: '1px solid ' + theme.success + '30' }}>
-                            <div style={{ color: theme.success, fontWeight: 700, fontSize: '12px', marginBottom: '6px' }}>🏷️ ON SPECIAL THIS WEEK</div>
-                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-                              {plan.catalogHighlights.map((h: string, i: number) => (
-                                <span key={i} style={{ padding: '3px 8px', background: theme.success + '20', color: theme.success, borderRadius: '6px', fontSize: '12px' }}>{h}</span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
-                          {(plan.shoppingList || []).map((item: any, i: number) => (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: theme.bg, borderRadius: '8px', border: '1px solid ' + (item.onSpecial ? theme.success + '40' : theme.border) }}>
-                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: catColors[item.category] || theme.textMuted, flexShrink: 0 }} />
-                                <div>
-                                  <span style={{ color: theme.text, fontSize: '13px' }}>{item.item}</span>
-                                  <span style={{ color: theme.textMuted, fontSize: '12px', marginLeft: '8px' }}>{item.quantity}</span>
-                                </div>
-                                {item.onSpecial && <span style={{ padding: '1px 6px', background: theme.success + '20', color: theme.success, borderRadius: '10px', fontSize: '10px', fontWeight: 600 }}>SPECIAL</span>}
-                              </div>
-                              <span style={{ color: theme.accent, fontWeight: 600, fontSize: '13px' }}>${item.estimatedCost?.toFixed(2)}</span>
-                            </div>
-                          ))}
-                        </div>
-                        {plan.tipsForBudget?.length > 0 && (
-                          <div style={{ marginTop: '14px', padding: '12px 14px', background: theme.accent + '10', borderRadius: '10px' }}>
-                            <div style={{ color: theme.accent, fontWeight: 700, fontSize: '12px', marginBottom: '8px' }}>💡 Budget tips from Aureus</div>
-                            {plan.tipsForBudget.map((tip: string, i: number) => (
-                              <div key={i} style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px', lineHeight: 1.5 }}>→ {tip}</div>
-                            ))}
-                          </div>
-                        )}
+                      <div style={{ marginTop: '10px', fontSize: '11px', color: theme.textMuted, textAlign: 'center' as const }}>
+                        Generated {new Date(plan.generatedAt).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}
                       </div>
                     </div>
                   )
@@ -7320,7 +7287,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         Week of {new Date(plan.generatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </div>
                       <div style={{ color: theme.textMuted, fontSize: '12px' }}>
-                        {plan.prefs?.people} people · ${plan.weeklyEstimate?.toFixed(0)}/week
+                        {plan.prefs?.people} people · ${plan.weeklyBudget || plan.prefs?.budget || '—'}/wk budget
                         {plan.usedCatalog && ' · 📸 catalog used'}
                       </div>
                     </div>
