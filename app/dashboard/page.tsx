@@ -1590,82 +1590,49 @@ Rules:
     setMealPlanError(null)
     try {
       const weeklyBudget = mealPlanPrefs.budget || (monthlySurplus > 0 ? Math.round(monthlySurplus * 0.25).toString() : '150')
-
-      const body: any = {
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [{
-          role: 'user',
-          content: [
-            ...catalogImages.map((img: string) => ({
-              type: 'image',
-              source: { type: 'base64', media_type: 'image/jpeg', data: img }
-            })),
-            {
-              type: 'text',
-              text: `Create a practical 7-day meal plan for an Australian household.
-
-HOUSEHOLD: ${mealPlanPrefs.people} people
-WEEKLY BUDGET: $${weeklyBudget} AUD total for groceries
-DIETARY NEEDS: ${mealPlanPrefs.dietaryNeeds || 'none'}
-DISLIKES/AVOID: ${mealPlanPrefs.dislikes || 'none'}
-${catalogImages.length > 0 ? 'SUPERMARKET CATALOG: Images attached — prioritise specials/discounted items.' : ''}
-${catalogText ? `CATALOG SPECIALS: ${catalogText}` : ''}
-
-Create a REALISTIC, BUDGET-CONSCIOUS 7-day meal plan. Prioritise batch cooking, cheap proteins (eggs, legumes, chicken thighs), and seasonal AU vegetables.
-
-CRITICAL: Respond with ONLY a valid JSON object. No preamble, no explanation, no markdown fences. Your entire response must start with { and end with }.
-${mealPlanPrefs.useWebSearch ? '\nPRICING: Use realistic 2024-25 Woolworths/Coles/Aldi AU prices. Be specific — e.g. "Chicken thighs 1kg Woolworths $8.50". Assume home-brand / budget options where possible.' : ''}
-
-{"weeklyEstimate":0,"savingsVsEatingOut":0,"days":[{"day":"Monday","breakfast":{"meal":"","estimatedCost":0},"lunch":{"meal":"","estimatedCost":0},"dinner":{"meal":"","estimatedCost":0,"servings":4,"batchNote":""}}],"shoppingList":[{"item":"","quantity":"","estimatedCost":0,"category":"produce","onSpecial":false}],"tipsForBudget":[""],"catalogHighlights":[""]}`
-            }
-          ]
-        }]
-      }
-
-      if (mealPlanPrefs.useWebSearch) {
-        // Note: web search tool is not available in direct browser API calls.
-        // The prompt already asks for realistic AU prices — this flag is reserved for future server-side use.
-      }
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const promptParts: string[] = [
+        'You are Aureus. Create a practical 7-day meal plan for an Australian household.',
+        '',
+        `HOUSEHOLD: ${mealPlanPrefs.people} people`,
+        `WEEKLY BUDGET: $${weeklyBudget} AUD total for groceries`,
+        `DIETARY NEEDS: ${mealPlanPrefs.dietaryNeeds || 'none'}`,
+        `DISLIKES/AVOID: ${mealPlanPrefs.dislikes || 'none'}`,
+        ...(catalogText ? [`CATALOG SPECIALS THIS WEEK: ${catalogText}`] : []),
+        ...(mealPlanPrefs.useWebSearch ? ['PRICING: Use realistic 2024-25 Woolworths/Coles/Aldi AU prices. Prefer home-brand options.'] : []),
+        '',
+        'Create a REALISTIC, BUDGET-CONSCIOUS 7-day meal plan. Prioritise batch cooking, cheap proteins (eggs, legumes, chicken thighs), and seasonal AU vegetables.',
+        '',
+        'Respond with ONLY valid JSON — no preamble, no explanation, no markdown fences. Structure:',
+        '{"weeklyEstimate":0,"savingsVsEatingOut":0,"days":[{"day":"Monday","breakfast":{"meal":"...","estimatedCost":0},"lunch":{"meal":"...","estimatedCost":0},"dinner":{"meal":"...","estimatedCost":0,"servings":4,"batchNote":"..."}}],"shoppingList":[{"item":"...","quantity":"...","estimatedCost":0,"category":"produce","onSpecial":false}],"tipsForBudget":["..."],"catalogHighlights":["..."]}'
+      ]
+      const response = await fetch('/api/budget-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify({
+          mode: 'question',
+          question: promptParts.join('\n'),
+          financialData: { income: incomeStreams, expenses },
+          memory: budgetMemory,
+          countryConfig: currentCountryConfig
+        })
       })
-
       if (!response.ok) {
         const err = await response.json().catch(() => ({}))
-        throw new Error((err as any)?.error?.message || `API error ${response.status}`)
+        throw new Error((err as any)?.error?.message || `Server error ${response.status}`)
       }
-
       const data = await response.json()
-      if ((data as any).error) throw new Error((data as any).error.message || 'API returned an error')
-
-      const text = ((data.content || []) as any[])
-        .filter((c: any) => c.type === 'text')
-        .map((c: any) => c.text)
-        .join('')
-
-      if (!text) throw new Error('No response from AI — please try again.')
-
-      // Robust JSON extraction
-      const jsonStart = text.indexOf('{')
-      const jsonEnd = text.lastIndexOf('}')
-      if (jsonStart === -1 || jsonEnd === -1) throw new Error('Could not parse response. Please try again.')
-      
+      const raw: string = data.message || data.advice || data.raw || ''
+      if (!raw) throw new Error('No response — please try again.')
+      const jsonStart = raw.indexOf('{')
+      const jsonEnd = raw.lastIndexOf('}')
+      if (jsonStart === -1 || jsonEnd === -1) throw new Error('Could not parse response — please try again.')
       let parsed: any
-      try {
-        parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1))
-      } catch {
-        throw new Error('Response was malformed. Please try again.')
-      }
-
+      try { parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1)) }
+      catch { throw new Error('Response malformed — please try again.') }
       if (!parsed.days || !Array.isArray(parsed.days) || parsed.days.length === 0) {
-        throw new Error('Incomplete meal plan returned. Please try again.')
+        throw new Error('Incomplete meal plan — please try again.')
       }
-
-      const plan = { ...parsed, generatedAt: new Date().toISOString(), prefs: { ...mealPlanPrefs }, usedCatalog: catalogImages.length > 0 || !!catalogText }
+      const plan = { ...parsed, generatedAt: new Date().toISOString(), prefs: { ...mealPlanPrefs }, usedCatalog: !!catalogText }
       setCurrentMealPlan(plan)
       setMealPlanHistory((prev: any[]) => [plan, ...prev.slice(0, 9)])
     } catch (e: any) {
@@ -2167,12 +2134,15 @@ Their data:
 - House status: ${houseStatus || 'not specified'}
 - FIRE goal: ${fireGoal ? 'Yes' : 'No'}
 
-CRITICAL RULES:
-- If existing savings >= $2000, do NOT propose "Build $2,000 Emergency Fund" — they already have it. Acknowledge they're ahead and propose the NEXT step.
-- If existing savings >= monthly expenses × 3, do NOT propose any emergency fund milestone — focus on debt/investing/mortgage.
-- The 3 milestones must reflect where they ACTUALLY are, not where a default user would be.
-- Each milestone must be something they have NOT already achieved.
-
+CRITICAL RULES — FOLLOW EXACTLY:
+- Baby Steps order: 1) $2,000 emergency fund → 2) Kill ALL bad debt → 3) 3-month expenses saved → 4) Invest/mortgage
+- savings < $2,000: milestone 1 MUST be Build $2,000 Emergency Fund
+- savings >= $2,000 AND bad debt > 0: one milestone MUST be killing that bad debt
+- savings < 3 months expenses: one milestone MUST be Build 3-Month Emergency Fund
+- NEVER propose investing milestones if bad debt exists
+- NEVER skip debt if totalDebt > 0 — it must appear
+- Each milestone must be something they have NOT already achieved
+- Use "Kill" not "Pay off" for debt milestones
 Respond in this EXACT JSON format, no other text:
 [
   {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 1},
@@ -2196,34 +2166,35 @@ Respond in this EXACT JSON format, no other text:
         throw new Error('No JSON in response')
       }
     } catch {
-      // Fallback proposals based on user's actual data — respects what's already achieved
-      const hasEmergencyFund = emergencyFund >= 2000
+      // Fallback proposals — strictly follow baby steps order based on actual data
+      const hasStarterFund = emergencyFund >= 2000
       const hasFullEmergencyFund = emergencyMonths >= 3
-      const monthlyExpenses3 = monthlyExpenses * 3
+      const hasSixMonthFund = emergencyMonths >= 6
+      const hasBadDebt = totalDebtBalance > 0
+      const monthlyExpenses3 = Math.max(Math.round(monthlyExpenses * 3), 6000)
+      const monthlyExpenses6 = Math.max(Math.round(monthlyExpenses * 6), 12000)
 
-      const milestone1 = !hasEmergencyFund
-        ? { name: 'Build $2,000 Emergency Fund', icon: '🛡️', target: 2000, notes: 'Your financial airbag — prevents going into debt when life throws surprises. This is the foundation everything else is built on.', priority: 1 }
-        : !hasFullEmergencyFund
-        ? { name: `Build ${Math.round(monthlyExpenses3)> 0 ? Math.round(monthlyExpenses3) : 6000} Full Emergency Fund`, icon: '🏦', target: Math.max(Math.round(monthlyExpenses3), 6000), notes: `You already have your $2,000 starter fund — great start. Now build 3 months of expenses ($${Math.round(monthlyExpenses3).toLocaleString()}) for true financial security.`, priority: 1 }
-        : totalDebtBalance > 0
-        ? { name: `Pay Off $${totalDebtBalance.toFixed(0)} Bad Debt`, icon: '💳', target: Math.round(totalDebtBalance), notes: 'Your emergency fund is solid. Now clear bad debt — every dollar of interest you stop paying is a guaranteed return.', priority: 1 }
-        : { name: 'Grow Investments to $50,000', icon: '📈', target: 50000, notes: 'Debt-free with a solid emergency fund — now it\'s time to build real wealth through investing.', priority: 1 }
+      // Build an ordered queue of incomplete steps
+      const steps: any[] = []
 
-      const milestone2 = totalDebtBalance > 0 && hasEmergencyFund
-        ? { name: `Pay Off $${totalDebtBalance.toFixed(0)} Bad Debt`, icon: '💳', target: Math.round(totalDebtBalance), notes: `Every dollar of bad debt is costing you in interest. Clearing this is a guaranteed return equal to your interest rate.`, priority: 2 }
-        : mortgageAccel.balance
-        ? { name: `Accelerate Mortgage Payoff`, icon: '🚀', target: 0, notes: `Extra repayments early in your mortgage save 3-4× that amount in interest.`, priority: 2 }
-        : { name: 'Build 6-Month Emergency Fund', icon: '🏦', target: Math.round(monthlyExpenses * 6) || 12000, notes: 'Extend your safety net to 6 months for maximum financial resilience.', priority: 2 }
+      if (!hasStarterFund)
+        steps.push({ name: 'Build $2,000 Emergency Fund', icon: '🛡️', target: 2000, notes: 'Your financial airbag — stops you going into debt when life throws surprises. Every other step depends on having this first.' })
 
-      const milestone3 = {
-        name: mortgageAccel.balance ? `Be Mortgage-Free by ${new Date().getFullYear() + 8}` : fireGoal ? 'Reach Financial Independence' : 'Grow Wealth to $100,000',
-        icon: mortgageAccel.balance ? '🏠' : '🔥',
-        target: 0,
-        notes: mortgageAccel.balance ? 'The ultimate finish line. When your mortgage is gone, every dollar you were paying the bank goes back into your life.' : 'Financial independence — when your passive income covers your lifestyle.',
-        priority: 3
-      }
+      if (hasBadDebt)
+        steps.push({ name: `Kill $${Math.round(totalDebtBalance).toLocaleString()} Bad Debt`, icon: '💳', target: Math.round(totalDebtBalance), notes: `Bad debt is an anchor on everything. At your current interest rate this is costing you $${Math.round(totalDebtBalance * 0.18 / 12).toLocaleString()}/month. Eliminating it is a guaranteed return.` })
 
-      const fallback = [milestone1, milestone2, milestone3]
+      if (!hasFullEmergencyFund)
+        steps.push({ name: `Build 3-Month Emergency Fund ($${monthlyExpenses3.toLocaleString()})`, icon: '🏦', target: monthlyExpenses3, notes: `3 months of expenses as a true safety net. This is Baby Step 3 — it means losing your job or a major emergency doesn't derail everything.` })
+
+      if (mortgageAccel.balance)
+        steps.push({ name: 'Accelerate Mortgage Payoff', icon: '🏠', target: 0, notes: 'Extra repayments early in a mortgage save 3-4× that amount in interest over the life of the loan.' })
+
+      if (!hasSixMonthFund && hasFullEmergencyFund)
+        steps.push({ name: `Build 6-Month Emergency Fund ($${monthlyExpenses6.toLocaleString()})`, icon: '🏦', target: monthlyExpenses6, notes: 'Extending from 3 to 6 months gives maximum financial resilience — especially important if you\'re self-employed or have variable income.' })
+
+      steps.push({ name: fireGoal ? 'Reach Financial Independence' : 'Grow Wealth to $100,000', icon: '🔥', target: fireGoal ? 0 : 100000, notes: fireGoal ? 'Financial independence — when your passive income covers your lifestyle.' : 'Building to $100k is the hardest part. After that compound growth does the heavy lifting.' })
+
+      const fallback = steps.slice(0, 3).map((s, i) => ({ ...s, priority: i + 1 }))
       setMissionP2Proposals(fallback)
       setMissionP2Confirmed(fallback.map(() => true))
       setMissionP2Step('propose')
