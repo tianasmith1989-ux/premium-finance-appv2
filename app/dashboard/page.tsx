@@ -1615,6 +1615,7 @@ ${catalogText ? `CATALOG SPECIALS: ${catalogText}` : ''}
 Create a REALISTIC, BUDGET-CONSCIOUS 7-day meal plan. Prioritise batch cooking, cheap proteins (eggs, legumes, chicken thighs), and seasonal AU vegetables.
 
 CRITICAL: Respond with ONLY a valid JSON object. No preamble, no explanation, no markdown fences. Your entire response must start with { and end with }.
+${mealPlanPrefs.useWebSearch ? '\nPRICING: Use realistic 2024-25 Woolworths/Coles/Aldi AU prices. Be specific — e.g. "Chicken thighs 1kg Woolworths $8.50". Assume home-brand / budget options where possible.' : ''}
 
 {"weeklyEstimate":0,"savingsVsEatingOut":0,"days":[{"day":"Monday","breakfast":{"meal":"","estimatedCost":0},"lunch":{"meal":"","estimatedCost":0},"dinner":{"meal":"","estimatedCost":0,"servings":4,"batchNote":""}}],"shoppingList":[{"item":"","quantity":"","estimatedCost":0,"category":"produce","onSpecial":false}],"tipsForBudget":[""],"catalogHighlights":[""]}`
             }
@@ -1623,7 +1624,8 @@ CRITICAL: Respond with ONLY a valid JSON object. No preamble, no explanation, no
       }
 
       if (mealPlanPrefs.useWebSearch) {
-        body.tools = [{ type: 'web_search_20250305', name: 'web_search' }]
+        // Note: web search tool is not available in direct browser API calls.
+        // The prompt already asks for realistic AU prices — this flag is reserved for future server-side use.
       }
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -3670,104 +3672,132 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
           {/* STEP 8 — Sinking Funds */}
           {missionStep === 8 && (() => {
-            const selectedFunds = step8SelectedFunds
-            const setSelectedFunds = setStep8SelectedFunds
-            const customAmounts = step8CustomAmounts
-            const setCustomAmounts = setStep8CustomAmounts
-            const suggestions = [
-              { name: 'Christmas & Gifts', category: 'christmas', target: 1200, weekly: 23, icon: '🎄', reason: 'Avoid the December credit card blowout' },
-              { name: 'Car Registration & Service', category: 'vehicle', target: 1000, weekly: 19, icon: '🚗', reason: 'AU avg rego + service = ~$1,000/yr' },
-              ...(houseStatus === 'own' || houseStatus === 'paid_off' ? [{ name: 'Home Maintenance', category: 'home', target: 2000, weekly: 38, icon: '🏠', reason: 'Budget 1% of home value per year for maintenance' }] : []),
-              { name: 'Annual Holiday', category: 'holiday', target: 3000, weekly: 58, icon: '✈️', reason: 'Most Australians say holidays cause financial stress' },
-              { name: 'Birthday Gifts', category: 'birthday', target: 600, weekly: 12, icon: '🎂', reason: '$50/month across family birthdays adds up fast' },
-              { name: 'Health & Medical', category: 'medical', target: 800, weekly: 15, icon: '🏥', reason: 'Gap fees, dentist, glasses — always unexpected' },
-              { name: 'Insurance Renewals', category: 'insurance', target: 1500, weekly: 29, icon: '🛡️', reason: 'Home, car, health — budget ahead to avoid scrambling' },
+            const SINKING_CATEGORIES = [
+              { id: 'christmas', label: 'Christmas', icon: '🎄' },
+              { id: 'birthday',  label: 'Birthday',  icon: '🎂' },
+              { id: 'holiday',   label: 'Holiday',   icon: '✈️' },
+              { id: 'vehicle',   label: 'Car/Rego',  icon: '🚗' },
+              { id: 'insurance', label: 'Insurance', icon: '🛡️' },
+              { id: 'medical',   label: 'Medical',   icon: '🏥' },
+              { id: 'home',      label: 'Home/Renos',icon: '🏠' },
+              { id: 'education', label: 'Education', icon: '📚' },
+              { id: 'celebration',label:'Celebration',icon:'🎉' },
+              { id: 'other',     label: 'Other',     icon: '📦' },
             ]
-
-            const totalWeekly = suggestions.reduce((s, f, i) => {
-              if (!selectedFunds.has(i)) return s
-              return s + parseFloat(customAmounts[i] || f.weekly.toString())
-            }, 0)
-
+            const quickSuggestions = [
+              { name: 'Christmas & Gifts', category: 'christmas', target: 1200, weekly: 23, icon: '🎄' },
+              { name: 'Car Rego & Service', category: 'vehicle', target: 1000, weekly: 19, icon: '🚗' },
+              ...(houseStatus === 'own' || houseStatus === 'paid_off' ? [{ name: 'Home Maintenance', category: 'home', target: 2000, weekly: 38, icon: '🏠' }] : []),
+              { name: 'Annual Holiday', category: 'holiday', target: 3000, weekly: 58, icon: '✈️' },
+              { name: 'Health & Medical', category: 'medical', target: 800, weekly: 15, icon: '🏥' },
+            ]
+            const totalWeekly = sinkingFunds.reduce((s, f) => s + parseFloat(f.weeklyAmount || '0'), 0)
             return (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '580px', margin: '0 auto', width: '100%' }}>
-                <div style={{ fontSize: '56px', marginBottom: '16px' }}>🎯</div>
-                <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>Plan for the big expenses.</h2>
-                <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 6px 0' }}>
-                  Every financial blowout was once a predictable expense. Sinking funds mean you save a little every week so you're never caught short.
-                </p>
-                <p style={{ color: theme.textMuted, fontSize: '13px', textAlign: 'center' as const, margin: '0 0 24px 0' }}>
-                  Aureus has pre-selected the ones most relevant to you. Tick what applies — adjust amounts if needed.
-                </p>
-
-                <div style={{ width: '100%', display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '20px' }}>
-                  {suggestions.map((f, i) => {
-                    const selected = selectedFunds.has(i)
-                    const weekly = parseFloat(customAmounts[i] || f.weekly.toString())
-                    const annual = weekly * 52
-                    return (
-                      <div key={i} onClick={() => {
-                        const s = new Set(selectedFunds)
-                        s.has(i) ? s.delete(i) : s.add(i)
-                        setSelectedFunds(s)
-                      }} style={{ padding: '14px 16px', background: selected ? theme.accent + '15' : theme.cardBg, borderRadius: '12px', border: '2px solid ' + (selected ? theme.accent : theme.border), cursor: 'pointer', transition: 'all 0.2s' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flex: 1 }}>
-                            <div style={{ fontSize: '24px', flexShrink: 0, marginTop: '2px' }}>{f.icon}</div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px' }}>{f.name}</div>
-                              <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>{f.reason}</div>
-                              {selected && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }} onClick={e => e.stopPropagation()}>
-                                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>$/week:</span>
-                                  <input type="number" value={customAmounts[i] ?? f.weekly.toString()} onChange={e => setCustomAmounts(prev => ({ ...prev, [i]: e.target.value }))}
-                                    style={{ ...inputStyle, width: '80px', padding: '6px 10px', fontSize: '13px' }} />
-                                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>= ${(parseFloat(customAmounts[i] || f.weekly.toString()) * 52).toFixed(0)}/yr</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                            {!selected && <span style={{ color: theme.textMuted, fontSize: '13px' }}>${f.weekly}/wk</span>}
-                            <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: '2px solid ' + (selected ? theme.accent : theme.border), background: selected ? theme.accent : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              {selected && <span style={{ color: '#0a0a0a', fontSize: '13px', fontWeight: 800 }}>✓</span>}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, padding: '28px 20px', maxWidth: '620px', margin: '0 auto', width: '100%', gap: '16px' }}>
+                <div style={{ textAlign: 'center' as const }}>
+                  <div style={{ fontSize: '48px', marginBottom: '10px' }}>🎯</div>
+                  <h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 6px 0' }}>Plan for the big expenses.</h2>
+                  <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>
+                    Every financial blowout was once a predictable expense. Save a little each week — no more surprise bills.
+                  </p>
                 </div>
 
-                {/* Running total */}
-                {selectedFunds.size > 0 && (
-                  <div style={{ width: '100%', padding: '14px 16px', background: 'linear-gradient(135deg, #1a1208, #0a0a0a)', borderRadius: '12px', border: '1px solid ' + theme.accent + '40', marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ color: theme.accent, fontWeight: 700, fontSize: '14px' }}>${totalWeekly.toFixed(0)}/week set aside</div>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>${(totalWeekly * 52).toFixed(0)}/year · automatically factored into your budget</div>
-                      </div>
-                      <div style={{ color: theme.success, fontWeight: 700, fontSize: '13px' }}>✓ {selectedFunds.size} fund{selectedFunds.size !== 1 ? 's' : ''}</div>
+                {/* Quick-add suggestion chips */}
+                <div>
+                  <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, letterSpacing: '1px', marginBottom: '8px' }}>QUICK ADD</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
+                    {quickSuggestions.filter(s => !sinkingFunds.some(f => f.name === s.name)).map((s, i) => (
+                      <button key={i} onClick={() => {
+                        const dec = new Date(); dec.setMonth(11); dec.setDate(15)
+                        setSinkingFunds(prev => [...prev, { id: Date.now() + i, name: s.name, category: s.category, targetAmount: s.target.toString(), weeklyAmount: s.weekly.toString(), savedAmount: '0', targetDate: dec.toISOString().split('T')[0], notes: '', createdAt: new Date().toISOString() }])
+                      }} style={{ padding: '6px 12px', background: theme.accent + '15', border: '1px solid ' + theme.accent + '40', borderRadius: '20px', color: theme.accent, cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        {s.icon} {s.name} · ${s.weekly}/wk
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Add form — identical to main app */}
+                <div style={{ padding: '14px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                  <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, letterSpacing: '1px', marginBottom: '10px' }}>ADD A FUND</div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
+                    <input placeholder="Fund name (e.g. Christmas 2026)" value={newSinkingFund.name} onChange={e => setNewSinkingFund({...newSinkingFund, name: e.target.value})} style={{...inputStyle, flex: 2, minWidth: '150px'}} />
+                    <input type="number" placeholder="Target $" value={newSinkingFund.targetAmount} onChange={e => {
+                      const target = parseFloat(e.target.value || '0')
+                      const weeksLeft = newSinkingFund.targetDate ? Math.max(1, Math.ceil((new Date(newSinkingFund.targetDate).getTime() - Date.now()) / (7 * 86400000))) : 52
+                      setNewSinkingFund({...newSinkingFund, targetAmount: e.target.value, weeklyAmount: target > 0 ? (target / weeksLeft).toFixed(2) : ''})
+                    }} style={{...inputStyle, width: '100px'}} />
+                    <select value={newSinkingFund.category} onChange={e => setNewSinkingFund({...newSinkingFund, category: e.target.value})} style={inputStyle}>
+                      {SINKING_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, alignItems: 'flex-end' }}>
+                    <div style={{ flex: 1, minWidth: '130px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>TARGET DATE</label>
+                      <input type="date" value={newSinkingFund.targetDate} onChange={e => {
+                        const date = e.target.value
+                        const target = parseFloat(newSinkingFund.targetAmount || '0')
+                        const weeksLeft = date ? Math.max(1, Math.ceil((new Date(date).getTime() - Date.now()) / (7 * 86400000))) : 52
+                        setNewSinkingFund({...newSinkingFund, targetDate: date, weeklyAmount: target > 0 ? (target / weeksLeft).toFixed(2) : newSinkingFund.weeklyAmount})
+                      }} style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: '110px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>WEEKLY AMOUNT $</label>
+                      <input type="number" placeholder="auto-calc" value={newSinkingFund.weeklyAmount} onChange={e => setNewSinkingFund({...newSinkingFund, weeklyAmount: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <button onClick={addSinkingFund} style={{...btnPrimary, padding: '10px 20px', flexShrink: 0}}>+ Add Fund</button>
+                  </div>
+                  {newSinkingFund.targetAmount && newSinkingFund.targetDate && (
+                    <div style={{ marginTop: '8px', padding: '8px 12px', background: theme.accent + '12', borderRadius: '8px', color: theme.textMuted, fontSize: '12px' }}>
+                      💡 Save <strong style={{ color: theme.accent }}>${parseFloat(newSinkingFund.weeklyAmount || '0').toFixed(2)}/week</strong> for {Math.max(1, Math.ceil((new Date(newSinkingFund.targetDate).getTime() - Date.now()) / (7 * 86400000)))} weeks → ${parseFloat(newSinkingFund.targetAmount || '0').toFixed(0)} by {new Date(newSinkingFund.targetDate + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Fund cards — same as main app */}
+                {sinkingFunds.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                    {sinkingFunds.map(fund => {
+                      const target = parseFloat(fund.targetAmount || '0')
+                      const saved = parseFloat(fund.savedAmount || '0')
+                      const pct = target > 0 ? Math.min(100, (saved / target) * 100) : 0
+                      const weeksLeft = fund.targetDate ? Math.max(0, Math.ceil((new Date(fund.targetDate).getTime() - Date.now()) / (7 * 86400000))) : null
+                      const catInfo = SINKING_CATEGORIES.find(c => c.id === fund.category) || SINKING_CATEGORIES[0]
+                      return (
+                        <div key={fund.id} style={{ padding: '12px 14px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <span style={{ fontSize: '16px' }}>{catInfo.icon}</span>
+                              <div>
+                                <div style={{ color: theme.text, fontWeight: 700, fontSize: '13px' }}>{fund.name}</div>
+                                <div style={{ color: theme.textMuted, fontSize: '11px' }}>
+                                  ${parseFloat(fund.weeklyAmount || '0').toFixed(0)}/week · ${target.toFixed(0)} target
+                                  {weeksLeft !== null && ` · ${weeksLeft} wks`}
+                                  {fund.targetDate && ` · ${new Date(fund.targetDate + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`}
+                                </div>
+                              </div>
+                            </div>
+                            <button onClick={() => deleteSinkingFund(fund.id)} style={{ padding: '3px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>×</button>
+                          </div>
+                          <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{ width: pct + '%', height: '100%', background: 'linear-gradient(90deg, #D4AF37, #B68B2E)', borderRadius: '3px' }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                    <div style={{ padding: '10px 14px', background: theme.accent + '10', borderRadius: '8px', border: '1px solid ' + theme.accent + '30', display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: theme.textMuted, fontSize: '13px' }}>{sinkingFunds.length} fund{sinkingFunds.length !== 1 ? 's' : ''} · total weekly</span>
+                      <span style={{ color: theme.accent, fontWeight: 700 }}>${totalWeekly.toFixed(0)}/week · ${(totalWeekly * 52).toFixed(0)}/year</span>
                     </div>
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                <div style={{ display: 'flex', gap: '10px', paddingTop: '4px' }}>
                   <button onClick={() => advanceMission(null, 2)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px', flexShrink: 0 }}>
                     Skip
                   </button>
-                  <button onClick={() => {
-                    // Save selected sinking funds
-                    const newFunds = suggestions.filter((_, i) => selectedFunds.has(i)).map((f, idx) => {
-                      const weekly = parseFloat(customAmounts[Array.from(selectedFunds)[idx]] || f.weekly.toString())
-                      const targetDate = new Date()
-                      targetDate.setMonth(11); targetDate.setDate(15) // default: Dec 15
-                      return { id: Date.now() + idx, name: f.name, category: f.category, targetAmount: f.target.toString(), weeklyAmount: weekly.toString(), savedAmount: '0', targetDate: targetDate.toISOString().split('T')[0], notes: f.reason, createdAt: new Date().toISOString() }
-                    })
-                    setSinkingFunds(prev => [...prev, ...newFunds])
-                    advanceMission(null, 2)
-                  }} style={{ flex: 1, padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 800 }}>
-                    {selectedFunds.size > 0 ? `Save ${selectedFunds.size} fund${selectedFunds.size !== 1 ? 's' : ''} & build my roadmap →` : 'Build my roadmap →'}
+                  <button onClick={() => advanceMission(null, 2)} style={{ flex: 1, padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 800 }}>
+                    {sinkingFunds.length > 0 ? `Save ${sinkingFunds.length} fund${sinkingFunds.length !== 1 ? 's' : ''} & build my roadmap →` : 'Build my roadmap →'}
                   </button>
                 </div>
               </div>
@@ -7162,7 +7192,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' as const }}>
                     <label style={{ display: 'flex', gap: '8px', alignItems: 'center', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>
                       <input type="checkbox" checked={mealPlanPrefs.useWebSearch} onChange={e => setMealPlanPrefs({...mealPlanPrefs, useWebSearch: e.target.checked})} style={{ accentColor: theme.accent, width: '14px', height: '14px' }} />
-                      🔍 Search current AU grocery prices (slower but more accurate)
+                      🧠 Use detailed AU pricing in prompt (more accurate estimates)
                     </label>
                     {(catalogImages.length > 0 || catalogText) && (
                       <div style={{ padding: '4px 10px', background: theme.success + '20', border: '1px solid ' + theme.success + '40', borderRadius: '8px', color: theme.success, fontSize: '12px' }}>
