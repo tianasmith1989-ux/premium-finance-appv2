@@ -7191,12 +7191,14 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       if (line.match(/^[🌅☀️🌙]/) ) return (
                         <div key={i} style={{ color: theme.text, fontSize: '13px', padding: '3px 0', display: 'flex', gap: '8px' }}>
                           <span>{line.split(' ')[0]}</span>
-                          <span dangerouslySetInnerHTML={{ __html: line.slice(line.indexOf(' ')+1).replace(/_(.*?)_/g, '<em style="color:' + theme.success + ';font-size:11px"> · $1</em>').replace(/~\$([\d.]+)/g, '<span style="color:' + theme.textMuted + ';font-size:11px"> ~$$1</span>') }} />
+                          <span dangerouslySetInnerHTML={{ __html: line.slice(line.indexOf(' ')+1)
+                            .replace(/_(.*?)_/g, '<em style="color:' + theme.success + ';font-size:11px"> · $1</em>')
+                            .replace(/~\$(\d+(?:\.\d{1,2})?)/g, '<span style="color:' + theme.textMuted + ';font-size:11px"> ~\$$1</span>') }} />
                         </div>
                       )
                       if (line.startsWith('- ')) return (
                         <div key={i} style={{ color: theme.textMuted, fontSize: '13px', padding: '2px 0 2px 12px', borderLeft: '2px solid ' + theme.border }}
-                          dangerouslySetInnerHTML={{ __html: line.slice(2).replace(/~\$([\d.]+)/g, '<span style="color:' + theme.accent + '"> ~$$1</span>') }} />
+                          dangerouslySetInnerHTML={{ __html: line.slice(2).replace(/~\$(\d+(?:\.\d{1,2})?)/g, '<span style="color:' + theme.accent + '"> ~\$$1</span>') }} />
                       )
                       if (line.trim() === '') return <div key={i} style={{ height: '4px' }} />
                       return <div key={i} style={{ color: theme.textMuted, fontSize: '13px' }}>{line}</div>
