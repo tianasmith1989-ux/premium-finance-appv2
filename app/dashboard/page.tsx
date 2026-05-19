@@ -1590,48 +1590,75 @@ Rules:
     setMealPlanError(null)
     try {
       const weeklyBudget = mealPlanPrefs.budget || (monthlySurplus > 0 ? Math.round(monthlySurplus * 0.25).toString() : '150')
-      const promptParts: string[] = [
-        'You are Aureus. Create a practical 7-day meal plan for an Australian household.',
+
+      // Compact schema — keeps token count low so budget-coach max_tokens won't truncate it
+      const question = [
+        'Generate a 7-day budget meal plan. Reply with ONLY the JSON below — no prose, no explanation.',
+        `People: ${mealPlanPrefs.people} | Weekly budget: $${weeklyBudget} AUD | Avoid: ${mealPlanPrefs.dislikes || 'nothing'}${mealPlanPrefs.dietaryNeeds ? ` | Dietary: ${mealPlanPrefs.dietaryNeeds}` : ''}`,
+        mealPlanPrefs.useWebSearch ? 'Use realistic 2024-25 AU supermarket prices (Woolworths/Coles/Aldi home-brand).' : '',
+        catalogText ? `Catalog specials: ${catalogText.slice(0, 300)}` : '',
         '',
-        `HOUSEHOLD: ${mealPlanPrefs.people} people`,
-        `WEEKLY BUDGET: $${weeklyBudget} AUD total for groceries`,
-        `DIETARY NEEDS: ${mealPlanPrefs.dietaryNeeds || 'none'}`,
-        `DISLIKES/AVOID: ${mealPlanPrefs.dislikes || 'none'}`,
-        ...(catalogText ? [`CATALOG SPECIALS THIS WEEK: ${catalogText}`] : []),
-        ...(mealPlanPrefs.useWebSearch ? ['PRICING: Use realistic 2024-25 Woolworths/Coles/Aldi AU prices. Prefer home-brand options.'] : []),
-        '',
-        'Create a REALISTIC, BUDGET-CONSCIOUS 7-day meal plan. Prioritise batch cooking, cheap proteins (eggs, legumes, chicken thighs), and seasonal AU vegetables.',
-        '',
-        'Respond with ONLY valid JSON — no preamble, no explanation, no markdown fences. Structure:',
-        '{"weeklyEstimate":0,"savingsVsEatingOut":0,"days":[{"day":"Monday","breakfast":{"meal":"...","estimatedCost":0},"lunch":{"meal":"...","estimatedCost":0},"dinner":{"meal":"...","estimatedCost":0,"servings":4,"batchNote":"..."}}],"shoppingList":[{"item":"...","quantity":"...","estimatedCost":0,"category":"produce","onSpecial":false}],"tipsForBudget":["..."],"catalogHighlights":["..."]}'
-      ]
+        'JSON schema (fill all 7 days, keep meal names short):',
+        '{"est":0,"saved":0,"tips":["tip1","tip2"],"days":[{"d":"Mon","b":"meal $0.00","l":"meal $0.00","di":"meal $0.00 (batch:note)"},{"d":"Tue","b":"","l":"","di":""},{"d":"Wed","b":"","l":"","di":""},{"d":"Thu","b":"","l":"","di":""},{"d":"Fri","b":"","l":"","di":""},{"d":"Sat","b":"","l":"","di":""},{"d":"Sun","b":"","l":"","di":""}],"shop":[{"i":"item","q":"qty","c":0,"cat":"meat"}]}',
+      ].filter(Boolean).join('\n')
+
       const response = await fetch('/api/budget-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'question',
-          question: promptParts.join('\n'),
+          question,
           financialData: { income: incomeStreams, expenses },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
         })
       })
+
       if (!response.ok) {
         const err = await response.json().catch(() => ({}))
         throw new Error((err as any)?.error?.message || `Server error ${response.status}`)
       }
+
       const data = await response.json()
       const raw: string = data.message || data.advice || data.raw || ''
       if (!raw) throw new Error('No response — please try again.')
-      const jsonStart = raw.indexOf('{')
-      const jsonEnd = raw.lastIndexOf('}')
-      if (jsonStart === -1 || jsonEnd === -1) throw new Error('Could not parse response — please try again.')
-      let parsed: any
-      try { parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1)) }
-      catch { throw new Error('Response malformed — please try again.') }
-      if (!parsed.days || !Array.isArray(parsed.days) || parsed.days.length === 0) {
-        throw new Error('Incomplete meal plan — please try again.')
+
+      // Find the outermost JSON object — handle prose before/after
+      const jsonMatch = raw.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) throw new Error('No JSON in response — please try again.')
+
+      let compact: any
+      try { compact = JSON.parse(jsonMatch[0]) }
+      catch { throw new Error('JSON malformed — please try again.') }
+
+      if (!compact.days || compact.days.length < 7) throw new Error('Incomplete plan — please try again.')
+
+      // Expand compact schema into the full schema the UI expects
+      const parseMeal = (s: string) => {
+        if (!s) return { meal: '', estimatedCost: 0, batchNote: '' }
+        const costMatch = s.match(/\$?([\d.]+)/)
+        const batchMatch = s.match(/\(batch:(.*?)\)/)
+        const meal = s.replace(/\$[\d.]+/, '').replace(/\(batch:.*?\)/, '').trim()
+        return { meal, estimatedCost: costMatch ? parseFloat(costMatch[1]) : 0, batchNote: batchMatch ? batchMatch[1].trim() : '' }
       }
+
+      const parsed = {
+        weeklyEstimate: compact.est || 0,
+        savingsVsEatingOut: compact.saved || 0,
+        tipsForBudget: compact.tips || [],
+        catalogHighlights: [],
+        days: compact.days.map((d: any) => ({
+          day: d.d,
+          breakfast: parseMeal(d.b),
+          lunch: parseMeal(d.l),
+          dinner: parseMeal(d.di),
+        })),
+        shoppingList: (compact.shop || []).map((s: any) => ({
+          item: s.i, quantity: s.q, estimatedCost: s.c,
+          category: s.cat || 'pantry', onSpecial: false
+        }))
+      }
+
       const plan = { ...parsed, generatedAt: new Date().toISOString(), prefs: { ...mealPlanPrefs }, usedCatalog: !!catalogText }
       setCurrentMealPlan(plan)
       setMealPlanHistory((prev: any[]) => [plan, ...prev.slice(0, 9)])
