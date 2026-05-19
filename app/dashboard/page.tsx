@@ -152,6 +152,33 @@ export default function Dashboard() {
   const [extractedPayslip, setExtractedPayslip] = useState<any>(null)
   const payslipInputRef = useRef<HTMLInputElement>(null)
 
+  // ==================== TAX ESTIMATOR ====================
+  const [showTaxEstimator, setShowTaxEstimator] = useState(false)
+  const [taxEstData, setTaxEstData] = useState({
+    grossIncome: '',
+    taxWithheld: '',
+    wfhDays: '0',
+    wfhWeeks: '48',
+    otherDeductions: '0',
+    medicareExempt: false,
+    helpDebt: '0',
+    privateHealth: false,
+  })
+
+  // ==================== COUPLE MODE ====================
+  const [coupleMode, setCoupleMode] = useState(false)
+  const [partnerName, setPartnerName] = useState('')
+  const [partnerIncome, setPartnerIncome] = useState('')
+  const [partnerFrequency, setPartnerFrequency] = useState('fortnightly')
+
+  // ==================== ACCOUNTABILITY CARD ====================
+  const [showAccountabilityCard, setShowAccountabilityCard] = useState(false)
+
+  // ==================== PUSH NOTIFICATIONS ====================
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
+  const [pwaInstallPrompt, setPwaInstallPrompt] = useState<any>(null)
+  const [showNotifSetup, setShowNotifSetup] = useState(false)
+
   // ==================== PASSIVE QUEST STATE ====================
   const [activeQuestId, setActiveQuestId] = useState<number | null>(null)
   const [passiveQuests, setPassiveQuests] = useState<any[]>([
@@ -408,6 +435,12 @@ export default function Dashboard() {
       if (data.netWorthHistory) setNetWorthHistory(data.netWorthHistory)
       if (data.personalityAnswers) setPersonalityAnswers(data.personalityAnswers)
       if (data.userName) setUserName(data.userName)
+      if (data.coupleMode !== undefined) setCoupleMode(data.coupleMode)
+      if (data.partnerName) setPartnerName(data.partnerName)
+      if (data.partnerIncome) setPartnerIncome(data.partnerIncome)
+      if (data.partnerFrequency) setPartnerFrequency(data.partnerFrequency)
+      if (data.taxEstData) setTaxEstData(prev => ({ ...prev, ...data.taxEstData }))
+      if (data.notificationsEnabled !== undefined) setNotificationsEnabled(data.notificationsEnabled)
       // Show onboarding for new users
       if (!data.onboardingComplete) setShowOnboarding(true)
       if (data.budgetOnboarding) setBudgetOnboarding(data.budgetOnboarding)
@@ -446,13 +479,22 @@ export default function Dashboard() {
       moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete,
       fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, sinkingFunds, mealPlanHistory, mealPlanPrefs, proactiveInsights,
       insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog,
-      annualReviews, superData, netWorthHistory, personalityAnswers, userName
+      annualReviews, superData, netWorthHistory, personalityAnswers, userName,
+      coupleMode, partnerName, partnerIncome, partnerFrequency, taxEstData, notificationsEnabled
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, categoryBudgets, actualSpend, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, coachNextAction, dismissedTriggers, lastAppOpen, missionPhase, missionStep, missionComplete, missionNavLocked, missionP2Proposals, missionP2Confirmed, missionP2Step, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, sinkingFunds, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, categoryBudgets, actualSpend, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, coachNextAction, dismissedTriggers, lastAppOpen, missionPhase, missionStep, missionComplete, missionNavLocked, missionP2Proposals, missionP2Confirmed, missionP2Step, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, sinkingFunds, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers, coupleMode, partnerName, partnerIncome, partnerFrequency, taxEstData, notificationsEnabled])
 
   // Chat scroll
   const chatContainerRef = useRef<HTMLDivElement>(null)
+
+  // ==================== PWA INSTALL PROMPT CAPTURE ====================
+  useEffect(() => {
+    const handler = (e: any) => { e.preventDefault(); setPwaInstallPrompt(e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
@@ -480,7 +522,8 @@ export default function Dashboard() {
     return amount
   }
 
-  const monthlyIncome = incomeStreams.reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0)
+  const partnerMonthly = coupleMode && partnerIncome ? convertToMonthly(parseFloat(partnerIncome || '0'), partnerFrequency) : 0
+  const monthlyIncome = incomeStreams.reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0) + partnerMonthly
   const passiveIncome = incomeStreams.filter(i => i.type === 'passive').reduce((sum, inc) => sum + convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency), 0)
   const monthlyExpenses = expenses.filter(e => !e.targetDebtId && !e.targetGoalId && !e.isDebtPayment).reduce((sum, exp) => sum + convertToMonthly(parseFloat(exp.amount || '0'), exp.frequency), 0)
   const monthlyDebtPayments = debts.reduce((sum, debt) => sum + convertToMonthly(parseFloat(debt.minPayment || '0'), debt.frequency || 'monthly'), 0)
@@ -5342,7 +5385,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       } catch { alert('Could not process payslip.') }
                       setPayslipProcessing(false)
                     }} style={{ display: 'none' }} />
-                    <button onClick={() => payslipInputRef.current?.click()} style={{ padding: '4px 10px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} disabled={payslipProcessing}>📄 Payslip</button>
+                    <button onClick={() => payslipInputRef.current?.click()} style={{ padding: '4px 10px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} disabled={payslipProcessing}>{payslipProcessing ? '...' : '📄 Payslip'}</button>
+                    <button onClick={() => setShowTaxEstimator(true)} style={{ padding: '4px 10px', background: theme.accent + '25', color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>🧾 Tax est.</button>
+                    <button onClick={() => setShowAccountabilityCard(true)} title="Share weekly snapshot" style={{ padding: '4px 8px', background: theme.bg, color: theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>📊</button>
                     <span style={{ color: theme.success, fontWeight: 700 }}>${monthlyIncome.toFixed(0)}/mo</span>
                   </div>
                 </div>
@@ -5412,6 +5457,37 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       </div>
                     )
                   ))}
+                </div>
+
+                {/* COUPLE MODE */}
+                <div style={{ marginTop: '12px', padding: '12px 14px', background: coupleMode ? theme.accent + '10' : theme.bg, borderRadius: '10px', border: '1px solid ' + (coupleMode ? theme.accent + '40' : theme.border) }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: coupleMode ? '12px' : '0' }}>
+                    <div style={{ display: 'flex', align: 'center', gap: '8px' }}>
+                      <span style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>💑 Partner / couple mode</span>
+                    </div>
+                    <button onClick={() => setCoupleMode(p => !p)} style={{ padding: '4px 12px', background: coupleMode ? theme.accent : 'transparent', color: coupleMode ? '#0a0a0a' : theme.textMuted, border: '1px solid ' + (coupleMode ? theme.accent : theme.border), borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
+                      {coupleMode ? 'On' : 'Off'}
+                    </button>
+                  </div>
+                  {coupleMode && (
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                      <input placeholder="Partner's name" value={partnerName} onChange={e => setPartnerName(e.target.value)} style={{...inputStyle, width: '100%'}} />
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input type="number" placeholder={`${partnerName || 'Partner'}'s take-home`} value={partnerIncome} onChange={e => setPartnerIncome(e.target.value)} style={{...inputStyle, flex: 1}} />
+                        <select value={partnerFrequency} onChange={e => setPartnerFrequency(e.target.value)} style={inputStyle}>
+                          <option value="weekly">Weekly</option>
+                          <option value="fortnightly">Fortnightly</option>
+                          <option value="monthly">Monthly</option>
+                        </select>
+                      </div>
+                      {partnerIncome && (
+                        <div style={{ padding: '8px 12px', background: theme.success + '15', borderRadius: '8px', fontSize: '13px', color: theme.success }}>
+                          Combined income: <strong>${monthlyIncome.toFixed(0)}/mo</strong>
+                          {partnerName && ` · you and ${partnerName} are saving ${monthlyIncome > 0 ? Math.round((monthlyGoalSavings / monthlyIncome) * 100) : 0}% combined`}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -7252,6 +7328,38 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             )}
 
             {/* PROACTIVE INSIGHTS */}
+            {/* TAX ESTIMATOR CARD */}
+            <div style={{ padding: '20px 24px', background: `linear-gradient(135deg, ${theme.accent}18, ${theme.accent}05)`, borderRadius: '16px', border: `1px solid ${theme.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' as const }}>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <div style={{ fontSize: '40px' }}>🧾</div>
+                <div>
+                  <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '4px' }}>AU Tax Return Estimator</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>
+                    {taxEstData.grossIncome
+                      ? `Based on $${parseInt(taxEstData.grossIncome).toLocaleString()} gross income · 2024–25`
+                      : 'Estimate your refund or bill — 2024–25 financial year'}
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setShowTaxEstimator(true)} style={{ ...btnPrimary, padding: '10px 20px', flexShrink: 0 }}>
+                {taxEstData.grossIncome ? 'Update estimate →' : 'Get estimate →'}
+              </button>
+            </div>
+
+            {/* ACCOUNTABILITY CARD */}
+            <div style={{ padding: '20px 24px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' as const }}>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <div style={{ fontSize: '40px' }}>📊</div>
+                <div>
+                  <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '4px' }}>Weekly Snapshot</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Share your progress with an accountability partner — partner, friend, or coach</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                <button onClick={() => setShowAccountabilityCard(true)} style={{ ...btnSuccess, padding: '10px 20px' }}>Share snapshot →</button>
+                {!notificationsEnabled && <button onClick={() => setShowNotifSetup(true)} style={{ padding: '10px 14px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>🔔</button>}
+              </div>
+            </div>
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <div>
@@ -7593,9 +7701,14 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               <div style={{ padding: '16px', background: theme.bg, borderRadius: '12px', marginBottom: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>📅 Your Check-In Schedule</div>
-                  <button onClick={() => setCheckInSchedule(s => ({ ...s, showScheduleSetup: !s.showScheduleSetup }))} style={{ padding: '4px 10px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '6px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>
-                    {checkInSchedule.showScheduleSetup ? 'Done' : 'Edit'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button onClick={() => setShowNotifSetup(true)} style={{ padding: '4px 10px', background: notificationsEnabled ? theme.success + '20' : 'transparent', border: '1px solid ' + (notificationsEnabled ? theme.success + '50' : theme.border), borderRadius: '6px', color: notificationsEnabled ? theme.success : theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>
+                      {notificationsEnabled ? '🔔 On' : '🔔 Reminders'}
+                    </button>
+                    <button onClick={() => setCheckInSchedule(s => ({ ...s, showScheduleSetup: !s.showScheduleSetup }))} style={{ padding: '4px 10px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '6px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>
+                      {checkInSchedule.showScheduleSetup ? 'Done' : 'Edit'}
+                    </button>
+                  </div>
                 </div>
                 {checkInSchedule.showScheduleSetup ? (
                   <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
@@ -8355,27 +8468,417 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         </div>
       )}
 
-      {/* PAYSLIP MODAL */}
-      {showPayslipUpload && extractedPayslip && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPayslipUpload(false)}>
-          <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '24px', maxWidth: '500px', width: '95%' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 20px 0', color: theme.text }}>📄 Payslip Detected!</h3>
-            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px', marginBottom: '20px' }}>
-              <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Employer</label><input value={extractedPayslip.employer || ''} onChange={e => setExtractedPayslip({...extractedPayslip, employer: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Net Pay</label><input type="number" value={extractedPayslip.netPay || ''} onChange={e => setExtractedPayslip({...extractedPayslip, netPay: e.target.value})} style={{...inputStyle, width: '100%'}} /></div>
-                <div><label style={{ color: theme.textMuted, fontSize: '12px' }}>Frequency</label><select value={extractedPayslip.frequency || 'fortnightly'} onChange={e => setExtractedPayslip({...extractedPayslip, frequency: e.target.value})} style={{...inputStyle, width: '100%'}}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
+      {/* PAYSLIP MODAL — ENHANCED */}
+      {showPayslipUpload && extractedPayslip && (() => {
+        const existingIdx = incomeStreams.findIndex(s =>
+          s.name?.toLowerCase() === (extractedPayslip.employer || '').toLowerCase() ||
+          (extractedPayslip.employer && s.name?.toLowerCase().includes(extractedPayslip.employer.toLowerCase().split(' ')[0]))
+        )
+        const isUpdate = existingIdx !== -1
+        const handleConfirm = () => {
+          const stream = {
+            id: isUpdate ? incomeStreams[existingIdx].id : Date.now(),
+            name: extractedPayslip.employer || 'Salary',
+            amount: extractedPayslip.netPay || '',
+            frequency: extractedPayslip.frequency || 'fortnightly',
+            type: 'active',
+            startDate: isUpdate ? incomeStreams[existingIdx].startDate : (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })(),
+            grossPay: extractedPayslip.grossPay || '',
+            taxWithheld: extractedPayslip.taxWithheld || '',
+            superPaid: extractedPayslip.superPaid || '',
+          }
+          if (isUpdate) {
+            setIncomeStreams(prev => prev.map((s, i) => i === existingIdx ? stream : s))
+          } else {
+            setIncomeStreams(prev => [...prev, stream])
+          }
+          // Pre-fill tax estimator with payslip data if we have gross/tax info
+          if (extractedPayslip.grossPay || extractedPayslip.taxWithheld) {
+            const annualisedGross = extractedPayslip.grossPay
+              ? (extractedPayslip.frequency === 'weekly' ? parseFloat(extractedPayslip.grossPay) * 52
+                : extractedPayslip.frequency === 'fortnightly' ? parseFloat(extractedPayslip.grossPay) * 26
+                : parseFloat(extractedPayslip.grossPay) * 12).toFixed(0)
+              : ''
+            setTaxEstData(prev => ({
+              ...prev,
+              grossIncome: annualisedGross,
+              taxWithheld: extractedPayslip.ytdTax || '',
+            }))
+          }
+          setExtractedPayslip(null)
+          setShowPayslipUpload(false)
+        }
+        return (
+          <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowPayslipUpload(false)}>
+            <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                <div style={{ fontSize: '28px' }}>📄</div>
+                <div>
+                  <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>Payslip Detected</h3>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>
+                    {isUpdate ? `⟳ Updates your existing "${incomeStreams[existingIdx]?.name}" income stream` : '+ Creates a new income stream'}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => { setIncomeStreams([...incomeStreams, { id: Date.now(), name: extractedPayslip.employer || 'Salary', amount: extractedPayslip.netPay || '', frequency: extractedPayslip.frequency || 'fortnightly', type: 'active', startDate: (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })() }]); setExtractedPayslip(null); setShowPayslipUpload(false) }} style={{ ...btnSuccess, flex: 1 }}>✓ Add Income</button>
-              <button onClick={() => { setShowPayslipUpload(false); setExtractedPayslip(null) }} style={{ ...btnPrimary, background: theme.textMuted }}>Cancel</button>
+
+              {/* Confirm/edit extracted fields */}
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', margin: '20px 0', padding: '16px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '4px' }}>Review extracted data</div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Employer / Income name</label>
+                  <input value={extractedPayslip.employer || ''} onChange={e => setExtractedPayslip({...extractedPayslip, employer: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Gross Pay (this period)</label>
+                    <input type="number" placeholder="0.00" value={extractedPayslip.grossPay || ''} onChange={e => setExtractedPayslip({...extractedPayslip, grossPay: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Net Pay (take-home)</label>
+                    <input type="number" placeholder="0.00" value={extractedPayslip.netPay || ''} onChange={e => setExtractedPayslip({...extractedPayslip, netPay: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Tax withheld (this period)</label>
+                    <input type="number" placeholder="0.00" value={extractedPayslip.taxWithheld || ''} onChange={e => setExtractedPayslip({...extractedPayslip, taxWithheld: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Super (this period)</label>
+                    <input type="number" placeholder="0.00" value={extractedPayslip.superPaid || ''} onChange={e => setExtractedPayslip({...extractedPayslip, superPaid: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>YTD tax withheld</label>
+                    <input type="number" placeholder="0.00" value={extractedPayslip.ytdTax || ''} onChange={e => setExtractedPayslip({...extractedPayslip, ytdTax: e.target.value})} style={{...inputStyle, width: '100%'}} />
+                  </div>
+                  <div>
+                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Frequency</label>
+                    <select value={extractedPayslip.frequency || 'fortnightly'} onChange={e => setExtractedPayslip({...extractedPayslip, frequency: e.target.value})} style={{...inputStyle, width: '100%'}}>
+                      <option value="weekly">Weekly</option>
+                      <option value="fortnightly">Fortnightly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Super sanity check */}
+              {extractedPayslip.grossPay && extractedPayslip.superPaid && (() => {
+                const superRate = (parseFloat(extractedPayslip.superPaid) / parseFloat(extractedPayslip.grossPay)) * 100
+                const isLow = superRate < 10.5
+                return isLow ? (
+                  <div style={{ padding: '10px 14px', background: theme.warning + '15', border: '1px solid ' + theme.warning + '40', borderRadius: '10px', marginBottom: '14px', fontSize: '13px', color: theme.warning }}>
+                    ⚠️ Super looks low ({superRate.toFixed(1)}% of gross). Minimum rate is 11.5%. Check with your employer or the ATO hotline: 13 28 61.
+                  </div>
+                ) : null
+              })()}
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={handleConfirm} style={{ ...btnSuccess, flex: 1 }}>
+                  {isUpdate ? '⟳ Update income stream' : '✓ Add income stream'}
+                </button>
+                <button onClick={() => { setShowPayslipUpload(false); setExtractedPayslip(null) }} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>Cancel</button>
+              </div>
+              {extractedPayslip.ytdTax && (
+                <button onClick={() => { handleConfirm(); setTimeout(() => setShowTaxEstimator(true), 100) }} style={{ marginTop: '10px', width: '100%', padding: '10px', background: 'transparent', border: '1px solid ' + theme.accent + '40', borderRadius: '8px', color: theme.accent, cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
+                  🧾 Also estimate my tax return →
+                </button>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
-      {/* BABY STEP DETAIL MODAL */}
+      {/* ==================== AU TAX RETURN ESTIMATOR MODAL ==================== */}
+      {showTaxEstimator && (() => {
+        // AU 2024-25 tax brackets
+        const calcTax = (income: number): number => {
+          if (income <= 18200) return 0
+          if (income <= 45000) return (income - 18200) * 0.19
+          if (income <= 120000) return 5092 + (income - 45000) * 0.325
+          if (income <= 180000) return 29467 + (income - 120000) * 0.37
+          return 51667 + (income - 180000) * 0.45
+        }
+        // Low income tax offset
+        const calcLITO = (income: number): number => {
+          if (income <= 37500) return 700
+          if (income <= 45000) return 700 - ((income - 37500) * 0.05)
+          if (income <= 66667) return 325 - ((income - 45000) * 0.015)
+          return 0
+        }
+        // LMITO was removed from 2022-23 — not applicable
+
+        const gross = parseFloat(taxEstData.grossIncome || '0')
+        const withheld = parseFloat(taxEstData.taxWithheld || '0')
+        const wfhDeduction = parseFloat(taxEstData.wfhDays || '0') * parseFloat(taxEstData.wfhWeeks || '48') * 8 * 0.67
+        const otherDed = parseFloat(taxEstData.otherDeductions || '0')
+        // Investment property deductions
+        const propDeductions = investmentProperties.reduce((sum: number, p: any) => {
+          const expenses = (parseFloat(p.managementFeePercent || '8.5') / 100 * parseFloat(p.weeklyRent || '0') * 52)
+            + parseFloat(p.councilRates || '0')
+            + parseFloat(p.insurance || '0')
+            + parseFloat(p.maintenance || '0')
+            + parseFloat(p.otherExpenses || '0')
+          const interest = parseFloat(p.mortgageBalance || '0') * (parseFloat(p.interestRate || '0') / 100)
+          return sum + expenses + interest
+        }, 0)
+        // HELP repayment
+        const helpDebt = parseFloat(taxEstData.helpDebt || '0')
+        // Taxable income
+        const totalDeductions = wfhDeduction + otherDed + propDeductions
+        const taxableIncome = Math.max(0, gross - totalDeductions)
+        const baseTax = calcTax(taxableIncome)
+        const lito = calcLITO(taxableIncome)
+        // Medicare levy (2%)
+        const medicare = taxEstData.medicareExempt ? 0 : taxableIncome * 0.02
+        // Private health surcharge avoidance — if they have private health, no surcharge
+        const mls = (!taxEstData.privateHealth && taxableIncome > 93000) ? taxableIncome * 0.01 : 0
+        const totalTaxLiability = Math.max(0, baseTax - lito + medicare + mls)
+        // HELP repayment threshold
+        const helpRepayment = helpDebt > 0 && taxableIncome >= 54435 ? taxableIncome * 0.01 : 0
+        const netResult = withheld - totalTaxLiability - helpRepayment
+        const isRefund = netResult >= 0
+
+        return (
+          <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowTaxEstimator(false)}>
+            <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '600px', width: '100%', maxHeight: '92vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <h3 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🧾 Tax Return Estimator</h3>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>Australia · 2024–25 financial year · General estimate only</div>
+                </div>
+                <button onClick={() => setShowTaxEstimator(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer' }}>×</button>
+              </div>
+
+              {/* Result banner */}
+              {gross > 0 && withheld > 0 && (
+                <div style={{ padding: '20px 24px', background: isRefund ? theme.success + '18' : theme.danger + '18', border: `2px solid ${isRefund ? theme.success : theme.danger}50`, borderRadius: '14px', marginBottom: '24px', textAlign: 'center' as const }}>
+                  <div style={{ color: isRefund ? theme.success : theme.danger, fontSize: '13px', fontWeight: 700, marginBottom: '4px', letterSpacing: '1px' }}>
+                    {isRefund ? 'ESTIMATED REFUND' : 'ESTIMATED TAX BILL'}
+                  </div>
+                  <div style={{ color: isRefund ? theme.success : theme.danger, fontSize: '42px', fontWeight: 900, lineHeight: 1 }}>
+                    ${Math.abs(Math.round(netResult)).toLocaleString()}
+                  </div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '8px' }}>
+                    Tax liability: ${Math.round(totalTaxLiability).toLocaleString()} · Withheld: ${Math.round(withheld).toLocaleString()}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Annual gross income (salary + any other taxable income)</label>
+                  <input type="number" value={taxEstData.grossIncome} onChange={e => setTaxEstData(p => ({...p, grossIncome: e.target.value}))} placeholder="e.g. 85000" style={{...inputStyle, width: '100%'}} />
+                </div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Total tax withheld (YTD from payslip or payment summary)</label>
+                  <input type="number" value={taxEstData.taxWithheld} onChange={e => setTaxEstData(p => ({...p, taxWithheld: e.target.value}))} placeholder="e.g. 22000" style={{...inputStyle, width: '100%'}} />
+                </div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>HELP / HECS debt balance (0 if none)</label>
+                  <input type="number" value={taxEstData.helpDebt} onChange={e => setTaxEstData(p => ({...p, helpDebt: e.target.value}))} placeholder="0" style={{...inputStyle, width: '100%'}} />
+                </div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>WFH days per week</label>
+                  <input type="number" min="0" max="5" step="0.5" value={taxEstData.wfhDays} onChange={e => setTaxEstData(p => ({...p, wfhDays: e.target.value}))} placeholder="e.g. 2" style={{...inputStyle, width: '100%'}} />
+                </div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Weeks worked from home</label>
+                  <input type="number" min="0" max="52" value={taxEstData.wfhWeeks} onChange={e => setTaxEstData(p => ({...p, wfhWeeks: e.target.value}))} placeholder="e.g. 48" style={{...inputStyle, width: '100%'}} />
+                </div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Other work deductions (tools, uniform, training, etc.)</label>
+                  <input type="number" value={taxEstData.otherDeductions} onChange={e => setTaxEstData(p => ({...p, otherDeductions: e.target.value}))} placeholder="0" style={{...inputStyle, width: '100%'}} />
+                </div>
+              </div>
+
+              {/* Toggles */}
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' as const }}>
+                {[
+                  { label: '🏥 Medicare exempt', key: 'medicareExempt' },
+                  { label: '🏥 Private health insurance', key: 'privateHealth' },
+                ].map(opt => (
+                  <button key={opt.key} onClick={() => setTaxEstData(p => ({...p, [opt.key]: !(p as any)[opt.key]}))}
+                    style={{ padding: '8px 14px', background: (taxEstData as any)[opt.key] ? theme.accent + '25' : 'transparent', border: '1px solid ' + ((taxEstData as any)[opt.key] ? theme.accent : theme.border), borderRadius: '8px', color: (taxEstData as any)[opt.key] ? theme.accent : theme.textMuted, cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Breakdown */}
+              {gross > 0 && (
+                <div style={{ padding: '16px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.border, fontSize: '13px' }}>
+                  <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '10px' }}>CALCULATION BREAKDOWN</div>
+                  {[
+                    { label: 'Gross income', value: gross, color: theme.text },
+                    { label: `WFH deduction (${taxEstData.wfhDays}d × ${taxEstData.wfhWeeks}wks × 8hrs × 67¢)`, value: -wfhDeduction, color: theme.success },
+                    ...(otherDed > 0 ? [{ label: 'Other deductions', value: -otherDed, color: theme.success }] : []),
+                    ...(propDeductions > 0 ? [{ label: `Investment property deductions (${investmentProperties.length} property)`, value: -propDeductions, color: theme.success }] : []),
+                    { label: 'Taxable income', value: taxableIncome, color: theme.accent, bold: true },
+                    { label: 'Income tax', value: -baseTax, color: theme.danger },
+                    { label: 'Low income tax offset (LITO)', value: lito, color: theme.success },
+                    { label: 'Medicare levy (2%)', value: -medicare, color: medicare > 0 ? theme.danger : theme.textMuted },
+                    ...(mls > 0 ? [{ label: 'Medicare levy surcharge (no private health)', value: -mls, color: theme.danger }] : []),
+                    { label: 'Total tax liability', value: -totalTaxLiability, color: theme.danger, bold: true },
+                    { label: 'Tax already withheld by employer', value: withheld, color: theme.success, bold: true },
+                    ...(helpRepayment > 0 ? [{ label: 'HELP repayment (estimated)', value: -helpRepayment, color: theme.warning }] : []),
+                  ].map((row: any, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: row.bold ? '1px solid ' + theme.border : 'none', marginBottom: row.bold ? '6px' : '0' }}>
+                      <span style={{ color: theme.textMuted }}>{row.label}</span>
+                      <span style={{ color: row.color, fontWeight: row.bold ? 700 : 400 }}>
+                        {row.value >= 0 ? '+' : ''}${Math.round(Math.abs(row.value)).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ marginTop: '16px', padding: '10px 14px', background: theme.warning + '10', borderRadius: '8px', border: '1px solid ' + theme.warning + '25', fontSize: '11px', color: theme.textMuted }}>
+                ⚠️ This is an estimate for planning purposes only. It does not replace a registered tax agent. Deductions require receipts and records. Consult an accountant before lodging.
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ==================== ACCOUNTABILITY CARD MODAL ==================== */}
+      {showAccountabilityCard && (() => {
+        const topGoal = goals.sort((a: any, b: any) => {
+          const aPct = parseFloat(a.savedAmount || '0') / parseFloat(a.targetAmount || '1')
+          const bPct = parseFloat(b.savedAmount || '0') / parseFloat(b.targetAmount || '1')
+          return bPct - aPct
+        })[0]
+        const topWin = wins.filter((w: any) => !w.auto).slice(-1)[0] || wins.slice(-1)[0]
+        const surplus = monthlySurplus
+        const savePct = monthlyIncome > 0 ? Math.round((monthlyGoalSavings / monthlyIncome) * 100) : 0
+        const partnerLine = coupleMode && partnerName ? `\n💑 Combined with ${partnerName}: $${Math.round(monthlyIncome).toLocaleString()}/mo total income` : ''
+        const cardText = `📊 Aureus Weekly Snapshot — ${new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+━━━━━━━━━━━━━━━━━━━━━━━
+💰 Monthly income: $${Math.round(monthlyIncome).toLocaleString()}${partnerLine}
+📤 Total outgoing: $${Math.round(totalOutgoing).toLocaleString()}
+✅ Surplus: $${Math.round(surplus).toLocaleString()} (${savePct}% saving rate)
+${topGoal ? `\n🎯 Top goal: ${topGoal.name}\n   $${parseFloat(topGoal.savedAmount || '0').toLocaleString()} of $${parseFloat(topGoal.targetAmount || '0').toLocaleString()} (${Math.min(100, Math.round(parseFloat(topGoal.savedAmount || '0') / parseFloat(topGoal.targetAmount || '1') * 100))}%)` : ''}
+${topWin ? `\n🏆 Recent win: ${topWin.title}` : ''}
+${coachNextAction ? `\n⚡ Next move: ${coachNextAction.action}` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━
+Tracking with Aureus 🏛️`
+
+        return (
+          <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowAccountabilityCard(false)}>
+            <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '480px', width: '100%' }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📊 Weekly Snapshot</h3>
+                <button onClick={() => setShowAccountabilityCard(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '22px', cursor: 'pointer' }}>×</button>
+              </div>
+
+              {/* Metrics */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+                {[
+                  { label: 'Monthly income', value: `$${Math.round(monthlyIncome).toLocaleString()}`, color: theme.success },
+                  { label: 'Monthly surplus', value: `$${Math.round(surplus).toLocaleString()}`, color: surplus >= 0 ? theme.success : theme.danger },
+                  { label: 'Saving rate', value: `${savePct}%`, color: savePct >= 20 ? theme.success : theme.warning },
+                  { label: 'Net worth', value: `$${Math.round(netWorth).toLocaleString()}`, color: theme.accent },
+                ].map(m => (
+                  <div key={m.label} style={{ padding: '14px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>{m.label}</div>
+                    <div style={{ color: m.color, fontSize: '20px', fontWeight: 700 }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {topGoal && (
+                <div style={{ padding: '14px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border, marginBottom: '10px' }}>
+                  <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '6px' }}>🎯 TOP GOAL PROGRESS</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ color: theme.text, fontWeight: 600 }}>{topGoal.name}</span>
+                    <span style={{ color: theme.accent, fontSize: '13px' }}>{Math.min(100, Math.round(parseFloat(topGoal.savedAmount || '0') / parseFloat(topGoal.targetAmount || '1') * 100))}%</span>
+                  </div>
+                  <div style={{ height: '6px', background: theme.border, borderRadius: '3px' }}>
+                    <div style={{ height: '100%', background: theme.accent, borderRadius: '3px', width: `${Math.min(100, parseFloat(topGoal.savedAmount || '0') / parseFloat(topGoal.targetAmount || '1') * 100)}%` }} />
+                  </div>
+                </div>
+              )}
+
+              {coachNextAction && (
+                <div style={{ padding: '12px 14px', background: theme.accent + '15', border: '1px solid ' + theme.accent + '40', borderRadius: '10px', marginBottom: '10px', fontSize: '13px' }}>
+                  <span style={{ color: theme.accent, fontWeight: 700 }}>⚡ Next move: </span>
+                  <span style={{ color: theme.text }}>{coachNextAction.action}</span>
+                </div>
+              )}
+
+              {/* Share buttons */}
+              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                <button onClick={async () => {
+                  await navigator.clipboard.writeText(cardText)
+                  alert('Snapshot copied! Share it with your accountability partner.')
+                }} style={{ ...btnSuccess, flex: 1 }}>📋 Copy to share</button>
+                {navigator.share && (
+                  <button onClick={() => navigator.share({ title: 'Aureus Weekly Snapshot', text: cardText })} style={{ ...btnPrimary, flex: 1 }}>↗ Share</button>
+                )}
+              </div>
+              <div style={{ marginTop: '12px', fontSize: '11px', color: theme.textMuted, textAlign: 'center' as const }}>Share with your accountability partner — spouse, friend, or coach</div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ==================== NOTIFICATION SETUP MODAL ==================== */}
+      {showNotifSetup && (() => {
+        const requestNotifications = async () => {
+          if (!('Notification' in window)) { alert('Your browser does not support notifications.'); return }
+          const permission = await Notification.requestPermission()
+          if (permission === 'granted') {
+            setNotificationsEnabled(true)
+            new Notification('Aureus', { body: '✅ Notifications enabled! We\'ll remind you for money dates and check-ins.', icon: '/favicon.ico' })
+          }
+          setShowNotifSetup(false)
+        }
+        const installPWA = async () => {
+          if (pwaInstallPrompt) {
+            pwaInstallPrompt.prompt()
+            const { outcome } = await pwaInstallPrompt.userChoice
+            if (outcome === 'accepted') setPwaInstallPrompt(null)
+          }
+        }
+        return (
+          <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowNotifSetup(false)}>
+            <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '440px', width: '100%' }} onClick={e => e.stopPropagation()}>
+              <div style={{ textAlign: 'center' as const, marginBottom: '24px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '12px' }}>🔔</div>
+                <h3 style={{ margin: '0 0 8px 0', color: theme.text, fontSize: '22px' }}>Stay on track</h3>
+                <p style={{ color: theme.textMuted, fontSize: '14px', margin: 0, lineHeight: 1.6 }}>Get reminders for money dates, monthly snapshots, and overdue actions — right to your device.</p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '24px' }}>
+                {[
+                  { icon: '📅', label: 'Money date reminders', desc: `Every ${checkInSchedule.moneyDateDay} at ${checkInSchedule.moneyDateTime}` },
+                  { icon: '📊', label: 'Monthly snapshot prompt', desc: `1st of each month at ${checkInSchedule.monthlyTime}` },
+                  { icon: '⚡', label: 'Coach action nudges', desc: 'When Aureus spots something important' },
+                ].map(n => (
+                  <div key={n.label} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                    <div style={{ fontSize: '22px' }}>{n.icon}</div>
+                    <div>
+                      <div style={{ color: theme.text, fontSize: '14px', fontWeight: 600 }}>{n.label}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>{n.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
+                <button onClick={requestNotifications} style={{ ...btnSuccess, padding: '14px' }}>
+                  🔔 Enable notifications
+                </button>
+                {pwaInstallPrompt && (
+                  <button onClick={installPWA} style={{ ...btnPrimary, padding: '14px' }}>
+                    📱 Add Aureus to home screen (for real push notifications)
+                  </button>
+                )}
+                <button onClick={() => setShowNotifSetup(false)} style={{ padding: '12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
+                  Not now
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
       {selectedBabyStep !== null && (() => {
         const step = australianBabySteps.find(s => s.step === selectedBabyStep)
         if (!step) return null
