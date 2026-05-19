@@ -1,6 +1,4 @@
-// ============================================================
-// ADD THIS FILE TO: app/api/meal-plan/route.ts
-// ============================================================
+// app/api/meal-plan/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -8,34 +6,44 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { people, budget, dietaryNeeds, dislikes, useDetailedPricing, catalogText } = body
+    const n = parseInt(people) || 4
 
-    const systemPrompt = `You are a practical Australian meal planning assistant. You create realistic, budget-conscious 7-day meal plans for Australian families. You know current Woolworths, Coles, and Aldi prices. You respond ONLY with structured meal plan content — no financial advice, no preamble, no sign-off.`
+    const systemPrompt = `You are a practical Australian meal planning assistant. You create realistic, budget-conscious 7-day meal plans for Australian families using current Woolworths, Coles, and Aldi prices. You ALWAYS include real dollar amounts — never placeholders. You respond ONLY with the meal plan — no preamble, no sign-off, no financial advice.`
 
     const userPrompt = [
-      `Create a 7-day meal plan.`,
-      `Household: ${people} people | Weekly grocery budget: $${budget} AUD`,
-      dislikes ? `Avoid: ${dislikes}` : '',
-      dietaryNeeds ? `Dietary needs: ${dietaryNeeds}` : '',
-      useDetailedPricing ? `Use realistic 2024-25 AU supermarket prices (Woolworths/Coles/Aldi home-brand where possible).` : '',
-      catalogText ? `\nThis week's catalog specials:\n${String(catalogText).slice(0, 600)}` : '',
+      `Create a 7-day meal plan for ${n} people with a weekly grocery budget of $${budget} AUD.`,
+      dislikes ? `Do NOT include: ${dislikes}.` : '',
+      dietaryNeeds ? `Dietary requirements: ${dietaryNeeds}.` : '',
       ``,
-      `Format your response EXACTLY like this — no extra text before or after:`,
+      `PORTIONS: All dinners must serve ${n} people. Batch cook where possible — leftovers become next-day lunches.`,
+      useDetailedPricing ? `PRICING: Use real 2024-25 AU prices. Examples: chicken thighs 1kg $8, beef mince 500g $7, eggs 12pk $5.50, milk 2L $3.20, bread loaf $3.50, pasta 500g $1.80, rice 1kg $3, frozen veg 1kg $4.50, rolled oats 1kg $3.50, bananas 1kg $3.50, cheese 500g block $9. Multiply quantities for ${n} people.` : '',
+      catalogText ? `\nThis week's specials to prioritise:\n${String(catalogText).slice(0, 600)}` : '',
       ``,
-      `**Estimated weekly cost: $X | Savings vs eating out: ~$Y**`,
+      `Use this EXACT format. Replace every price with a real dollar amount:`,
+      ``,
+      `**Estimated weekly cost: $[real total] | Savings vs eating out: ~$[real saving]**`,
       ``,
       `## Monday`,
-      `🌅 Breakfast: [meal] ~$X`,
-      `☀️ Lunch: [meal] ~$X`,
-      `🌙 Dinner: [meal] ~$X _(batch: leftovers note)_`,
+      `🌅 Breakfast: Rolled oats with banana and honey (${n} serves) ~$3.20`,
+      `☀️ Lunch: Vegemite and cheese sandwiches (${n} serves) ~$4.50`,
+      `🌙 Dinner: Spaghetti bolognese (${n} serves) ~$14.00 _(batch: double — leftover pasta Tue lunch)_`,
       ``,
-      `[Repeat for Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday]`,
+      `## Tuesday`,
+      `🌅 Breakfast: Weetbix with milk (${n} serves) ~$2.80`,
+      `☀️ Lunch: Leftover bolognese on toast (${n} serves) ~$1.50`,
+      `🌙 Dinner: Baked chicken drumsticks with roast potatoes (${n} serves) ~$16.00`,
+      ``,
+      `[Continue for Wednesday, Thursday, Friday, Saturday, Sunday in the SAME format with REAL prices]`,
       ``,
       `## Shopping List`,
-      `- [item] — [qty] ~$X`,
+      `- Chicken drumsticks 1.5kg — 2 packs ~$17.00`,
+      `- Beef mince 500g — 2 packs ~$14.00`,
+      `- Eggs — 2 dozen ~$11.00`,
+      `[List every ingredient needed. Use real prices from Woolworths/Coles/Aldi.]`,
       ``,
       `## Budget Tips`,
-      `- [tip]`,
-    ].filter(Boolean).join('\n')
+      `- [3 specific tips for a ${n}-person household on $${budget}/week]`,
+    ].filter(s => s !== undefined && s !== null).join('\n')
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -46,7 +54,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
+        max_tokens: 2500,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }]
       })
