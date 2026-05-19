@@ -1591,55 +1591,30 @@ Rules:
     try {
       const weeklyBudget = mealPlanPrefs.budget || (monthlySurplus > 0 ? Math.round(monthlySurplus * 0.25).toString() : '150')
 
-      const question = [
-        `Create a 7-day budget meal plan for an Australian family. ${mealPlanPrefs.people} people. Weekly grocery budget: $${weeklyBudget} AUD.`,
-        mealPlanPrefs.dislikes ? `Avoid: ${mealPlanPrefs.dislikes}.` : '',
-        mealPlanPrefs.dietaryNeeds ? `Dietary needs: ${mealPlanPrefs.dietaryNeeds}.` : '',
-        catalogText ? `This week's specials: ${catalogText.slice(0, 400)}` : '',
-        '',
-        'Format your response EXACTLY like this — no extra text before or after:',
-        '',
-        '## 7-Day Meal Plan',
-        '**Estimated weekly cost: $[X] | Savings vs eating out: $[Y]**',
-        '',
-        '**Monday**',
-        '🌅 Breakfast: [meal] ~$[X]',
-        '☀️ Lunch: [meal] ~$[X]',
-        '🌙 Dinner: [meal] ~$[X] _(batch tip if any)_',
-        '',
-        '[repeat for Tue, Wed, Thu, Fri, Sat, Sun]',
-        '',
-        '## Shopping List',
-        '- [item] — [qty] ~$[X]',
-        '',
-        '## Budget Tips',
-        '- [tip]',
-      ].filter(Boolean).join('\n')
-
-      const response = await fetch('/api/budget-coach', {
+      const response = await fetch('/api/meal-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mode: 'question',
-          question,
-          financialData: { income: incomeStreams, expenses },
-          memory: budgetMemory,
-          countryConfig: currentCountryConfig
+          people: mealPlanPrefs.people,
+          budget: weeklyBudget,
+          dietaryNeeds: mealPlanPrefs.dietaryNeeds,
+          dislikes: mealPlanPrefs.dislikes,
+          useDetailedPricing: mealPlanPrefs.useWebSearch,
+          catalogText: catalogText || ''
         })
       })
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}))
-        throw new Error((err as any)?.error?.message || `Server error ${response.status}`)
+        throw new Error((err as any)?.error || `Server error ${response.status}`)
       }
 
       const data = await response.json()
-      const raw: string = data.message || data.advice || data.raw || ''
-      if (!raw || raw.trim().length < 50) throw new Error('No response — please try again.')
+      const text: string = data.text || ''
+      if (!text || text.trim().length < 100) throw new Error('No response — please try again.')
 
-      // Store as text-based plan (no JSON parsing needed)
       const plan = {
-        rawText: raw,
+        rawText: text,
         generatedAt: new Date().toISOString(),
         prefs: { ...mealPlanPrefs },
         weeklyBudget,
