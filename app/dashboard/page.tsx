@@ -301,7 +301,7 @@ export default function Dashboard() {
   const [celebrationData, setCelebrationData] = useState<{title: string, message: string, emoji: string, type: 'win' | 'debt_free' | 'goal_hit' | 'baby_step' | 'streak'} | null>(null)
   // Meal planning state
   const [mealPlanTab, setMealPlanTab] = useState<'plan' | 'catalog' | 'history'>('plan')
-  const [mealPlanPrefs, setMealPlanPrefs] = useState({ people: '2', budget: '', dietaryNeeds: '', dislikes: '', useWebSearch: false })
+  const [mealPlanPrefs, setMealPlanPrefs] = useState({ people: '2', budget: '', dietaryNeeds: '', dislikes: '', useWebSearch: false, meals: ['breakfast', 'lunch', 'dinner'] })
   const [catalogImages, setCatalogImages] = useState<string[]>([])
   const [catalogText, setCatalogText] = useState<string>('')
   const [generatingMealPlan, setGeneratingMealPlan] = useState(false)
@@ -1600,6 +1600,7 @@ Rules:
           dietaryNeeds: mealPlanPrefs.dietaryNeeds,
           dislikes: mealPlanPrefs.dislikes,
           useDetailedPricing: mealPlanPrefs.useWebSearch,
+          meals: mealPlanPrefs.meals || ['breakfast', 'lunch', 'dinner'],
           catalogText: catalogText || ''
         })
       })
@@ -3227,6 +3228,17 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   }} style={btnDanger}>+ Add bill</button>
                 </div>
               </div>
+
+              {/* Meal planner offer — show if they have a food/groceries expense */}
+              {expenses.some(e => e.category === 'food' || e.name?.toLowerCase().includes('grocer') || e.name?.toLowerCase().includes('food')) && (
+                <div style={{ width: '100%', padding: '14px 16px', background: theme.accent + '10', border: '1px solid ' + theme.accent + '30', borderRadius: '12px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ fontSize: '28px', flexShrink: 0 }}>🍽️</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: theme.accent, fontWeight: 700, fontSize: '13px', marginBottom: '2px' }}>Save on groceries with Aureus Meal Planner</div>
+                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>Once you're set up, Aureus can build a 7-day budget meal plan around your grocery spend — upload your supermarket catalog and we'll plan around the specials.</div>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
                 <button onClick={() => advanceMission(4)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
@@ -5237,6 +5249,17 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                     <div style={{ position: 'absolute' as const, left: (monthProgress * 100) + '%', top: '-2px', width: '2px', height: '10px', background: theme.accent }} />
                                   </div>
                                 )}
+                                {/* Meal planner nudge for food over-budget */}
+                                {isOver && (cat.id === 'food' || cat.id === 'eating_out') && (
+                                  <div style={{ marginTop: '8px', padding: '8px 12px', background: theme.accent + '12', border: '1px solid ' + theme.accent + '30', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ color: theme.textMuted, fontSize: '12px' }}>
+                                      🍽️ {cat.id === 'food' ? 'A meal plan could cut this back' : 'Cooking at home could save you here'}
+                                    </span>
+                                    <button onClick={() => setActiveTab('meals' as any)} style={{ padding: '4px 12px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+                                      Try Meal Planner →
+                                    </button>
+                                  </div>
+                                )}
                                 {/* Manual budget override */}
                                 {p === 0 && (
                                   <button onClick={e => { e.stopPropagation(); const val = window.prompt(`Set monthly budget for ${cat.label} ($):`); if (val !== null && !isNaN(parseFloat(val))) setCategoryBudgets(prev => ({ ...prev, [cat.id]: val })) }}
@@ -7152,6 +7175,24 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       <input type="checkbox" checked={mealPlanPrefs.useWebSearch} onChange={e => setMealPlanPrefs({...mealPlanPrefs, useWebSearch: e.target.checked})} style={{ accentColor: theme.accent, width: '14px', height: '14px' }} />
                       🧠 Use detailed AU pricing in prompt (more accurate estimates)
                     </label>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' as const }}>
+                    <span style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>INCLUDE:</span>
+                    {(['breakfast', 'lunch', 'dinner'] as const).map(meal => {
+                      const icons: Record<string, string> = { breakfast: '🌅', lunch: '☀️', dinner: '🌙' }
+                      const selected = (mealPlanPrefs.meals || ['breakfast','lunch','dinner']).includes(meal)
+                      return (
+                        <button key={meal} onClick={() => {
+                          const current = mealPlanPrefs.meals || ['breakfast','lunch','dinner']
+                          const next = selected && current.length > 1
+                            ? current.filter(m => m !== meal)
+                            : selected ? current : [...current, meal]
+                          setMealPlanPrefs({...mealPlanPrefs, meals: next})
+                        }} style={{ padding: '5px 14px', background: selected ? theme.accent + '20' : 'transparent', border: '1px solid ' + (selected ? theme.accent : theme.border), borderRadius: '20px', color: selected ? theme.accent : theme.textMuted, cursor: 'pointer', fontSize: '13px', fontWeight: 600, transition: 'all 0.15s' }}>
+                          {icons[meal]} {meal.charAt(0).toUpperCase() + meal.slice(1)}
+                        </button>
+                      )
+                    })}
                     {(catalogImages.length > 0 || catalogText) && (
                       <div style={{ padding: '4px 10px', background: theme.success + '20', border: '1px solid ' + theme.success + '40', borderRadius: '8px', color: theme.success, fontSize: '12px' }}>
                         📸 Using {catalogImages.length > 0 ? `${catalogImages.length} catalog image${catalogImages.length !== 1 ? 's' : ''}` : 'pasted specials'}
@@ -7188,14 +7229,20 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       if (line.startsWith('**') && line.includes('**')) return (
                         <div key={i} style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong style="color:' + theme.accent + '">$1</strong>') }} />
                       )
-                      if (line.match(/^[🌅☀️🌙]/) ) return (
+                      if (line.match(/^[🌅☀️🌙]/) ) {
+                        const mealEmojis: Record<string, string> = { breakfast: '🌅', lunch: '☀️', dinner: '🌙' }
+                        const selectedMeals = currentMealPlan?.prefs?.meals || ['breakfast','lunch','dinner']
+                        const isMealSelected = selectedMeals.some((m: string) => line.startsWith(mealEmojis[m]))
+                        if (!isMealSelected) return null
+                        return (
                         <div key={i} style={{ color: theme.text, fontSize: '13px', padding: '3px 0', display: 'flex', gap: '8px' }}>
                           <span>{line.split(' ')[0]}</span>
                           <span dangerouslySetInnerHTML={{ __html: line.slice(line.indexOf(' ')+1)
                             .replace(/_(.*?)_/g, (_m: string, g: string) => `<em style="color:${theme.success};font-size:11px"> · ${g}</em>`)
                             .replace(/~\$(\d+(?:\.\d{1,2})?)/g, (_m: string, price: string) => `<span style="color:${theme.textMuted};font-size:11px"> ~$${price}</span>`) }} />
                         </div>
-                      )
+                        )
+                      }
                       if (line.startsWith('- ')) return (
                         <div key={i} style={{ color: theme.textMuted, fontSize: '13px', padding: '2px 0 2px 12px', borderLeft: '2px solid ' + theme.border }}
                           dangerouslySetInnerHTML={{ __html: line.slice(2).replace(/~\$(\d+(?:\.\d{1,2})?)/g, (_m: string, price: string) => `<span style="color:${theme.accent}"> ~$${price}</span>`) }} />
