@@ -6466,7 +6466,6 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
               ))}
             </div>
-          </div>
 
             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
               {literacyTopics.map(topic => (
@@ -7098,6 +7097,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 })}
               </div>
             </div>
+          </div>
 
         )}
 
