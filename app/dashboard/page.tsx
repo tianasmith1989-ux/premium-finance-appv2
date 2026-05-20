@@ -4339,7 +4339,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               {['mortgage','property','insights','grow','review','overview','learn','quickview'].includes(activeTab) ? '● More ▾' : 'More ▾'}
             </button>
             {showMoreTabs && (
-              <div style={{ position: 'absolute' as const, top: 'calc(100% + 6px)', left: 0, background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', padding: '8px', zIndex: 300, minWidth: '210px', boxShadow: '0 12px 40px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
+              <div style={{ position: 'absolute' as const, top: 'calc(100% + 6px)', left: 0, background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', padding: '8px', zIndex: 301, minWidth: '210px', boxShadow: '0 12px 40px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
                 <div style={{ color: theme.accent, fontSize: '10px', fontWeight: 700, padding: '4px 10px 8px', letterSpacing: '1px' }}>BUILD WEALTH</div>
                 {[
                   { id: 'mortgage',  label: '🚀 Mortgage Accelerator' },
@@ -4381,7 +4381,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
       </header>
 
       {/* Close More drawer on outside click */}
-      {showMoreTabs && <div style={{ position: 'fixed' as const, inset: 0, zIndex: 299 }} onClick={() => setShowMoreTabs(false)} />}
+      {showMoreTabs && <div style={{ position: 'fixed' as const, inset: 0, zIndex: 298 }} onClick={() => setShowMoreTabs(false)} />}
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
 
@@ -6403,6 +6403,71 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               </div>
             </div>
 
+            {/* Australian Home Buying Roadmap — moved from Grow tab */}
+            {/* Australian Home Buying Roadmap */}
+            <div style={{ padding: '24px', background: 'linear-gradient(135deg, theme.cardBg 0%, theme.bg 100%)', borderRadius: '20px', border: '1px solid ' + theme.border }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: 'linear-gradient(135deg, #D4AF37, #B68B2E)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>🏠</div>
+                  <div>
+                    <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>Australian Home Buying Roadmap</h2>
+                    <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Expand each phase · Add phases to your personal roadmap</p>
+                  </div>
+                </div>
+                <button onClick={() => addToRoadmapQuick('Buy My First Home', '🏠', '120000', 'Deposit + costs for property purchase')} style={{ padding: '8px 14px', background: theme.warning + '20', color: theme.warning, border: '1px solid ' + theme.warning + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>+ Add to Roadmap</button>
+              </div>
+
+              {[
+                { id: 'phase1', num: '1', icon: '💰', title: 'Get Financially Ready', color: theme.warning, items: ['Complete Baby Steps 1–3 first (emergency fund + kill bad debt)', 'Save your deposit: 5% minimum, 20% avoids LMI', 'Check your credit score free via Credit Savvy or Finder', 'Stop applying for new credit 6+ months before applying', 'Consistent income for 12+ months strengthens your application', 'Reduce existing debt and BNPL balances to boost borrowing power'] },
+                { id: 'phase2', num: '2', icon: '🧾', title: 'Understand the True Costs', color: theme.purple, items: ['Stamp duty: 0% (first home QLD new builds) to 5.5% (investors)', 'LMI: $8k–$30k if deposit under 20% — often added to your loan', 'Conveyancer / solicitor: ~$1,500–$2,500', 'Building & pest inspection: ~$500–$800', 'Lender fees (application, valuation): ~$500–$1,500', "Moving costs + immediate repairs: budget $3k–$10k", "Budget 3–5% of purchase price in extra costs on top of deposit"] },
+                { id: 'phase3', num: '3', icon: '🏛️', title: 'Government Schemes & Grants', color: theme.accent, items: ['First Home Guarantee: 5% deposit, no LMI — 35,000 places/yr', 'Regional First Home Guarantee: same for regional areas', 'Family Home Guarantee: single parents — 2% deposit', 'QLD FHOG: $30,000 grant for new builds', 'NSW FHOG: $10,000 for new builds under $600k', 'First Home Super Saver Scheme: up to $50k from super for deposit', 'Check your state revenue office for current stamp duty concessions'] },
+                { id: 'phase4', num: '4', icon: '🏦', title: 'Get Pre-Approved', color: theme.success, items: ['Pre-approval shows sellers you\'re serious — valid ~90 days', 'Use a mortgage broker: access 40+ lenders, free to you (paid by bank)', 'Bring: 3 months payslips, 3 months bank statements, tax returns, ID', 'Understand variable (flexible) vs fixed rate (certainty)', 'Ask about offset accounts — critical for accelerating payoff', 'Compare comparison rates, not just advertised rates', 'Get pre-approval BEFORE falling in love with a property'] },
+                { id: 'phase5', num: '5', icon: '🎯', title: 'Buy Smart & Pay It Off Fast', color: theme.danger, items: ['Research suburbs: price trends, yield, infrastructure, school catchments', 'Buy slightly below your max borrowing capacity — buffer for rate rises', 'Switch to fortnightly repayments immediately — saves 3–4 years', 'Open an offset account and park all savings there from day one', 'Direct tax returns, bonuses, and windfalls straight to mortgage', 'Review your rate every 2 years — don\'t pay the loyalty tax', 'Use the Mortgage Accelerator tab to see exactly what extra payments save you'] },
+              ].map(phase => (
+                <div key={phase.id} style={{ marginBottom: '10px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + (homeGuideExpanded === phase.id ? phase.color : theme.border) }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px 0 0' }}>
+                    <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === phase.id ? null : phase.id)} style={{ flex: 1, padding: '14px 16px', background: homeGuideExpanded === phase.id ? phase.color + '20' : theme.cardBg, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left' as const }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: phase.color + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{phase.icon}</div>
+                      <div>
+                        <div style={{ color: phase.color, fontWeight: 700, fontSize: '14px' }}>Phase {phase.num}: {phase.title}</div>
+                        <div style={{ color: '#64748b', fontSize: '11px' }}>{phase.items.length} key steps</div>
+                      </div>
+                      <span style={{ color: phase.color, fontSize: '16px', marginLeft: '8px' }}>{homeGuideExpanded === phase.id ? '▼' : '▶'}</span>
+                    </button>
+                    <button onClick={() => addToRoadmapQuick(`Home Buying Phase ${phase.num}: ${phase.title}`, phase.icon, '', phase.items[0])} style={{ padding: '6px 10px', background: phase.color + '20', color: phase.color, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, flexShrink: 0 }}>+ Roadmap</button>
+                  </div>
+                  {homeGuideExpanded === phase.id && (
+                    <div style={{ padding: '0 16px 16px 16px', background: theme.bg }}>
+                      <div style={{ height: '1px', background: theme.border, marginBottom: '14px' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                        {phase.items.map((item, i) => (
+                          <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', background: theme.cardBg, borderRadius: '8px' }}>
+                            <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: phase.color + '30', color: phase.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', flexShrink: 0 }}>{i + 1}</div>
+                            <div style={{ color: '#e2e8f0', fontSize: '13px', lineHeight: 1.5 }}>{item}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {phase.id === 'phase5' && <button onClick={() => setActiveTab('mortgage')} style={{ ...btnSuccess, width: '100%', marginTop: '12px' }}>🚀 Open Mortgage Accelerator →</button>}
+                      {phase.id === 'phase3' && (
+                        <div style={{ marginTop: '12px', padding: '12px', background: theme.cardBg, borderRadius: '8px' }}>
+                          <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, marginBottom: '8px' }}>📊 Stamp Duty Quick Reference</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                            {Object.entries(australianHomeData.stampDuty).map(([state, data]: [string, any]) => (
+                              <div key={state} style={{ padding: '8px', background: theme.bg, borderRadius: '6px' }}>
+                                <div style={{ color: theme.accent, fontWeight: 700, fontSize: '12px', marginBottom: '2px' }}>{state}</div>
+                                <div style={{ color: '#64748b', fontSize: '11px' }}>{data.firstHome}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
               {literacyTopics.map(topic => (
                 <div key={topic.id} style={{ background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + (learnExpanded === topic.id ? theme.accent : theme.border), overflow: 'hidden' }}>
@@ -7034,69 +7099,6 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               </div>
             </div>
 
-            {/* Australian Home Buying Roadmap */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, theme.cardBg 0%, theme.bg 100%)', borderRadius: '20px', border: '1px solid ' + theme.border }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: 'linear-gradient(135deg, #D4AF37, #B68B2E)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>🏠</div>
-                  <div>
-                    <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>Australian Home Buying Roadmap</h2>
-                    <p style={{ margin: '4px 0 0 0', color: theme.textMuted, fontSize: '13px' }}>Expand each phase · Add phases to your personal roadmap</p>
-                  </div>
-                </div>
-                <button onClick={() => addToRoadmapQuick('Buy My First Home', '🏠', '120000', 'Deposit + costs for property purchase')} style={{ padding: '8px 14px', background: theme.warning + '20', color: theme.warning, border: '1px solid ' + theme.warning + '40', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>+ Add to Roadmap</button>
-              </div>
-
-              {[
-                { id: 'phase1', num: '1', icon: '💰', title: 'Get Financially Ready', color: theme.warning, items: ['Complete Baby Steps 1–3 first (emergency fund + kill bad debt)', 'Save your deposit: 5% minimum, 20% avoids LMI', 'Check your credit score free via Credit Savvy or Finder', 'Stop applying for new credit 6+ months before applying', 'Consistent income for 12+ months strengthens your application', 'Reduce existing debt and BNPL balances to boost borrowing power'] },
-                { id: 'phase2', num: '2', icon: '🧾', title: 'Understand the True Costs', color: theme.purple, items: ['Stamp duty: 0% (first home QLD new builds) to 5.5% (investors)', 'LMI: $8k–$30k if deposit under 20% — often added to your loan', 'Conveyancer / solicitor: ~$1,500–$2,500', 'Building & pest inspection: ~$500–$800', 'Lender fees (application, valuation): ~$500–$1,500', "Moving costs + immediate repairs: budget $3k–$10k", "Budget 3–5% of purchase price in extra costs on top of deposit"] },
-                { id: 'phase3', num: '3', icon: '🏛️', title: 'Government Schemes & Grants', color: theme.accent, items: ['First Home Guarantee: 5% deposit, no LMI — 35,000 places/yr', 'Regional First Home Guarantee: same for regional areas', 'Family Home Guarantee: single parents — 2% deposit', 'QLD FHOG: $30,000 grant for new builds', 'NSW FHOG: $10,000 for new builds under $600k', 'First Home Super Saver Scheme: up to $50k from super for deposit', 'Check your state revenue office for current stamp duty concessions'] },
-                { id: 'phase4', num: '4', icon: '🏦', title: 'Get Pre-Approved', color: theme.success, items: ['Pre-approval shows sellers you\'re serious — valid ~90 days', 'Use a mortgage broker: access 40+ lenders, free to you (paid by bank)', 'Bring: 3 months payslips, 3 months bank statements, tax returns, ID', 'Understand variable (flexible) vs fixed rate (certainty)', 'Ask about offset accounts — critical for accelerating payoff', 'Compare comparison rates, not just advertised rates', 'Get pre-approval BEFORE falling in love with a property'] },
-                { id: 'phase5', num: '5', icon: '🎯', title: 'Buy Smart & Pay It Off Fast', color: theme.danger, items: ['Research suburbs: price trends, yield, infrastructure, school catchments', 'Buy slightly below your max borrowing capacity — buffer for rate rises', 'Switch to fortnightly repayments immediately — saves 3–4 years', 'Open an offset account and park all savings there from day one', 'Direct tax returns, bonuses, and windfalls straight to mortgage', 'Review your rate every 2 years — don\'t pay the loyalty tax', 'Use the Mortgage Accelerator tab to see exactly what extra payments save you'] },
-              ].map(phase => (
-                <div key={phase.id} style={{ marginBottom: '10px', borderRadius: '12px', overflow: 'hidden', border: '1px solid ' + (homeGuideExpanded === phase.id ? phase.color : theme.border) }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px 0 0' }}>
-                    <button onClick={() => setHomeGuideExpanded(homeGuideExpanded === phase.id ? null : phase.id)} style={{ flex: 1, padding: '14px 16px', background: homeGuideExpanded === phase.id ? phase.color + '20' : theme.cardBg, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left' as const }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: phase.color + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{phase.icon}</div>
-                      <div>
-                        <div style={{ color: phase.color, fontWeight: 700, fontSize: '14px' }}>Phase {phase.num}: {phase.title}</div>
-                        <div style={{ color: '#64748b', fontSize: '11px' }}>{phase.items.length} key steps</div>
-                      </div>
-                      <span style={{ color: phase.color, fontSize: '16px', marginLeft: '8px' }}>{homeGuideExpanded === phase.id ? '▼' : '▶'}</span>
-                    </button>
-                    <button onClick={() => addToRoadmapQuick(`Home Buying Phase ${phase.num}: ${phase.title}`, phase.icon, '', phase.items[0])} style={{ padding: '6px 10px', background: phase.color + '20', color: phase.color, border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, flexShrink: 0 }}>+ Roadmap</button>
-                  </div>
-                  {homeGuideExpanded === phase.id && (
-                    <div style={{ padding: '0 16px 16px 16px', background: theme.bg }}>
-                      <div style={{ height: '1px', background: theme.border, marginBottom: '14px' }} />
-                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                        {phase.items.map((item, i) => (
-                          <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', background: theme.cardBg, borderRadius: '8px' }}>
-                            <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: phase.color + '30', color: phase.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', flexShrink: 0 }}>{i + 1}</div>
-                            <div style={{ color: '#e2e8f0', fontSize: '13px', lineHeight: 1.5 }}>{item}</div>
-                          </div>
-                        ))}
-                      </div>
-                      {phase.id === 'phase5' && <button onClick={() => setActiveTab('mortgage')} style={{ ...btnSuccess, width: '100%', marginTop: '12px' }}>🚀 Open Mortgage Accelerator →</button>}
-                      {phase.id === 'phase3' && (
-                        <div style={{ marginTop: '12px', padding: '12px', background: theme.cardBg, borderRadius: '8px' }}>
-                          <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, marginBottom: '8px' }}>📊 Stamp Duty Quick Reference</div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                            {Object.entries(australianHomeData.stampDuty).map(([state, data]: [string, any]) => (
-                              <div key={state} style={{ padding: '8px', background: theme.bg, borderRadius: '6px' }}>
-                                <div style={{ color: theme.accent, fontWeight: 700, fontSize: '12px', marginBottom: '2px' }}>{state}</div>
-                                <div style={{ color: '#64748b', fontSize: '11px' }}>{data.firstHome}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
         )}
 
         {/* ==================== INSIGHTS TAB ==================== */}
@@ -7274,18 +7276,26 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         if (!isMealSelected) return null
                         return (
                         <div key={i} onClick={() => {
-                          const mealText = line.slice(line.indexOf(' ')+1).split('~$')[0].replace(/\s*\(.*?\)\s*/g, '').trim()
+                          // Strip emoji, then "Breakfast: " / "Lunch: " / "Dinner: " prefix, then cost/serves annotations
+                          const afterEmoji = line.slice(line.indexOf(' ')+1)
+                          const afterLabel = afterEmoji.includes(': ') ? afterEmoji.slice(afterEmoji.indexOf(': ')+2) : afterEmoji
+                          const mealText = afterLabel.split('~$')[0].replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim()
                           fetchRecipe(mealText)
-                        }} style={{ color: theme.text, fontSize: '13px', padding: '5px 8px', display: 'flex', gap: '8px', alignItems: 'center', borderRadius: '8px', cursor: 'pointer', transition: 'background 0.15s' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = theme.accent + '10')}
+                        }} style={{ color: theme.text, fontSize: '13px', padding: '5px 8px', display: 'flex', gap: '8px', alignItems: 'center', borderRadius: '8px', cursor: 'pointer', transition: 'background 0.15s', userSelect: 'none' as const }}
+                          onMouseEnter={e => (e.currentTarget.style.background = theme.accent + '12')}
                           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                          <span style={{ flexShrink: 0 }}>{line.split(' ')[0]}</span>
-                          <span style={{ flex: 1 }} dangerouslySetInnerHTML={{ __html: line.slice(line.indexOf(' ')+1)
+                          <span style={{ flexShrink: 0, pointerEvents: 'none' as const }}>{line.split(' ')[0]}</span>
+                          <span style={{ flex: 1, pointerEvents: 'none' as const }} dangerouslySetInnerHTML={{ __html: line.slice(line.indexOf(' ')+1)
                             .replace(/_(.*?)_/g, (_m: string, g: string) => `<em style="color:${theme.success};font-size:11px"> · ${g}</em>`)
                             .replace(/~\$(\d+(?:\.\d{1,2})?)/g, (_m: string, price: string) => `<span style="color:${theme.textMuted};font-size:11px"> ~$${price}</span>`) }} />
-                          {fetchingRecipe === line.slice(line.indexOf(' ')+1).split('~$')[0].replace(/\s*\(.*?\)\s*/g, '').trim()
-                            ? <span style={{ color: theme.accent, fontSize: '10px', flexShrink: 0 }}>⏳</span>
-                            : <span style={{ color: theme.accent + '80', fontSize: '10px', flexShrink: 0 }}>📋</span>}
+                          {(() => {
+                            const afterEmoji = line.slice(line.indexOf(' ')+1)
+                            const afterLabel = afterEmoji.includes(': ') ? afterEmoji.slice(afterEmoji.indexOf(': ')+2) : afterEmoji
+                            const mealText = afterLabel.split('~$')[0].replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim()
+                            return fetchingRecipe === mealText
+                              ? <span style={{ color: theme.accent, fontSize: '11px', flexShrink: 0, pointerEvents: 'none' as const }}>⏳</span>
+                              : <span style={{ color: theme.accent, fontSize: '10px', flexShrink: 0, opacity: 0.6, pointerEvents: 'none' as const }}>📋 recipe</span>
+                          })()}
                         </div>
                         )
                       }
