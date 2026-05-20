@@ -5,41 +5,57 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { people, budget, dietaryNeeds, dislikes, useDetailedPricing, catalogText } = body
+    const { people, budget, dietaryNeeds, dislikes, useDetailedPricing, catalogText, meals } = body
     const n = parseInt(people) || 4
+    const selectedMeals: string[] = meals && meals.length > 0 ? meals : ['breakfast', 'lunch', 'dinner']
+    const hasBreakfast = selectedMeals.includes('breakfast')
+    const hasLunch = selectedMeals.includes('lunch')
+    const hasDinner = selectedMeals.includes('dinner')
+
+    const mealLabel = selectedMeals.map((m: string) => m.charAt(0).toUpperCase() + m.slice(1)).join(' + ')
 
     const systemPrompt = `You are a practical Australian meal planning assistant. You create realistic, budget-conscious 7-day meal plans for Australian families using current Woolworths, Coles, and Aldi prices. You ALWAYS include real dollar amounts — never placeholders. You respond ONLY with the meal plan — no preamble, no sign-off, no financial advice.`
 
+    // Build the example day based on selected meals only
+    const exampleDay = [
+      hasBreakfast ? `🌅 Breakfast: Rolled oats with banana and honey (${n} serves) ~$3.20` : '',
+      hasLunch    ? `☀️ Lunch: Vegemite and cheese sandwiches (${n} serves) ~$4.50` : '',
+      hasDinner   ? `🌙 Dinner: Spaghetti bolognese (${n} serves) ~$14.00 _(batch: double batch — leftover pasta Tue lunch)_` : '',
+    ].filter(Boolean).join('\n')
+
+    const exampleDay2 = [
+      hasBreakfast ? `🌅 Breakfast: Weetbix with milk (${n} serves) ~$2.80` : '',
+      hasLunch    ? `☀️ Lunch: Leftover bolognese on toast (${n} serves) ~$1.50` : '',
+      hasDinner   ? `🌙 Dinner: Baked chicken drumsticks with roast potatoes (${n} serves) ~$16.00` : '',
+    ].filter(Boolean).join('\n')
+
     const userPrompt = [
-      `Create a 7-day meal plan for ${n} people with a weekly grocery budget of $${budget} AUD.`,
+      `Create a 7-day meal plan (${mealLabel} only) for ${n} people with a weekly grocery budget of $${budget} AUD.`,
       dislikes ? `Do NOT include: ${dislikes}.` : '',
       dietaryNeeds ? `Dietary requirements: ${dietaryNeeds}.` : '',
       ``,
-      `PORTIONS: All dinners must serve ${n} people. Batch cook where possible — leftovers become next-day lunches.`,
-      useDetailedPricing ? `PRICING: Use real 2024-25 AU prices. Examples: chicken thighs 1kg $8, beef mince 500g $7, eggs 12pk $5.50, milk 2L $3.20, bread loaf $3.50, pasta 500g $1.80, rice 1kg $3, frozen veg 1kg $4.50, rolled oats 1kg $3.50, bananas 1kg $3.50, cheese 500g block $9. Multiply quantities for ${n} people.` : '',
-      catalogText ? `\nThis week's specials to prioritise:\n${String(catalogText).slice(0, 600)}` : '',
+      `MEALS TO INCLUDE: Only generate ${mealLabel}. Do NOT add any other meal types.`,
+      hasDinner ? `PORTIONS: All dinners must serve ${n} people. Batch cook where possible — dinner leftovers become next-day lunches.` : `PORTIONS: All meals must serve ${n} people.`,
+      useDetailedPricing ? `PRICING: Use real 2024-25 AU prices. Examples: chicken thighs 1kg $8, beef mince 500g $7, eggs 12pk $5.50, milk 2L $3.20, bread loaf $3.50, pasta 500g $1.80, rice 1kg $3, frozen veg 1kg $4.50, rolled oats 1kg $3.50, bananas 1kg $3.50, cheese 500g block $9. Scale quantities for ${n} people.` : '',
+      catalogText ? `\nThis week's catalog specials to prioritise:\n${String(catalogText).slice(0, 600)}` : '',
       ``,
-      `Use this EXACT format. Replace every price with a real dollar amount:`,
+      `Use this EXACT format — real dollar amounts only, no placeholders:`,
       ``,
-      `**Estimated weekly cost: $[real total] | Savings vs eating out: ~$[real saving]**`,
+      `**Estimated weekly cost: $[real number] | Savings vs eating out: ~$[real number]**`,
       ``,
       `## Monday`,
-      `🌅 Breakfast: Rolled oats with banana and honey (${n} serves) ~$3.20`,
-      `☀️ Lunch: Vegemite and cheese sandwiches (${n} serves) ~$4.50`,
-      `🌙 Dinner: Spaghetti bolognese (${n} serves) ~$14.00 _(batch: double — leftover pasta Tue lunch)_`,
+      exampleDay,
       ``,
       `## Tuesday`,
-      `🌅 Breakfast: Weetbix with milk (${n} serves) ~$2.80`,
-      `☀️ Lunch: Leftover bolognese on toast (${n} serves) ~$1.50`,
-      `🌙 Dinner: Baked chicken drumsticks with roast potatoes (${n} serves) ~$16.00`,
+      exampleDay2,
       ``,
-      `[Continue for Wednesday, Thursday, Friday, Saturday, Sunday in the SAME format with REAL prices]`,
+      `[Continue for Wednesday, Thursday, Friday, Saturday, Sunday in the SAME format with real prices]`,
       ``,
       `## Shopping List`,
       `- Chicken drumsticks 1.5kg — 2 packs ~$17.00`,
       `- Beef mince 500g — 2 packs ~$14.00`,
       `- Eggs — 2 dozen ~$11.00`,
-      `[List every ingredient needed. Use real prices from Woolworths/Coles/Aldi.]`,
+      `[List every ingredient needed with real AU prices]`,
       ``,
       `## Budget Tips`,
       `- [3 specific tips for a ${n}-person household on $${budget}/week]`,
