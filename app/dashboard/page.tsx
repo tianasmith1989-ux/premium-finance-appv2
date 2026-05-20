@@ -6405,7 +6405,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
             {/* Australian Home Buying Roadmap — moved from Grow tab */}
             {/* Australian Home Buying Roadmap */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, theme.cardBg 0%, theme.bg 100%)', borderRadius: '20px', border: '1px solid ' + theme.border }}>
+            <div style={{ padding: '24px', background: theme.cardBg, borderRadius: '20px', border: '1px solid ' + theme.border }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: 'linear-gradient(135deg, #D4AF37, #B68B2E)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>🏠</div>
@@ -6596,7 +6596,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             </div>
 
             {/* ACCOUNTABILITY SCORECARD */}
-            <div style={{ ...cardStyle, background: 'linear-gradient(135deg, theme.cardBg, theme.bg)', border: '1px solid ' + theme.border }}>
+            <div style={{ ...cardStyle, background: theme.cardBg, border: '1px solid ' + theme.border }}>
               <h3 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '20px' }}>📊 Accountability Scorecard</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
                 {[
@@ -6661,7 +6661,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             </div>
 
             {/* ===== ROADMAP — MOVED TO TOP ===== */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, theme.cardBg, theme.bg)', borderRadius: '20px', border: '2px solid ' + theme.purple }}>
+            <div style={{ padding: '24px', background: theme.cardBg, borderRadius: '20px', border: '2px solid ' + theme.purple }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
                 <div>
                   <h2 style={{ margin: 0, color: theme.text, fontSize: '22px' }}>🗺️ My Roadmap</h2>
@@ -7069,7 +7069,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             </div>
 
             {/* Rat Race Escape Tracker */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, theme.cardBg 0%, theme.bg 100%)', borderRadius: '20px', border: '1px solid ' + theme.border }}>
+            <div style={{ padding: '24px', background: theme.cardBg, borderRadius: '20px', border: '1px solid ' + theme.border }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                 <div>
                   <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px' }}>🐀 RAT RACE ESCAPE TRACKER</div>
@@ -7594,7 +7594,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             </div>
 
             {/* COMMUNITY STATS */}
-            <div style={{ padding: '20px', background: 'linear-gradient(135deg, theme.cardBg, theme.bg)', borderRadius: '16px', border: '1px solid ' + theme.border }}>
+            <div style={{ padding: '20px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}>
               <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '18px' }}>🌏 You're Not Alone</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
                 {[
@@ -8112,7 +8112,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         {/* OVERVIEW */}
         {activeTab === 'overview' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, theme.cardBg, theme.bg)', borderRadius: '20px', border: '1px solid ' + theme.border }}>
+            <div style={{ padding: '24px', background: theme.cardBg, borderRadius: '20px', border: '1px solid ' + theme.border }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ color: '#64748b', fontSize: '12px', letterSpacing: '2px' }}>FINANCIAL HEALTH SCORE</div>
                 <div style={{ fontSize: '48px', fontWeight: 700, color: financialHealthScore >= 70 ? theme.success : financialHealthScore >= 40 ? theme.warning : theme.danger }}>{financialHealthScore}</div>
