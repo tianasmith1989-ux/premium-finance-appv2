@@ -7223,12 +7223,20 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       if (line.startsWith('## ')) return (
                         <div key={i} style={{ color: theme.accent, fontWeight: 800, fontSize: '16px', marginTop: '18px', marginBottom: '6px', borderBottom: '1px solid ' + theme.accent + '30', paddingBottom: '4px' }}>{line.replace('## ', '')}</div>
                       )
+                      // Bold summary line (costs)
                       if (line.startsWith('**') && line.endsWith('**') && !line.slice(2,-2).includes('**')) return (
                         <div key={i} style={{ color: theme.text, fontWeight: 700, fontSize: '14px', marginTop: '12px', marginBottom: '4px' }}>{line.replace(/\*\*/g, '')}</div>
                       )
                       if (line.startsWith('**') && line.includes('**')) return (
-                        <div key={i} style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '8px' }} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong style="color:' + theme.accent + '">$1</strong>') }} />
+                        <div key={i} style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '4px' }} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, `<strong style="color:${theme.accent}">$1</strong>`) }} />
                       )
+                      // Pantry explanation tip line
+                      if (line.startsWith('💡')) return (
+                        <div key={i} style={{ padding: '10px 14px', background: theme.accent + '12', border: '1px solid ' + theme.accent + '30', borderRadius: '8px', color: theme.textMuted, fontSize: '12px', lineHeight: 1.5, marginBottom: '8px' }}>
+                          {line}
+                        </div>
+                      )
+                      // Meal lines
                       if (line.match(/^[🌅☀️🌙]/) ) {
                         const mealEmojis: Record<string, string> = { breakfast: '🌅', lunch: '☀️', dinner: '🌙' }
                         const selectedMeals = currentMealPlan?.prefs?.meals || ['breakfast','lunch','dinner']
@@ -7243,9 +7251,12 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         </div>
                         )
                       }
+                      // Shopping list items — highlight pantry staple duration
                       if (line.startsWith('- ')) return (
                         <div key={i} style={{ color: theme.textMuted, fontSize: '13px', padding: '2px 0 2px 12px', borderLeft: '2px solid ' + theme.border }}
-                          dangerouslySetInnerHTML={{ __html: line.slice(2).replace(/~\$(\d+(?:\.\d{1,2})?)/g, (_m: string, price: string) => `<span style="color:${theme.accent}"> ~$${price}</span>`) }} />
+                          dangerouslySetInnerHTML={{ __html: line.slice(2)
+                            .replace(/~\$(\d+(?:\.\d{1,2})?)/g, (_m: string, price: string) => `<span style="color:${theme.accent}"> ~$${price}</span>`)
+                            .replace(/\(lasts (.*?)\)/g, `<span style="color:${theme.success};font-size:11px;background:${theme.success}18;padding:1px 6px;border-radius:4px;margin-left:4px"> ♻️ lasts $1</span>`) }} />
                       )
                       if (line.trim() === '') return <div key={i} style={{ height: '4px' }} />
                       return <div key={i} style={{ color: theme.textMuted, fontSize: '13px' }}>{line}</div>
