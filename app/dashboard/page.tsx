@@ -179,6 +179,10 @@ export default function Dashboard() {
   const [pwaInstallPrompt, setPwaInstallPrompt] = useState<any>(null)
   const [showNotifSetup, setShowNotifSetup] = useState(false)
 
+  // ==================== RECIPE MODAL ====================
+  const [recipeModal, setRecipeModal] = useState<{ meal: string; text: string } | null>(null)
+  const [fetchingRecipe, setFetchingRecipe] = useState<string | null>(null) // meal name being fetched
+
   // ==================== PASSIVE QUEST STATE ====================
   const [activeQuestId, setActiveQuestId] = useState<number | null>(null)
   const [passiveQuests, setPassiveQuests] = useState<any[]>([
@@ -1585,6 +1589,32 @@ Rules:
 
   // ── Generate meal plan ──
   const [mealPlanError, setMealPlanError] = useState<string | null>(null)
+  // ── Fetch recipe for a specific meal ──
+  const fetchRecipe = async (mealName: string) => {
+    // Strip cost annotation e.g. "Spaghetti bolognese ~$14.00" → "Spaghetti bolognese"
+    const cleanName = mealName.replace(/~\$[\d.]+/g, '').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim()
+    setFetchingRecipe(cleanName)
+    try {
+      const response = await fetch('/api/recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          meal: cleanName,
+          serves: currentMealPlan?.prefs?.people || 4,
+          dislikes: currentMealPlan?.prefs?.dislikes || '',
+          dietaryNeeds: currentMealPlan?.prefs?.dietaryNeeds || '',
+          budget: currentMealPlan?.weeklyBudget || ''
+        })
+      })
+      if (!response.ok) throw new Error('Failed to fetch recipe')
+      const data = await response.json()
+      if (data.text) setRecipeModal({ meal: cleanName, text: data.text })
+    } catch (e) {
+      console.error('Recipe fetch error:', e)
+    }
+    setFetchingRecipe(null)
+  }
+
   const generateMealPlan = async () => {
     setGeneratingMealPlan(true)
     setMealPlanError(null)
@@ -7243,11 +7273,19 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         const isMealSelected = selectedMeals.some((m: string) => line.startsWith(mealEmojis[m]))
                         if (!isMealSelected) return null
                         return (
-                        <div key={i} style={{ color: theme.text, fontSize: '13px', padding: '3px 0', display: 'flex', gap: '8px' }}>
-                          <span>{line.split(' ')[0]}</span>
-                          <span dangerouslySetInnerHTML={{ __html: line.slice(line.indexOf(' ')+1)
+                        <div key={i} onClick={() => {
+                          const mealText = line.slice(line.indexOf(' ')+1).split('~$')[0].replace(/\s*\(.*?\)\s*/g, '').trim()
+                          fetchRecipe(mealText)
+                        }} style={{ color: theme.text, fontSize: '13px', padding: '5px 8px', display: 'flex', gap: '8px', alignItems: 'center', borderRadius: '8px', cursor: 'pointer', transition: 'background 0.15s' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = theme.accent + '10')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                          <span style={{ flexShrink: 0 }}>{line.split(' ')[0]}</span>
+                          <span style={{ flex: 1 }} dangerouslySetInnerHTML={{ __html: line.slice(line.indexOf(' ')+1)
                             .replace(/_(.*?)_/g, (_m: string, g: string) => `<em style="color:${theme.success};font-size:11px"> · ${g}</em>`)
                             .replace(/~\$(\d+(?:\.\d{1,2})?)/g, (_m: string, price: string) => `<span style="color:${theme.textMuted};font-size:11px"> ~$${price}</span>`) }} />
+                          {fetchingRecipe === line.slice(line.indexOf(' ')+1).split('~$')[0].replace(/\s*\(.*?\)\s*/g, '').trim()
+                            ? <span style={{ color: theme.accent, fontSize: '10px', flexShrink: 0 }}>⏳</span>
+                            : <span style={{ color: theme.accent + '80', fontSize: '10px', flexShrink: 0 }}>📋</span>}
                         </div>
                         )
                       }
@@ -7273,6 +7311,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                             {plan.prefs?.people} people · ${plan.weeklyBudget}/wk budget
                             {plan.prefs?.dislikes ? ` · no ${plan.prefs.dislikes}` : ''}
                             {plan.usedCatalog ? ' · 📸 catalog used' : ''}
+                            {' · '}<span style={{ color: theme.accent }}>📋 tap any meal for recipe</span>
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
@@ -8513,6 +8552,42 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           </div>
         </div>
       )}
+
+      {/* ==================== RECIPE MODAL ==================== */}
+      {recipeModal && (() => {
+        const renderRecipeText = (text: string) => text.split('\n').map((line, i) => {
+          if (line.startsWith('# ')) return <h2 key={i} style={{ color: theme.accent, fontSize: '22px', fontWeight: 800, margin: '0 0 4px 0', fontFamily: 'Cinzel, serif' }}>{line.slice(2)}</h2>
+          if (line.startsWith('## ')) return <div key={i} style={{ color: theme.accent, fontWeight: 700, fontSize: '14px', marginTop: '16px', marginBottom: '6px', borderBottom: '1px solid ' + theme.accent + '30', paddingBottom: '3px' }}>{line.slice(3)}</div>
+          if (line.startsWith('**') && line.endsWith('**')) return <div key={i} style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '2px' }}>{line.replace(/\*\*/g, '')}</div>
+          if (line.startsWith('**')) return <div key={i} style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, `<strong style="color:${theme.text}">$1</strong>`) }} />
+          if (line.match(/^\d+\./)) return <div key={i} style={{ color: theme.text, fontSize: '13px', padding: '4px 0 4px 4px', display: 'flex', gap: '8px', lineHeight: 1.5 }}>
+            <span style={{ color: theme.accent, fontWeight: 700, flexShrink: 0 }}>{line.match(/^\d+/)?.[0]}.</span>
+            <span>{line.replace(/^\d+\.\s*/, '')}</span>
+          </div>
+          if (line.startsWith('- ')) return <div key={i} style={{ color: theme.textMuted, fontSize: '13px', padding: '2px 0 2px 12px', borderLeft: '2px solid ' + theme.border, marginBottom: '2px' }}
+            dangerouslySetInnerHTML={{ __html: line.slice(2).replace(/~\$(\d+(?:\.\d{1,2})?)/g, (_m: string, p: string) => `<span style="color:${theme.accent}"> ~$${p}</span>`) }} />
+          if (line.trim() === '') return <div key={i} style={{ height: '6px' }} />
+          return <div key={i} style={{ color: theme.textMuted, fontSize: '13px' }}>{line}</div>
+        })
+        return (
+          <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setRecipeModal(null)}>
+            <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '560px', width: '100%', maxHeight: '88vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', gap: '12px' }}>
+                <div style={{ fontSize: '32px' }}>🍳</div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={async () => { await navigator.clipboard.writeText(recipeModal.text); alert('Recipe copied!') }}
+                    style={{ padding: '6px 12px', background: theme.accent + '20', border: '1px solid ' + theme.accent + '40', borderRadius: '8px', color: theme.accent, cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>📋 Copy</button>
+                  <button onClick={() => setRecipeModal(null)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '24px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                </div>
+              </div>
+              {renderRecipeText(recipeModal.text)}
+              <div style={{ marginTop: '20px', padding: '10px 14px', background: theme.bg, borderRadius: '8px', border: '1px solid ' + theme.border, fontSize: '11px', color: theme.textMuted }}>
+                💡 Tap any other meal in your plan to get its recipe
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* PAYSLIP MODAL — ENHANCED */}
       {showPayslipUpload && extractedPayslip && (() => {
