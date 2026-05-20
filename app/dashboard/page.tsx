@@ -1590,10 +1590,12 @@ Rules:
   // ── Generate meal plan ──
   const [mealPlanError, setMealPlanError] = useState<string | null>(null)
   // ── Fetch recipe for a specific meal ──
+  const [recipeError, setRecipeError] = useState<string | null>(null)
   const fetchRecipe = async (mealName: string) => {
-    // Strip cost annotation e.g. "Spaghetti bolognese ~$14.00" → "Spaghetti bolognese"
     const cleanName = mealName.replace(/~\$[\d.]+/g, '').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim()
+    if (!cleanName) return
     setFetchingRecipe(cleanName)
+    setRecipeError(null)
     try {
       const response = await fetch('/api/recipe', {
         method: 'POST',
@@ -1606,11 +1608,13 @@ Rules:
           budget: currentMealPlan?.weeklyBudget || ''
         })
       })
-      if (!response.ok) throw new Error('Failed to fetch recipe')
       const data = await response.json()
-      if (data.text) setRecipeModal({ meal: cleanName, text: data.text })
-    } catch (e) {
+      if (!response.ok) throw new Error(data?.error || `Server error ${response.status}`)
+      if (!data.text) throw new Error('No recipe returned — please try again.')
+      setRecipeModal({ meal: cleanName, text: data.text })
+    } catch (e: any) {
       console.error('Recipe fetch error:', e)
+      setRecipeError(e?.message || 'Could not load recipe. Check that /api/recipe/route.ts is deployed.')
     }
     setFetchingRecipe(null)
   }
@@ -7338,6 +7342,12 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         {renderMealText(plan.rawText || '')}
                       </div>
 
+                      {recipeError && (
+                        <div style={{ marginTop: '10px', padding: '12px 16px', background: theme.danger + '18', border: '1px solid ' + theme.danger + '40', borderRadius: '10px', color: theme.danger, fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>⚠️ {recipeError}</span>
+                          <button onClick={() => setRecipeError(null)} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '16px', padding: '0 4px' }}>×</button>
+                        </div>
+                      )}
                       <div style={{ marginTop: '10px', fontSize: '11px', color: theme.textMuted, textAlign: 'center' as const }}>
                         Generated {new Date(plan.generatedAt).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}
                       </div>
