@@ -7214,8 +7214,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' as const }}>
                     <span style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>INCLUDE:</span>
-                    {(['breakfast', 'lunch', 'dinner'] as const).map(meal => {
-                      const icons: Record<string, string> = { breakfast: '🌅', lunch: '☀️', dinner: '🌙' }
+                    {(['breakfast', 'lunch', 'dinner', 'dessert'] as const).map(meal => {
+                      const icons: Record<string, string> = { breakfast: '🌅', lunch: '☀️', dinner: '🌙', dessert: '🍮' }
                       const selected = (mealPlanPrefs.meals || ['breakfast','lunch','dinner']).includes(meal)
                       return (
                         <button key={meal} onClick={() => {
@@ -7273,8 +7273,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         </div>
                       )
                       // Meal lines
-                      if (line.match(/^[🌅☀️🌙]/) ) {
-                        const mealEmojis: Record<string, string> = { breakfast: '🌅', lunch: '☀️', dinner: '🌙' }
+                      if (line.match(/^[🌅☀️🌙🍮]/) ) {
+                        const mealEmojis: Record<string, string> = { breakfast: '🌅', lunch: '☀️', dinner: '🌙', dessert: '🍮' }
                         const selectedMeals = currentMealPlan?.prefs?.meals || ['breakfast','lunch','dinner']
                         const isMealSelected = selectedMeals.some((m: string) => line.startsWith(mealEmojis[m]))
                         if (!isMealSelected) return null
