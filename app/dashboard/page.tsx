@@ -8879,7 +8879,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
           // Get a 1-sentence coach reaction
           try {
-            const lines = spendCats.map(cat => `${cat.label}: $${Math.round(checkInSliders[cat.id] || actualSpend[cat.id] || 0)} (budget $${categoryBudgets[cat.id] || 0})`).join(', ')
+            const lines = spendCats.map(cat => `${cat.label}: $${Math.round(checkInSliders[cat.id] || parseFloat(String((actualSpend as any)[cat.id] || 0)) || 0)} (budget $${parseFloat(String((categoryBudgets as any)[cat.id] || 0)) || 0})`).join(', ')
             const response = await fetch('/api/budget-coach', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -8931,9 +8931,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
                   <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px', marginBottom: '20px' }}>
                     {spendCats.map(cat => {
-                      const budget = categoryBudgets[cat.id] || 200
+                      const budget = parseFloat(String((categoryBudgets as any)[cat.id] || 0)) || 200
                       const _mp = new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate()
-                      const current = checkInSliders[cat.id] ?? (actualSpend[cat.id] || Math.round(budget * _mp))
+                      const current = checkInSliders[cat.id] ?? (parseFloat(String((actualSpend as any)[cat.id] || 0)) || Math.round(budget * _mp))
                       const pct = Math.min(1, current / budget)
                       const isOver = current > budget
                       return (
