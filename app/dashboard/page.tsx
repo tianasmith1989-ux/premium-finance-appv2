@@ -753,7 +753,29 @@ export default function Dashboard() {
       })
       const name = userName || 'Builder'
       const dayName = new Date().toLocaleDateString('en-AU', { weekday: 'long' })
-      const question = `Write a 2-sentence daily briefing for ${name}. Warm, specific, forward-looking — like a coach who knows them. Use their name. Do NOT say "Good morning". Do NOT judge past spending. Focus on what's possible today.\n\nSituation: Income $${monthlyIncome.toFixed(0)}/mo, surplus $${monthlySurplus.toFixed(0)}/mo, emergency fund ${emergencyMonths.toFixed(1)} months, debts: ${debts.length > 0 ? debts.map((d: any) => d.name + ' $' + d.balance).join(', ') : 'none'}, baby step: ${currentBabyStep.title}, overdue: ${overdueBills.length > 0 ? overdueBills.map((e: any) => e.name).join(', ') : 'none'}, streak: ${streak} days, day: ${dayName}.\n\n2 sentences max. End with one specific action for today. No markdown.`
+      const babyStepTarget = currentBabyStep.step === 1 ? 2000
+        : currentBabyStep.step === 3 ? Math.round(monthlyExpenses * 3)
+        : currentBabyStep.step === 6 ? Math.round(monthlyExpenses * 6) : 0
+      const babyStepSaved = emergencyFund
+      const babyStepRemaining = babyStepTarget > 0 ? Math.max(0, babyStepTarget - babyStepSaved) : 0
+      const monthsToComplete = babyStepRemaining > 0 && monthlySurplus > 0 ? Math.ceil(babyStepRemaining / monthlySurplus) : 0
+      const question = [
+        `Write a 2-sentence daily briefing for ${name}. Warm, specific, forward-looking. Use their name. Do NOT say "Good morning". Do NOT judge past spending.`,
+        '',
+        'NUMBERS (use these exactly — do not invent or estimate differently):',
+        `- Monthly surplus available: $${monthlySurplus.toFixed(0)}/month`,
+        `- Current baby step: ${currentBabyStep.title}`,
+        `- Baby step target: $${babyStepTarget.toLocaleString()} | Already saved: $${babyStepSaved.toFixed(0)} | Still needed: $${babyStepRemaining.toFixed(0)}`,
+        `- Months to complete at current surplus: ${monthsToComplete > 0 ? monthsToComplete + ' month' + (monthsToComplete !== 1 ? 's' : '') : 'already done'}`,
+        `- Debts: ${debts.length > 0 ? debts.map((d: any) => d.name + ' $' + d.balance).join(', ') : 'none'}`,
+        `- Streak: ${streak} days | Day: ${dayName}`,
+        overdueBills.length > 0 ? `- URGENT: ${overdueBills.map((e: any) => e.name).join(', ')} overdue` : '',
+        '',
+        'RULES:',
+        `- Only make time claims using the months figure above — do not invent a different timeframe`,
+        `- If surplus < remaining, do not say it can be done faster than ${monthsToComplete} months`,
+        '- End with one concrete action for today. 2 sentences max. No markdown.',
+      ].filter(Boolean).join('\n')
       const response = await fetch('/api/budget-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
