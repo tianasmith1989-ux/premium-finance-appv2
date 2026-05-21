@@ -181,7 +181,17 @@ export default function Dashboard() {
 
   // ==================== RECIPE MODAL ====================
   const [recipeModal, setRecipeModal] = useState<{ meal: string; text: string } | null>(null)
-  const [fetchingRecipe, setFetchingRecipe] = useState<string | null>(null) // meal name being fetched
+  const [fetchingRecipe, setFetchingRecipe] = useState<string | null>(null)
+
+  // ==================== SPENDING CHECK-IN ====================
+  const [showSpendCheckIn, setShowSpendCheckIn] = useState(false)
+  const [checkInSliders, setCheckInSliders] = useState<Record<string, number>>({})
+  const [checkInNote, setCheckInNote] = useState('')
+  const [checkInResult, setCheckInResult] = useState<string | null>(null)
+  const [checkInSubmitting, setCheckInSubmitting] = useState(false)
+
+  // ==================== CELEBRATIONS ====================
+  const [celebration, setCelebration] = useState<{ title: string; subtitle: string; emoji: string; amount?: string } | null>(null)
 
   // ==================== PASSIVE QUEST STATE ====================
   const [activeQuestId, setActiveQuestId] = useState<number | null>(null)
@@ -499,6 +509,7 @@ export default function Dashboard() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
+
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
@@ -546,7 +557,51 @@ export default function Dashboard() {
   const savingsRate = monthlyIncome > 0 ? ((monthlyGoalSavings + Math.max(0, monthlySurplus)) / monthlyIncome * 100) : 0
   const passiveCoverage = monthlyExpenses > 0 ? (passiveIncome / monthlyExpenses * 100) : 0
   const emergencyFund = assets.filter(a => a.type === 'savings').reduce((s, a) => s + parseFloat(a.value || '0'), 0)
+
+
   const emergencyMonths = monthlyExpenses > 0 ? emergencyFund / monthlyExpenses : 0
+
+  // ==================== CELEBRATION TRIGGERS ====================
+  const celebrationShownRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!onboardingComplete) return
+    const checks = [
+      ...debts.map((d: any) => ({
+        key: `debt-paid-${d.id}`,
+        condition: parseFloat(d.balance || '1') <= 0,
+        title: `${d.name} — paid off!`,
+        subtitle: `That's one less debt dragging on your life. You did it${userName ? ', ' + userName : ''}.`,
+        emoji: '🎉',
+        amount: `$${parseFloat(d.originalBalance || d.balance || '0').toLocaleString()} gone`
+      })),
+      ...goals.map((g: any) => ({
+        key: `goal-hit-${g.id}`,
+        condition: parseFloat(g.savedAmount || '0') >= parseFloat(g.targetAmount || '1') && parseFloat(g.targetAmount || '0') > 0,
+        title: `${g.name} — goal reached!`,
+        subtitle: `Every dollar of that was a choice. Be proud${userName ? ', ' + userName : ''}.`,
+        emoji: '🏆',
+        amount: `$${parseFloat(g.targetAmount || '0').toLocaleString()} saved`
+      })),
+      { key: 'emergency-2k', condition: emergencyFund >= 2000, title: '$2,000 emergency fund built!', subtitle: 'Your financial airbag is in place. You\'re protected now.', emoji: '🛡️', amount: `$${emergencyFund.toLocaleString()} saved` },
+      { key: 'emergency-3mo', condition: emergencyMonths >= 3, title: '3-month emergency fund!', subtitle: 'Three months of breathing room. Most people never get here.', emoji: '🏦', amount: `${emergencyMonths.toFixed(1)} months covered` },
+      ...roadmapMilestones.filter((m: any) => parseFloat(m.targetAmount || '0') > 0).map((m: any) => ({
+        key: `milestone-${m.id}`,
+        condition: (m.currentAmount || 0) >= parseFloat(m.targetAmount || '1'),
+        title: `${m.name} — milestone hit!`,
+        subtitle: `This is what building wealth looks like${userName ? ', ' + userName : ''}. Keep going.`,
+        emoji: m.icon || '🔥',
+        amount: `$${parseFloat(m.targetAmount || '0').toLocaleString()}`
+      })),
+    ]
+    for (const c of checks) {
+      if (c.condition && !celebrationShownRef.current.has(c.key)) {
+        celebrationShownRef.current.add(c.key)
+        setCelebration({ title: c.title, subtitle: c.subtitle, emoji: c.emoji, amount: c.amount })
+        break
+      }
+    }
+  }, [debts, goals, emergencyFund, emergencyMonths, roadmapMilestones, onboardingComplete, userName])
+
   const totalPassiveQuestIncome = passiveQuests.filter(q => q.status === 'completed').reduce((sum, q) => sum + q.monthlyIncome, 0)
 
   const capitalEfficiencyRatio = monthlyIncome > 0 ? ((monthlyGoalSavings + passiveIncome) / monthlyIncome) * 100 : 0
@@ -1710,6 +1765,49 @@ Respond with ONE sentence only. Be specific. Include the actual step.`
     setChatMessages(updatedMessages)
     setChatInput('')
     setIsLoading(true)
+
+    // ── #4 Smart expense capture: parse natural language spend statements ──
+    const spendRegex = /(?:spent|spend|paid|forked out|dropped|shelled out)\s+\$?([\d,]+(?:\.\d{1,2})?)\s+(?:on\s+)?(.+?)(?:\s+and\s+\$?([\d,]+(?:\.\d{1,2})?)\s+(?:on\s+)?(.+?))?(?:[.,!]|$)/gi
+    const CAT_MAP: Record<string, string> = {
+      grocer: 'food', food: 'food', supermarket: 'food', woolies: 'food', coles: 'food', aldi: 'food',
+      meal: 'eating_out', restaurant: 'eating_out', takeaway: 'eating_out', coffee: 'eating_out', cafe: 'eating_out', lunch: 'eating_out', dinner: 'eating_out',
+      fuel: 'transport', petrol: 'transport', uber: 'transport', car: 'transport', train: 'transport', bus: 'transport',
+      movie: 'entertainment', netflix: 'entertainment', spotify: 'entertainment', game: 'entertainment', concert: 'entertainment',
+      gym: 'health', doctor: 'health', pharmacy: 'health', medical: 'health',
+      clothes: 'clothing', shoes: 'clothing', clothing: 'clothing',
+    }
+    const detectCategory = (text: string): string => {
+      const lower = text.toLowerCase()
+      for (const [keyword, cat] of Object.entries(CAT_MAP)) {
+        if (lower.includes(keyword)) return cat
+      }
+      return 'other'
+    }
+    const spendMatches = [...message.matchAll(spendRegex)]
+    if (spendMatches.length > 0) {
+      const updates: Record<string, number> = {}
+      spendMatches.forEach(m => {
+        if (m[1] && m[2]) {
+          const cat = detectCategory(m[2])
+          const amt = parseFloat(m[1].replace(',', ''))
+          updates[cat] = (updates[cat] || 0) + amt
+        }
+        if (m[3] && m[4]) {
+          const cat = detectCategory(m[4])
+          const amt = parseFloat(m[3].replace(',', ''))
+          updates[cat] = (updates[cat] || 0) + amt
+        }
+      })
+      if (Object.keys(updates).length > 0) {
+        setActualSpend((prev: any) => {
+          const next: any = { ...prev }
+          for (const [cat, amt] of Object.entries(updates)) {
+            next[cat] = (next[cat] || 0) + amt
+          }
+          return next
+        })
+      }
+    }
 
     try {
       // Build full conversation history for the API route
@@ -4430,6 +4528,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       <div style={{ color: theme.accent, fontWeight: 800, fontSize: '18px' }}>{streak}</div>
                       <div style={{ color: theme.textMuted, fontSize: '10px' }}>day streak</div>
                     </div>}
+                    <button onClick={() => setShowSpendCheckIn(true)} style={{ padding: '10px 18px', background: theme.cardBg, color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
+                      ⚡ Check-in
+                    </button>
                     <button onClick={() => setActiveTab('chat')} style={{ padding: '10px 18px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
                       💬 Ask Aureus
                     </button>
@@ -4437,7 +4538,122 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
               </div>
 
-              {/* ── IMPROVEMENT #1: DAILY AI BRIEFING ── */}
+              {/* ── FEATURE 1: THE ONE THING ── */}
+              {onboardingComplete && (() => {
+                // Derive the single most important action from live data
+                const todayBills = upcoming.filter((u: any) => u.dayOffset === 0 && u.itemType === 'expense')
+                const tomorrowBills = upcoming.filter((u: any) => u.dayOffset === 1)
+                const _mpOT = new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate()
+                const overBudgetCats = Object.entries(categoryBudgets).filter(([catId, budget]: [string, any]) => {
+                  const spent = actualSpend[catId] || 0
+                  return budget > 0 && spent > budget * (_mpOT + 0.1)
+                })
+                const topGoal = goals.sort((a: any, b: any) => (parseFloat(b.savedAmount||'0')/parseFloat(b.targetAmount||'1')) - (parseFloat(a.savedAmount||'0')/parseFloat(a.targetAmount||'1')))[0]
+                const nextMilestone = roadmapMilestones.find((m: any) => (m.currentAmount||0) < parseFloat(m.targetAmount||'99999'))
+                const daysToPayday = incomeStreams.length > 0 ? (() => {
+                  const nextIncome = upcoming.find((u: any) => u.itemType === 'income')
+                  return nextIncome ? nextIncome.dayOffset : null
+                })() : null
+
+                // Priority order: overdue bills > overspend > payday context > roadmap > goal > default
+                let oneThingIcon = '⚡'
+                let oneThingTitle = ''
+                let oneThingBody = ''
+                let oneThingCta = ''
+                let oneThingTab = 'dashboard'
+                let oneThingColor = theme.accent
+                let oneThingAction: (() => void) | null = null
+
+                if (overdueItems.length > 0) {
+                  const item = overdueItems[0]
+                  oneThingIcon = '🔴'
+                  oneThingTitle = `${item.name} is overdue`
+                  oneThingBody = `$${parseFloat(item.amount).toFixed(0)} was due ${item.daysAgo} day${item.daysAgo !== 1 ? 's' : ''} ago. Tick it off so your budget stays accurate.`
+                  oneThingCta = 'Mark as paid →'
+                  oneThingColor = theme.danger
+                  oneThingAction = () => setActiveTab('dashboard')
+                } else if (todayBills.length > 0) {
+                  const bill = todayBills[0]
+                  oneThingIcon = '📅'
+                  oneThingTitle = `${bill.name} is due today`
+                  oneThingBody = `$${parseFloat(bill.amount).toFixed(0)} — make sure it's covered. You have $${monthlySurplus > 0 ? monthlySurplus.toFixed(0) : '0'} surplus this month.`
+                  oneThingCta = 'View budget →'
+                  oneThingColor = theme.warning
+                  oneThingAction = () => setActiveTab('dashboard')
+                } else if (overBudgetCats.length > 0) {
+                  const [catId, budget] = overBudgetCats[0] as [string, number]
+                  const spent = actualSpend[catId] || 0
+                  const pct = Math.round((spent / budget) * 100)
+                  const CATS: Record<string, string> = { food: 'Groceries', eating_out: 'Eating out', entertainment: 'Entertainment', transport: 'Transport', clothing: 'Clothing', health: 'Health', personal: 'Personal care', other: 'Other' }
+                  const catName = CATS[catId] || catId
+                  oneThingIcon = '⚠️'
+                  oneThingTitle = `${catName} is at ${pct}% of budget`
+                  const _daysLeft = new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate() - new Date().getDate()
+                  oneThingBody = `You've spent $${spent.toFixed(0)} of your $${budget.toFixed(0)} ${catName.toLowerCase()} budget with ${_daysLeft} days left this month.`
+                  oneThingCta = catId === 'food' ? 'Try Meal Planner →' : 'Review spending →'
+                  oneThingColor = theme.warning
+                  oneThingAction = () => setActiveTab(catId === 'food' ? 'meals' as any : 'dashboard')
+                } else if (coachNextAction) {
+                  oneThingIcon = coachNextAction.icon || '⚡'
+                  oneThingTitle = coachNextAction.action
+                  oneThingBody = coachNextAction.message
+                  oneThingCta = 'Take action →'
+                  oneThingColor = coachNextAction.urgency === 'high' ? theme.warning : theme.accent
+                  oneThingAction = () => setActiveTab(coachNextAction.tab as any)
+                } else if (tomorrowBills.length > 0) {
+                  const bill = tomorrowBills[0]
+                  oneThingIcon = '📅'
+                  oneThingTitle = `${bill.name} due tomorrow`
+                  oneThingBody = `$${parseFloat(bill.amount).toFixed(0)} — make sure funds are ready.`
+                  oneThingCta = 'Check budget →'
+                  oneThingColor = theme.accent
+                  oneThingAction = () => setActiveTab('dashboard')
+                } else if (nextMilestone) {
+                  const pct = Math.min(100, Math.round(((nextMilestone.currentAmount||0) / parseFloat(nextMilestone.targetAmount||'1')) * 100))
+                  const remaining = parseFloat(nextMilestone.targetAmount||'0') - (nextMilestone.currentAmount||0)
+                  const weeklyNeeded = monthlySurplus > 0 ? Math.round(monthlySurplus / 4.3) : 0
+                  oneThingIcon = nextMilestone.icon || '🎯'
+                  oneThingTitle = `${nextMilestone.name} — ${pct}% there`
+                  oneThingBody = `$${remaining.toLocaleString()} to go.${weeklyNeeded > 0 ? ` At your current surplus you could reach this in ${Math.ceil(remaining / (monthlySurplus)).toFixed(0)} months.` : ''}`
+                  oneThingCta = 'View roadmap →'
+                  oneThingColor = theme.accent
+                  oneThingAction = () => setActiveTab('grow')
+                } else if (topGoal) {
+                  const pct = Math.min(100, Math.round((parseFloat(topGoal.savedAmount||'0') / parseFloat(topGoal.targetAmount||'1')) * 100))
+                  oneThingIcon = '🎯'
+                  oneThingTitle = `${topGoal.name} — ${pct}% saved`
+                  oneThingBody = `$${(parseFloat(topGoal.targetAmount||'0') - parseFloat(topGoal.savedAmount||'0')).toLocaleString()} to go. Keep the momentum.`
+                  oneThingCta = 'View goals →'
+                  oneThingColor = theme.success
+                  oneThingAction = () => setActiveTab('dashboard')
+                } else {
+                  oneThingIcon = '💬'
+                  oneThingTitle = `What's your money move today?`
+                  oneThingBody = monthlySurplus > 0 ? `You have $${monthlySurplus.toFixed(0)}/month surplus working for you. Make it count.` : `Every financial journey starts with knowing the numbers. You're here.`
+                  oneThingCta = 'Ask Aureus →'
+                  oneThingColor = theme.accent
+                  oneThingAction = () => setActiveTab('chat')
+                }
+
+                return (
+                  <div style={{ padding: '24px 28px', background: `linear-gradient(135deg, ${oneThingColor}15 0%, ${theme.cardBg} 100%)`, borderRadius: '20px', border: `2px solid ${oneThingColor}40`, position: 'relative' as const, overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute' as const, top: 0, right: 0, width: '200px', height: '100%', background: `radial-gradient(ellipse at 80% 50%, ${oneThingColor}08 0%, transparent 70%)`, pointerEvents: 'none' as const }} />
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                      <div style={{ fontSize: '36px', flexShrink: 0, lineHeight: 1 }}>{oneThingIcon}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: oneThingColor, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>TODAY'S ONE THING</div>
+                        <div style={{ color: theme.text, fontSize: '18px', fontWeight: 800, marginBottom: '6px', lineHeight: 1.3 }}>{oneThingTitle}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, marginBottom: '16px' }}>{oneThingBody}</div>
+                        <button onClick={oneThingAction || (() => {})} style={{ padding: '10px 20px', background: oneThingColor, color: '#0a0a0a', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>
+                          {oneThingCta}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* ── DAILY AI BRIEFING ── */}
               <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg, #1a1208 0%, #0f0a04 100%)', borderRadius: '16px', border: '1px solid ' + theme.accent + '40', position: 'relative' as const }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
                   <div style={{ flex: 1 }}>
@@ -7677,13 +7893,35 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         <text x={p.x} y={p.y - 10} textAnchor="middle" fill={p.projected ? '#D4AF37' : '#B68B2E'} fontSize="10">${Math.round(p.value / 1000)}k</text>
                       </g>
                     ))}
-                    <line x1={PAD} y1={H-PAD} x2={W-PAD} y2={H-PAD} stroke="theme.border" strokeWidth="1"/>
+                    {/* Milestone annotation markers */}
+                    {wins.filter((w: any) => w.date && w.amount > 0).slice(-5).map((w: any, i: number) => {
+                      // Find closest chart point by date
+                      const wDate = new Date(w.date).getTime()
+                      let closestIdx = 0
+                      let closestDiff = Infinity
+                      data.forEach((d: any, idx: number) => {
+                        const diff = Math.abs(new Date(d.date).getTime() - wDate)
+                        if (diff < closestDiff) { closestDiff = diff; closestIdx = idx }
+                      })
+                      if (closestDiff > 90 * 86400000) return null // >90 days away, skip
+                      const p = points[closestIdx]
+                      if (!p) return null
+                      return (
+                        <g key={i}>
+                          <line x1={p.x} y1={p.y - 8} x2={p.x} y2={p.y - 28} stroke="#D4AF37" strokeWidth="1.5" strokeDasharray="3,2" />
+                          <circle cx={p.x} cy={p.y - 30} r="10" fill="#1a1208" stroke="#D4AF37" strokeWidth="1.5" />
+                          <text x={p.x} y={p.y - 26} textAnchor="middle" fontSize="10">🏆</text>
+                        </g>
+                      )
+                    })}
+                    <line x1={PAD} y1={H-PAD} x2={W-PAD} y2={H-PAD} stroke="#334155" strokeWidth="1"/>
                   </svg>
                 )
               })()}
-              <div style={{ display: 'flex', gap: '16px', marginTop: '12px', justifyContent: 'center' as const }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', borderRadius: '50%', background: theme.success }} /><span style={{ color: theme.textMuted, fontSize: '12px' }}>Actual</span></div>
+              <div style={{ display: 'flex', gap: '16px', marginTop: '12px', justifyContent: 'center' as const, flexWrap: 'wrap' as const }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#B68B2E' }} /><span style={{ color: theme.textMuted, fontSize: '12px' }}>Actual</span></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', borderRadius: '50%', background: theme.warning }} /><span style={{ color: theme.textMuted, fontSize: '12px' }}>Projected</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ fontSize: '12px' }}>🏆</span><span style={{ color: theme.textMuted, fontSize: '12px' }}>Milestone win</span></div>
               </div>
             </div>
 
@@ -8572,6 +8810,168 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           </div>
         </div>
       )}
+
+      {/* ==================== CELEBRATION MODAL ==================== */}
+      {celebration && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setCelebration(null)}>
+          {/* Confetti */}
+          <div style={{ position: 'absolute' as const, inset: 0, overflow: 'hidden', pointerEvents: 'none' as const }}>
+            {Array.from({ length: 40 }).map((_, i) => (
+              <div key={i} style={{
+                position: 'absolute' as const,
+                left: `${Math.random() * 100}%`,
+                top: `-10px`,
+                width: `${6 + Math.random() * 8}px`,
+                height: `${6 + Math.random() * 8}px`,
+                background: ['#D4AF37','#B68B2E','#4ade80','#60a5fa','#f472b6','#fb923c'][i % 6],
+                borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+                animation: `confettiFall ${2 + Math.random() * 3}s ${Math.random() * 2}s linear forwards`,
+                opacity: 0,
+              }} />
+            ))}
+          </div>
+          <style>{`
+            @keyframes confettiFall {
+              0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+              100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+            }
+            @keyframes celebrationPop {
+              0% { transform: scale(0.5); opacity: 0; }
+              70% { transform: scale(1.05); }
+              100% { transform: scale(1); opacity: 1; }
+            }
+          `}</style>
+          <div style={{ background: 'linear-gradient(135deg, #1a1208, #0f0a04)', border: '2px solid ' + theme.accent, borderRadius: '24px', padding: '40px 36px', maxWidth: '420px', width: '100%', textAlign: 'center' as const, animation: 'celebrationPop 0.4s ease-out forwards' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: '72px', marginBottom: '16px', lineHeight: 1 }}>{celebration.emoji}</div>
+            <h2 style={{ color: theme.accent, fontSize: '26px', fontWeight: 900, margin: '0 0 10px 0', fontFamily: 'Cinzel, serif', lineHeight: 1.2 }}>{celebration.title}</h2>
+            {celebration.amount && <div style={{ display: 'inline-block', padding: '6px 16px', background: theme.accent + '20', border: '1px solid ' + theme.accent + '50', borderRadius: '20px', color: theme.accent, fontWeight: 800, fontSize: '18px', marginBottom: '14px' }}>{celebration.amount}</div>}
+            <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 28px 0' }}>{celebration.subtitle}</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => { setCelebration(null); setShowAccountabilityCard(true) }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid ' + theme.accent + '50', borderRadius: '10px', color: theme.accent, cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>📊 Share this win</button>
+              <button onClick={() => setCelebration(null)} style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>Keep building 🔥</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 60-SECOND SPENDING CHECK-IN ==================== */}
+      {showSpendCheckIn && (() => {
+        const spendCats = [
+          { id: 'food', label: 'Groceries', icon: '🛒', emoji: '🛒' },
+          { id: 'eating_out', label: 'Eating out', icon: '🍔', emoji: '🍔' },
+          { id: 'entertainment', label: 'Fun & entertainment', icon: '🎬', emoji: '🎬' },
+          { id: 'transport', label: 'Transport & fuel', icon: '🚗', emoji: '🚗' },
+          { id: 'other', label: 'Everything else', icon: '📦', emoji: '📦' },
+        ].filter(c => categoryBudgets[c.id] > 0 || c.id === 'other')
+
+        const handleSubmit = async () => {
+          setCheckInSubmitting(true)
+          // Apply slider values to actualSpend
+          const updates: Record<string, number> = {}
+          spendCats.forEach(cat => {
+            if (checkInSliders[cat.id] !== undefined) {
+              updates[cat.id] = Math.round(checkInSliders[cat.id])
+            }
+          })
+          setActualSpend((prev: any) => ({ ...prev, ...updates }))
+
+          // Get a 1-sentence coach reaction
+          try {
+            const lines = spendCats.map(cat => `${cat.label}: $${Math.round(checkInSliders[cat.id] || actualSpend[cat.id] || 0)} (budget $${categoryBudgets[cat.id] || 0})`).join(', ')
+            const response = await fetch('/api/budget-coach', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                mode: 'question',
+                question: `Weekly spending check-in from ${userName || 'user'}. Spending so far this month: ${lines}. Monthly income $${monthlyIncome.toFixed(0)}, surplus $${monthlySurplus.toFixed(0)}. Give ONE short sentence of coaching — direct, specific, encouraging. No bullet points. Max 25 words.`,
+                financialData: { income: incomeStreams, expenses },
+                memory: budgetMemory,
+                countryConfig: currentCountryConfig
+              })
+            })
+            if (response.ok) {
+              const data = await response.json()
+              setCheckInResult(data.message || data.advice || '')
+            }
+          } catch { /* silent */ }
+          setLastCheckIn(new Date().toISOString())
+          setCheckInSubmitting(false)
+        }
+
+        return (
+          <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.82)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => { setShowSpendCheckIn(false); setCheckInResult(null) }}>
+            <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '480px', width: '100%' }} onClick={e => e.stopPropagation()}>
+
+              {checkInResult ? (
+                // Result screen
+                <div style={{ textAlign: 'center' as const }}>
+                  <div style={{ fontSize: '56px', marginBottom: '16px' }}>✅</div>
+                  <h3 style={{ color: theme.text, fontSize: '20px', margin: '0 0 12px 0' }}>Check-in saved</h3>
+                  <div style={{ padding: '16px 20px', background: theme.accent + '15', border: '1px solid ' + theme.accent + '30', borderRadius: '12px', marginBottom: '20px' }}>
+                    <p style={{ color: theme.text, fontSize: '15px', lineHeight: 1.6, margin: 0, fontStyle: 'italic' }}>"{checkInResult}"</p>
+                    <div style={{ color: theme.accent, fontSize: '11px', marginTop: '8px' }}>— Aureus</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button onClick={() => { setShowSpendCheckIn(false); setCheckInResult(null) }} style={{ flex: 1, padding: '12px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }}>Done</button>
+                    <button onClick={() => { setActiveTab('chat'); setShowSpendCheckIn(false); setCheckInResult(null) }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '10px', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>Ask follow-up →</button>
+                  </div>
+                </div>
+              ) : (
+                // Slider screen
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div>
+                      <h3 style={{ color: theme.text, fontSize: '20px', margin: '0 0 2px 0' }}>⚡ Weekly check-in</h3>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>Drag each slider to where you actually spent. Takes 60 seconds.</div>
+                    </div>
+                    <button onClick={() => setShowSpendCheckIn(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '22px', cursor: 'pointer' }}>×</button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px', marginBottom: '20px' }}>
+                    {spendCats.map(cat => {
+                      const budget = categoryBudgets[cat.id] || 200
+                      const _mp = new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate()
+                      const current = checkInSliders[cat.id] ?? (actualSpend[cat.id] || Math.round(budget * _mp))
+                      const pct = Math.min(1, current / budget)
+                      const isOver = current > budget
+                      return (
+                        <div key={cat.id}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>{cat.icon} {cat.label}</span>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <span style={{ color: isOver ? theme.danger : theme.success, fontWeight: 700, fontSize: '14px' }}>${Math.round(current)}</span>
+                              <span style={{ color: theme.textMuted, fontSize: '11px' }}>/ ${budget}</span>
+                              {isOver && <span style={{ color: theme.danger, fontSize: '10px', fontWeight: 700 }}>OVER</span>}
+                            </div>
+                          </div>
+                          <div style={{ position: 'relative' as const, height: '36px', display: 'flex', alignItems: 'center' }}>
+                            {/* Budget marker */}
+                            <div style={{ position: 'absolute' as const, left: '100%', top: '50%', transform: 'translate(-1px, -50%)', width: '2px', height: '18px', background: theme.border, borderRadius: '1px' }} />
+                            <input type="range" min={0} max={Math.round(budget * 1.5)} step={5}
+                              value={current}
+                              onChange={e => setCheckInSliders(prev => ({ ...prev, [cat.id]: parseFloat(e.target.value) }))}
+                              style={{ width: '100%', accentColor: isOver ? theme.danger : theme.accent, cursor: 'pointer' }} />
+                          </div>
+                          <div style={{ height: '4px', background: theme.border, borderRadius: '2px', overflow: 'hidden' }}>
+                            <div style={{ width: Math.min(100, pct * 100) + '%', height: '100%', background: isOver ? theme.danger : theme.accent, borderRadius: '2px', transition: 'width 0.1s' }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <textarea placeholder="Anything notable this week? (optional)" value={checkInNote} onChange={e => setCheckInNote(e.target.value)}
+                    style={{ ...inputStyle, width: '100%', height: '60px', resize: 'none' as const, marginBottom: '12px' }} />
+
+                  <button onClick={handleSubmit} disabled={checkInSubmitting} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '15px', opacity: checkInSubmitting ? 0.7 : 1 }}>
+                    {checkInSubmitting ? '⏳ Getting your feedback...' : '✓ Save check-in & get feedback'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ==================== RECIPE MODAL ==================== */}
       {recipeModal && (() => {
