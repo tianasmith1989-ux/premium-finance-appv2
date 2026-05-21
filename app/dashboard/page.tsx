@@ -4546,7 +4546,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 const _mpOT = new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate()
                 const overBudgetCats = Object.entries(categoryBudgets).filter(([catId, budget]: [string, any]) => {
                   const spent = actualSpend[catId] || 0
-                  return budget > 0 && spent > budget * (_mpOT + 0.1)
+                  const b = parseFloat(budget) || 0
+                  return b > 0 && spent > b * (_mpOT + 0.1)
                 })
                 const topGoal = goals.sort((a: any, b: any) => (parseFloat(b.savedAmount||'0')/parseFloat(b.targetAmount||'1')) - (parseFloat(a.savedAmount||'0')/parseFloat(a.targetAmount||'1')))[0]
                 const nextMilestone = roadmapMilestones.find((m: any) => (m.currentAmount||0) < parseFloat(m.targetAmount||'99999'))
@@ -4581,7 +4582,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   oneThingColor = theme.warning
                   oneThingAction = () => setActiveTab('dashboard')
                 } else if (overBudgetCats.length > 0) {
-                  const [catId, budget] = overBudgetCats[0] as [string, number]
+                  const [catId, budgetRaw] = overBudgetCats[0] as [string, any]
+                  const budget = parseFloat(budgetRaw) || 0
                   const spent = actualSpend[catId] || 0
                   const pct = Math.round((spent / budget) * 100)
                   const CATS: Record<string, string> = { food: 'Groceries', eating_out: 'Eating out', entertainment: 'Entertainment', transport: 'Transport', clothing: 'Clothing', health: 'Health', personal: 'Personal care', other: 'Other' }
