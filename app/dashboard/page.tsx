@@ -741,9 +741,9 @@ export default function Dashboard() {
   // COACHING IMPROVEMENT #1 — DAILY AI BRIEFING
   // ══════════════════════════════════════════════════════════════
   const generateDailyBriefing = async () => {
-    if (monthlyIncome === 0) return // not set up yet
+    if (monthlyIncome === 0) return
     const today = new Date().toDateString()
-    if (dailyBriefing?.generatedDate === today) return // already generated today
+    if (dailyBriefing?.generatedDate === today) return
     setDailyBriefingLoading(true)
     try {
       const overdueBills = expenses.filter((e: any) => {
@@ -751,37 +751,24 @@ export default function Dashboard() {
         const due = new Date(e.dueDate + 'T12:00:00')
         return due <= new Date() && !Array.from(paidOccurrences).some(k => k.includes(e.id))
       })
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const name = userName || 'Builder'
+      const dayName = new Date().toLocaleDateString('en-AU', { weekday: 'long' })
+      const question = `Write a 2-sentence daily briefing for ${name}. Warm, specific, forward-looking — like a coach who knows them. Use their name. Do NOT say "Good morning". Do NOT judge past spending. Focus on what's possible today.\n\nSituation: Income $${monthlyIncome.toFixed(0)}/mo, surplus $${monthlySurplus.toFixed(0)}/mo, emergency fund ${emergencyMonths.toFixed(1)} months, debts: ${debts.length > 0 ? debts.map((d: any) => d.name + ' $' + d.balance).join(', ') : 'none'}, baby step: ${currentBabyStep.title}, overdue: ${overdueBills.length > 0 ? overdueBills.map((e: any) => e.name).join(', ') : 'none'}, streak: ${streak} days, day: ${dayName}.\n\n2 sentences max. End with one specific action for today. No markdown.`
+      const response = await fetch('/api/budget-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 200,
-          messages: [{
-            role: 'user',
-            content: `You are Aureus, a personal financial coach. Write a 2-3 sentence morning briefing for ${userName || 'this user'}. Be specific, warm, and direct — like a coach who knows them well. Use their name (${userName || 'Builder'}) naturally in the message. No generic advice.
-
-User's situation:
-- Monthly income: $${monthlyIncome.toFixed(0)}, surplus: $${monthlySurplus.toFixed(0)}
-- Emergency fund: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months)
-- Active debts: ${debts.length > 0 ? debts.map((d: any) => `${d.name} $${d.balance}`).join(', ') : 'none'}
-- Active goals: ${goals.length > 0 ? goals.map((g: any) => `${g.name} ${Math.round((parseFloat(g.saved||'0')/parseFloat(g.target||'1'))*100)}% done`).join(', ') : 'none'}
-- Current baby step: ${currentBabyStep.step} — ${currentBabyStep.title}
-- Overdue bills today: ${overdueBills.length > 0 ? overdueBills.map((e: any) => `${e.name} $${e.amount}`).join(', ') : 'none'}
-- Streak: ${streak} days
-- Day of week: ${new Date().toLocaleDateString('en-AU', { weekday: 'long' })}
-${moneyPersonality ? `- Money personality: ${personalityProfiles[moneyPersonality]?.label}` : ''}
-
-Write 2-3 sentences only. Start with something specific to their situation — not "Good morning!" Be honest if things are tight. Be excited if things are going well. End with one concrete thing to focus on today. No markdown, no lists.`
-          }]
+          mode: 'question',
+          question,
+          financialData: { income: incomeStreams, expenses },
+          memory: budgetMemory,
+          countryConfig: currentCountryConfig
         })
       })
       const data = await response.json()
-      const text = data.content?.find((c: any) => c.type === 'text')?.text?.trim() || ''
+      const text = (data.message || data.advice || '').trim()
       if (text) setDailyBriefing({ text, generatedDate: today })
-    } catch (e) {
-      // silent fail — fallback shown in UI
-    }
+    } catch { /* silent — fallback shown in UI */ }
     setDailyBriefingLoading(false)
   }
 
@@ -3035,13 +3022,21 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               </div>
             </div>
             {/* Progress bar — only show after step 0 */}
-            {missionStep > 0 && (
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                {[1,2,3,4,5,6,7,8].map(s => (
-                  <div key={s} style={{ width: s === missionStep ? '24px' : '8px', height: '8px', borderRadius: '4px', background: s < missionStep ? theme.success : s === missionStep ? theme.accent : theme.border, transition: 'all 0.3s' }} />
-                ))}
-              </div>
-            )}
+            {missionStep > 0 && (() => {
+              const stepNames = ['', 'Your name', 'Income', 'Expenses', 'Debts', 'Savings', 'Goals', 'Super', 'Sinking funds']
+              const pct = Math.round((missionStep / 8) * 100)
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '4px', minWidth: '120px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <span style={{ color: theme.textMuted, fontSize: '10px' }}>{stepNames[missionStep] || `Step ${missionStep}`}</span>
+                    <span style={{ color: theme.accent, fontSize: '10px', fontWeight: 700 }}>{pct}%</span>
+                  </div>
+                  <div style={{ width: '120px', height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ width: pct + '%', height: '100%', background: 'linear-gradient(90deg, #D4AF37, #B68B2E)', borderRadius: '3px', transition: 'width 0.4s ease' }} />
+                  </div>
+                </div>
+              )
+            })()}
           </div>
 
           {/* STEP 0 — Welcome */}
@@ -4231,7 +4226,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   icon: '💰', title: 'Weekly Money Date',
                   items: [
                     'Sit down for 15 minutes on your chosen day (see Settings → Schedule)',
-                    'Review your Budget — any bills unpaid? Any overspending?',
+                    'Review My Money — any bills unpaid? Any areas to redirect?',
                     'Check your Goals — on track? Adjust if needed',
                     'Open Roadmap — tick off any completed steps, generate a new plan if ready',
                     'Record your weekly win',
@@ -4423,7 +4418,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           {[
             { id: 'home',      label: '🏠 Home' },
             { id: 'chat',      label: '💬 Aureus' },
-            { id: 'dashboard', label: '🎛️ Budget' },
+            { id: 'dashboard', label: '💰 My Money' },
             { id: 'path',      label: '🛤️ Roadmap' },
             { id: 'wins',      label: `🏆 Wins${wins.length > 0 ? ` (${wins.length})` : ''}` },
           ].map(tab => (
@@ -4787,6 +4782,71 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 ))}
               </div>
 
+              {/* ── SOCIAL BENCHMARKS — encouragement not judgement ── */}
+              {monthlyIncome > 0 && (() => {
+                const savingRatePct = monthlyIncome > 0 ? Math.round((monthlyGoalSavings / monthlyIncome) * 100) : 0
+                // AU household benchmarks (ABS data)
+                const avgSaveRate = coupleMode ? 15 : 12
+                const benchmarks = [
+                  savingRatePct > avgSaveRate
+                    ? { icon: '📈', text: `Your ${savingRatePct}% saving rate is above the AU average of ~${avgSaveRate}%`, good: true }
+                    : savingRatePct > 0
+                    ? { icon: '🎯', text: `Saving ${savingRatePct}% — the AU average is ~${avgSaveRate}%. ${Math.round((avgSaveRate - savingRatePct) * monthlyIncome / 100).toLocaleString()} more/month closes the gap`, good: false }
+                    : null,
+                  emergencyMonths >= 3
+                    ? { icon: '🛡️', text: `${emergencyMonths.toFixed(1)} months emergency fund — only 1 in 3 Australians has this much saved`, good: true }
+                    : emergencyFund > 0
+                    ? { icon: '🛡️', text: `${emergencyMonths.toFixed(1)} months saved — most Australians have less than 1 month. You're building something most don't bother with`, good: false }
+                    : null,
+                  debts.length === 0 && incomeStreams.length > 0
+                    ? { icon: '✅', text: 'No consumer debt — less than 40% of Australians can say that', good: true }
+                    : null,
+                ].filter(Boolean)
+
+                if (benchmarks.length === 0) return null
+                return (
+                  <div style={{ padding: '16px 20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '10px' }}>📊 HOW YOU COMPARE</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                      {benchmarks.map((b: any, i) => (
+                        <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                          <span style={{ flexShrink: 0 }}>{b.icon}</span>
+                          <span style={{ color: b.good ? theme.success : theme.textMuted, fontSize: '13px', lineHeight: 1.5 }}>{b.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* ── COACH MEMORY SUMMARY — builds trust through transparency ── */}
+              {onboardingComplete && (budgetMemory?.notes?.length > 0 || moneyPersonality || deepWhyAnswers[0]) && (() => {
+                const memoryItems = [
+                  userName ? `Your name is ${userName}` : null,
+                  moneyPersonality && personalityProfiles[moneyPersonality] ? `Money personality: ${personalityProfiles[moneyPersonality].label}` : null,
+                  deepWhyAnswers[0] ? `Your why: "${deepWhyAnswers[0].slice(0, 60)}${deepWhyAnswers[0].length > 60 ? '…' : ''}"` : null,
+                  whyStatement ? `Goal: ${whyStatement.slice(0, 60)}${whyStatement.length > 60 ? '…' : ''}` : null,
+                  ...(budgetMemory?.notes || []).slice(-2).map((n: string) => n.slice(0, 80)),
+                  coupleMode && partnerName ? `Partner: ${partnerName}` : null,
+                ].filter(Boolean)
+
+                if (memoryItems.length === 0) return null
+                return (
+                  <div style={{ padding: '16px 20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>🧠 WHAT AUREUS KNOWS ABOUT YOU</div>
+                      <button onClick={() => askAureusAbout('What do you know about me and my financial situation? Give me a brief summary.')} style={{ background: 'none', border: 'none', color: theme.accent, cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>Ask for full summary →</button>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '6px' }}>
+                      {memoryItems.map((item: any, i) => (
+                        <div key={i} style={{ padding: '4px 10px', background: theme.bg, border: '1px solid ' + theme.border, borderRadius: '20px', color: theme.textMuted, fontSize: '12px' }}>{item}</div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: '8px', fontSize: '11px', color: theme.textMuted }}>All data stays on your device — Aureus never sees it.</div>
+                  </div>
+                )
+              })()}
+
               {/* ── IMPROVEMENT #6: SPENDING PATTERNS ── */}
               {spendingPatterns.length > 0 && (
                 <div style={{ padding: '16px 20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
@@ -4964,7 +5024,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px' }}>
                   {[
                     { id: 'chat',      icon: '💬', label: 'Ask Aureus',    desc: 'AI coach' },
-                    { id: 'dashboard', icon: '🎛️', label: 'Budget',        desc: 'Income, bills, goals' },
+                    { id: 'dashboard', icon: '💰', label: 'My Money', desc: 'Income, bills, goals' },
                     { id: 'path',      icon: '🛤️', label: 'Roadmap',       desc: 'Baby steps & milestones' },
                     { id: 'wins',      icon: '🏆', label: 'Wins',          desc: 'Your progress log' },
                     { id: 'mortgage',  icon: '🚀', label: 'Mortgage',      desc: 'Pay off faster' },
@@ -5408,7 +5468,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                       {leaking.length > 0 && (
                         <div style={{ padding: '4px 10px', background: theme.danger + '20', border: '1px solid ' + theme.danger + '40', borderRadius: '20px', color: theme.danger, fontSize: '12px', fontWeight: 600 }}>
-                          ⚠️ {leaking.length} categor{leaking.length === 1 ? 'y' : 'ies'} over budget
+                          💡 {leaking.length} area{leaking.length === 1 ? '' : 's'} to redirect
                         </div>
                       )}
                       {pacePct > 0 && pacePct <= 1.05 && leaking.length === 0 && (
@@ -5694,7 +5754,13 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <button onClick={addIncome} style={{...btnSuccess, alignSelf: 'flex-start' as const, padding: '8px 16px'}}>+ Add income</button>
                 </div>
                 <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>
-                  {incomeStreams.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No income streams yet</p> : incomeStreams.map(inc => (
+                  {incomeStreams.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center' as const, border: '2px dashed ' + theme.border, borderRadius: '12px' }}>
+                      <div style={{ fontSize: '28px', marginBottom: '8px' }}>💸</div>
+                      <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>Add your income and Aureus can start coaching you</div>
+                      <button onClick={() => setIncomeStreams([{ id: Date.now(), name: 'Salary', amount: '', frequency: 'fortnightly', type: 'active', startDate: '' }])} style={{ padding: '8px 18px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>+ Add income</button>
+                    </div>
+                  ) : incomeStreams.map(inc => (
                     editingItem?.type === 'income' && editingItem.id === inc.id ? (
                       <div key={inc.id} style={{ padding: '10px', marginBottom: '8px', background: theme.bg, borderRadius: '8px' }}>
                         <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
@@ -5809,7 +5875,13 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <button onClick={addExpense} style={{...btnDanger, alignSelf: 'flex-start' as const, padding: '8px 16px'}}>+ Add expense</button>
                 </div>
                 <div style={{ maxHeight: '200px', overflowY: 'auto' as const }}>
-                  {expenses.filter(e => !e.targetDebtId && !e.targetGoalId).length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No expenses yet</p> : expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(exp => (
+                  {expenses.filter(e => !e.targetDebtId && !e.targetGoalId).length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center' as const, border: '2px dashed ' + theme.border, borderRadius: '12px' }}>
+                      <div style={{ fontSize: '28px', marginBottom: '8px' }}>🧾</div>
+                      <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>Add your regular bills and expenses</div>
+                      <button onClick={() => setNewExpense((prev: any) => ({ ...prev, name: 'Rent', amount: '', frequency: 'fortnightly', category: 'housing' }))} style={{ padding: '8px 18px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>+ Add expense</button>
+                    </div>
+                  ) : expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(exp => (
                     editingItem?.type === 'expense' && editingItem.id === exp.id ? (
                       <div key={exp.id} style={{ padding: '10px', marginBottom: '6px', background: '#2a1010', borderRadius: '8px' }}>
                         <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' as const }}>
@@ -6172,7 +6244,18 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   </div>
                 </div>
                 <div style={{ maxHeight: '300px', overflowY: 'auto' as const }}>
-                  {goals.length === 0 ? <p style={{ color: theme.textMuted, textAlign: 'center' as const }}>No goals yet</p> : goals.map(goal => {
+                  {goals.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center' as const, border: '2px dashed ' + theme.border, borderRadius: '12px' }}>
+                      <div style={{ fontSize: '28px', marginBottom: '8px' }}>🎯</div>
+                      <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '4px' }}>What are you saving toward?</div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '12px' }}>Holiday, car, emergency fund, home deposit — it all counts</div>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' as const }}>
+                        {['🏖️ Holiday', '🚗 Car', '🛡️ Emergency fund', '🏠 Home deposit'].map(label => (
+                          <button key={label} onClick={() => setNewGoal((prev: any) => ({ ...prev, name: label.slice(3) }))} style={{ padding: '6px 12px', background: theme.accent + '15', border: '1px solid ' + theme.accent + '40', borderRadius: '20px', color: theme.accent, cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>{label}</button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : goals.map(goal => {
                     const pct = (parseFloat(goal.saved || '0') / parseFloat(goal.target || '1')) * 100
                     return (
                       <div key={goal.id} style={{ padding: '12px', marginBottom: '8px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
@@ -7757,7 +7840,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
               ) : (
                 <div style={{ color: theme.textMuted, fontSize: '14px', textAlign: 'center' as const, padding: '20px' }}>
-                  {expenses.length < 3 ? 'Add at least 3 expenses in Budget to unlock spending pattern analysis.' : 'Tap Analyse to get AI-powered insights about your spending patterns.'}
+                  {expenses.length < 3 ? 'Add at least 3 expenses in My Money to unlock spending pattern analysis.' : 'Tap Analyse to get AI-powered insights about your spending patterns.'}
                 </div>
               )}
             </div>
