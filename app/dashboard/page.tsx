@@ -190,6 +190,11 @@ export default function Dashboard() {
   const [checkInResult, setCheckInResult] = useState<string | null>(null)
   const [checkInSubmitting, setCheckInSubmitting] = useState(false)
 
+  // ==================== MANUAL SPEND FORM ====================
+  const [showManualSpend, setShowManualSpend] = useState(false)
+  const [manualSpendCat, setManualSpendCat] = useState('')
+  const [manualSpendAmt, setManualSpendAmt] = useState('')
+
   // ==================== CELEBRATIONS ====================
   const [celebration, setCelebration] = useState<{ title: string; subtitle: string; emoji: string; amount?: string } | null>(null)
 
@@ -4238,17 +4243,18 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 {
                   icon: '📋', title: 'Your Daily Routine',
                   items: [
-                    'Open Home tab every morning — check your Next Action and any calendar events due today',
-                    'Tick off calendar items when you pay them (Budget tab → Calendar)',
+                    'Open Home tab — your One Thing card tells you the most important action today',
+                    '⚡ Check-in weekly (Home → Check-in button) — takes 60 seconds, moves the sliders, get coach feedback',
+                    'Type spends in chat naturally: "spent $95 on groceries" and Aureus updates your numbers',
+                    'Tick off calendar items when you pay them (My Money → Calendar)',
                     'Log a win when something goes right (Wins tab → + Add)',
-                    'Ask Aureus when you\'re unsure what to do next',
                   ]
                 },
                 {
                   icon: '💰', title: 'Weekly Money Date',
                   items: [
-                    'Sit down for 15 minutes on your chosen day (see Settings → Schedule)',
-                    'Review My Money — any bills unpaid? Any areas to redirect?',
+                    'Sit down for 15 minutes on your chosen day (Settings → Check-in Schedule)',
+                    'Open My Money — review Projected vs Actual. Any areas running over?',
                     'Check your Goals — on track? Adjust if needed',
                     'Open Roadmap — tick off any completed steps, generate a new plan if ready',
                     'Record your weekly win',
@@ -4305,6 +4311,37 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   ]
                 },
                 {
+                  icon: '🎯', title: 'Sinking Funds — Never Be Surprised Again',
+                  items: [
+                    'Add a sinking fund for every predictable annual expense: Christmas, car rego, insurance, holidays',
+                    'Set the target amount and target date — Aureus calculates your exact weekly amount',
+                    'Sinking funds appear in your budget as a weekly expense, reducing your surplus accordingly',
+                    'When the big expense hits, the money is already there — no stress, no credit card',
+                    'Quick-add chips in onboarding suggest the most common funds for your situation',
+                  ]
+                },
+                {
+                  icon: '🍽️', title: 'Meal Planner — Cut Grocery Spend',
+                  items: [
+                    'Open the Meals tab and enter your household size, weekly budget, and any dislikes',
+                    'Upload your supermarket catalog (Woolworths/Coles/Aldi) for a plan built around this week\'s specials',
+                    'Choose which meals to include: Breakfast, Lunch, Dinner, Dessert — any combination',
+                    'Tap any meal in the plan to get a full recipe with AU quantities and prices',
+                    'Two cost totals shown: what you\'ll spend at checkout vs actual weekly meal cost (pantry staples last weeks)',
+                    'If Groceries goes over budget, Aureus will suggest the Meal Planner automatically',
+                  ]
+                },
+                {
+                  icon: '⚡', title: '60-Second Weekly Check-In',
+                  items: [
+                    'Tap ⚡ Check-in on the Home tab any day this week',
+                    'Drag sliders for each category to where you actually spent — pre-filled with your actuals',
+                    'Hit Save — Aureus updates your Projected vs Actual and gives you a one-sentence coaching note',
+                    'Or just type in chat: "spent $340 on groceries" and it updates automatically',
+                    'The check-in builds your streak and keeps the coach\'s advice accurate',
+                  ]
+                },
+                {
                   icon: '🔥', title: 'FIRE & Financial Independence',
                   items: [
                     'Your FIRE number = annual expenses × 25 (the 4% rule)',
@@ -4317,11 +4354,13 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 {
                   icon: '💬', title: 'Getting the Most from Aureus Chat',
                   items: [
+                    'Natural language spend capture: "spent $340 on groceries and $85 on fuel" updates your actuals instantly',
                     'Ask specific questions: "Should I pay off my credit card or save for a house deposit?"',
                     'Ask for explanations: "Explain offset accounts in simple terms"',
-                    'Ask for a plan: "Give me a 3-month plan to pay off my car loan faster"',
+                    'Ask for a plan: "Give me a 3-month plan to build my emergency fund"',
                     'Ask about your data: "What\'s my biggest financial risk right now?"',
-                    'Aureus knows your personality — it coaches you accordingly',
+                    'Ask about meal planning: "What\'s the cheapest meal plan for my family this week?"',
+                    'Aureus knows your personality, your why, and your full financial picture',
                   ]
                 },
               ].map(section => (
@@ -5617,14 +5656,65 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                           style={{ padding: '10px 16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>
                           📸 Scan Receipt
                         </button>
-                        <button onClick={() => {
-                          const cat = window.prompt('Category (food/transport/eating_out/utilities/health/entertainment/clothing/personal/subscriptions/other):')
-                          if (!cat) return
-                          const amt = window.prompt(`Amount spent on ${cat} ($):`)
-                          if (amt && !isNaN(parseFloat(amt))) addActualSpend(cat, parseFloat(amt))
-                        }} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '10px', cursor: 'pointer', color: theme.text, fontSize: '13px' }}>
-                          + Add spend manually
-                        </button>
+                        {/* ── MANUAL SPEND ENTRY ── */}
+                        {showManualSpend ? (
+                          <div style={{ padding: '14px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.accent + '40', display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
+                            <div style={{ color: theme.accent, fontSize: '12px', fontWeight: 700, marginBottom: '2px' }}>➕ Add actual spend</div>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                              <select
+                                value={manualSpendCat}
+                                onChange={e => setManualSpendCat(e.target.value)}
+                                style={{ ...inputStyle, flex: 2, minWidth: '160px' }}>
+                                <option value="">— Select category —</option>
+                                <optgroup label="Your projected expenses">
+                                  {expenses.filter((e: any) => !e.targetDebtId && !e.targetGoalId).map((e: any) => {
+                                    const cat = EXPENSE_CATEGORIES.find(c => c.id === e.category)
+                                    return <option key={e.id} value={e.category}>{cat?.icon || ''} {e.name} ({cat?.label || e.category})</option>
+                                  })}
+                                </optgroup>
+                                {sinkingFunds.length > 0 && (
+                                  <optgroup label="Sinking funds">
+                                    {sinkingFunds.map((f: any) => (
+                                      <option key={f.id} value={`sinking_${f.id}`}>🎯 {f.name}</option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                                <optgroup label="All categories">
+                                  {EXPENSE_CATEGORIES.map(c => (
+                                    <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                                  ))}
+                                </optgroup>
+                              </select>
+                              <input
+                                type="number"
+                                placeholder="Amount $"
+                                value={manualSpendAmt}
+                                onChange={e => setManualSpendAmt(e.target.value)}
+                                style={{ ...inputStyle, width: '100px' }}
+                                onKeyDown={e => { if (e.key === 'Enter' && manualSpendCat && manualSpendAmt) { addActualSpend(manualSpendCat, parseFloat(manualSpendAmt)); setManualSpendAmt(''); setManualSpendCat(''); setShowManualSpend(false) } }}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                onClick={() => {
+                                  if (!manualSpendCat || !manualSpendAmt) return
+                                  addActualSpend(manualSpendCat, parseFloat(manualSpendAmt))
+                                  setManualSpendAmt('')
+                                  setManualSpendCat('')
+                                  setShowManualSpend(false)
+                                }}
+                                disabled={!manualSpendCat || !manualSpendAmt}
+                                style={{ padding: '8px 18px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px', opacity: !manualSpendCat || !manualSpendAmt ? 0.5 : 1 }}>
+                                Add
+                              </button>
+                              <button onClick={() => { setShowManualSpend(false); setManualSpendAmt(''); setManualSpendCat('') }} style={{ padding: '8px 14px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button onClick={() => setShowManualSpend(true)} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '10px', cursor: 'pointer', color: theme.text, fontSize: '13px' }}>
+                            + Add spend manually
+                          </button>
+                        )}
                         <button onClick={() => {
                           if (window.confirm('Reset all actual spend for this month?')) setActualSpend(prev => ({ ...prev, [monthKey]: {} }))
                         }} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '10px', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>
