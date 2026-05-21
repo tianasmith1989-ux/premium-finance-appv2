@@ -8864,7 +8864,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           { id: 'entertainment', label: 'Fun & entertainment', icon: '🎬', emoji: '🎬' },
           { id: 'transport', label: 'Transport & fuel', icon: '🚗', emoji: '🚗' },
           { id: 'other', label: 'Everything else', icon: '📦', emoji: '📦' },
-        ].filter(c => categoryBudgets[c.id] > 0 || c.id === 'other')
+        ].filter(c => parseFloat(String(categoryBudgets[c.id] || 0)) > 0 || c.id === 'other')
 
         const handleSubmit = async () => {
           setCheckInSubmitting(true)
