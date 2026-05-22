@@ -3068,42 +3068,65 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
           {/* STEP 0 — Welcome */}
           {missionStep === 0 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '40px 24px', maxWidth: '560px', margin: '0 auto', width: '100%', textAlign: 'center' as const }}>
-              <div style={{ width: '90px', height: '90px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 28px', fontSize: '44px', fontWeight: 800, color: '#0a0a0a', boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}>A</div>
-              <h1 style={{ color: theme.text, fontSize: '32px', fontWeight: 800, margin: '0 0 12px 0', fontFamily: 'Cinzel, serif' }}>G'day, I'm Aureus.</h1>
-              <p style={{ color: theme.textMuted, fontSize: '16px', lineHeight: 1.8, margin: '0 0 12px 0', maxWidth: '420px' }}>
-                Your personal AI financial coach — built for Australians who want to pay off debt faster, build real wealth, and stop wondering what to do next.
-              </p>
-              <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 32px 0' }}>Takes about 5 minutes. Your data never leaves your device.</p>
-              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', width: '100%', maxWidth: '400px', marginBottom: '28px' }}>
-                {[
-                  { icon: '🧠', text: 'Understand your money personality' },
-                  { icon: '💰', text: 'Map your income, bills, debts & savings' },
-                  { icon: '📅', text: 'Set up your check-in schedule' },
-                  { icon: '🛤️', text: 'Build your personalised roadmap' },
-                ].map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
-                    <span style={{ fontSize: '20px' }}>{item.icon}</span>
-                    <span style={{ color: theme.text, fontSize: '14px' }}>{item.text}</span>
-                    <span style={{ marginLeft: 'auto', color: theme.success, fontSize: '12px' }}>→</span>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '40px 24px', maxWidth: '520px', margin: '0 auto', width: '100%', textAlign: 'center' as const }}>
+              <div style={{ width: '90px', height: '90px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: '44px', fontWeight: 800, color: '#0a0a0a', boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}>A</div>
+
+              {!userName.trim() ? (
+                // ── Phase A: Name first ──
+                <>
+                  <h1 style={{ color: theme.text, fontSize: '30px', fontWeight: 800, margin: '0 0 10px 0', fontFamily: 'Cinzel, serif' }}>G'day, I'm Aureus.</h1>
+                  <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 28px 0', maxWidth: '380px' }}>
+                    Your personal AI financial coach — built for Australians who want to pay off debt faster and build real wealth.
+                  </p>
+                  <div style={{ width: '100%', maxWidth: '380px', marginBottom: '16px' }}>
+                    <label style={{ color: theme.accent, fontSize: '18px', fontWeight: 700, display: 'block', marginBottom: '14px' }}>
+                      First — what's your name?
+                    </label>
+                    <input
+                      placeholder="Your first name"
+                      value={userName}
+                      onChange={e => setUserName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && e.currentTarget.value.trim()) advanceMission(1) }}
+                      style={{ ...inputStyle, width: '100%', fontSize: '20px', padding: '16px 20px', textAlign: 'center' as const, borderColor: theme.accent + '60' }}
+                      autoFocus
+                    />
+                    <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px' }}>Your data never leaves your device.</div>
                   </div>
-                ))}
-              </div>
-              <div style={{ width: '100%', maxWidth: '400px', marginBottom: '20px' }}>
-                <label style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginBottom: '8px', fontWeight: 600 }}>What should Aureus call you?</label>
-                <input
-                  placeholder="Your first name"
-                  value={userName}
-                  onChange={e => setUserName(e.target.value)}
-                  style={{ ...inputStyle, width: '100%', fontSize: '16px', padding: '14px 18px', textAlign: 'center' as const }}
-                  autoFocus
-                />
-              </div>
-              <button onClick={() => advanceMission(1)}
-                disabled={!userName.trim()}
-                style={{ width: '100%', maxWidth: '400px', padding: '18px', background: userName.trim() ? 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)' : theme.border, color: userName.trim() ? '#0a0a0a' : theme.textMuted, border: 'none', borderRadius: '14px', cursor: userName.trim() ? 'pointer' : 'default', fontSize: '18px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
-                {userName.trim() ? `Let's go, ${userName.trim()} →` : 'Enter your name to begin →'}
-              </button>
+                  <button onClick={() => userName.trim() && advanceMission(1)}
+                    disabled={!userName.trim()}
+                    style={{ width: '100%', maxWidth: '380px', padding: '16px', background: userName.trim() ? 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)' : theme.border, color: userName.trim() ? '#0a0a0a' : theme.textMuted, border: 'none', borderRadius: '14px', cursor: userName.trim() ? 'pointer' : 'default', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif', transition: 'all 0.2s' }}>
+                    {userName.trim() ? `Nice to meet you, ${userName.trim()} →` : 'Enter your name to begin'}
+                  </button>
+                </>
+              ) : (
+                // ── Phase B: Name entered — show what's next ──
+                <>
+                  <h1 style={{ color: theme.text, fontSize: '30px', fontWeight: 800, margin: '0 0 8px 0', fontFamily: 'Cinzel, serif' }}>
+                    Nice to meet you, <span style={{ color: theme.accent }}>{userName.trim()}</span>.
+                  </h1>
+                  <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 24px 0', maxWidth: '380px' }}>
+                    I'm going to learn how you think about money, map your full financial picture, and build you a personalised roadmap. Takes about 5 minutes.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', width: '100%', maxWidth: '380px', marginBottom: '24px' }}>
+                    {[
+                      { icon: '🧠', text: 'Understand your money personality' },
+                      { icon: '💰', text: 'Map income, bills, debts & savings' },
+                      { icon: '🎯', text: 'Set up sinking funds & goals' },
+                      { icon: '🛤️', text: 'Build your personalised roadmap' },
+                    ].map((item, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                        <span style={{ fontSize: '18px' }}>{item.icon}</span>
+                        <span style={{ color: theme.text, fontSize: '13px' }}>{item.text}</span>
+                        <span style={{ marginLeft: 'auto', color: theme.success, fontSize: '12px' }}>→</span>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => advanceMission(1)}
+                    style={{ width: '100%', maxWidth: '380px', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
+                    Let's build your plan, {userName.trim()} →
+                  </button>
+                </>
+              )}
               <button onClick={() => { setMissionComplete(true); setMissionNavLocked(false); setOnboardingComplete(true); setActiveTab('home' as any) }}
                 style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', marginTop: '14px', fontSize: '13px' }}>
                 Skip setup — I'll do this later
@@ -4562,7 +4585,22 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           // Active roadmap milestone
           const activeMilestone = roadmapMilestones.find((m: any) => (m.currentAmount || 0) < parseFloat(m.targetAmount || '99999'))
           const hourOfDay = new Date().getHours()
-          const greeting = hourOfDay < 12 ? 'Good morning' : hourOfDay < 17 ? 'Good afternoon' : 'Good evening'
+          const greetingWord = hourOfDay < 12 ? 'Good morning' : hourOfDay < 17 ? 'Good afternoon' : 'Good evening'
+          const name = userName || 'Builder'
+          // Contextual sub-greeting based on situation
+          const subGreeting = (() => {
+            if (overdueItems.length > 0) return `You have ${overdueItems.length} overdue payment${overdueItems.length > 1 ? 's' : ''} to tick off.`
+            const todayBill = upcoming.find((u: any) => u.dayOffset === 0 && u.itemType === 'expense')
+            if (todayBill) return `${todayBill.name} ($${parseFloat(todayBill.amount).toFixed(0)}) is due today.`
+            if (streak >= 7) return `${streak}-day streak — you're building something real.`
+            if (monthlySurplus > 0 && goals.length > 0) {
+              const topGoal = goals[0]
+              return `$${monthlySurplus.toFixed(0)}/month working toward ${topGoal.name}.`
+            }
+            if (hourOfDay < 12) return `Let's make today count.`
+            if (hourOfDay < 17) return `How's your week tracking?`
+            return `Great time to review how today went.`
+          })()
           const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][today.getDay()]
 
           return (
@@ -4574,8 +4612,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' as const, gap: '12px' }}>
                   <div>
                     <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, letterSpacing: '1px', marginBottom: '4px' }}>{dayName.toUpperCase()} · {today.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-                    <h2 style={{ color: theme.text, fontSize: '26px', fontWeight: 800, margin: '0 0 6px 0', fontFamily: 'Cinzel, serif' }}>{greeting}, {userName || 'Builder'}.</h2>
-                    <div style={{ color: theme.textMuted, fontSize: '14px', fontStyle: 'italic' }}>"{currentQuote.quote}"</div>
+                    <h2 style={{ color: theme.text, fontSize: '26px', fontWeight: 800, margin: '0 0 4px 0', fontFamily: 'Cinzel, serif' }}>{greetingWord}, <span style={{ color: theme.accent }}>{name}</span>.</h2>
+                    <div style={{ color: theme.textMuted, fontSize: '14px', marginBottom: '4px' }}>{subGreeting}</div>
+                    {currentQuote.quote && <div style={{ color: theme.textMuted, fontSize: '13px', fontStyle: 'italic' }}>"{currentQuote.quote}"</div>}
                     {whyStatement && <div style={{ marginTop: '10px', padding: '8px 12px', background: theme.accent + '15', borderRadius: '8px', border: '1px solid ' + theme.accent + '30', color: theme.accent, fontSize: '13px', fontStyle: 'italic' }}>🎯 {whyStatement}</div>}
                   </div>
                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const }}>
@@ -5510,7 +5549,15 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               const totalProjected = activeCategories.reduce((s, c) => s + (proj[c.id] || 0), 0)
               const totalActual = activeCategories.reduce((s, c) => s + (actual[c.id] || 0), 0)
               const pacePct = monthProgress > 0 ? totalActual / (totalProjected * monthProgress) : 0
-              const leaking = activeCategories.filter(c => (actual[c.id] || 0) > (proj[c.id] || 0) * monthProgress * 1.1 && (actual[c.id] || 0) > 0)
+              const leaking = activeCategories.filter(c => {
+                const budget = proj[c.id] || 0
+                const spent = actual[c.id] || 0
+                if (budget < 20) return false // no meaningful budget set — not a leak
+                const expectedByNow = budget * monthProgress
+                const isSignificantlyOver = spent > expectedByNow * 1.15 // >15% ahead of pace
+                const isOverByMeaningfulAmount = (spent - expectedByNow) > 20 // >$20 over
+                return isSignificantlyOver && isOverByMeaningfulAmount
+              })
               // Check for uncategorised expenses
               const uncategorisedExpenses = expenses.filter((e: any) => !e.category || e.category === 'other')
               const hasOtherBucket = uncategorisedExpenses.length > 0 && proj['other'] > 0
@@ -5589,12 +5636,13 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                             const a = actual[cat.id] || 0
                             const expectedSoFar = p * monthProgress
                             const pct = p > 0 ? (a / p) * 100 : 0
-                            const isOver = a > p
-                            const isAheadOfPace = a > expectedSoFar * 1.15 && !isOver
+                            const hasBudget = p >= 20 // only meaningful if budget is set
+                            const isOver = hasBudget && a > p
+                            const isAheadOfPace = hasBudget && a > expectedSoFar * 1.15 && !isOver
                             const barColor = isOver ? theme.danger : isAheadOfPace ? theme.warning : theme.success
                             const remaining = p - a
                             return (
-                              <div key={cat.id} style={{ padding: '12px 14px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + (isOver ? theme.danger + '40' : theme.border) }}>
+                              <div key={cat.id} style={{ padding: '12px 14px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + (isOver ? theme.danger + '40' : isAheadOfPace ? theme.warning + '40' : theme.border) }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                     <span style={{ fontSize: '16px' }}>{cat.icon}</span>
@@ -5602,7 +5650,10 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                       <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px' }}>{cat.label}</div>
                                       <div style={{ color: theme.textMuted, fontSize: '11px' }}>
                                         ${a.toFixed(0)} spent
-                                        {p > 0 && <span> · ${p.toFixed(0)} budget · {remaining >= 0 ? <span style={{ color: theme.success }}>${remaining.toFixed(0)} left</span> : <span style={{ color: theme.danger }}>${Math.abs(remaining).toFixed(0)} over</span>}</span>}
+                                        {p >= 20
+                                          ? <span> · ${p.toFixed(0)} budget · {remaining >= 0 ? <span style={{ color: theme.success }}>${remaining.toFixed(0)} left</span> : <span style={{ color: theme.danger }}>${Math.abs(remaining).toFixed(0)} over</span>}</span>
+                                          : <span style={{ color: theme.textMuted }}> · no budget set</span>
+                                        }
                                       </div>
                                     </div>
                                   </div>
@@ -5794,15 +5845,16 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
                       {/* Leak insights */}
                       {leaking.length > 0 && (
-                        <div style={{ marginTop: '14px', padding: '14px', background: theme.danger + '10', borderRadius: '10px', border: '1px solid ' + theme.danger + '30' }}>
-                          <div style={{ color: theme.danger, fontWeight: 700, fontSize: '13px', marginBottom: '8px' }}>💸 Money leak detected</div>
+                        <div style={{ marginTop: '14px', padding: '14px', background: theme.accent + '08', borderRadius: '10px', border: '1px solid ' + theme.accent + '25' }}>
+                          <div style={{ color: theme.accent, fontWeight: 700, fontSize: '13px', marginBottom: '8px' }}>🔍 A few areas running ahead of pace</div>
                           {leaking.map(cat => {
                             const p = proj[cat.id] || 0
                             const a = actual[cat.id] || 0
-                            const over = a - p
+                            const over = Math.round(a - p * monthProgress)
                             return (
-                              <div key={cat.id} style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '4px', lineHeight: 1.6 }}>
-                                {cat.icon} <strong style={{ color: theme.text }}>{cat.label}</strong> — ${a.toFixed(0)} spent vs ${p.toFixed(0)} budget (${over.toFixed(0)} over). At this rate: ${(a / (getMonthKey() === monthKey ? dayOfMonth : daysInMonth) * daysInMonth).toFixed(0)} by month end.
+                              <div key={cat.id} style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '6px', lineHeight: 1.6 }}>
+                                {cat.icon} <strong style={{ color: theme.text }}>{cat.label}</strong> — ${a.toFixed(0)} of ${p.toFixed(0)} used.
+                                {' '}<span style={{ color: theme.accent }}>Redirect ${over > 0 ? over.toFixed(0) : '0'} and you're back on track.</span>
                               </div>
                             )
                           })}
