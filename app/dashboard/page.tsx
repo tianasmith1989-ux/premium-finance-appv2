@@ -345,7 +345,7 @@ export default function Dashboard() {
 
   // ==================== THEME ====================
   const theme = {
-    bg: '#0a0a0a',
+    bg: '#111111',
     cardBg: '#141414',
     text: '#F5F5F5',
     textMuted: '#9a8a6a',
@@ -362,11 +362,11 @@ export default function Dashboard() {
   }
 
   const inputStyle: React.CSSProperties = { padding: '10px 14px', border: '2px solid ' + theme.inputBorder, borderRadius: '8px', fontSize: '14px', background: theme.input, color: theme.text, outline: 'none' }
-  const btnPrimary: React.CSSProperties = { padding: '10px 20px', background: 'linear-gradient(135deg, #D4AF37 0%, #B68B2E 100%)', color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }
+  const btnPrimary: React.CSSProperties = { padding: '10px 20px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }
   const btnSuccess: React.CSSProperties = { ...btnPrimary, background: 'linear-gradient(135deg, #B68B2E 0%, #8C6A1F 100%)', color: '#F5F5F5' }
   const btnDanger: React.CSSProperties = { ...btnPrimary, background: theme.danger, color: 'white' }
-  const btnWarning: React.CSSProperties = { ...btnPrimary, background: 'linear-gradient(135deg, #D4AF37 0%, #B68B2E 100%)', color: '#0a0a0a' }
-  const btnPurple: React.CSSProperties = { ...btnPrimary, background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a' }
+  const btnWarning: React.CSSProperties = { ...btnPrimary, background: 'linear-gradient(135deg, #D4AF37 0%, #B68B2E 100%)', color: '#111111' }
+  const btnPurple: React.CSSProperties = { ...btnPrimary, background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111' }
   const cardStyle: React.CSSProperties = { padding: '24px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }
 
   const countryConfig: {[key: string]: any} = {
@@ -2971,8 +2971,8 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
       <div style={{ minHeight: '100vh', background: theme.bg, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ maxWidth: '480px', width: '100%', textAlign: 'center' as const }}>
           {/* Logo */}
-          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 32px rgba(212,175,55,0.3)', border: '4px solid #D4AF37', margin: '0 auto 24px' }}>
-            <span style={{ color: '#0a0a0a', fontWeight: 800, fontSize: '40px' }}>A</span>
+          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 32px rgba(212,175,55,0.3)', border: '4px solid #D4AF37', margin: '0 auto 24px' }}>
+            <span style={{ color: '#111111', fontWeight: 800, fontSize: '40px' }}>A</span>
           </div>
           <h1 style={{ fontSize: '38px', fontWeight: 800, color: theme.text, margin: '0 0 12px 0' }}>Meet Aureus</h1>
           <p style={{ fontSize: '18px', color: theme.textMuted, margin: '0 0 8px 0', lineHeight: 1.5 }}>Your AI financial coach. I'll help you pay your mortgage off years early, eliminate debt, and build real wealth.</p>
@@ -3042,7 +3042,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           {/* Mission header */}
           <div style={{ padding: '16px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#0a0a0a', fontSize: '16px' }}>A</div>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#111111', fontSize: '16px' }}>A</div>
               <div>
                 <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Aureus Setup</div>
                 <div style={{ color: theme.textMuted, fontSize: '11px' }}>{missionStep === 0 ? 'Welcome' : `Step ${missionStep} of 8`}</div>
@@ -3069,7 +3069,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           {/* STEP 0 — Welcome */}
           {missionStep === 0 && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '40px 24px', maxWidth: '520px', margin: '0 auto', width: '100%', textAlign: 'center' as const }}>
-              <div style={{ width: '90px', height: '90px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: '44px', fontWeight: 800, color: '#0a0a0a', boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}>A</div>
+              <div style={{ width: '90px', height: '90px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: '44px', fontWeight: 800, color: '#111111', boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}>A</div>
 
               {!userName.trim() ? (
                 // ── Phase A: Name first ──
@@ -3094,7 +3094,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   </div>
                   <button onClick={() => userName.trim() && advanceMission(1)}
                     disabled={!userName.trim()}
-                    style={{ width: '100%', maxWidth: '380px', padding: '16px', background: userName.trim() ? 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)' : theme.border, color: userName.trim() ? '#0a0a0a' : theme.textMuted, border: 'none', borderRadius: '14px', cursor: userName.trim() ? 'pointer' : 'default', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif', transition: 'all 0.2s' }}>
+                    style={{ width: '100%', maxWidth: '380px', padding: '16px', background: userName.trim() ? 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)' : theme.border, color: userName.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '14px', cursor: userName.trim() ? 'pointer' : 'default', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif', transition: 'all 0.2s' }}>
                     {userName.trim() ? `Nice to meet you, ${userName.trim()} →` : 'Enter your name to begin'}
                   </button>
                 </>
@@ -3122,7 +3122,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     ))}
                   </div>
                   <button onClick={() => advanceMission(1)}
-                    style={{ width: '100%', maxWidth: '380px', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
+                    style={{ width: '100%', maxWidth: '380px', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
                     Let's build your plan, {userName.trim()} →
                   </button>
                 </>
@@ -3421,7 +3421,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <button onClick={() => advanceMission(4)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
                   Skip for now
                 </button>
-                <button onClick={() => advanceMission(4)} style={{ flex: 1, padding: '16px', background: expenses.length > 0 ? theme.accent : theme.border, color: expenses.length > 0 ? '#0a0a0a' : 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
+                <button onClick={() => advanceMission(4)} style={{ flex: 1, padding: '16px', background: expenses.length > 0 ? theme.accent : theme.border, color: expenses.length > 0 ? '#111111' : 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
                   {expenses.length > 0 ? 'Next: my debts →' : 'Continue without expenses →'}
                 </button>
               </div>
@@ -3501,7 +3501,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <button onClick={() => advanceMission(5)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
                   No debts — skip
                 </button>
-                <button onClick={() => advanceMission(5)} style={{ flex: 1, padding: '16px', background: debts.length > 0 ? theme.accent : theme.border, color: debts.length > 0 ? '#0a0a0a' : 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
+                <button onClick={() => advanceMission(5)} style={{ flex: 1, padding: '16px', background: debts.length > 0 ? theme.accent : theme.border, color: debts.length > 0 ? '#111111' : 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
                   {debts.length > 0 ? `Next: my savings →` : 'Continue →'}
                 </button>
               </div>
@@ -3591,7 +3591,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <button onClick={() => advanceMission(6)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
                   No savings yet — skip
                 </button>
-                <button onClick={() => advanceMission(6)} style={{ flex: 1, padding: '16px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
+                <button onClick={() => advanceMission(6)} style={{ flex: 1, padding: '16px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
                   {assets.length > 0 ? 'Next: my mortgage →' : 'Continue →'}
                 </button>
               </div>
@@ -3811,7 +3811,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               )}
 
               <button onClick={() => advanceMission(8)}
-                style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '16px', fontWeight: 800, fontFamily: 'Cinzel, serif', marginTop: '8px' }}>
+                style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '16px', fontWeight: 800, fontFamily: 'Cinzel, serif', marginTop: '8px' }}>
                 Next: plan for big expenses →
               </button>
             </div>
@@ -3943,7 +3943,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <button onClick={() => advanceMission(null, 2)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px', flexShrink: 0 }}>
                     Skip
                   </button>
-                  <button onClick={() => advanceMission(null, 2)} style={{ flex: 1, padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 800 }}>
+                  <button onClick={() => advanceMission(null, 2)} style={{ flex: 1, padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 800 }}>
                     {sinkingFunds.length > 0 ? `Save ${sinkingFunds.length} fund${sinkingFunds.length !== 1 ? 's' : ''} & build my roadmap →` : 'Build my roadmap →'}
                   </button>
                 </div>
@@ -3959,7 +3959,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
       {!missionComplete && missionPhase === 2 && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: theme.bg, zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
           <div style={{ padding: '16px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', gap: '12px', position: 'sticky' as const, top: 0, zIndex: 1 }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#0a0a0a', fontSize: '16px' }}>A</div>
+            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#111111', fontSize: '16px' }}>A</div>
             <div><div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Building your roadmap</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>Almost there</div></div>
           </div>
 
@@ -4121,7 +4121,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
 
                     <button
                       onClick={() => advanceMission(null, 3)}
-                      style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '18px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
+                      style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '18px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
                       Enter Your Empire →
                     </button>
                   </>
@@ -4235,12 +4235,12 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </button>
                 {tourStep < tourSteps.length - 1 ? (
                   <button onClick={() => { setTourStep(tourStep + 1); setActiveTab(tourSteps[tourStep + 1].tab as any) }}
-                    style={{ flex: 1, padding: '10px 18px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', border: 'none', borderRadius: '10px', cursor: 'pointer', color: '#0a0a0a', fontSize: '14px', fontWeight: 700 }}>
+                    style={{ flex: 1, padding: '10px 18px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', border: 'none', borderRadius: '10px', cursor: 'pointer', color: '#111111', fontSize: '14px', fontWeight: 700 }}>
                     Next →
                   </button>
                 ) : (
                   <button onClick={() => { setShowTour(false); setActiveTab('home' as any) }}
-                    style={{ flex: 1, padding: '10px 18px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', border: 'none', borderRadius: '10px', cursor: 'pointer', color: '#0a0a0a', fontSize: '14px', fontWeight: 700 }}>
+                    style={{ flex: 1, padding: '10px 18px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', border: 'none', borderRadius: '10px', cursor: 'pointer', color: '#111111', fontSize: '14px', fontWeight: 700 }}>
                     🏠 Start building →
                   </button>
                 )}
@@ -4277,7 +4277,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   icon: '💰', title: 'Weekly Money Date',
                   items: [
                     'Sit down for 15 minutes on your chosen day (Settings → Check-in Schedule)',
-                    'Open My Money — review Projected vs Actual. Any areas running over?',
+                    'Open Treasury — review Projected vs Actual. Any areas running over?',
                     'Check your Goals — on track? Adjust if needed',
                     'Open Roadmap — tick off any completed steps, generate a new plan if ready',
                     'Record your weekly win',
@@ -4408,7 +4408,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => { setShowHelpGuide(false); setTourStep(0); setShowTour(true) }}
-                  style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }}>
+                  style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: 700 }}>
                   ▶ Take the Tour
                 </button>
                 <button onClick={() => setShowHelpGuide(false)}
@@ -4441,7 +4441,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             <p style={{ color: theme.textMuted, fontSize: '16px', lineHeight: 1.7, margin: '0 0 28px 0' }}>{celebrationData.message}</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
               <button onClick={() => { askAureusAbout(`I just ${celebrationData.title.toLowerCase()}. What should I focus on next?`); setCelebrationData(null) }}
-                style={{ padding: '12px 24px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' }}>
+                style={{ padding: '12px 24px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' }}>
                 💬 What's next?
               </button>
               <button onClick={() => setCelebrationData(null)}
@@ -4459,7 +4459,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #D4AF37 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #D4AF37' }}>
-              <span style={{ color: '#0a0a0a', fontWeight: 800, fontSize: '18px' }}>A</span>
+              <span style={{ color: '#111111', fontWeight: 800, fontSize: '18px' }}>A</span>
             </div>
             <div>
               <span style={{ color: theme.text, fontWeight: 700, fontSize: '20px' }}>Aureus</span>
@@ -4502,13 +4502,13 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
           {[
             { id: 'home',      label: '🏠 Home' },
             { id: 'chat',      label: '💬 Aureus' },
-            { id: 'dashboard', label: '💰 My Money' },
+            { id: 'dashboard', label: '🏛️ Treasury' },
             { id: 'path',      label: '🛤️ Roadmap' },
             { id: 'wins',      label: `🏆 Wins${wins.length > 0 ? ` (${wins.length})` : ''}` },
           ].map(tab => (
             <button key={tab.id}
               onClick={() => { if (missionNavLocked) return; setActiveTab(tab.id as any); setShowMoreTabs(false) }}
-              style={{ padding: '7px 14px', background: activeTab === tab.id ? theme.accent : 'transparent', color: activeTab === tab.id ? '#0a0a0a' : missionNavLocked ? theme.textMuted + '60' : theme.text, border: '1px solid ' + (activeTab === tab.id ? theme.accent : theme.border), borderRadius: '8px', cursor: missionNavLocked ? 'default' : 'pointer', fontSize: '12px', fontWeight: activeTab === tab.id ? 700 : 500, whiteSpace: 'nowrap' as const, flexShrink: 0, opacity: missionNavLocked ? 0.4 : 1 }}>
+              style={{ padding: '7px 14px', background: activeTab === tab.id ? theme.accent : 'transparent', color: activeTab === tab.id ? '#111111' : missionNavLocked ? theme.textMuted + '60' : theme.text, border: '1px solid ' + (activeTab === tab.id ? theme.accent : theme.border), borderRadius: '8px', cursor: missionNavLocked ? 'default' : 'pointer', fontSize: '12px', fontWeight: activeTab === tab.id ? 700 : 500, whiteSpace: 'nowrap' as const, flexShrink: 0, opacity: missionNavLocked ? 0.4 : 1 }}>
               {tab.label}
             </button>
           ))}
@@ -4626,7 +4626,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     <button onClick={() => setShowSpendCheckIn(true)} style={{ padding: '10px 18px', background: theme.cardBg, color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
                       ⚡ Check-in
                     </button>
-                    <button onClick={() => setActiveTab('chat')} style={{ padding: '10px 18px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
+                    <button onClick={() => setActiveTab('chat')} style={{ padding: '10px 18px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
                       💬 Ask Aureus
                     </button>
                   </div>
@@ -4741,7 +4741,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         <div style={{ color: oneThingColor, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>TODAY'S ONE THING</div>
                         <div style={{ color: theme.text, fontSize: '18px', fontWeight: 800, marginBottom: '6px', lineHeight: 1.3 }}>{oneThingTitle}</div>
                         <div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, marginBottom: '16px' }}>{oneThingBody}</div>
-                        <button onClick={oneThingAction || (() => {})} style={{ padding: '10px 20px', background: oneThingColor, color: '#0a0a0a', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>
+                        <button onClick={oneThingAction || (() => {})} style={{ padding: '10px 20px', background: oneThingColor, color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>
                           {oneThingCta}
                         </button>
                       </div>
@@ -4776,7 +4776,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     )}
                   </div>
                   <button onClick={() => askAureusAbout('Give me a detailed coaching session based on my current financial situation')}
-                    style={{ padding: '8px 14px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
+                    style={{ padding: '8px 14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
                     💬 Ask Aureus
                   </button>
                 </div>
@@ -4789,7 +4789,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     <div style={{ color: theme.warning, fontWeight: 700, fontSize: '13px' }}>💰 Money date overdue — {daysSinceMoneyDate} days since your last one</div>
                     <div style={{ color: theme.textMuted, fontSize: '12px' }}>15 minutes now could save you hundreds. Review your week?</div>
                   </div>
-                  <button onClick={() => setActiveTab('dashboard')} style={{ padding: '8px 14px', background: theme.warning, color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>Do it now →</button>
+                  <button onClick={() => setActiveTab('dashboard')} style={{ padding: '8px 14px', background: theme.warning, color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>Do it now →</button>
                 </div>
               )}
               {overdueItems.length > 0 && (
@@ -4973,7 +4973,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       <div style={{ fontSize: '28px', marginBottom: '8px' }}>{coachNextAction.icon}</div>
                       <div style={{ color: theme.text, fontSize: '15px', fontWeight: 600, lineHeight: 1.5, marginBottom: '14px' }}>{coachNextAction.message}</div>
                       <button onClick={() => { setActiveTab(coachNextAction.tab as any); setShowMoreTabs(false) }}
-                        style={{ padding: '10px 18px', background: coachNextAction.urgency === 'high' ? theme.danger : theme.accent, color: coachNextAction.urgency === 'high' ? 'white' : '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
+                        style={{ padding: '10px 18px', background: coachNextAction.urgency === 'high' ? theme.danger : theme.accent, color: coachNextAction.urgency === 'high' ? 'white' : '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
                         {coachNextAction.action} →
                       </button>
                     </div>
@@ -5104,7 +5104,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         {!oneDecision && <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>The single highest-leverage action for your situation right now</div>}
                       </div>
                       <button onClick={generateMonthlyDecision}
-                        style={{ padding: '6px 14px', background: oneDecision ? 'transparent' : theme.warning, color: oneDecision ? theme.warning : '#0a0a0a', border: '1px solid ' + theme.warning + '50', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        style={{ padding: '6px 14px', background: oneDecision ? 'transparent' : theme.warning, color: oneDecision ? theme.warning : '#111111', border: '1px solid ' + theme.warning + '50', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                         {oneDecision ? (decisionIsThisMonth ? '🔄 New' : '↻ Refresh') : '⚡ Generate'}
                       </button>
                     </div>
@@ -5124,7 +5124,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px' }}>
                   {[
                     { id: 'chat',      icon: '💬', label: 'Ask Aureus',    desc: 'AI coach' },
-                    { id: 'dashboard', icon: '💰', label: 'My Money', desc: 'Income, bills, goals' },
+                    { id: 'dashboard', icon: '🏛️', label: 'Treasury', desc: 'Income, bills, goals' },
                     { id: 'path',      icon: '🛤️', label: 'Roadmap',       desc: 'Baby steps & milestones' },
                     { id: 'wins',      icon: '🏆', label: 'Wins',          desc: 'Your progress log' },
                     { id: 'mortgage',  icon: '🚀', label: 'Mortgage',      desc: 'Pay off faster' },
@@ -5187,7 +5187,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 )
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#0a0a0a', flexShrink: 0 }}>A</div>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#111111', flexShrink: 0 }}>A</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                       <div style={{ color: coachNextAction.urgency === 'high' ? theme.warning : coachNextAction.urgency === 'medium' ? theme.accent : theme.success, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>
@@ -5270,7 +5270,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             {/* AUREUS CHAT WIDGET */}
             <div style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#0a0a0a' }}>A</div>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#111111' }}>A</div>
                 <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{currentBabyStep.title}</div></div>
               </div>
               {chatMessages.length > 0 && (
@@ -5413,7 +5413,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             <div style={{ background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, border: '2px solid ' + theme.success, borderRadius: '20px', padding: '24px', minHeight: '70vh', display: 'flex', flexDirection: 'column' as const }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid ' + theme.border }}>
                 <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #D4AF37 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #D4AF37' }}>
-                  <span style={{ color: '#0a0a0a', fontWeight: 800, fontSize: '28px' }}>A</span>
+                  <span style={{ color: '#111111', fontWeight: 800, fontSize: '28px' }}>A</span>
                 </div>
                 <div>
                   <div style={{ color: theme.text, fontWeight: 700, fontSize: '22px' }}>Aureus</div>
@@ -5488,7 +5488,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 {chatMessages.map((msg, idx) => (
                   <div key={idx} style={{ marginBottom: '16px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                     <div style={{ maxWidth: '85%' }}>
-                      <div style={{ padding: '14px 18px', borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? '#0a0a0a' : theme.text, fontSize: '15px', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
+                      <div style={{ padding: '14px 18px', borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? '#111111' : theme.text, fontSize: '15px', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
                       {msg.usedWebSearch && (
                         <div style={{ marginTop: '4px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                           <span style={{ fontSize: '10px', color: theme.accent, padding: '2px 8px', background: theme.accent + '15', borderRadius: '10px', border: '1px solid ' + theme.accent + '30' }}>🔍 Live web data</span>
@@ -5679,7 +5679,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                     <span style={{ color: theme.textMuted, fontSize: '12px' }}>
                                       🍽️ {cat.id === 'food' ? 'A meal plan could cut this back' : 'Cooking at home could save you here'}
                                     </span>
-                                    <button onClick={() => setActiveTab('meals' as any)} style={{ padding: '4px 12px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+                                    <button onClick={() => setActiveTab('meals' as any)} style={{ padding: '4px 12px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
                                       Try Meal Planner →
                                     </button>
                                   </div>
@@ -5704,7 +5704,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       {/* Receipt Scanner & Manual Add */}
                       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const }}>
                         <button onClick={() => setShowReceiptScanner(!showReceiptScanner)}
-                          style={{ padding: '10px 16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>
+                          style={{ padding: '10px 16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>
                           📸 Scan Receipt
                         </button>
                         {/* ── MANUAL SPEND ENTRY ── */}
@@ -5755,7 +5755,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                   setShowManualSpend(false)
                                 }}
                                 disabled={!manualSpendCat || !manualSpendAmt}
-                                style={{ padding: '8px 18px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px', opacity: !manualSpendCat || !manualSpendAmt ? 0.5 : 1 }}>
+                                style={{ padding: '8px 18px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px', opacity: !manualSpendCat || !manualSpendAmt ? 0.5 : 1 }}>
                                 Add
                               </button>
                               <button onClick={() => { setShowManualSpend(false); setManualSpendAmt(''); setManualSpendCat('') }} style={{ padding: '8px 14px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>Cancel</button>
@@ -5825,7 +5825,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                               </div>
                               <div style={{ display: 'flex', gap: '8px' }}>
                                 <button onClick={() => { applyReceiptToActuals(receiptScanResult, monthKey); setReceiptScanResult(null); setShowReceiptScanner(false) }}
-                                  style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
+                                  style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
                                   ✓ Add to {now.toLocaleDateString('en-AU', { month: 'long' })} actuals
                                 </button>
                                 <button onClick={() => setReceiptScanResult(null)}
@@ -5922,7 +5922,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     <div style={{ padding: '20px', textAlign: 'center' as const, border: '2px dashed ' + theme.border, borderRadius: '12px' }}>
                       <div style={{ fontSize: '28px', marginBottom: '8px' }}>💸</div>
                       <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>Add your income and Aureus can start coaching you</div>
-                      <button onClick={() => setIncomeStreams([{ id: Date.now(), name: 'Salary', amount: '', frequency: 'fortnightly', type: 'active', startDate: '' }])} style={{ padding: '8px 18px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>+ Add income</button>
+                      <button onClick={() => setIncomeStreams([{ id: Date.now(), name: 'Salary', amount: '', frequency: 'fortnightly', type: 'active', startDate: '' }])} style={{ padding: '8px 18px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>+ Add income</button>
                     </div>
                   ) : incomeStreams.map(inc => (
                     editingItem?.type === 'income' && editingItem.id === inc.id ? (
@@ -5968,7 +5968,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>💑 Partner / couple mode</span>
                     </div>
-                    <button onClick={() => setCoupleMode(p => !p)} style={{ padding: '4px 12px', background: coupleMode ? theme.accent : 'transparent', color: coupleMode ? '#0a0a0a' : theme.textMuted, border: '1px solid ' + (coupleMode ? theme.accent : theme.border), borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
+                    <button onClick={() => setCoupleMode(p => !p)} style={{ padding: '4px 12px', background: coupleMode ? theme.accent : 'transparent', color: coupleMode ? '#111111' : theme.textMuted, border: '1px solid ' + (coupleMode ? theme.accent : theme.border), borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
                       {coupleMode ? 'On' : 'Off'}
                     </button>
                   </div>
@@ -6043,7 +6043,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     <div style={{ padding: '20px', textAlign: 'center' as const, border: '2px dashed ' + theme.border, borderRadius: '12px' }}>
                       <div style={{ fontSize: '28px', marginBottom: '8px' }}>🧾</div>
                       <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>Add your regular bills and expenses</div>
-                      <button onClick={() => setNewExpense((prev: any) => ({ ...prev, name: 'Rent', amount: '', frequency: 'fortnightly', category: 'housing' }))} style={{ padding: '8px 18px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>+ Add expense</button>
+                      <button onClick={() => setNewExpense((prev: any) => ({ ...prev, name: 'Rent', amount: '', frequency: 'fortnightly', category: 'housing' }))} style={{ padding: '8px 18px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>+ Add expense</button>
                     </div>
                   ) : expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(exp => (
                     editingItem?.type === 'expense' && editingItem.id === exp.id ? (
@@ -6169,7 +6169,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         <div style={{ textAlign: 'right' as const, display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '4px' }}>
                           <div style={{ color: theme.warning, fontWeight: 700 }}>${parseFloat(debt.balance).toFixed(0)}</div>
                           <div style={{ display: 'flex', gap: '4px' }}>
-                            <button onClick={() => startEdit('debt', debt)} style={{ padding: '2px 6px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>✏️</button>
+                            <button onClick={() => startEdit('debt', debt)} style={{ padding: '2px 6px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>✏️</button>
                             <button onClick={() => deleteDebt(debt.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button>
                           </div>
                         </div>
@@ -6220,7 +6220,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                         <div style={{ display: 'flex', gap: '4px' }}>
                           {(['avalanche', 'snowball'] as const).map(m => (
                             <button key={m} onClick={() => setPayoffMethod(m)}
-                              style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 600, border: 'none', borderRadius: '6px', cursor: 'pointer', background: payoffMethod === m ? theme.accent : theme.border, color: payoffMethod === m ? '#0a0a0a' : theme.textMuted, textTransform: 'capitalize' as const }}>
+                              style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 600, border: 'none', borderRadius: '6px', cursor: 'pointer', background: payoffMethod === m ? theme.accent : theme.border, color: payoffMethod === m ? '#111111' : theme.textMuted, textTransform: 'capitalize' as const }}>
                               {m}
                             </button>
                           ))}
@@ -7097,7 +7097,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             {/* Aureus Chat Widget */}
             <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#0a0a0a' }}>A</div>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#111111' }}>A</div>
                 <div>
                   <div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div>
                   <div style={{ color: theme.textMuted, fontSize: '11px' }}>
@@ -7312,7 +7312,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
                                             }, 350)
                                           }}
-                                          style={{ padding: '8px 16px', background: theme.warning, color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
+                                          style={{ padding: '8px 16px', background: theme.warning, color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
                                         >
                                           💳 Add to Debts in Budget →
                                         </button>
@@ -7345,7 +7345,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
                                             }, 350)
                                           }}
-                                          style={{ padding: '8px 16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
+                                          style={{ padding: '8px 16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
                                         >
                                           🎯 Set up in Goals →
                                         </button>
@@ -7586,7 +7586,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {(['plan', 'catalog', 'history'] as const).map(t => (
                     <button key={t} onClick={() => setMealPlanTab(t)}
-                      style={{ padding: '7px 14px', background: mealPlanTab === t ? theme.accent : 'transparent', color: mealPlanTab === t ? '#0a0a0a' : theme.textMuted, border: '1px solid ' + (mealPlanTab === t ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, textTransform: 'capitalize' as const }}>
+                      style={{ padding: '7px 14px', background: mealPlanTab === t ? theme.accent : 'transparent', color: mealPlanTab === t ? '#111111' : theme.textMuted, border: '1px solid ' + (mealPlanTab === t ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, textTransform: 'capitalize' as const }}>
                       {t === 'plan' ? '🗓️ Plan' : t === 'catalog' ? '📸 Catalog' : '📚 History'}
                     </button>
                   ))}
@@ -8004,7 +8004,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
               ) : (
                 <div style={{ color: theme.textMuted, fontSize: '14px', textAlign: 'center' as const, padding: '20px' }}>
-                  {expenses.length < 3 ? 'Add at least 3 expenses in My Money to unlock spending pattern analysis.' : 'Tap Analyse to get AI-powered insights about your spending patterns.'}
+                  {expenses.length < 3 ? 'Add at least 3 expenses in Treasury to unlock spending pattern analysis.' : 'Tap Analyse to get AI-powered insights about your spending patterns.'}
                 </div>
               )}
             </div>
@@ -8638,7 +8638,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <div style={{ color: theme.accent, fontWeight: 700, fontSize: '14px' }}>🏘️ Investment Portfolio</div>
                   <div style={{ color: theme.textMuted, fontSize: '12px' }}>{investmentProperties.length} propert{investmentProperties.length === 1 ? 'y' : 'ies'} · ${investmentProperties.reduce((s, p) => s + parseFloat(p.currentValue || p.purchasePrice || '0'), 0).toLocaleString()} total value</div>
                 </div>
-                <button onClick={() => setActiveTab('property' as any)} style={{ padding: '7px 14px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>View Portfolio →</button>
+                <button onClick={() => setActiveTab('property' as any)} style={{ padding: '7px 14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>View Portfolio →</button>
               </div>
             )}
 
@@ -8796,7 +8796,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       {investmentProperties.length > 0 && <div style={{ color: theme.textMuted, fontSize: '12px' }}>{investmentProperties.length} propert{investmentProperties.length === 1 ? 'y' : 'ies'}</div>}
                     </div>
                     <button onClick={() => setShowAddProperty(!showAddProperty)}
-                      style={{ padding: '8px 16px', background: showAddProperty ? theme.border : 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: showAddProperty ? theme.textMuted : '#0a0a0a', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>
+                      style={{ padding: '8px 16px', background: showAddProperty ? theme.border : 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: showAddProperty ? theme.textMuted : '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>
                       {showAddProperty ? '✕ Cancel' : '+ Add Property'}
                     </button>
                   </div>
@@ -9097,7 +9097,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 28px 0' }}>{celebration.subtitle}</p>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => { setCelebration(null); setShowAccountabilityCard(true) }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid ' + theme.accent + '50', borderRadius: '10px', color: theme.accent, cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>📊 Share this win</button>
-              <button onClick={() => setCelebration(null)} style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>Keep building 🔥</button>
+              <button onClick={() => setCelebration(null)} style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>Keep building 🔥</button>
             </div>
           </div>
         </div>
@@ -9161,7 +9161,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     <div style={{ color: theme.accent, fontSize: '11px', marginTop: '8px' }}>— Aureus</div>
                   </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={() => { setShowSpendCheckIn(false); setCheckInResult(null) }} style={{ flex: 1, padding: '12px', background: theme.accent, color: '#0a0a0a', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }}>Done</button>
+                    <button onClick={() => { setShowSpendCheckIn(false); setCheckInResult(null) }} style={{ flex: 1, padding: '12px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }}>Done</button>
                     <button onClick={() => { setActiveTab('chat'); setShowSpendCheckIn(false); setCheckInResult(null) }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '10px', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>Ask follow-up →</button>
                   </div>
                 </div>
@@ -9212,7 +9212,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <textarea placeholder="Anything notable this week? (optional)" value={checkInNote} onChange={e => setCheckInNote(e.target.value)}
                     style={{ ...inputStyle, width: '100%', height: '60px', resize: 'none' as const, marginBottom: '12px' }} />
 
-                  <button onClick={handleSubmit} disabled={checkInSubmitting} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#0a0a0a', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '15px', opacity: checkInSubmitting ? 0.7 : 1 }}>
+                  <button onClick={handleSubmit} disabled={checkInSubmitting} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '15px', opacity: checkInSubmitting ? 0.7 : 1 }}>
                     {checkInSubmitting ? '⏳ Getting your feedback...' : '✓ Save check-in & get feedback'}
                   </button>
                 </>
@@ -9754,7 +9754,7 @@ Tracking with Aureus 🏛️`
             {/* Step 0: Welcome */}
             {onboardingStep === 0 && (
               <div style={{ textAlign: 'center' as const }}>
-                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: '40px', fontWeight: 800, color: '#0a0a0a' }}>A</div>
+                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: '40px', fontWeight: 800, color: '#111111' }}>A</div>
                 <h2 style={{ color: theme.text, fontSize: '28px', margin: '0 0 12px 0' }}>G'day! I'm Aureus.</h2>
                 <p style={{ color: theme.textMuted, fontSize: '16px', lineHeight: 1.7, marginBottom: '24px' }}>Your AI financial coach — built to help you pay your mortgage off faster, eliminate debt, and build real wealth. Let me learn about how you think about money so I can coach you properly.</p>
                 <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '28px' }}>Takes about 5 minutes. Everything is stored only on your device.</p>
