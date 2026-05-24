@@ -195,6 +195,41 @@ export default function Dashboard() {
   const [manualSpendCat, setManualSpendCat] = useState('')
   const [manualSpendAmt, setManualSpendAmt] = useState('')
 
+  // ==================== RETURN VISIT ENGAGEMENT ====================
+  const [returnCard, setReturnCard] = useState<{ title: string; body: string; cta: string; action: string; emoji: string } | null>(null)
+  const returnCardShownRef = useRef<string | null>(null)
+
+  // ==================== FEATURE 1: PAYOFF DATE MOVED ====================
+  const [payoffMovedCard, setPayoffMovedCard] = useState<{ debt: string; weeks: number; newDate: string } | null>(null)
+  const prevDebtBalancesRef = useRef<Record<string, number>>({})
+
+  // ==================== FEATURE 2: PATTERN MEMORY ====================
+  const [aureusNoticedCard, setAureusNoticedCard] = useState<string[] | null>(null)
+  const lastNoticedMonthRef = useRef<string | null>(null)
+
+  // ==================== FEATURE 3: NEXT 3 MOVES ====================
+  const [nextMovesExpanded, setNextMovesExpanded] = useState(false)
+
+  // ==================== FEATURE 4: ACCOUNTABILITY PARTNER ====================
+  const [showAccountabilitySetup, setShowAccountabilitySetup] = useState(false)
+  const [accountabilityEmail, setAccountabilityEmail] = useState('')
+  const [accountabilityName, setAccountabilityName] = useState('')
+  const [accountabilitySending, setAccountabilitySending] = useState(false)
+  const [accountabilitySent, setAccountabilitySent] = useState(false)
+
+  // ==================== FEATURE 5: WEALTH MILESTONES ====================
+  const [wealthMilestones, setWealthMilestones] = useState<Record<string, boolean>>({})
+
+  // ==================== FEATURE 6: SHAREABLE WIN CARD ====================
+  const [showShareWinCard, setShowShareWinCard] = useState(false)
+  const [shareWinType, setShareWinType] = useState<'win' | 'snapshot' | 'milestone'>('snapshot')
+  const [shareWinContext, setShareWinContext] = useState<any>(null)
+
+  // ==================== EMAIL NOTIFICATIONS ====================
+  const [notificationEmail, setNotificationEmail] = useState('')
+  const [emailNotifEnabled, setEmailNotifEnabled] = useState(false)
+  const [emailNotifFrequency, setEmailNotifFrequency] = useState<'weekly' | 'fortnightly'>('weekly')
+
   // ==================== CELEBRATIONS ====================
   const [celebration, setCelebration] = useState<{ title: string; subtitle: string; emoji: string; amount?: string } | null>(null)
 
@@ -437,10 +472,10 @@ export default function Dashboard() {
       if (data.missionP2Proposals) setMissionP2Proposals(data.missionP2Proposals)
       if (data.missionP2Confirmed) setMissionP2Confirmed(data.missionP2Confirmed)
       if (data.missionP2Step) setMissionP2Step(data.missionP2Step)
-      // New users start at mission step 1
+      // New users start at mission step 0 (name collection)
       if (!data.missionComplete && !data.missionPhase) {
         setMissionPhase(1)
-        setMissionStep(1)
+        setMissionStep(0)
         setMissionNavLocked(true)
       }
       if (data.proactiveInsights) setProactiveInsights(data.proactiveInsights)
@@ -460,6 +495,12 @@ export default function Dashboard() {
       if (data.partnerFrequency) setPartnerFrequency(data.partnerFrequency)
       if (data.taxEstData) setTaxEstData(prev => ({ ...prev, ...data.taxEstData }))
       if (data.notificationsEnabled !== undefined) setNotificationsEnabled(data.notificationsEnabled)
+      if (data.wealthMilestones) setWealthMilestones(data.wealthMilestones)
+      if (data.accountabilityEmail) setAccountabilityEmail(data.accountabilityEmail)
+      if (data.accountabilityName) setAccountabilityName(data.accountabilityName)
+      if (data.emailNotifEnabled !== undefined) setEmailNotifEnabled(data.emailNotifEnabled)
+      if (data.emailNotifFrequency) setEmailNotifFrequency(data.emailNotifFrequency)
+      if (data.notificationEmail) setNotificationEmail(data.notificationEmail)
       // Show onboarding for new users
       if (!data.onboardingComplete) setShowOnboarding(true)
       if (data.budgetOnboarding) setBudgetOnboarding(data.budgetOnboarding)
@@ -502,7 +543,7 @@ export default function Dashboard() {
       coupleMode, partnerName, partnerIncome, partnerFrequency, taxEstData, notificationsEnabled
     }
     localStorage.setItem('aureus_data', JSON.stringify(data))
-  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, categoryBudgets, actualSpend, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, coachNextAction, dismissedTriggers, lastAppOpen, missionPhase, missionStep, missionComplete, missionNavLocked, missionP2Proposals, missionP2Confirmed, missionP2Step, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, sinkingFunds, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers, coupleMode, partnerName, partnerIncome, partnerFrequency, taxEstData, notificationsEnabled])
+  }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, categoryBudgets, actualSpend, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, coachNextAction, dismissedTriggers, lastAppOpen, missionPhase, missionStep, missionComplete, missionNavLocked, missionP2Proposals, missionP2Confirmed, missionP2Step, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, sinkingFunds, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers, coupleMode, partnerName, partnerIncome, partnerFrequency, taxEstData, notificationsEnabled, wealthMilestones, accountabilityEmail, accountabilityName, emailNotifEnabled, emailNotifFrequency, notificationEmail])
 
   // Chat scroll
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -565,6 +606,73 @@ export default function Dashboard() {
 
 
   const emergencyMonths = monthlyExpenses > 0 ? emergencyFund / monthlyExpenses : 0
+
+  // ==================== FEATURE 1: PAYOFF DATE MOVED ====================
+  useEffect(() => {
+    if (!onboardingComplete || debts.length === 0) return
+    debts.forEach((debt: any) => {
+      const prev = prevDebtBalancesRef.current[debt.id]
+      const curr = parseFloat(debt.balance || '0')
+      if (prev !== undefined && curr < prev && curr > 0) {
+        const rate = parseFloat(debt.interestRate || '0') / 100 / 12
+        const minPay = parseFloat(debt.minimumPayment || '200')
+        const monthsNow = rate > 0 ? Math.ceil(Math.log(minPay/(minPay - rate*curr))/Math.log(1+rate)) : Math.ceil(curr/minPay)
+        const monthsPrev = rate > 0 ? Math.ceil(Math.log(minPay/(minPay - rate*prev))/Math.log(1+rate)) : Math.ceil(prev/minPay)
+        const weeksSaved = Math.round((monthsPrev - monthsNow) * 4.3)
+        if (weeksSaved >= 1) {
+          const payoffDate = new Date(); payoffDate.setMonth(payoffDate.getMonth() + monthsNow)
+          setPayoffMovedCard({ debt: debt.name, weeks: weeksSaved, newDate: payoffDate.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }) })
+        }
+      }
+      prevDebtBalancesRef.current[debt.id] = curr
+    })
+  }, [debts, onboardingComplete])
+
+  // ==================== FEATURE 2: AUREUS NOTICED (monthly pattern card) ====================
+  useEffect(() => {
+    if (!onboardingComplete || monthlyIncome === 0) return
+    const thisMonth = new Date().toISOString().slice(0, 7)
+    if (lastNoticedMonthRef.current === thisMonth) return
+    if (new Date().getDate() < 25) return
+    const observations: string[] = []
+    if (budgetMemory?.patterns?.length > 0) observations.push(...budgetMemory.patterns.slice(0, 2))
+    const savingRate = monthlyIncome > 0 ? Math.round((monthlyGoalSavings / monthlyIncome) * 100) : 0
+    if (savingRate >= 20) observations.push(`Your ${savingRate}% saving rate puts you ahead of 85% of Australians.`)
+    else if (savingRate > 0) observations.push(`Saving rate: ${savingRate}% — AU average is ~12%.`)
+    if (streak >= 7) observations.push(`${streak}-day streak — top 10% of users.`)
+    const sfOnTrack = sinkingFunds.filter((f: any) => {
+      const weekly = parseFloat(f.weeklyAmount||'0'); const saved = parseFloat(f.savedAmount||'0')
+      const weeksIn = Math.floor((Date.now() - new Date(f.createdAt||Date.now()).getTime())/(7*86400000))
+      return saved >= weekly * weeksIn * 0.9
+    })
+    if (sfOnTrack.length > 0) observations.push(`${sfOnTrack.length} sinking fund${sfOnTrack.length>1?'s':''} on track — ${sfOnTrack.map((f: any) => f.name).join(', ')}.`)
+    if (observations.length >= 2) { lastNoticedMonthRef.current = thisMonth; setAureusNoticedCard(observations.slice(0, 3)) }
+  }, [onboardingComplete, monthlyIncome, budgetMemory, streak, sinkingFunds, monthlyGoalSavings])
+
+  // ==================== FEATURE 5: WEALTH MILESTONES ====================
+  useEffect(() => {
+    if (!onboardingComplete) return
+    const MILESTONES: Record<string, { condition: boolean; title: string; subtitle: string; emoji: string }> = {
+      first_win: { condition: wins.length>=1, title: 'First Victory', emoji: '⚔️', subtitle: 'PRIMA VICTORIA\n\nYou logged your first financial win. Every empire starts with one.' },
+      emergency_1k: { condition: emergencyFund>=1000, title: 'Treasury Founded', emoji: '🏛️', subtitle: 'AERARIUM CONDITVM\n\n$1,000 saved. Your treasury has opened its doors.' },
+      emergency_2k: { condition: emergencyFund>=2000, title: 'The Shield', emoji: '🛡️', subtitle: 'SCVTVM\n\n$2,000. Your financial airbag is in place.' },
+      debt_started: { condition: debts.some((d:any) => parseFloat(d.balance||'0') < parseFloat(d.originalBalance||d.balance||'1')*0.9), title: 'Liberation Begun', emoji: '⛓️', subtitle: 'LIBERATIO INCEPTA\n\nFirst 10% of a debt eliminated. The chains are breaking.' },
+      net_worth_positive: { condition: netWorth>0, title: 'Positive Territory', emoji: '📈', subtitle: 'IN BONO STARE\n\nNet worth above zero. You now own more than you owe.' },
+      net_worth_10k: { condition: netWorth>=10000, title: 'Ten Thousand', emoji: '💰', subtitle: 'DECEM MILIA\n\n$10,000 net worth. A real foundation.' },
+      net_worth_50k: { condition: netWorth>=50000, title: 'Fifty Thousand', emoji: '🔥', subtitle: 'QVINQVAGINTA MILIA\n\n$50,000. This is where compound growth starts to feel real.' },
+      net_worth_100k: { condition: netWorth>=100000, title: 'The Century', emoji: '👑', subtitle: 'CENTVM MILIA\n\n$100,000. Most people never get here. You did.' },
+      streak_7: { condition: streak>=7, title: 'Seven Days', emoji: '⚡', subtitle: 'SEPTEM DIES\n\n7-day streak. Discipline creates freedom.' },
+      streak_30: { condition: streak>=30, title: 'The Month', emoji: '🏆', subtitle: 'MENSIS\n\n30-day streak. You are the 5%.' },
+      goal_first: { condition: goals.some((g:any) => parseFloat(g.savedAmount||'0')>=parseFloat(g.targetAmount||'1') && parseFloat(g.targetAmount||'0')>0), title: 'Goal Conquered', emoji: '🎯', subtitle: 'PROPOSITVM VICTVM\n\nFirst savings goal reached. You said you would. You did.' },
+      sinking_3: { condition: sinkingFunds.length>=3, title: 'Forward Thinker', emoji: '🗓️', subtitle: 'PROVIDENS\n\n3 sinking funds active. Planning for life, not reacting to it.' },
+    }
+    const newUnlocked = { ...wealthMilestones }
+    let firstNew: any = null
+    for (const [key, m] of Object.entries(MILESTONES)) {
+      if (m.condition && !newUnlocked[key]) { newUnlocked[key]=true; if (!firstNew) firstNew=m }
+    }
+    if (firstNew) { setWealthMilestones(newUnlocked); setCelebration({ title: firstNew.title, subtitle: firstNew.subtitle, emoji: firstNew.emoji }) }
+  }, [wins, emergencyFund, debts, netWorth, streak, goals, sinkingFunds, onboardingComplete, wealthMilestones])
 
   // ==================== CELEBRATION TRIGGERS ====================
   const celebrationShownRef = useRef<Set<string>>(new Set())
@@ -1945,6 +2053,60 @@ Rules: Be specific and use their actual numbers. No generic advice. Be warm but 
     // Track app opens for re-engagement
     if (lastAppOpen !== today) {
       setLastAppOpen(today)
+
+      // ── Return visit re-engagement card ──
+      if (onboardingComplete && lastAppOpen && returnCardShownRef.current !== today) {
+        returnCardShownRef.current = today
+        const daysSinceLastOpen = Math.floor((Date.now() - new Date(lastAppOpen).getTime()) / 86400000)
+        const name = userName || 'Builder'
+
+        // Build a contextual, directed re-engagement message
+        let card = null
+
+        if (daysSinceLastOpen >= 7) {
+          const nextMilestone = roadmapMilestones.find((m: any) => (m.currentAmount || 0) < parseFloat(m.targetAmount || '99999'))
+          card = {
+            emoji: '🏛️',
+            title: `Good to have you back, ${name}.`,
+            body: nextMilestone
+              ? `Your roadmap is exactly where you left it. ${nextMilestone.name} is still within reach — and your surplus has been quietly building while you were away. Want to see where you stand?`
+              : monthlySurplus > 0
+              ? `Your money has been working while you were away. $${Math.round(monthlySurplus * (daysSinceLastOpen / 30)).toLocaleString()} in surplus since your last visit. Let's put it to work.`
+              : `Your financial foundation is right here waiting. Even a 2-minute check keeps the momentum going.`,
+            cta: `See what's waiting →`,
+            action: nextMilestone ? 'grow' : 'home'
+          }
+        } else if (daysSinceLastOpen >= 3) {
+          const topGoal = goals.sort((a: any, b: any) => parseFloat(b.savedAmount||'0') - parseFloat(a.savedAmount||'0'))[0]
+          card = topGoal
+            ? {
+                emoji: '🎯',
+                title: `${name}, your goals missed you.`,
+                body: `${topGoal.name} is at ${Math.min(100, Math.round(parseFloat(topGoal.savedAmount||'0') / parseFloat(topGoal.targetAmount||'1') * 100))}% — closer than it was last time you checked. A quick update keeps the picture accurate.`,
+                cta: 'Check my progress →',
+                action: 'dashboard'
+              }
+            : {
+                emoji: '⚡',
+                title: `Welcome back, ${name}.`,
+                body: `The fastest way to feel good about money is knowing exactly where it's going. A 60-second check-in and you're back in control.`,
+                cta: 'Do a quick check-in →',
+                action: 'checkin'
+              }
+        } else {
+          if (streak >= 3) {
+            card = {
+              emoji: '🔥',
+              title: `${streak} days strong, ${name}.`,
+              body: `People who check in consistently build wealth 3× faster than those who don't. You're already doing the hard part.`,
+              cta: `Keep the streak alive →`,
+              action: 'home'
+            }
+          }
+        }
+
+        if (card) setReturnCard(card)
+      }
     }
 
     const daysSinceCheckIn = lastCheckIn
@@ -4745,6 +4907,108 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                           {oneThingCta}
                         </button>
                       </div>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* ── PAYOFF DATE MOVED micro-celebration ── */}
+              {payoffMovedCard && (
+                <div style={{ padding: '16px 20px', background: `linear-gradient(135deg, ${theme.success}18, ${theme.cardBg})`, borderRadius: '14px', border: `2px solid ${theme.success}40`, display: 'flex', gap: '14px', alignItems: 'center' }}>
+                  <div style={{ fontSize: '32px' }}>📅</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: theme.success, fontWeight: 800, fontSize: '14px', marginBottom: '2px' }}>Payoff date moved!</div>
+                    <div style={{ color: theme.text, fontSize: '13px' }}>{payoffMovedCard.debt} — you just saved <strong style={{ color: theme.success }}>{payoffMovedCard.weeks} week{payoffMovedCard.weeks !== 1 ? 's' : ''}</strong> of interest. New payoff: <strong>{payoffMovedCard.newDate}</strong>.</div>
+                  </div>
+                  <button onClick={() => setPayoffMovedCard(null)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '18px', flexShrink: 0 }}>×</button>
+                </div>
+              )}
+
+              {/* ── AUREUS NOTICED monthly card ── */}
+              {aureusNoticedCard && (
+                <div style={{ padding: '18px 20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.accent + '30' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ color: theme.accent, fontWeight: 700, fontSize: '13px', letterSpacing: '1px' }}>🧠 AUREUS NOTICED THIS MONTH</div>
+                    <button onClick={() => setAureusNoticedCard(null)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '16px' }}>×</button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                    {aureusNoticedCard.map((obs, i) => (
+                      <div key={i} style={{ display: 'flex', gap: '10px', padding: '10px 12px', background: theme.bg, borderRadius: '8px', border: '1px solid ' + theme.border }}>
+                        <span style={{ color: theme.accent, flexShrink: 0 }}>{['📊','💡','🎯'][i] || '•'}</span>
+                        <span style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.5 }}>{obs}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── FEATURE 3: NEXT 3 MOVES ── */}
+              {onboardingComplete && monthlyIncome > 0 && (() => {
+                // Derive 3 specific, time-estimated moves from live data
+                const moves: { icon: string; action: string; time: string; tab: string; priority: number }[] = []
+
+                // Overdue payments
+                overdueItems.slice(0, 1).forEach((item: any) => moves.push({ icon: '🔴', action: `Mark ${item.name} as paid ($${parseFloat(item.amount).toFixed(0)})`, time: '1 min', tab: 'dashboard', priority: 1 }))
+
+                // Emergency fund top-up
+                if (emergencyFund < 2000) {
+                  const needed = 2000 - emergencyFund
+                  const weeklyNeeded = monthlySurplus > 0 ? Math.min(needed, Math.round(monthlySurplus / 4)) : 50
+                  moves.push({ icon: '🛡️', action: `Transfer $${weeklyNeeded} to emergency fund (${Math.ceil(needed / weeklyNeeded)} weeks to $2k)`, time: '2 min', tab: 'dashboard', priority: 2 })
+                }
+
+                // Top debt extra payment
+                const topDebt = debts.sort((a: any, b: any) => parseFloat(b.interestRate||'0') - parseFloat(a.interestRate||'0'))[0]
+                if (topDebt && monthlySurplus > 100) {
+                  const extra = Math.round(Math.min(monthlySurplus * 0.3, 200))
+                  moves.push({ icon: '💳', action: `Put extra $${extra} on ${topDebt.name} (${topDebt.interestRate}% interest)`, time: '2 min', tab: 'dashboard', priority: 2 })
+                }
+
+                // Sinking fund behind
+                const sfBehind = sinkingFunds.find((f: any) => {
+                  const weekly = parseFloat(f.weeklyAmount||'0'); const saved = parseFloat(f.savedAmount||'0')
+                  const weeksIn = Math.floor((Date.now() - new Date(f.createdAt||Date.now()).getTime())/(7*86400000))
+                  return saved < weekly * weeksIn * 0.8
+                })
+                if (sfBehind) moves.push({ icon: '🎯', action: `Top up ${sfBehind.name} sinking fund — running behind`, time: '2 min', tab: 'dashboard', priority: 3 })
+
+                // Goal contribution
+                const topGoal = goals.find((g: any) => parseFloat(g.savedAmount||'0') < parseFloat(g.targetAmount||'0'))
+                if (topGoal && moves.length < 3) {
+                  const pct = Math.round(parseFloat(topGoal.savedAmount||'0') / parseFloat(topGoal.targetAmount||'1') * 100)
+                  moves.push({ icon: '🏆', action: `Update ${topGoal.name} progress (${pct}% there)`, time: '1 min', tab: 'dashboard', priority: 3 })
+                }
+
+                // Weekly check-in if not done recently
+                const daysSinceCheckIn = lastCheckIn ? Math.floor((Date.now() - new Date(lastCheckIn).getTime()) / 86400000) : 999
+                if (daysSinceCheckIn >= 6 && moves.length < 3) {
+                  moves.push({ icon: '⚡', action: `Weekly check-in — ${daysSinceCheckIn} days since last one`, time: '60 sec', tab: 'checkin', priority: 3 })
+                }
+
+                // Tax estimator if in AU and May-June
+                const month = new Date().getMonth()
+                if (userCountry === 'AU' && (month === 4 || month === 5) && moves.length < 3) {
+                  moves.push({ icon: '🧾', action: `EOFY coming — run your tax return estimate`, time: '5 min', tab: 'insights', priority: 3 })
+                }
+
+                const top3 = moves.sort((a, b) => a.priority - b.priority).slice(0, 3)
+                if (top3.length === 0) return null
+
+                return (
+                  <div style={{ padding: '18px 20px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>⚡ YOUR NEXT 3 MOVES</div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px' }}>Highest impact first</div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                      {top3.map((move, i) => (
+                        <button key={i} onClick={() => { if (move.tab === 'checkin') setShowSpendCheckIn(true); else setActiveTab(move.tab as any) }}
+                          style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px 14px', background: i === 0 ? theme.accent + '10' : theme.bg, border: '1px solid ' + (i === 0 ? theme.accent + '40' : theme.border), borderRadius: '10px', cursor: 'pointer', textAlign: 'left' as const, width: '100%' }}>
+                          <span style={{ fontSize: '18px', flexShrink: 0 }}>{move.icon}</span>
+                          <span style={{ flex: 1, color: theme.text, fontSize: '13px', fontWeight: i === 0 ? 600 : 400, lineHeight: 1.4 }}>{move.action}</span>
+                          <span style={{ color: theme.textMuted, fontSize: '11px', flexShrink: 0, background: theme.bg, padding: '2px 8px', borderRadius: '10px', border: '1px solid ' + theme.border }}>{move.time}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )
@@ -7925,8 +8189,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <div style={{ color: theme.textMuted, fontSize: '13px' }}>Share your progress with an accountability partner — partner, friend, or coach</div>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                <button onClick={() => setShowAccountabilityCard(true)} style={{ ...btnSuccess, padding: '10px 20px' }}>Share snapshot →</button>
+              <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' as const }}>
+                <button onClick={() => { setShareWinContext(null); setShowShareWinCard(true) }} style={{ ...btnSuccess, padding: '10px 16px', fontSize: '13px' }}>🏛️ Share card →</button>
+                <button onClick={() => setShowAccountabilitySetup(true)} style={{ padding: '10px 14px', background: 'transparent', border: '1px solid ' + theme.accent + '40', borderRadius: '8px', color: theme.accent, cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🤝 Partner</button>
                 {!notificationsEnabled && <button onClick={() => setShowNotifSetup(true)} style={{ padding: '10px 14px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>🔔</button>}
               </div>
             </div>
@@ -9060,6 +9325,29 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         </div>
       )}
 
+      {/* ==================== RETURN VISIT CARD ==================== */}
+      {returnCard && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1090, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setReturnCard(null)}>
+          <div style={{ background: 'linear-gradient(135deg, #1a1810 0%, #111111 100%)', border: '2px solid ' + theme.accent + '50', borderRadius: '24px', padding: '36px 32px', maxWidth: '420px', width: '100%', textAlign: 'center' as const }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: '56px', marginBottom: '16px' }}>{returnCard.emoji}</div>
+            <h2 style={{ color: theme.accent, fontSize: '24px', fontWeight: 900, margin: '0 0 12px 0', fontFamily: 'Cinzel, serif' }}>{returnCard.title}</h2>
+            <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.7, margin: '0 0 24px 0' }}>{returnCard.body}</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => {
+                setReturnCard(null)
+                if (returnCard.action === 'checkin') setShowSpendCheckIn(true)
+                else if (returnCard.action !== 'home') setActiveTab(returnCard.action as any)
+              }} style={{ flex: 1, padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '14px', fontFamily: 'Cinzel, serif' }}>
+                {returnCard.cta}
+              </button>
+              <button onClick={() => setReturnCard(null)} style={{ padding: '14px 16px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>
+                Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================== CELEBRATION MODAL ==================== */}
       {celebration && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setCelebration(null)}>
@@ -9096,7 +9384,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             {celebration.amount && <div style={{ display: 'inline-block', padding: '6px 16px', background: theme.accent + '20', border: '1px solid ' + theme.accent + '50', borderRadius: '20px', color: theme.accent, fontWeight: 800, fontSize: '18px', marginBottom: '14px' }}>{celebration.amount}</div>}
             <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 28px 0' }}>{celebration.subtitle}</p>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => { setCelebration(null); setShowAccountabilityCard(true) }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid ' + theme.accent + '50', borderRadius: '10px', color: theme.accent, cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>📊 Share this win</button>
+              <button onClick={() => { const c = celebration; setCelebration(null); setShareWinContext({ title: c?.title, subtitle: c?.subtitle, emoji: c?.emoji, amount: c?.amount }); setShowShareWinCard(true) }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid ' + theme.accent + '50', borderRadius: '10px', color: theme.accent, cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>📊 Share this win</button>
               <button onClick={() => setCelebration(null)} style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>Keep building 🔥</button>
             </div>
           </div>
@@ -9604,6 +9892,173 @@ Tracking with Aureus 🏛️`
                 )}
               </div>
               <div style={{ marginTop: '12px', fontSize: '11px', color: theme.textMuted, textAlign: 'center' as const }}>Share with your accountability partner — spouse, friend, or coach</div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ==================== ACCOUNTABILITY PARTNER SETUP ==================== */}
+      {showAccountabilitySetup && (
+        <div style={{ position:'fixed' as const, top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.85)', zIndex:1060, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }} onClick={() => setShowAccountabilitySetup(false)}>
+          <div style={{ background:theme.cardBg, borderRadius:'20px', padding:'28px', maxWidth:'440px', width:'100%' }} onClick={e => e.stopPropagation()}>
+            {accountabilitySent ? (
+              <div style={{ textAlign:'center' as const }}>
+                <div style={{ fontSize:'52px', marginBottom:'12px' }}>✅</div>
+                <h3 style={{ color:theme.text, fontSize:'20px', margin:'0 0 8px 0' }}>Snapshot sent!</h3>
+                <p style={{ color:theme.textMuted, fontSize:'14px', lineHeight:1.6 }}>{accountabilityName} will get your weekly Aureus snapshot every {emailNotifFrequency === 'weekly' ? 'week' : 'fortnight'}.</p>
+                <button onClick={() => { setShowAccountabilitySetup(false); setAccountabilitySent(false) }} style={{ marginTop:'16px', padding:'12px 24px', background:theme.accent, color:'#111111', border:'none', borderRadius:'10px', cursor:'pointer', fontWeight:700 }}>Done</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ textAlign:'center' as const, marginBottom:'24px' }}>
+                  <div style={{ fontSize:'44px', marginBottom:'10px' }}>🤝</div>
+                  <h3 style={{ color:theme.text, fontSize:'20px', margin:'0 0 8px 0' }}>Accountability Partner</h3>
+                  <p style={{ color:theme.textMuted, fontSize:'13px', lineHeight:1.6 }}>Choose one person — partner, friend, coach — who gets your weekly Aureus snapshot. No sign-up needed on their end. Just an email.</p>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column' as const, gap:'10px', marginBottom:'20px' }}>
+                  <div>
+                    <label style={{ color:theme.textMuted, fontSize:'12px', display:'block', marginBottom:'4px' }}>Their name</label>
+                    <input placeholder="e.g. Sarah" value={accountabilityName} onChange={e => setAccountabilityName(e.target.value)} style={{...inputStyle, width:'100%'}} />
+                  </div>
+                  <div>
+                    <label style={{ color:theme.textMuted, fontSize:'12px', display:'block', marginBottom:'4px' }}>Their email</label>
+                    <input type="email" placeholder="email@example.com" value={accountabilityEmail} onChange={e => setAccountabilityEmail(e.target.value)} style={{...inputStyle, width:'100%'}} />
+                  </div>
+                  <div>
+                    <label style={{ color:theme.textMuted, fontSize:'12px', display:'block', marginBottom:'4px' }}>Send frequency</label>
+                    <select value={emailNotifFrequency} onChange={e => setEmailNotifFrequency(e.target.value as any)} style={{...inputStyle, width:'100%'}}>
+                      <option value="weekly">Weekly</option>
+                      <option value="fortnightly">Fortnightly</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ padding:'12px 14px', background:theme.bg, borderRadius:'10px', border:'1px solid '+theme.border, marginBottom:'16px', fontSize:'12px', color:theme.textMuted }}>
+                  📧 They'll receive: your saving rate, surplus, top goal progress, recent win, and your next coach action. Nothing sensitive. Just progress.
+                </div>
+                <button onClick={async () => {
+                  if (!accountabilityEmail || !accountabilityName) return
+                  setAccountabilitySending(true)
+                  try {
+                    const topGoal = goals[0]
+                    const topWin = wins.slice(-1)[0]
+                    await fetch('/api/send-accountability', {
+                      method:'POST', headers:{'Content-Type':'application/json'},
+                      body: JSON.stringify({
+                        partnerName: accountabilityName, partnerEmail: accountabilityEmail,
+                        userName: userName || 'Your friend',
+                        savingRate: Math.round((monthlyGoalSavings/Math.max(1,monthlyIncome))*100),
+                        surplus: Math.round(monthlySurplus),
+                        topGoal: topGoal ? { name: topGoal.name, pct: Math.round(parseFloat(topGoal.savedAmount||'0')/parseFloat(topGoal.targetAmount||'1')*100) } : null,
+                        topWin: topWin?.title || null,
+                        nextAction: coachNextAction?.action || null,
+                        frequency: emailNotifFrequency
+                      })
+                    })
+                    setAccountabilitySent(true)
+                  } catch { alert('Failed to send — check your email settings.') }
+                  setAccountabilitySending(false)
+                }} disabled={!accountabilityEmail || !accountabilityName || accountabilitySending}
+                  style={{ width:'100%', padding:'14px', background:theme.accent, color:'#111111', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:800, fontSize:'15px', opacity:!accountabilityEmail||!accountabilityName?0.5:1 }}>
+                  {accountabilitySending ? '⏳ Sending...' : `Send snapshot to ${accountabilityName || 'partner'} →`}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== SHAREABLE WIN CARD ==================== */}
+      {showShareWinCard && (() => {
+        const savingRate = Math.round((monthlyGoalSavings / Math.max(1, monthlyIncome)) * 100)
+        const topGoal = goals.sort((a:any,b:any) => parseFloat(b.savedAmount||'0')-parseFloat(a.savedAmount||'0'))[0]
+        const topWin = wins.filter((w:any) => !w.auto).slice(-1)[0]
+        const context = shareWinContext
+        const milestoneCount = Object.values(wealthMilestones).filter(Boolean).length
+
+        // Card text for sharing
+        const shareLines = [
+          `🏛️ AUREUS — ${new Date().toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' })}`,
+          `━━━━━━━━━━━━━━━━━━━━━━━`,
+          ...(context ? [`🏆 ${context.title}`, context.amount ? `   ${context.amount}` : ''] : []),
+          `💰 Monthly surplus: $${Math.round(monthlySurplus).toLocaleString()}`,
+          `📈 Saving rate: ${savingRate}%`,
+          `🏦 Net worth: $${Math.round(netWorth).toLocaleString()}`,
+          ...(topGoal ? [`🎯 ${topGoal.name}: ${Math.min(100,Math.round(parseFloat(topGoal.savedAmount||'0')/parseFloat(topGoal.targetAmount||'1')*100))}%`] : []),
+          ...(topWin ? [`🏆 Latest win: ${topWin.title}`] : []),
+          ...(milestoneCount > 0 ? [`⚔️ Milestones unlocked: ${milestoneCount}`] : []),
+          `━━━━━━━━━━━━━━━━━━━━━━━`,
+          `Building my empire with Aureus 🏛️`,
+          `Wealth through discipline.`,
+        ].filter(Boolean).join('\n')
+
+        return (
+          <div style={{ position:'fixed' as const, top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.9)', zIndex:1060, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }} onClick={() => setShowShareWinCard(false)}>
+            <div style={{ maxWidth:'440px', width:'100%' }} onClick={e => e.stopPropagation()}>
+              {/* Visual card */}
+              <div style={{ background:'linear-gradient(135deg, #1a1810 0%, #111111 60%, #1a1208 100%)', border:'2px solid #D4AF37', borderRadius:'20px', padding:'28px', marginBottom:'16px', fontFamily:'Cinzel, serif', position:'relative' as const, overflow:'hidden' }}>
+                {/* Gold shimmer */}
+                <div style={{ position:'absolute' as const, top:'-50%', right:'-20%', width:'200px', height:'200px', background:'radial-gradient(circle, rgba(212,175,55,0.08) 0%, transparent 70%)', pointerEvents:'none' as const }} />
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'20px' }}>
+                  <div>
+                    <div style={{ color:'#D4AF37', fontSize:'20px', fontWeight:900, letterSpacing:'2px' }}>AUREUS</div>
+                    <div style={{ color:'#9a8a6a', fontSize:'10px', letterSpacing:'1px' }}>{new Date().toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' }).toUpperCase()}</div>
+                  </div>
+                  <div style={{ fontSize:'28px' }}>{context?.emoji || '🏛️'}</div>
+                </div>
+                {context && (
+                  <div style={{ marginBottom:'16px', padding:'12px 16px', background:'rgba(212,175,55,0.1)', border:'1px solid rgba(212,175,55,0.3)', borderRadius:'10px' }}>
+                    <div style={{ color:'#D4AF37', fontWeight:900, fontSize:'16px', marginBottom:'2px' }}>{context.title}</div>
+                    {context.amount && <div style={{ color:'#F5F5F5', fontSize:'22px', fontWeight:800 }}>{context.amount}</div>}
+                    {context.subtitle && <div style={{ color:'#9a8a6a', fontSize:'12px', marginTop:'4px', fontFamily:'Inter, sans-serif', fontStyle:'italic' }}>{context.subtitle}</div>}
+                  </div>
+                )}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'16px' }}>
+                  {[
+                    { label:'SAVING RATE', value:`${savingRate}%` },
+                    { label:'NET WORTH', value:`$${Math.round(netWorth).toLocaleString()}` },
+                    { label:'SURPLUS/MO', value:`$${Math.round(monthlySurplus).toLocaleString()}` },
+                    { label:'MILESTONES', value:`${milestoneCount} earned` },
+                  ].map(stat => (
+                    <div key={stat.label} style={{ padding:'10px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(212,175,55,0.15)', borderRadius:'8px' }}>
+                      <div style={{ color:'#9a8a6a', fontSize:'9px', letterSpacing:'1px', marginBottom:'4px' }}>{stat.label}</div>
+                      <div style={{ color:'#F5F5F5', fontSize:'16px', fontWeight:800 }}>{stat.value}</div>
+                    </div>
+                  ))}
+                </div>
+                {topGoal && (
+                  <div style={{ marginBottom:'14px' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
+                      <span style={{ color:'#9a8a6a', fontSize:'10px', letterSpacing:'1px' }}>MISSION: {topGoal.name.toUpperCase()}</span>
+                      <span style={{ color:'#D4AF37', fontSize:'10px' }}>{Math.min(100,Math.round(parseFloat(topGoal.savedAmount||'0')/parseFloat(topGoal.targetAmount||'1')*100))}%</span>
+                    </div>
+                    <div style={{ height:'4px', background:'rgba(255,255,255,0.1)', borderRadius:'2px' }}>
+                      <div style={{ width:`${Math.min(100,parseFloat(topGoal.savedAmount||'0')/parseFloat(topGoal.targetAmount||'1')*100)}%`, height:'100%', background:'linear-gradient(90deg,#D4AF37,#BC6A1F)', borderRadius:'2px' }} />
+                    </div>
+                  </div>
+                )}
+                <div style={{ borderTop:'1px solid rgba(212,175,55,0.2)', paddingTop:'12px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ color:'#9a8a6a', fontSize:'10px', letterSpacing:'1px' }}>WEALTH THROUGH DISCIPLINE</div>
+                  <div style={{ color:'#D4AF37', fontSize:'10px', letterSpacing:'1px' }}>AUREUS.APP</div>
+                </div>
+              </div>
+              {/* Action buttons */}
+              <div style={{ display:'flex', gap:'10px' }}>
+                <button onClick={async () => { await navigator.clipboard.writeText(shareLines); alert('Copied! Paste it anywhere.') }}
+                  style={{ flex:1, padding:'12px', background:theme.accent, color:'#111111', border:'none', borderRadius:'10px', cursor:'pointer', fontWeight:700, fontSize:'13px' }}>
+                  📋 Copy text
+                </button>
+                {navigator.share && (
+                  <button onClick={() => navigator.share({ title:'My Aureus snapshot', text:shareLines })}
+                    style={{ flex:1, padding:'12px', background:'transparent', border:'1px solid '+theme.accent+'50', borderRadius:'10px', cursor:'pointer', color:theme.accent, fontWeight:700, fontSize:'13px' }}>
+                    ↗ Share
+                  </button>
+                )}
+                <button onClick={() => { setShowAccountabilitySetup(true); setShowShareWinCard(false) }}
+                  style={{ flex:1, padding:'12px', background:'transparent', border:'1px solid '+theme.border, borderRadius:'10px', cursor:'pointer', color:theme.textMuted, fontSize:'13px' }}>
+                  🤝 Partner
+                </button>
+              </div>
+              <button onClick={() => setShowShareWinCard(false)} style={{ width:'100%', marginTop:'10px', padding:'10px', background:'none', border:'none', color:theme.textMuted, cursor:'pointer', fontSize:'13px' }}>Close</button>
             </div>
           </div>
         )
