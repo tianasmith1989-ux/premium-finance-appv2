@@ -2027,7 +2027,48 @@ Net worth: $${netWorth.toLocaleString()}
 Baby Step: ${currentBabyStep.step} — ${currentBabyStep.title}
 House status: ${houseStatus || 'not specified'}
 ${moneyPersonality ? `Money personality: ${personalityProfiles[moneyPersonality]?.label}` : ''}
-${mortgageAccel.balance ? `Mortgage: $${mortgageAccel.balance} at ${mortgageAccel.rate}%` : ''}
+${mortgageAccel.balance ? (() => {
+        const bal = parseFloat(mortgageAccel.balance || '0')
+        const annualRate = parseFloat(mortgageAccel.rate || '0') / 100
+        const weeklyRate = annualRate / 52
+        const weeklyPay = parseFloat(mortgageAccel.weeklyPayment || mortgageAccel.payment || '0')
+        const monthlyPay = parseFloat(mortgageAccel.monthlyPayment || '0') || weeklyPay * 52 / 12
+
+        // Calculate months to payoff
+        const calcMonths = (balance: number, monthlyPayment: number, monthlyRate: number): number => {
+          if (monthlyRate === 0) return Math.ceil(balance / monthlyPayment)
+          if (monthlyPayment <= balance * monthlyRate) return 9999 // payment doesn't cover interest
+          return Math.ceil(Math.log(monthlyPayment / (monthlyPayment - balance * monthlyRate)) / Math.log(1 + monthlyRate))
+        }
+
+        const monthlyRate = annualRate / 12
+        const effectiveMonthly = weeklyPay > 0 ? weeklyPay * 52 / 12 : monthlyPay
+        const monthsStandard = calcMonths(bal, effectiveMonthly, monthlyRate)
+        const yearsStandard = (monthsStandard / 12).toFixed(1)
+
+        // Extra $100/week scenario
+        const extra100Monthly = (weeklyPay + 100) * 52 / 12
+        const monthsExtra100 = calcMonths(bal, extra100Monthly, monthlyRate)
+        const yearsSaved100 = ((monthsStandard - monthsExtra100) / 12).toFixed(1)
+        const interestSaved100 = Math.round((monthsStandard - monthsExtra100) * effectiveMonthly * 0.6)
+
+        // Extra $200/week scenario
+        const extra200Monthly = (weeklyPay + 200) * 52 / 12
+        const monthsExtra200 = calcMonths(bal, extra200Monthly, monthlyRate)
+        const yearsSaved200 = ((monthsStandard - monthsExtra200) / 12).toFixed(1)
+
+        // Current monthly interest cost
+        const monthlyInterest = Math.round(bal * monthlyRate)
+
+        return `Mortgage: $${bal.toLocaleString()} at ${mortgageAccel.rate}%
+  - Current payment: ${weeklyPay > 0 ? `$${weeklyPay}/week ($${Math.round(effectiveMonthly)}/month effective)` : `$${Math.round(effectiveMonthly)}/month`}
+  - Payoff at current rate: ${yearsStandard} years
+  - Monthly interest cost right now: $${monthlyInterest}
+  - Extra $100/week → pays off ${yearsSaved100} years sooner, saves ~$${interestSaved100.toLocaleString()} interest
+  - Extra $200/week → pays off ${yearsSaved200} years sooner
+  - Fortnightly split trick: ${weeklyPay > 0 ? 'NOT APPLICABLE — already paying weekly (more frequent than fortnightly)' : `pay $${Math.round(effectiveMonthly / 2)} fortnightly instead of $${Math.round(effectiveMonthly)} monthly — makes 1 extra monthly payment per year`}
+  - IMPORTANT: Use ONLY these pre-calculated figures. Do not estimate or approximate mortgage payoff numbers.`
+      })() : ''}
 ${(extraContext || '')}${getPersonalityCoachingContext()}
 
 Rules: Be specific and use their actual numbers. No generic advice. Be warm but direct — like a coach who knows them well. Remember earlier parts of this conversation. Keep responses concise unless they ask for detail.`
@@ -10066,22 +10107,45 @@ Tracking with Aureus 🏛️`
 
       {/* ==================== NOTIFICATION SETUP MODAL ==================== */}
       {showNotifSetup && (() => {
-        const requestNotifications = async () => {
-          if (!('Notification' in window)) { alert('Your browser does not support notifications.'); return }
-          const permission = await Notification.requestPermission()
-          if (permission === 'granted') {
-            setNotificationsEnabled(true)
-            new Notification('Aureus', { body: '✅ Notifications enabled! We\'ll remind you for money dates and check-ins.', icon: '/favicon.ico' })
+        const handleEnableEmail = async () => {
+          if (!notificationEmail || !notificationEmail.includes('@')) { alert('Please enter a valid email address.'); return }
+          setNotificationsEnabled(true)
+          // Generate a stable anonymous token for this user
+          let userToken = localStorage.getItem('aureus_user_token')
+          if (!userToken) { userToken = 'aureus_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('aureus_user_token', userToken) }
+          const topGoal = goals[0]
+          const topWin = wins.slice(-1)[0]
+          const upcomingBills = upcoming.slice(0, 10).map((u: any) => ({ name: u.name, amount: u.amount, dayOffset: u.dayOffset }))
+          try {
+            await fetch('/api/save-notification-prefs', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userToken, email: notificationEmail, userName,
+                frequency: emailNotifFrequency,
+                notifyWeeklySnapshot: true, notifyOverdueBills: true, notifyMoneyDate: true,
+                moneyDateDay: checkInSchedule.moneyDateDay || 'Sunday',
+                moneyDateTime: checkInSchedule.moneyDateTime || '18:00',
+                savingRate: Math.round((monthlyGoalSavings / Math.max(1, monthlyIncome)) * 100),
+                monthlySurplus: Math.round(monthlySurplus),
+                topGoal: topGoal ? { name: topGoal.name, pct: Math.min(100, Math.round(parseFloat(topGoal.savedAmount||'0') / parseFloat(topGoal.targetAmount||'1') * 100)) } : null,
+                topWin: topWin?.title || null,
+                nextAction: coachNextAction?.action || null,
+                streak, upcomingBills
+              })
+            })
+          } catch { /* silent — still enables locally */ }
+          setShowNotifSetup(false)
+        }
+
+        const handleDisable = async () => {
+          setNotificationsEnabled(false)
+          const userToken = localStorage.getItem('aureus_user_token')
+          if (userToken) {
+            await fetch('/api/save-notification-prefs', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userToken }) })
           }
           setShowNotifSetup(false)
         }
-        const installPWA = async () => {
-          if (pwaInstallPrompt) {
-            pwaInstallPrompt.prompt()
-            const { outcome } = await pwaInstallPrompt.userChoice
-            if (outcome === 'accepted') setPwaInstallPrompt(null)
-          }
-        }
+
         return (
           <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowNotifSetup(false)}>
             <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '440px', width: '100%' }} onClick={e => e.stopPropagation()}>
