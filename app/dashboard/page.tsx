@@ -199,6 +199,7 @@ export default function Dashboard() {
   const [mirrorLoading, setMirrorLoading] = useState(false)
   const [lastMirrorMonth, setLastMirrorMonth] = useState<string | null>(null)
   const [fetchingRecipe, setFetchingRecipe] = useState<string | null>(null)
+  const [recipeModal, setRecipeModal] = useState<{ meal: string; text: string } | null>(null)
 
   // ==================== SPENDING CHECK-IN ====================
   const [showSpendCheckIn, setShowSpendCheckIn] = useState(false)
