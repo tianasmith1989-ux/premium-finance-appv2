@@ -10183,11 +10183,24 @@ Tracking with Aureus 🏛️`
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
-                <button onClick={requestNotifications} style={{ ...btnSuccess, padding: '14px' }}>
-                  🔔 Enable notifications
+                <button onClick={async () => {
+                  if ('Notification' in window) {
+                    const permission = await Notification.requestPermission()
+                    if (permission === 'granted') {
+                      new Notification('Aureus', { body: '✅ Browser notifications enabled!' })
+                    }
+                  }
+                }} style={{ ...btnSuccess, padding: '14px' }}>
+                  🔔 Enable browser notifications
                 </button>
                 {pwaInstallPrompt && (
-                  <button onClick={installPWA} style={{ ...btnPrimary, padding: '14px' }}>
+                  <button onClick={async () => {
+                    if (pwaInstallPrompt) {
+                      pwaInstallPrompt.prompt()
+                      const { outcome } = await pwaInstallPrompt.userChoice
+                      if (outcome === 'accepted') setPwaInstallPrompt(null)
+                    }
+                  }} style={{ ...btnPrimary, padding: '14px' }}>
                     📱 Add Aureus to home screen (for real push notifications)
                   </button>
                 )}
