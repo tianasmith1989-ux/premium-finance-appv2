@@ -34,6 +34,78 @@ INCORRECT EXAMPLE (never do this):
 
 `
 
+
+// ============================================================
+// AUTHORITATIVE RESOURCE LIBRARY
+// Injected into responses when Aureus declines a topic
+// ============================================================
+const RESOURCE_LIBRARY = `
+=== AUTHORITATIVE AUSTRALIAN RESOURCES — USE THESE LINKS ===
+
+When declining a topic, ALWAYS include the most relevant specific link(s) below.
+Format links in your response as markdown: [Link text](URL)
+
+SUPERANNUATION:
+- Compare all super funds: [ATO YourSuper comparison tool](https://www.ato.gov.au/calculators-and-tools/yoursuper-comparison-tool)
+- Find lost super: [ATO myGov Super lookup](https://www.ato.gov.au/individuals-and-families/super-for-individuals-and-families/super/growing-and-keeping-track-of-your-super/keep-track-of-your-super/find-your-super)
+- Super basics explained: [ASIC Moneysmart — Superannuation](https://moneysmart.gov.au/retirement-income/superannuation)
+- Consolidate super: [ASIC Moneysmart — Consolidate super](https://moneysmart.gov.au/grow-your-super/consolidate-your-super)
+- Employer super obligations: [ATO Super for employers](https://www.ato.gov.au/businesses-and-organisations/super-for-employers)
+
+INVESTING & SHARES:
+- Getting started with investing: [ASIC Moneysmart — Investing](https://moneysmart.gov.au/investing)
+- ETFs explained: [ASIC Moneysmart — Exchange traded funds](https://moneysmart.gov.au/shares/exchange-traded-funds-etfs)
+- Shares explained: [ASIC Moneysmart — Shares](https://moneysmart.gov.au/shares)
+- Managed funds: [ASIC Moneysmart — Managed funds](https://moneysmart.gov.au/managed-funds-and-etfs/managed-funds)
+- Check if adviser is licensed: [ASIC Financial advisers register](https://www.moneysmart.gov.au/investing/financial-advice/financial-advisers-register)
+
+HOME BUYING:
+- First Home Guarantee: [Housing Australia — First Home Guarantee](https://www.housingaustralia.gov.au/support-buy-home/first-home-guarantee)
+- First Home Super Saver: [ATO First Home Super Saver scheme](https://www.ato.gov.au/individuals-and-families/super-for-individuals-and-families/super/withdrawing-and-using-your-super/early-access-to-super/first-home-super-saver-scheme)
+- Stamp duty by state: [ASIC Moneysmart — Stamp duty](https://moneysmart.gov.au/buy-a-home/stamp-duty-calculator)
+- Home buying steps: [ASIC Moneysmart — Buying a home](https://moneysmart.gov.au/buy-a-home)
+- Mortgage comparison: [ASIC Moneysmart — Home loans](https://moneysmart.gov.au/home-loans)
+
+LOANS & CREDIT:
+- Compare home loans: [ASIC Moneysmart — Home loan calculator](https://moneysmart.gov.au/home-loans/mortgage-calculator)
+- Credit cards explained: [ASIC Moneysmart — Credit cards](https://moneysmart.gov.au/credit-cards)
+- Personal loans: [ASIC Moneysmart — Personal loans](https://moneysmart.gov.au/personal-loans)
+- Debt management: [ASIC Moneysmart — Managing debt](https://moneysmart.gov.au/managing-debt)
+- Free financial counselling: [National Debt Helpline — 1800 007 007](https://ndh.org.au)
+- Check credit licence: [ASIC Credit licensees register](https://connectonline.asic.gov.au/RegistrySearch)
+
+TAX:
+- Work from home deductions: [ATO — Working from home expenses](https://www.ato.gov.au/individuals-and-families/income-deductions-offsets-and-records/deductions-you-can-claim/working-from-home-expenses)
+- Individual tax return: [ATO — Lodge a tax return](https://www.ato.gov.au/individuals-and-families/lodging-a-tax-return)
+- Tax deductions overview: [ATO — Deductions you can claim](https://www.ato.gov.au/individuals-and-families/income-deductions-offsets-and-records/deductions-you-can-claim)
+- Find a registered tax agent: [Tax Practitioners Board — Find a tax agent](https://www.tpb.gov.au/find-tax-agent-bas-agent-or-payroll-service-provider)
+- Side hustle / ABN income: [ATO — Income from business](https://www.ato.gov.au/individuals-and-families/your-tax-return/income-types-and-reliefs/income-and-allowances/income-from-business)
+- CGT basics: [ATO — Capital gains tax](https://www.ato.gov.au/individuals-and-families/investments-and-assets/capital-gains-tax)
+
+FINANCIAL ADVICE:
+- Find a licensed financial adviser: [ASIC Financial advisers register](https://www.moneysmart.gov.au/investing/financial-advice/financial-advisers-register)
+- What advisers can charge: [ASIC Moneysmart — Financial advice](https://moneysmart.gov.au/investing/financial-advice)
+- Free financial guidance: [ASIC Moneysmart — Get help](https://moneysmart.gov.au/get-help)
+- Financial counselling (free): [Financial Counselling Australia — 1800 007 007](https://www.financialcounsellingaustralia.org.au)
+
+CENTRELINK & BENEFITS:
+- Payment rates and eligibility: [Services Australia](https://www.servicesaustralia.gov.au/individuals)
+- JobSeeker: [Services Australia — JobSeeker Payment](https://www.servicesaustralia.gov.au/jobseeker-payment)
+- Family Tax Benefit: [Services Australia — Family Tax Benefit](https://www.servicesaustralia.gov.au/family-tax-benefit)
+- myGov: [myGov](https://my.gov.au)
+
+GENERAL MONEY TOOLS:
+- Budget planner: [ASIC Moneysmart — Budget planner](https://moneysmart.gov.au/budgeting/budget-planner)
+- Compound interest calculator: [ASIC Moneysmart — Compound interest](https://moneysmart.gov.au/budgeting/compound-interest-calculator)
+- Savings goal calculator: [ASIC Moneysmart — Savings calculator](https://moneysmart.gov.au/saving/savings-goals-calculator)
+- All ASIC calculators: [ASIC Moneysmart — Calculators & tools](https://moneysmart.gov.au/calculators-and-tools)
+
+RULE: When declining a question, include 1-3 of the most directly relevant links above.
+Do NOT list all links — pick the most useful ones for the specific question.
+Format: [Descriptive text](URL) — make the link text descriptive, not just "click here".
+`
+
+
 // Financial frameworks and metrics the AI knows about
 const FINANCIAL_FRAMEWORKS = `
 === FINANCIAL FRAMEWORKS ===
@@ -307,7 +379,7 @@ export async function POST(request: NextRequest) {
     let userPrompt = ''
 
     if (mode === 'onboarding') {
-      systemPrompt = COMPLIANCE_GUARDRAIL + `You are Aureus, a friendly budgeting assistant helping "${memory?.name || 'a new user'}" set up their budget.
+      systemPrompt = COMPLIANCE_GUARDRAIL + RESOURCE_LIBRARY + `You are Aureus, a friendly budgeting assistant helping "${memory?.name || 'a new user'}" set up their budget.
 
 TODAY: ${today}
 CURRENT STEP: ${onboardingStep}
@@ -408,7 +480,7 @@ User said: "${userResponse}"
 Respond with JSON only.`
 
     } else if (mode === 'proactive') {
-      systemPrompt = COMPLIANCE_GUARDRAIL + `You are Aureus, giving a quick daily insight. Today is ${today}.
+      systemPrompt = COMPLIANCE_GUARDRAIL + RESOURCE_LIBRARY + `You are Aureus, giving a quick daily insight. Today is ${today}.
 
 ${buildCountryContext()}
 ${buildFinancialContext()}
@@ -429,7 +501,7 @@ Response format:
 
     } else {
       // Question/Chat mode
-      systemPrompt = COMPLIANCE_GUARDRAIL + `You are Aureus, a budgeting assistant. Today is ${today}.
+      systemPrompt = COMPLIANCE_GUARDRAIL + RESOURCE_LIBRARY + `You are Aureus, a budgeting assistant. Today is ${today}.
 
 ${buildCountryContext()}
 
