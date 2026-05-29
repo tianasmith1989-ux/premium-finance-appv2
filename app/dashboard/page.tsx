@@ -1764,20 +1764,36 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
   // Checks AI responses for advice-like content before displaying
   const checkComplianceFilter = (text: string): { safe: boolean; rewrite?: string } => {
     const lower = text.toLowerCase()
-    // Red flags: recommendation language about named products
+
+    // Don't flag responses that are already declining — they contain the right words but are safe
+    const isAlreadyDeclining = (
+      lower.includes("not licensed") ||
+      lower.includes("isn't licensed") ||
+      lower.includes("aureus isn't") ||
+      lower.includes("can't give") ||
+      lower.includes("cannot give") ||
+      lower.includes("financial advice and aureus") ||
+      lower.includes("speak with a licensed") ||
+      lower.includes("moneysmart") ||
+      lower.includes("yoursuper")
+    )
+    if (isAlreadyDeclining) return { safe: true }
+
+    // Only flag if actually recommending/evaluating a named product
     const productAdvicePatterns = [
-      /\b(should|i'd|i would|you'd be better off|go with|switch to|move to|get the|buy the|invest in the)\b.{0,60}(super|etf|fund|shares|stock|loan|mortgage|card|bnpl|afterpay|zip|account)/i,
-      /\b(best|better|recommend|suggest|advise)\b.{0,40}(super|etf|fund|shares|loan|card)/i,
-      /(aussuper|australian super|vanguard|betashares|commsec|raiz|spaceship).{0,40}(good|great|best|better|solid|strong|worth|recommend)/i,
-      /can claim.{0,30}(deduction|tax)/i,
-      /\breduce your tax\b/i,
-      /\bstructure it.{0,30}(tax|minimise)/i,
+      /\b(you should|i'd recommend|i recommend|my recommendation|go with|switch to|move to|get the|invest in)\b.{0,80}(super|fund|etf|shares|stock|loan|mortgage|credit card|bnpl)/i,
+      /\b(aussuper|australian super|vanguard|betashares|raiz|spaceship|ubank|ing|macquarie).{0,60}(is (a )?(good|great|best|solid|strong|worth|excellent)|i'?d (choose|pick|recommend|go with))/i,
+      /\byou (can|could) claim.{0,30}(deduction|as a deduction)/i,
+      /\breduce your tax\b.{0,40}(by|through|if you|with)/i,
+      /\bstructure.{0,30}(to (minimise|reduce|save on) tax)/i,
+      /\bshould (refinance|pay off|consolidate|get a|apply for).{0,40}(loan|mortgage|card|credit)/i,
     ]
-    const hasAdvice = productAdvicePatterns.some(p => p.test(text))
-    if (hasAdvice) {
+
+    const hasActualAdvice = productAdvicePatterns.some(p => p.test(text))
+    if (hasActualAdvice) {
       return {
         safe: false,
-        rewrite: "I need to flag that my previous response may have crossed into financial advice territory — I'm not licensed to give that. Let me restate: I can show you the facts from your own tracked data and point you to the right resources, but for product recommendations please speak with a licensed financial adviser."
+        rewrite: "That question touches on financial product recommendations — I'm not licensed to give those. I can show you your own numbers and point you to the right tools, but for product decisions please speak with a licensed financial adviser. Want me to show you what the ATO's YourSuper tool or ASIC's Moneysmart can help with instead?"
       }
     }
     return { safe: true }
@@ -3191,7 +3207,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
           </div>
           <h1 style={{ fontSize: '38px', fontWeight: 800, color: theme.text, margin: '0 0 12px 0' }}>Meet Aureus</h1>
           <p style={{ fontSize: '18px', color: theme.textMuted, margin: '0 0 8px 0', lineHeight: 1.5 }}>Your AI budgeting assistant. I'll help you understand your money, pay your mortgage off years early, and eliminate debt.</p>
-          <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 36px 0' }}>I won't just give you tools — I'll tell you exactly what to do, in the right order, one step at a time.</p>
+          <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 36px 0' }}>I won't just show you numbers — I'll help you understand exactly where your money is going and what your options are, one step at a time.</p>
 
           {/* What to expect */}
           <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '20px', marginBottom: '28px', textAlign: 'left' as const, border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -3200,7 +3216,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
               { step: '1', icon: '🧠', text: 'I learn how you think about money (5 min quiz)' },
               { step: '2', icon: '💰', text: 'You enter your income, bills, and mortgage' },
               { step: '3', icon: '🗺️', text: 'I build your personalised financial roadmap' },
-              { step: '4', icon: '📋', text: 'I generate your first week-by-week action plan' },
+              { step: '4', icon: '📋', text: 'I map out your priorities in order, with clear next steps' },
             ].map(item => (
               <div key={item.step} style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
                 <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#1a1208', border: '2px solid #D4AF37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>{item.icon}</div>
@@ -5770,7 +5786,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                 </div>
                 <div>
                   <div style={{ color: theme.text, fontWeight: 700, fontSize: '22px' }}>Aureus</div>
-                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Your financial coach · {currentBabyStep.title}</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Your budgeting assistant · {currentBabyStep.title}</div>
                 </div>
               </div>
               <div style={{ padding: '8px 12px', background: theme.warning + '15', borderRadius: '8px', marginBottom: '12px', border: '1px solid ' + theme.warning + '30' }}>
