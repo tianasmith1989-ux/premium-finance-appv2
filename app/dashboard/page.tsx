@@ -10112,13 +10112,16 @@ Tracking with Aureus 🏛️`
           if (!userToken) { userToken = 'aureus_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('aureus_user_token', userToken) }
           const topGoal = goals[0]
           const topWin = wins.slice(-1)[0]
-          const upcomingBills = upcoming.slice(0, 14).map((u: any) => ({
-                name: u.name,
-                amount: u.amount,
-                dayOffset: u.dayOffset,
-                automatic: u.automatic || hasAutomatedPayments || false,
-                itemType: u.itemType
-              })).filter((u: any) => u.itemType === 'expense')
+          const upcomingBills = expenses
+            .filter((e: any) => e.dueDate || e.frequency)
+            .map((e: any) => {
+              const due = e.dueDate ? new Date(e.dueDate + 'T12:00:00') : null
+              const dayOffset = due ? Math.round((due.getTime() - Date.now()) / 86400000) : 999
+              return { name: e.name, amount: e.amount, dayOffset, automatic: hasAutomatedPayments, itemType: 'expense' }
+            })
+            .filter((u: any) => u.dayOffset < 30)
+            .sort((a: any, b: any) => a.dayOffset - b.dayOffset)
+            .slice(0, 14)
           try {
             await fetch('/api/save-notification-prefs', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
