@@ -179,8 +179,25 @@ export default function Dashboard() {
   const [pwaInstallPrompt, setPwaInstallPrompt] = useState<any>(null)
   const [showNotifSetup, setShowNotifSetup] = useState(false)
 
-  // ==================== RECIPE MODAL ====================
-  const [recipeModal, setRecipeModal] = useState<{ meal: string; text: string } | null>(null)
+  // ==================== MONEY DEBRIEF ====================
+  const [showMoneyDebrief, setShowMoneyDebrief] = useState(false)
+  const [debriefEmotion, setDebriefEmotion] = useState<string | null>(null)
+  const [debriefText, setDebriefText] = useState('')
+  const [debriefResponse, setDebriefResponse] = useState<string | null>(null)
+  const [debriefLoading, setDebriefLoading] = useState(false)
+
+  // ==================== TELL AUREUS SOMETHING ====================
+  const [showTellAureus, setShowTellAureus] = useState(false)
+  const [tellAureusText, setTellAureusText] = useState('')
+  const [tellAureusResponse, setTellAureusResponse] = useState<string | null>(null)
+  const [tellAureusLoading, setTellAureusLoading] = useState(false)
+
+  // ==================== MONEY MIRROR (monthly reflection) ====================
+  const [showMoneyMirror, setShowMoneyMirror] = useState(false)
+  const [mirrorStory, setMirrorStory] = useState('')
+  const [mirrorResponse, setMirrorResponse] = useState<string | null>(null)
+  const [mirrorLoading, setMirrorLoading] = useState(false)
+  const [lastMirrorMonth, setLastMirrorMonth] = useState<string | null>(null)
   const [fetchingRecipe, setFetchingRecipe] = useState<string | null>(null)
 
   // ==================== SPENDING CHECK-IN ====================
@@ -229,6 +246,7 @@ export default function Dashboard() {
   const [notificationEmail, setNotificationEmail] = useState('')
   const [emailNotifEnabled, setEmailNotifEnabled] = useState(false)
   const [emailNotifFrequency, setEmailNotifFrequency] = useState<'weekly' | 'fortnightly'>('weekly')
+  const [monthlyMealPlanOptIn, setMonthlyMealPlanOptIn] = useState(false)
 
   // ==================== CELEBRATIONS ====================
   const [celebration, setCelebration] = useState<{ title: string; subtitle: string; emoji: string; amount?: string } | null>(null)
@@ -958,13 +976,7 @@ export default function Dashboard() {
             max_tokens: 150,
             messages: [{
               role: 'user',
-              content: `The user just advanced from Baby Step ${prevBabyStep} to Baby Step ${currentBabyStep.step} (${currentBabyStep.title}). Write 2 things:
-1. A 1-sentence celebration of what they just achieved (specific, genuine, not generic)
-2. A 1-sentence description of what Baby Step ${currentBabyStep.step} means for their life specifically
-
-Their data: income $${monthlyIncome.toFixed(0)}/mo, surplus $${monthlySurplus.toFixed(0)}/mo, ${debts.length} debts, emergency fund $${emergencyFund.toFixed(0)}
-
-Respond as JSON: {"celebration": "...", "nextFocus": "..."}`
+              content: `The user just advanced from Baby Step ${prevBabyStep} to Baby Step ${currentBabyStep.step} (${currentBabyStep.title}). Write 2 things: 1. A 1-sentence celebration of what they just achieved (specific, genuine, not generic) 2. A 1-sentence description of what Baby Step ${currentBabyStep.step} means for their life specifically Their data: income $${monthlyIncome.toFixed(0)}/mo, surplus $${monthlySurplus.toFixed(0)}/mo, ${debts.length} debts, emergency fund $${emergencyFund.toFixed(0)} Respond as JSON: {"celebration": "...", "nextFocus": "..."}`
             }]
           })
         })
@@ -1064,9 +1076,7 @@ Respond as JSON: {"celebration": "...", "nextFocus": "..."}`
           max_tokens: 100,
           messages: [{
             role: 'user',
-            content: `User just completed this step toward their goal "${milestone.name}": "${step.text}". ${nextStep ? `Next step is: "${nextStep.text}"` : 'This was the last step!'}
-
-Write ONE sentence: brief celebration + what to expect from the next step (or final celebration if last step). Warm, specific, coach-like. No markdown.`
+            content: `User just completed this step toward their goal "${milestone.name}": "${step.text}". ${nextStep ? `Next step is: "${nextStep.text}"` : 'This was the last step!'} Write ONE sentence: brief celebration + what to expect from the next step (or final celebration if last step). Warm, specific, coach-like. No markdown.`
           }]
         })
       })
@@ -1626,22 +1636,7 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'question',
-          question: `You are Aureus, an AI financial coach built into a budgeting app called Aureus. The user is already using Aureus to track their budget, income, expenses, debts, and goals — so NEVER suggest they download a budgeting app, spreadsheet, or any other tracking tool. They already have one.
-
-Important financial context for Australian users:
-- The $2,000 Starter Emergency Fund (Baby Step 1) is a buffer for UNEXPECTED emergencies like car breakdowns, medical bills, vet bills, or appliance failures — it is NOT meant to cover a month of living expenses. Do not describe it that way.
-- Baby Step 3 (3-6 months of expenses) is the full emergency fund — different goal.
-
-Create a 7-step action plan for this goal: "${milestone.name}"${milestone.targetAmount ? ` (target: $${milestone.targetAmount})` : ''}${milestone.notes ? `. Context: ${milestone.notes}` : ''}.
-
-Rules:
-- Output ONLY the 7 steps, nothing else. No intro sentence, no summary, no preamble.
-- Format each line as: Step 1: [action]
-- Each action must be specific, concrete, and doable — no fixed day requirement, user does them at their own pace
-- One sentence per step
-- Never suggest downloading another app or creating a spreadsheet — the user is already in Aureus
-- MILESTONE TYPE: This is ${isDebtMilestone ? 'a DEBT PAYOFF milestone. Step 5 MUST be EXACTLY this word for word: "Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically." Do NOT change a single word.' : 'a SAVINGS GOAL milestone — NOT a debt. Do NOT use the word "debt" anywhere in your plan. Step 5 MUST be EXACTLY this word for word: "Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders." Do NOT change a single word.'}
-- Start directly with "Step 1:"${getPersonalityCoachingContext()}`,
+          question: `You are Aureus, an AI financial coach built into a budgeting app called Aureus. The user is already using Aureus to track their budget, income, expenses, debts, and goals — so NEVER suggest they download a budgeting app, spreadsheet, or any other tracking tool. They already have one.  Important financial context for Australian users: - The $2,000 Starter Emergency Fund (Baby Step 1) is a buffer for UNEXPECTED emergencies like car breakdowns, medical bills, vet bills, or appliance failures — it is NOT meant to cover a month of living expenses. Do not describe it that way. - Baby Step 3 (3-6 months of expenses) is the full emergency fund — different goal.  Create a 7-step action plan for this goal: "${milestone.name}"${milestone.targetAmount ? ` (target: $${milestone.targetAmount})` : ''}${milestone.notes ? `. Context: ${milestone.notes}` : ''}. Rules: - Output ONLY the 7 steps, nothing else. No intro sentence, no summary, no preamble. - Format each line as: Step 1: [action] - Each action must be specific, concrete, and doable — no fixed day requirement, user does them at their own pace - One sentence per step - Never suggest downloading another app or creating a spreadsheet — the user is already in Aureus - MILESTONE TYPE: This is ${isDebtMilestone ? 'a DEBT PAYOFF milestone. Step 5 MUST be EXACTLY this word for word: "Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically." Do NOT change a single word.' : 'a SAVINGS GOAL milestone — NOT a debt. Do NOT use the word "debt" anywhere in your plan. Step 5 MUST be EXACTLY this word for word: "Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders." Do NOT change a single word.'} - Start directly with "Step 1:"${getPersonalityCoachingContext()}`,
           financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
@@ -1852,20 +1847,7 @@ Rules:
           max_tokens: 150,
           messages: [{
             role: 'user',
-            content: `You are Aureus. This user's data: income $${monthlyIncome.toFixed(0)}/mo, surplus $${monthlySurplus.toFixed(0)}/mo, debts: ${debts.map((d: any) => `${d.name} $${d.balance} @ ${d.interestRate}%`).join(', ') || 'none'}, emergency fund $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months), baby step ${currentBabyStep.step}, house: ${houseStatus || 'unknown'}.
-
-Give them ONE specific financial action to take THIS MONTH. Not a list. One thing. It must be:
-- Specific and actionable (with a phone number, website, or exact step if relevant)
-- High-leverage for their specific situation
-- Achievable in under 2 hours
-- Australian-specific if relevant
-
-Examples of good ones:
-- "Call your bank on 13 22 43 and ask for a mortgage rate review — rates have dropped and most people who ask get 0.1–0.3% off their rate without refinancing"
-- "Log into MyGov and check your super balance and employer contributions match your payslips — $3.4B goes unpaid each year"
-- "Set up a $50/fortnight automatic transfer to a sinking fund account specifically for Christmas — start now and you'll have $600 by December"
-
-Respond with ONE sentence only. Be specific. Include the actual step.`
+            content: `You are Aureus. This user's data: income $${monthlyIncome.toFixed(0)}/mo, surplus $${monthlySurplus.toFixed(0)}/mo, debts: ${debts.map((d: any) => `${d.name} $${d.balance} @ ${d.interestRate}%`).join(', ') || 'none'}, emergency fund $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months), baby step ${currentBabyStep.step}, house: ${houseStatus || 'unknown'}. Give them ONE specific financial action to take THIS MONTH. Not a list. One thing. It must be: - Specific and actionable (with a phone number, website, or exact step if relevant) - High-leverage for their specific situation - Achievable in under 2 hours - Australian-specific if relevant Examples of good ones: - "Call your bank on 13 22 43 and ask for a mortgage rate review — rates have dropped and most people who ask get 0.1–0.3% off their rate without refinancing" - "Log into MyGov and check your super balance and employer contributions match your payslips — $3.4B goes unpaid each year" - "Set up a $50/fortnight automatic transfer to a sinking fund account specifically for Christmas — start now and you'll have $600 by December" Respond with ONE sentence only. Be specific. Include the actual step.`
           }]
         })
       })
@@ -1938,8 +1920,10 @@ Respond with ONE sentence only. Be specific. Include the actual step.`
         content: m.content
       }))
 
-      const systemContext = `You are Aureus, a personal AI financial coach for Australian users.
-USER NAME: ${userName || 'not provided'} — use their name naturally when appropriate (encouragement, celebrating wins, gentle corrections). Not every message.
+      const systemContext = `You are Aureus, a personal AI financial coach for Australian users. You do not judge money decisions — you build an accurate map of reality and help from there.
+USER NAME: ${userName || 'not provided'} — use their name naturally when appropriate. Not every message.
+
+RADICAL ACCEPTANCE: When someone admits overspending, debt, or a mistake — acknowledge first, advise second. Never lecture. Honesty = immediate help, not pain. Use story language: "You've bought back X months of freedom" not just numbers.
 
 FINANCIAL DATA:
 • Income: ${incomeStreams.map((i: any) => `${i.name} $${i.amount}/${i.frequency}`).join(', ') || 'not set up'}${coupleMode && partnerName ? ` | Partner (${partnerName}): $${partnerIncome}/${partnerFrequency}` : ''}
@@ -2071,7 +2055,26 @@ ${mortgageAccel.balance ? (() => {
       })() : ''}
 ${(extraContext || '')}${getPersonalityCoachingContext()}
 
-Rules: Be specific and use their actual numbers. No generic advice. Be warm but direct — like a coach who knows them well. Remember earlier parts of this conversation. Keep responses concise unless they ask for detail.`
+COACHING PHILOSOPHY — READ THIS FIRST:
+Aureus is not here to judge money decisions. It's here to understand them.
+The goal is an accurate map of reality, not a report card.
+
+RADICAL ACCEPTANCE RULES:
+- When a user confesses overspending, debt, or a "bad" decision: ACKNOWLEDGE FIRST, advise second. "Okay. That's where we are. Let's work from reality."
+- NEVER say "you should have", "you shouldn't have", or imply shame about past decisions.
+- NEVER lecture. One insight, one action. That's it.
+- When someone admits something hard (hidden debt, impulse spending, missed bills): "Thanks for telling me the real number. That's what lets me actually help."
+- If a user says they feel like they're failing, hopeless, or ashamed: acknowledge the emotion before touching the numbers. Pull evidence that contradicts the story if it exists.
+- Celebrate honesty: "Most people would have rounded that down. You didn't. That's how this works."
+- Instant value for honesty: when someone admits a problem, give them a plan within 2 sentences. Honesty = help, not pain.
+
+RESPONSE FORMAT:
+- Ask "why did you spend it?" or "what was going on?" when spending seems emotionally driven — the context changes the advice completely.
+- Use story language: "You've bought back X months of financial freedom" not "debt reduced $X". "Your emergency fund now covers X weeks" not "savings = $X".
+- Be specific with their actual numbers. Generic advice is worthless.
+- Warm, direct, calm. Not cheerful. Not clinical.
+
+Rules: Be specific. No generic advice. Keep responses concise unless detail is requested.`
 
     return {
       mode: 'question',
@@ -2457,35 +2460,7 @@ Rules: Be specific and use their actual numbers. No generic advice. Be warm but 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'question',
-          question: `You are Aureus. A new user has just set up their financial profile. Based on their data, propose exactly 3 roadmap milestones that will have the biggest impact on their financial life. Be specific with numbers.
-
-Their data:
-- Monthly income: $${monthlyIncome.toFixed(0)}
-- Monthly expenses: $${monthlyExpenses.toFixed(0)}  
-- Monthly surplus: $${monthlySurplus.toFixed(0)}
-- Existing savings: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months of expenses covered)
-- Total bad debt: $${totalDebtBalance.toFixed(0)}
-- Mortgage: ${mortgageAccel.balance ? `$${mortgageAccel.balance} at ${mortgageAccel.rate}%` : 'not entered'}
-- Baby Step: ${currentBabyStep.step} — ${currentBabyStep.title}
-- Money personality: ${moneyPersonality ? personalityProfiles[moneyPersonality]?.label : 'not assessed'}
-- House status: ${houseStatus || 'not specified'}
-- FIRE goal: ${fireGoal ? 'Yes' : 'No'}
-
-CRITICAL RULES — FOLLOW EXACTLY:
-- Baby Steps order: 1) $2,000 emergency fund → 2) Kill ALL bad debt → 3) 3-month expenses saved → 4) Invest/mortgage
-- savings < $2,000: milestone 1 MUST be Build $2,000 Emergency Fund
-- savings >= $2,000 AND bad debt > 0: one milestone MUST be killing that bad debt
-- savings < 3 months expenses: one milestone MUST be Build 3-Month Emergency Fund
-- NEVER propose investing milestones if bad debt exists
-- NEVER skip debt if totalDebt > 0 — it must appear
-- Each milestone must be something they have NOT already achieved
-- Use "Kill" not "Pay off" for debt milestones
-Respond in this EXACT JSON format, no other text:
-[
-  {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 1},
-  {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 2},
-  {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 3}
-]`,
+          question: `You are Aureus. A new user has just set up their financial profile. Based on their data, propose exactly 3 roadmap milestones that will have the biggest impact on their financial life. Be specific with numbers.  Their data: - Monthly income: $${monthlyIncome.toFixed(0)} - Monthly expenses: $${monthlyExpenses.toFixed(0)} - Monthly surplus: $${monthlySurplus.toFixed(0)} - Existing savings: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months of expenses covered) - Total bad debt: $${totalDebtBalance.toFixed(0)} - Mortgage: ${mortgageAccel.balance ? `$${mortgageAccel.balance} at ${mortgageAccel.rate}%` : 'not entered'} - Baby Step: ${currentBabyStep.step} — ${currentBabyStep.title} - Money personality: ${moneyPersonality ? personalityProfiles[moneyPersonality]?.label : 'not assessed'} - House status: ${houseStatus || 'not specified'} - FIRE goal: ${fireGoal ? 'Yes' : 'No'} CRITICAL RULES — FOLLOW EXACTLY: - Baby Steps order: 1) $2,000 emergency fund → 2) Kill ALL bad debt → 3) 3-month expenses saved → 4) Invest/mortgage - savings < $2,000: milestone 1 MUST be Build $2,000 Emergency Fund - savings >= $2,000 AND bad debt > 0: one milestone MUST be killing that bad debt - savings < 3 months expenses: one milestone MUST be Build 3-Month Emergency Fund - NEVER propose investing milestones if bad debt exists - NEVER skip debt if totalDebt > 0 — it must appear - Each milestone must be something they have NOT already achieved - Use "Kill" not "Pay off" for debt milestones Respond in this EXACT JSON format, no other text: [ {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 1}, {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 2}, {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 3} ]`,
           financialData: { income: incomeStreams, expenses, debts, goals, assets },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
@@ -2595,16 +2570,7 @@ Respond in this EXACT JSON format, no other text:
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             mode: 'question',
-            question: `You are Aureus. Create a 7-day action plan for this goal: "${first.name}"${first.targetAmount !== '0' ? ` (target: $${first.targetAmount})` : ''}. Context: ${first.notes}
-
-Rules:
-- Output ONLY the 7 steps, nothing else. No intro sentence, no summary, no preamble.
-- Format each line as: Step 1: [action]
-- Each action must be specific, concrete, and doable — no fixed day requirement
-- One sentence per step
-- Never suggest downloading another app — the user is in Aureus
-- MILESTONE TYPE: This is ${isDebtMilestone ? 'a DEBT PAYOFF milestone. Step 5 MUST be EXACTLY this word for word: "Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically." Do NOT change a single word.' : 'a SAVINGS GOAL milestone — NOT a debt. Do NOT use the word "debt" anywhere in your plan. Step 5 MUST be EXACTLY this word for word: "Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders." Do NOT change a single word.'}
-- Start directly with "Step 1:"${getPersonalityCoachingContext()}`,
+            question: `You are Aureus. Create a 7-day action plan for this goal: "${first.name}"${first.targetAmount !== '0' ? ` (target: $${first.targetAmount})` : ''}. Context: ${first.notes} Rules: - Output ONLY the 7 steps, nothing else. No intro sentence, no summary, no preamble. - Format each line as: Step 1: [action] - Each action must be specific, concrete, and doable — no fixed day requirement - One sentence per step - Never suggest downloading another app — the user is in Aureus - MILESTONE TYPE: This is ${isDebtMilestone ? 'a DEBT PAYOFF milestone. Step 5 MUST be EXACTLY this word for word: "Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically." Do NOT change a single word.' : 'a SAVINGS GOAL milestone — NOT a debt. Do NOT use the word "debt" anywhere in your plan. Step 5 MUST be EXACTLY this word for word: "Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders." Do NOT change a single word.'} - Start directly with "Step 1:"${getPersonalityCoachingContext()}`,
             financialData: { income: incomeStreams, expenses, debts, goals, assets },
             memory: budgetMemory,
             countryConfig: currentCountryConfig
@@ -2932,23 +2898,7 @@ Rules:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'question',
-          question: `You are Aureus, an AI financial coach. Analyse this user's financial data and generate 4-5 proactive insights — things you notice that they may not have spotted. Be specific with numbers. Sound like a sharp personal trainer who's reviewed their stats, not a generic chatbot.
-
-Financial snapshot:
-- Monthly income: $${monthlyIncome.toFixed(0)}
-- Monthly expenses: $${monthlyExpenses.toFixed(0)}
-- Monthly surplus: $${monthlySurplus.toFixed(0)}
-- Savings rate: ${savingsRate.toFixed(1)}%
-- Emergency fund: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months)
-- Total debt: $${totalDebtBalance.toFixed(0)}
-- Net worth: $${netWorth.toFixed(0)}
-- Baby step: ${currentBabyStep.step} - ${currentBabyStep.title}
-- Passive income: $${passiveIncome.toFixed(0)}/mo
-- Mortgage data: ${mortgageAccel.balance ? `$${mortgageAccel.balance} at ${mortgageAccel.rate}%` : 'not entered'}
-- Money personality: ${moneyPersonality || 'not assessed'}
-
-Format each insight as a single line starting with an emoji, then the insight. No headers, no lists within insights. Be direct and specific. Focus on: patterns worth noting, risks, quick wins, mortgage acceleration opportunities, and behavioural observations. Tailor the tone to their money personality. Maximum 5 insights.${getPersonalityCoachingContext()}`,
-          financialData: { income: incomeStreams, expenses, debts, goals, assets },
+          question: `You are Aureus, an AI financial coach. Analyse this user's financial data and generate 4-5 proactive insights — things you notice that they may not have spotted. Be specific with numbers. Sound like a sharp personal trainer who's reviewed their stats, not a generic chatbot.  Financial snapshot: - Monthly income: $${monthlyIncome.toFixed(0)} - Monthly expenses: $${monthlyExpenses.toFixed(0)} - Monthly surplus: $${monthlySurplus.toFixed(0)} - Savings rate: ${savingsRate.toFixed(1)}% - Emergency fund: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months) - Total debt: $${totalDebtBalance.toFixed(0)} - Net worth: $${netWorth.toFixed(0)} - Baby step: ${currentBabyStep.step} - ${currentBabyStep.title} - Passive income: $${passiveIncome.toFixed(0)}/mo - Mortgage data: ${mortgageAccel.balance ? `$${mortgageAccel.balance} at ${mortgageAccel.rate}%` : 'not entered'} - Money personality: ${moneyPersonality || 'not assessed'} - Spending by category: ${Object.entries(actualSpend).map(([k,v]) => `${k}: $${v}`).join(', ') || 'not tracked'} - Sinking funds: ${sinkingFunds.length > 0 ? sinkingFunds.map((f: any) => `${f.name} ($${f.weeklyAmount}/wk)`).join(', ') : 'none'} - Wins logged: ${wins.length} | Streak: ${streak} days Generate 4-5 AHA MOMENTS — non-obvious insights the user probably hasn't noticed. Make them think "I hadn't realised that." RIGHT kind of insight: - "You blame coffee but takeaway costs 11× more." - "Your income isn't the problem — debt repayments are dragging your savings rate down." - "You're 4 months from your emergency fund at current pace — 2 months if eating out drops 30%." WRONG (generic/obvious): - "You should save more." "Consider reducing spending." "You're doing well." Use STORY LANGUAGE: "You've bought back 3 months of financial freedom" not "debt reduced $1,100". "Your emergency fund covers 6 weeks of survival" not "savings = $2,400". One insight per line, emoji first. No headers. Max 5. Be direct and surprising.${getPersonalityCoachingContext()}`, financialData: { income: incomeStreams, expenses, debts, goals, assets },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
         })
@@ -2971,9 +2921,7 @@ Format each insight as a single line starting with an emoji, then the insight. N
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'question',
-          question: `You are Aureus. Based on this user's financial situation, identify THE SINGLE highest-leverage financial action they could take this week. Not a list — one specific action with a specific number or step. Format: start with the action verb, be specific, include the estimated impact in brackets at the end. Maximum 2 sentences.
-
-Income: $${monthlyIncome.toFixed(0)}/mo | Expenses: $${monthlyExpenses.toFixed(0)}/mo | Surplus: $${monthlySurplus.toFixed(0)}/mo | Debt: $${totalDebtBalance.toFixed(0)} | Baby Step: ${currentBabyStep.step} | Mortgage: ${mortgageAccel.balance ? `$${mortgageAccel.balance} @ ${mortgageAccel.rate}%` : 'not entered'} | Emergency fund: ${emergencyMonths.toFixed(1)} months${getPersonalityCoachingContext()}`,
+          question: 'You are Aureus. Identify THE SINGLE highest-leverage financial action this user could take this week. One specific action with a number. Start with an action verb. Include estimated impact in brackets. Max 2 sentences. Income: $' + monthlyIncome.toFixed(0) + '/mo | Surplus: $' + monthlySurplus.toFixed(0) + '/mo | Debt: $' + totalDebtBalance.toFixed(0) + ' | Baby Step: ' + currentBabyStep.step + ' | Mortgage: ' + (mortgageAccel.balance ? '$' + mortgageAccel.balance + ' @ ' + mortgageAccel.rate + '%' : 'not entered') + ' | Emergency: ' + emergencyMonths.toFixed(1) + ' months' + getPersonalityCoachingContext(),
           financialData: { income: incomeStreams, expenses, debts, goals, assets },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
@@ -2996,14 +2944,7 @@ Income: $${monthlyIncome.toFixed(0)}/mo | Expenses: $${monthlyExpenses.toFixed(0
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'question',
-          question: `Analyse these expenses and generate 3 specific spending pattern insights. Be concrete with numbers. Sound like a sharp analyst, not a generic advisor.
-
-Expenses: ${expenses.map(e => `${e.name}: $${e.amount}/${e.frequency}`).join(', ')}
-Monthly income: $${monthlyIncome.toFixed(0)}
-Monthly total expenses: $${monthlyExpenses.toFixed(0)}
-Savings rate: ${savingsRate.toFixed(1)}%
-
-Each insight: one sentence, starts with an emoji, references actual numbers from their data. Focus on: category concentration, income ratios, opportunities to redirect to mortgage. Tailor tone to their money personality.${getPersonalityCoachingContext()}`,
+          question: 'Analyse this user\'s expenses and generate 3 specific spending pattern insights. Be concrete with numbers. Sound like a sharp analyst. Each insight: one sentence, starts with an emoji, references actual numbers. Focus on category concentration, income ratios, and opportunities. ' + getPersonalityCoachingContext(),
           financialData: { income: incomeStreams, expenses },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
@@ -3615,7 +3556,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   <div style={{ fontSize: '28px', flexShrink: 0 }}>🍽️</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ color: theme.accent, fontWeight: 700, fontSize: '13px', marginBottom: '2px' }}>Save on groceries with Aureus Meal Planner</div>
-                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>Once you're set up, Aureus can build a 7-day budget meal plan around your grocery spend — upload your supermarket catalog and we'll plan around the specials.</div>
+                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>Once you're set up, opt into the monthly Aureus meal plan email — we'll build a 7-day budget meal plan each month tailored to your household and grocery budget.</div>
                   </div>
                 </div>
               )}
@@ -4729,8 +4670,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   { id: 'mortgage',  label: '🚀 Mortgage Accelerator' },
                   { id: 'property',  label: '🏘️ Property Portfolio' },
                   { id: 'grow',      label: '📈 Grow & FIRE' },
-                  { id: 'meals',     label: '🍽️ Meal Planning' },
-                ].map(tab => (
+                    ].map(tab => (
                   <button key={tab.id} onClick={() => { setActiveTab(tab.id as any); setShowMoreTabs(false) }}
                     style={{ display: 'block', width: '100%', padding: '9px 10px', background: activeTab === tab.id ? theme.accent + '20' : 'transparent', color: activeTab === tab.id ? theme.accent : theme.text, border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' as const, fontWeight: activeTab === tab.id ? 700 : 400 }}>
                     {tab.label}
@@ -4826,6 +4766,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       <div style={{ color: theme.accent, fontWeight: 800, fontSize: '18px' }}>{streak}</div>
                       <div style={{ color: theme.textMuted, fontSize: '10px' }}>day streak</div>
                     </div>}
+                    <button onClick={() => setShowTellAureus(true)} style={{ padding: '10px 18px', background: theme.cardBg, color: theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                      💬 Tell Aureus something
+                    </button>
                     <button onClick={() => setShowSpendCheckIn(true)} style={{ padding: '10px 18px', background: theme.cardBg, color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
                       ⚡ Check-in
                     </button>
@@ -4890,9 +4833,9 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                   oneThingTitle = `${catName} is at ${pct}% of budget`
                   const _daysLeft = new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate() - new Date().getDate()
                   oneThingBody = `You've spent $${spent.toFixed(0)} of your $${budget.toFixed(0)} ${catName.toLowerCase()} budget with ${_daysLeft} days left this month.`
-                  oneThingCta = catId === 'food' ? 'Try Meal Planner →' : 'Review spending →'
+                  oneThingCta = catId === 'food' ? 'Review food spend →' : 'Review spending →'
                   oneThingColor = theme.warning
-                  oneThingAction = () => setActiveTab(catId === 'food' ? 'meals' as any : 'dashboard')
+                  oneThingAction = () => setActiveTab('dashboard')
                 } else if (coachNextAction) {
                   oneThingIcon = coachNextAction.icon || '⚡'
                   oneThingTitle = coachNextAction.action
@@ -5252,6 +5195,41 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 )
               })()}
 
+              {/* ── MONEY MIRROR — monthly reflection ── */}
+              {onboardingComplete && monthlyIncome > 0 && (() => {
+                const thisMonth = new Date().toISOString().slice(0, 7)
+                const dayOfMonth = new Date().getDate()
+                // Show on last week of month or if never done
+                if (lastMirrorMonth === thisMonth) return null
+                if (dayOfMonth < 22) return null
+                return (
+                  <div style={{ padding: '18px 20px', background: `linear-gradient(135deg, ${theme.accent}08, ${theme.cardBg})`, borderRadius: '16px', border: '1px solid ' + theme.accent + '25', display: 'flex', gap: '16px', alignItems: 'center' }}>
+                    <div style={{ fontSize: '36px', flexShrink: 0 }}>🪞</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: theme.accent, fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>The Money Mirror — {new Date().toLocaleDateString('en-AU', { month: 'long' })}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.5 }}>What story are you telling yourself about money this month? Say it out loud — Aureus will show you what the evidence actually says.</div>
+                    </div>
+                    <button onClick={() => setShowMoneyMirror(true)} style={{ padding: '10px 16px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700, fontSize: '13px', flexShrink: 0 }}>Open →</button>
+                  </div>
+                )
+              })()}
+
+              {/* ── DAILY DEBRIEF entry point (evening) ── */}
+              {onboardingComplete && (() => {
+                const hour = new Date().getHours()
+                if (hour < 17) return null // Only show after 5pm
+                return (
+                  <div style={{ padding: '14px 18px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border, display: 'flex', gap: '14px', alignItems: 'center' }}>
+                    <div style={{ fontSize: '28px', flexShrink: 0 }}>🌙</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px', marginBottom: '2px' }}>Evening money debrief</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>How did today go financially? Takes 60 seconds. No judgment.</div>
+                    </div>
+                    <button onClick={() => setShowMoneyDebrief(true)} style={{ padding: '8px 14px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.textMuted, fontSize: '12px', fontWeight: 600, flexShrink: 0 }}>Check in →</button>
+                  </div>
+                )
+              })()}
+
               {/* ── IMPROVEMENT #6: SPENDING PATTERNS ── */}
               {spendingPatterns.length > 0 && (
                 <div style={{ padding: '16px 20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
@@ -5435,8 +5413,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                     { id: 'mortgage',  icon: '🚀', label: 'Mortgage',      desc: 'Pay off faster' },
                     { id: 'property',  icon: '🏘️', label: 'Property',      desc: 'IP portfolio' },
                     { id: 'grow',      icon: '📈', label: 'Grow & FIRE',   desc: 'Investments & FI' },
-                    { id: 'meals',     icon: '🍽️', label: 'Meal Planning', desc: 'Budget meals + catalog' },
-                    { id: 'insights',  icon: '🧠', label: 'Insights',      desc: 'AI analysis' },
+                      { id: 'insights',  icon: '🧠', label: 'Insights',      desc: 'AI analysis' },
                     { id: 'review',    icon: '🔄', label: 'Review',        desc: 'Monthly check-in' },
                     { id: 'overview',  icon: '📊', label: 'Metrics',       desc: 'Net worth & health' },
                     { id: 'learn',     icon: '🎓', label: 'Learn',         desc: 'Financial education' },
@@ -5984,7 +5961,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                                     <span style={{ color: theme.textMuted, fontSize: '12px' }}>
                                       🍽️ {cat.id === 'food' ? 'A meal plan could cut this back' : 'Cooking at home could save you here'}
                                     </span>
-                                    <button onClick={() => setActiveTab('meals' as any)} style={{ padding: '4px 12px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+                                    <button onClick={() => setActiveTab('insights' as any)} style={{ padding: '4px 12px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
                                       Try Meal Planner →
                                     </button>
                                   </div>
@@ -6188,7 +6165,6 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       setPayslipProcessing(false)
                     }} style={{ display: 'none' }} />
                     <button onClick={() => payslipInputRef.current?.click()} style={{ padding: '4px 10px', background: theme.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} disabled={payslipProcessing}>{payslipProcessing ? '...' : '📄 Payslip'}</button>
-                    <button onClick={() => setShowTaxEstimator(true)} style={{ padding: '4px 10px', background: theme.accent + '25', color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>🧾 Tax est.</button>
                     <button onClick={() => setShowAccountabilityCard(true)} title="Share weekly snapshot" style={{ padding: '4px 8px', background: theme.bg, color: theme.textMuted, border: '1px solid ' + theme.border, borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>📊</button>
                     <span style={{ color: theme.success, fontWeight: 700 }}>${monthlyIncome.toFixed(0)}/mo</span>
                   </div>
@@ -6725,20 +6701,38 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                       </div>
                     </div>
                   ) : goals.map(goal => {
-                    const pct = (parseFloat(goal.saved || '0') / parseFloat(goal.target || '1')) * 100
+                    const saved = parseFloat(goal.saved || goal.savedAmount || '0')
+                    const target = parseFloat(goal.target || goal.targetAmount || '1')
+                    const pct = (saved / target) * 100
+                    const remaining = Math.max(0, target - saved)
+                    const currentWeekly = parseFloat(goal.paymentAmount || '0')
+                    const freqToWeekly = goal.savingsFrequency === 'fortnightly' ? 0.5 : goal.savingsFrequency === 'monthly' ? 12/52 : 1
+                    const currentWeeklyAmt = currentWeekly * freqToWeekly
+                    const weeksToGoalCurrent = currentWeeklyAmt > 0 ? Math.ceil(remaining / currentWeeklyAmt) : null
+                    const extra50Weekly = currentWeeklyAmt + 50
+                    const weeksExtra50 = Math.ceil(remaining / extra50Weekly)
+                    const weeksSaved50 = weeksToGoalCurrent ? weeksToGoalCurrent - weeksExtra50 : 0
+                    const extra100Weekly = currentWeeklyAmt + 100
+                    const weeksExtra100 = Math.ceil(remaining / extra100Weekly)
+                    const weeksSaved100 = weeksToGoalCurrent ? weeksToGoalCurrent - weeksExtra100 : 0
+                    const goalDate = weeksToGoalCurrent ? (() => { const d = new Date(); d.setDate(d.getDate() + weeksToGoalCurrent * 7); return d.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' }) })() : null
+                    const goalDate50 = (() => { const d = new Date(); d.setDate(d.getDate() + weeksExtra50 * 7); return d.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' }) })()
+                    const goalDate100 = (() => { const d = new Date(); d.setDate(d.getDate() + weeksExtra100 * 7); return d.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' }) })()
+                    const [showAccel, setShowAccel] = React.useState(false)
                     return (
-                      <div key={goal.id} style={{ padding: '12px', marginBottom: '8px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                      <div key={goal.id} style={{ padding: '14px', marginBottom: '8px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                           <div>
-                            <div style={{ color: theme.text, fontWeight: 600 }}>{goal.name}</div>
-                            <div style={{ color: theme.textMuted, fontSize: '12px' }}>
-                              ${parseFloat(goal.saved || '0').toFixed(0)} / ${parseFloat(goal.target || '0').toFixed(0)}
+                            <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{goal.name}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>
+                              ${saved.toFixed(0)} of ${target.toFixed(0)}
                               {goal.paymentAmount && <span> · ${goal.paymentAmount}/{goal.savingsFrequency || 'monthly'}</span>}
-                              {goal.addedToCalendar ? <span style={{ color: theme.accent, marginLeft: '6px' }}>📅</span> : <span style={{ color: theme.textMuted, marginLeft: '6px' }}>no calendar</span>}
+                              {goalDate && <span style={{ color: theme.accent, marginLeft: '6px' }}>→ {goalDate}</span>}
+                              {goal.addedToCalendar ? <span style={{ color: theme.accent, marginLeft: '6px' }}>📅</span> : null}
                             </div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ color: theme.accent, fontWeight: 700 }}>{pct.toFixed(0)}%</span>
+                            <span style={{ color: theme.accent, fontWeight: 700 }}>{Math.min(100, pct).toFixed(0)}%</span>
                             <button onClick={() => deleteGoal(goal.id)} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button>
                           </div>
                         </div>
@@ -6748,7 +6742,40 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                             {goal.deadline && <span style={{ color: theme.accent, fontSize: '11px' }}>🏁 Target: {new Date(goal.deadline + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
                           </div>
                         )}
-                        <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}><div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: 'linear-gradient(90deg, #D4AF37, #B68B2E)' }} /></div>
+                        <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' }}>
+                          <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: 'linear-gradient(90deg, #D4AF37, #B68B2E)', borderRadius: '3px' }} />
+                        </div>
+                        {/* Acceleration calculator */}
+                        {remaining > 0 && currentWeeklyAmt > 0 && (
+                          <div>
+                            <button onClick={() => setShowAccel(!showAccel)} style={{ background: 'none', border: 'none', color: theme.accent, cursor: 'pointer', fontSize: '11px', fontWeight: 600, padding: '0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              ⚡ {showAccel ? 'Hide' : 'How to get there faster →'}
+                            </button>
+                            {showAccel && (
+                              <div style={{ marginTop: '10px', padding: '12px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.accent + '25' }}>
+                                <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>GOAL ACCELERATION</div>
+                                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
+                                  {[
+                                    { label: 'Current pace', weekly: currentWeeklyAmt, date: goalDate, saved: null, highlight: false },
+                                    { label: '+$50/week extra', weekly: extra50Weekly, date: goalDate50, saved: weeksSaved50, highlight: false },
+                                    { label: '+$100/week extra', weekly: extra100Weekly, date: goalDate100, saved: weeksSaved100, highlight: true },
+                                  ].map((row, i) => (
+                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: row.highlight ? theme.accent + '12' : 'transparent', borderRadius: '8px', border: row.highlight ? '1px solid ' + theme.accent + '30' : 'none' }}>
+                                      <div>
+                                        <div style={{ color: row.highlight ? theme.accent : theme.textMuted, fontSize: '12px', fontWeight: row.highlight ? 700 : 400 }}>{row.label}</div>
+                                        {row.saved !== null && row.saved > 0 && <div style={{ color: theme.success, fontSize: '10px' }}>↑ {Math.floor(row.saved / 4.3)} months sooner</div>}
+                                      </div>
+                                      <div style={{ textAlign: 'right' as const }}>
+                                        <div style={{ color: theme.text, fontSize: '12px', fontWeight: 600 }}>${row.weekly.toFixed(0)}/wk</div>
+                                        {row.date && <div style={{ color: theme.textMuted, fontSize: '10px' }}>done {row.date}</div>}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -6908,6 +6935,70 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
                 </div>
               ))}
             </div>
+
+            {/* AU Tax Return Estimator — under assets, pre-filled from income */}
+            {userCountry === 'AU' && (() => {
+              // Auto-fill gross income from income streams (annualised)
+              const autoGross = Math.round(incomeStreams.reduce((sum, inc) => {
+                const monthly = convertToMonthly(parseFloat(inc.amount || '0'), inc.frequency)
+                return sum + (monthly * 12)
+              }, 0))
+              const autoYtdTax = taxEstData.taxWithheld || (incomeStreams.find((i: any) => i.ytdTax) as any)?.ytdTax || ''
+              return (
+                <div style={{ ...cardStyle, background: `linear-gradient(135deg, ${theme.accent}08, ${theme.cardBg})`, border: '1px solid ' + theme.accent + '25' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: theme.accent, fontSize: '18px' }}>🧾 Tax Return Estimator</h3>
+                      <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>
+                        AU 2024–25 · {autoGross > 0 ? `Pre-filled from your income ($${autoGross.toLocaleString()} gross)` : 'Enter your income details above first'}
+                      </div>
+                    </div>
+                    <button onClick={() => {
+                      // Auto-fill from income before opening
+                      if (autoGross > 0 && !taxEstData.grossIncome) {
+                        setTaxEstData(prev => ({ ...prev, grossIncome: autoGross.toString() }))
+                      }
+                      setShowTaxEstimator(true)
+                    }} style={{ ...btnPrimary, padding: '8px 16px', fontSize: '13px' }}>
+                      {taxEstData.grossIncome ? 'Update estimate →' : 'Estimate my return →'}
+                    </button>
+                  </div>
+                  {taxEstData.grossIncome && (() => {
+                    // Quick summary of last estimate
+                    const gross = parseFloat(taxEstData.grossIncome || '0')
+                    const withheld = parseFloat(taxEstData.taxWithheld || '0')
+                    if (!gross || !withheld) return (
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>Add your YTD tax withheld (from your payslip) to see your estimated refund or bill.</div>
+                    )
+                    const calcTax = (income: number) => {
+                      if (income <= 18200) return 0
+                      if (income <= 45000) return (income - 18200) * 0.19
+                      if (income <= 120000) return 5092 + (income - 45000) * 0.325
+                      if (income <= 180000) return 29467 + (income - 120000) * 0.37
+                      return 51667 + (income - 180000) * 0.45
+                    }
+                    const lito = gross <= 37500 ? 700 : gross <= 45000 ? 700 - (gross - 37500) * 0.05 : gross <= 66667 ? 325 - (gross - 45000) * 0.015 : 0
+                    const tax = Math.max(0, calcTax(gross) - lito + gross * 0.02)
+                    const result = withheld - tax
+                    const isRefund = result >= 0
+                    return (
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px 14px', background: isRefund ? theme.success + '12' : theme.danger + '12', borderRadius: '10px', border: '1px solid ' + (isRefund ? theme.success : theme.danger) + '30' }}>
+                        <div style={{ fontSize: '28px' }}>{isRefund ? '💰' : '📋'}</div>
+                        <div>
+                          <div style={{ color: isRefund ? theme.success : theme.danger, fontWeight: 800, fontSize: '20px' }}>
+                            {isRefund ? '+' : '-'}${Math.abs(Math.round(result)).toLocaleString()}
+                          </div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>
+                            Estimated {isRefund ? 'refund' : 'tax bill'} · based on $${gross.toLocaleString()} gross income
+                          </div>
+                        </div>
+                        <button onClick={() => setShowTaxEstimator(true)} style={{ marginLeft: 'auto', padding: '6px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>Edit →</button>
+                      </div>
+                    )
+                  })()}
+                </div>
+              )
+            })()}
           </div>
         )}
 
@@ -7876,292 +7967,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         )}
 
         {/* ==================== INSIGHTS TAB ==================== */}
-        {/* ═══════════════════════════════════
-            MEAL PLANNING TAB
-        ═══════════════════════════════════ */}
-        {activeTab === 'meals' && (
-          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
-            {/* Header */}
-            <div style={{ padding: '24px', background: 'linear-gradient(135deg, #1a1208, #0a0a0a)', borderRadius: '16px', border: '1px solid ' + theme.accent + '40' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' as const, gap: '12px' }}>
-                <div>
-                  <h2 style={{ color: theme.accent, fontSize: '24px', fontWeight: 800, margin: '0 0 6px 0', fontFamily: 'Cinzel, serif' }}>🍽️ Aureus Meal Planner</h2>
-                  <p style={{ color: theme.textMuted, fontSize: '14px', margin: 0 }}>Upload this week's supermarket catalog — Aureus builds a budget meal plan around the specials.</p>
-                </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  {(['plan', 'catalog', 'history'] as const).map(t => (
-                    <button key={t} onClick={() => setMealPlanTab(t)}
-                      style={{ padding: '7px 14px', background: mealPlanTab === t ? theme.accent : 'transparent', color: mealPlanTab === t ? '#111111' : theme.textMuted, border: '1px solid ' + (mealPlanTab === t ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, textTransform: 'capitalize' as const }}>
-                      {t === 'plan' ? '🗓️ Plan' : t === 'catalog' ? '📸 Catalog' : '📚 History'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* TAB: CATALOG UPLOAD */}
-            {mealPlanTab === 'catalog' && (
-              <div style={cardStyle}>
-                <h3 style={{ color: theme.accent, margin: '0 0 8px 0' }}>📸 Upload Supermarket Catalog</h3>
-                <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '16px', lineHeight: 1.6 }}>
-                  Take a photo of the specials page from Woolworths, Coles, Aldi, or IGA. Aureus reads what's on sale and builds your meal plan around those items. Works best with the "half price" or "weekly specials" pages.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px', fontWeight: 600 }}>UPLOAD CATALOG IMAGE(S)</label>
-                    <input type="file" accept="image/*" multiple
-                      onChange={async e => {
-                        const files = Array.from(e.target.files || [])
-                        const b64s: string[] = []
-                        for (const file of files) {
-                          const b64 = await new Promise<string>(res => {
-                            const r = new FileReader()
-                            r.onload = ev => res((ev.target?.result as string).split(',')[1])
-                            r.readAsDataURL(file)
-                          })
-                          b64s.push(b64)
-                        }
-                        setCatalogImages(prev => [...prev, ...b64s].slice(0, 6))
-                      }}
-                      style={{ color: theme.text, fontSize: '13px' }} />
-                    {catalogImages.length > 0 && (
-                      <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                        {catalogImages.map((_, i) => (
-                          <div key={i} style={{ padding: '6px 12px', background: theme.success + '20', border: '1px solid ' + theme.success + '40', borderRadius: '8px', color: theme.success, fontSize: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            📸 Image {i + 1}
-                            <button onClick={() => setCatalogImages(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '14px', padding: 0 }}>×</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '6px', fontWeight: 600 }}>OR PASTE SPECIALS TEXT</label>
-                    <textarea value={catalogText} onChange={e => setCatalogText(e.target.value)} placeholder="e.g. Woolworths half price: chicken breast $8/kg, eggs $4.50 doz, broccoli $1.50..."
-                      style={{ ...inputStyle, width: '100%', height: '100px', resize: 'vertical' as const, fontFamily: 'inherit' }} />
-                  </div>
-                  {(catalogImages.length > 0 || catalogText) && (
-                    <div style={{ padding: '10px 14px', background: theme.success + '15', borderRadius: '8px', color: theme.success, fontSize: '13px' }}>
-                      ✅ Catalog ready — switch to Plan tab to generate your meal plan
-                    </div>
-                  )}
-                  <button onClick={() => setMealPlanTab('plan')} style={{ ...btnPrimary, alignSelf: 'flex-start' as const, padding: '10px 20px' }}>
-                    Go to Plan tab →
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* TAB: MEAL PLAN */}
-            {mealPlanTab === 'plan' && (
-              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
-                {/* Preferences */}
-                <div style={cardStyle}>
-                  <h3 style={{ color: theme.accent, margin: '0 0 14px 0', fontSize: '16px' }}>⚙️ Your Household</h3>
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const, marginBottom: '12px' }}>
-                    <div style={{ flex: 1, minWidth: '100px' }}>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>PEOPLE</label>
-                      <input type="number" min="1" max="10" value={mealPlanPrefs.people} onChange={e => setMealPlanPrefs({...mealPlanPrefs, people: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: '120px' }}>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>WEEKLY FOOD BUDGET $</label>
-                      <input type="number" placeholder={monthlySurplus > 0 ? `e.g. ${Math.round(monthlySurplus * 0.25)}` : '150'} value={mealPlanPrefs.budget} onChange={e => setMealPlanPrefs({...mealPlanPrefs, budget: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div style={{ flex: 2, minWidth: '160px' }}>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>DIETARY NEEDS</label>
-                      <input placeholder="e.g. gluten-free, vegetarian, diabetic..." value={mealPlanPrefs.dietaryNeeds} onChange={e => setMealPlanPrefs({...mealPlanPrefs, dietaryNeeds: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div style={{ flex: 2, minWidth: '160px' }}>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>DISLIKES / AVOID</label>
-                      <input placeholder="e.g. seafood, mushrooms, spicy..." value={mealPlanPrefs.dislikes} onChange={e => setMealPlanPrefs({...mealPlanPrefs, dislikes: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' as const }}>
-                    <label style={{ display: 'flex', gap: '8px', alignItems: 'center', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>
-                      <input type="checkbox" checked={mealPlanPrefs.useWebSearch} onChange={e => setMealPlanPrefs({...mealPlanPrefs, useWebSearch: e.target.checked})} style={{ accentColor: theme.accent, width: '14px', height: '14px' }} />
-                      🧠 Use detailed AU pricing in prompt (more accurate estimates)
-                    </label>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' as const }}>
-                    <span style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600 }}>INCLUDE:</span>
-                    {(['breakfast', 'lunch', 'dinner', 'dessert'] as const).map(meal => {
-                      const icons: Record<string, string> = { breakfast: '🌅', lunch: '☀️', dinner: '🌙', dessert: '🍮' }
-                      const selected = (mealPlanPrefs.meals || ['breakfast','lunch','dinner']).includes(meal)
-                      return (
-                        <button key={meal} onClick={() => {
-                          const current = mealPlanPrefs.meals || ['breakfast','lunch','dinner']
-                          const next = selected && current.length > 1
-                            ? current.filter(m => m !== meal)
-                            : selected ? current : [...current, meal]
-                          setMealPlanPrefs({...mealPlanPrefs, meals: next})
-                        }} style={{ padding: '5px 14px', background: selected ? theme.accent + '20' : 'transparent', border: '1px solid ' + (selected ? theme.accent : theme.border), borderRadius: '20px', color: selected ? theme.accent : theme.textMuted, cursor: 'pointer', fontSize: '13px', fontWeight: 600, transition: 'all 0.15s' }}>
-                          {icons[meal]} {meal.charAt(0).toUpperCase() + meal.slice(1)}
-                        </button>
-                      )
-                    })}
-                    {(catalogImages.length > 0 || catalogText) && (
-                      <div style={{ padding: '4px 10px', background: theme.success + '20', border: '1px solid ' + theme.success + '40', borderRadius: '8px', color: theme.success, fontSize: '12px' }}>
-                        📸 Using {catalogImages.length > 0 ? `${catalogImages.length} catalog image${catalogImages.length !== 1 ? 's' : ''}` : 'pasted specials'}
-                      </div>
-                    )}
-                    <button onClick={generateMealPlan} disabled={generatingMealPlan}
-                      style={{ ...btnPrimary, padding: '10px 24px', opacity: generatingMealPlan ? 0.7 : 1, display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      {generatingMealPlan ? (
-                        <><div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '2px solid #0a0a0a', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />Generating...</>
-                      ) : '🍽️ Generate Meal Plan'}
-                    </button>
-                  </div>
-                  {mealPlanError && (
-                    <div style={{ marginTop: '12px', padding: '12px 16px', background: theme.danger + '18', border: '1px solid ' + theme.danger + '40', borderRadius: '10px', color: theme.danger, fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>⚠️ {mealPlanError}</span>
-                      <button onClick={() => setMealPlanError(null)} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '16px', padding: '0 4px' }}>×</button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Generated plan */}
-                {currentMealPlan && (() => {
-                  const plan = currentMealPlan
-
-                  // Render markdown-style text as styled HTML
-                  const renderMealText = (text: string) => {
-                    return text.split('\n').map((line, i) => {
-                      if (line.startsWith('## ')) return (
-                        <div key={i} style={{ color: theme.accent, fontWeight: 800, fontSize: '16px', marginTop: '18px', marginBottom: '6px', borderBottom: '1px solid ' + theme.accent + '30', paddingBottom: '4px' }}>{line.replace('## ', '')}</div>
-                      )
-                      // Bold summary line (costs)
-                      if (line.startsWith('**') && line.endsWith('**') && !line.slice(2,-2).includes('**')) return (
-                        <div key={i} style={{ color: theme.text, fontWeight: 700, fontSize: '14px', marginTop: '12px', marginBottom: '4px' }}>{line.replace(/\*\*/g, '')}</div>
-                      )
-                      if (line.startsWith('**') && line.includes('**')) return (
-                        <div key={i} style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '4px' }} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, `<strong style="color:${theme.accent}">$1</strong>`) }} />
-                      )
-                      // Pantry explanation tip line
-                      if (line.startsWith('💡')) return (
-                        <div key={i} style={{ padding: '10px 14px', background: theme.accent + '12', border: '1px solid ' + theme.accent + '30', borderRadius: '8px', color: theme.textMuted, fontSize: '12px', lineHeight: 1.5, marginBottom: '8px' }}>
-                          {line}
-                        </div>
-                      )
-                      // Meal lines
-                      if (line.match(/^[🌅☀️🌙🍮]/) ) {
-                        const mealEmojis: Record<string, string> = { breakfast: '🌅', lunch: '☀️', dinner: '🌙', dessert: '🍮' }
-                        const selectedMeals = currentMealPlan?.prefs?.meals || ['breakfast','lunch','dinner']
-                        const isMealSelected = selectedMeals.some((m: string) => line.startsWith(mealEmojis[m]))
-                        if (!isMealSelected) return null
-                        return (
-                        <div key={i} onClick={() => {
-                          // Strip emoji, then "Breakfast: " / "Lunch: " / "Dinner: " prefix, then cost/serves annotations
-                          const afterEmoji = line.slice(line.indexOf(' ')+1)
-                          const afterLabel = afterEmoji.includes(': ') ? afterEmoji.slice(afterEmoji.indexOf(': ')+2) : afterEmoji
-                          const mealText = afterLabel.split('~$')[0].replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim()
-                          fetchRecipe(mealText)
-                        }} style={{ color: theme.text, fontSize: '13px', padding: '5px 8px', display: 'flex', gap: '8px', alignItems: 'center', borderRadius: '8px', cursor: 'pointer', transition: 'background 0.15s', userSelect: 'none' as const }}
-                          onMouseEnter={e => (e.currentTarget.style.background = theme.accent + '12')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                          <span style={{ flexShrink: 0, pointerEvents: 'none' as const }}>{line.split(' ')[0]}</span>
-                          <span style={{ flex: 1, pointerEvents: 'none' as const }} dangerouslySetInnerHTML={{ __html: line.slice(line.indexOf(' ')+1)
-                            .replace(/_(.*?)_/g, (_m: string, g: string) => `<em style="color:${theme.success};font-size:11px"> · ${g}</em>`)
-                            .replace(/~\$(\d+(?:\.\d{1,2})?)/g, (_m: string, price: string) => `<span style="color:${theme.textMuted};font-size:11px"> ~$${price}</span>`) }} />
-                          {(() => {
-                            const afterEmoji = line.slice(line.indexOf(' ')+1)
-                            const afterLabel = afterEmoji.includes(': ') ? afterEmoji.slice(afterEmoji.indexOf(': ')+2) : afterEmoji
-                            const mealText = afterLabel.split('~$')[0].replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim()
-                            return fetchingRecipe === mealText
-                              ? <span style={{ color: theme.accent, fontSize: '11px', flexShrink: 0, pointerEvents: 'none' as const }}>⏳</span>
-                              : <span style={{ color: theme.accent, fontSize: '10px', flexShrink: 0, opacity: 0.6, pointerEvents: 'none' as const }}>📋 recipe</span>
-                          })()}
-                        </div>
-                        )
-                      }
-                      // Shopping list items — highlight pantry staple duration
-                      if (line.startsWith('- ')) return (
-                        <div key={i} style={{ color: theme.textMuted, fontSize: '13px', padding: '2px 0 2px 12px', borderLeft: '2px solid ' + theme.border }}
-                          dangerouslySetInnerHTML={{ __html: line.slice(2)
-                            .replace(/~\$(\d+(?:\.\d{1,2})?)/g, (_m: string, price: string) => `<span style="color:${theme.accent}"> ~$${price}</span>`)
-                            .replace(/\(lasts (.*?)\)/g, `<span style="color:${theme.success};font-size:11px;background:${theme.success}18;padding:1px 6px;border-radius:4px;margin-left:4px"> ♻️ lasts $1</span>`) }} />
-                      )
-                      if (line.trim() === '') return <div key={i} style={{ height: '4px' }} />
-                      return <div key={i} style={{ color: theme.textMuted, fontSize: '13px' }}>{line}</div>
-                    })
-                  }
-
-                  return (
-                    <div>
-                      {/* Header bar */}
-                      <div style={{ padding: '14px 18px', background: 'linear-gradient(135deg, #1a1208, #0a0a0a)', borderRadius: '12px', border: '1px solid ' + theme.accent + '40', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: '8px' }}>
-                        <div>
-                          <div style={{ color: theme.accent, fontWeight: 700, fontSize: '15px' }}>🍽️ Your meal plan is ready</div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>
-                            {plan.prefs?.people} people · ${plan.weeklyBudget}/wk budget
-                            {plan.prefs?.dislikes ? ` · no ${plan.prefs.dislikes}` : ''}
-                            {plan.usedCatalog ? ' · 📸 catalog used' : ''}
-                            {' · '}<span style={{ color: theme.accent }}>📋 tap any meal for recipe</span>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button onClick={async () => {
-                            await navigator.clipboard.writeText(plan.rawText || '')
-                            alert('Meal plan copied!')
-                          }} style={{ padding: '6px 14px', background: theme.accent + '20', border: '1px solid ' + theme.accent + '40', borderRadius: '8px', color: theme.accent, cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>📋 Copy</button>
-                          <button onClick={() => setCurrentMealPlan(null)} style={{ padding: '6px 10px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>✕ Clear</button>
-                        </div>
-                      </div>
-
-                      {/* Rendered meal plan text */}
-                      <div style={{ padding: '18px 20px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, lineHeight: 1.7 }}>
-                        {renderMealText(plan.rawText || '')}
-                      </div>
-
-                      {recipeError && (
-                        <div style={{ marginTop: '10px', padding: '12px 16px', background: theme.danger + '18', border: '1px solid ' + theme.danger + '40', borderRadius: '10px', color: theme.danger, fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span>⚠️ {recipeError}</span>
-                          <button onClick={() => setRecipeError(null)} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '16px', padding: '0 4px' }}>×</button>
-                        </div>
-                      )}
-                      <div style={{ marginTop: '10px', fontSize: '11px', color: theme.textMuted, textAlign: 'center' as const }}>
-                        Generated {new Date(plan.generatedAt).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}
-                      </div>
-                    </div>
-                  )
-                })()}
-
-                {!currentMealPlan && !generatingMealPlan && (
-                  <div style={{ padding: '40px 20px', textAlign: 'center' as const, color: theme.textMuted }}>
-                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>🍽️</div>
-                    <div style={{ color: theme.text, fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>No meal plan yet</div>
-                    <div style={{ fontSize: '13px', maxWidth: '380px', margin: '0 auto', lineHeight: 1.6 }}>
-                      Upload this week's catalog in the Catalog tab for the best results — or just hit Generate and Aureus will build a budget meal plan from scratch.
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* TAB: HISTORY */}
-            {mealPlanTab === 'history' && (
-              <div style={cardStyle}>
-                <h3 style={{ color: theme.accent, margin: '0 0 16px 0' }}>📚 Previous Meal Plans</h3>
-                {mealPlanHistory.length === 0 ? (
-                  <div style={{ textAlign: 'center' as const, padding: '32px', color: theme.textMuted }}>No meal plans generated yet</div>
-                ) : mealPlanHistory.map((plan, i) => (
-                  <div key={i} onClick={() => { setCurrentMealPlan(plan); setMealPlanTab('plan') }}
-                    style={{ padding: '14px 16px', marginBottom: '8px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>
-                        Week of {new Date(plan.generatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </div>
-                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>
-                        {plan.prefs?.people} people · ${plan.weeklyBudget || plan.prefs?.budget || '—'}/wk budget
-                        {plan.usedCatalog && ' · 📸 catalog used'}
-                      </div>
-                    </div>
-                    <div style={{ color: theme.accent, fontSize: '12px', fontWeight: 600 }}>View →</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {/* Meal Planning moved to monthly email opt-in in notification settings */}
 
         {activeTab === 'insights' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
@@ -8203,24 +8009,6 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
             )}
 
             {/* PROACTIVE INSIGHTS */}
-            {/* TAX ESTIMATOR CARD */}
-            <div style={{ padding: '20px 24px', background: `linear-gradient(135deg, ${theme.accent}18, ${theme.accent}05)`, borderRadius: '16px', border: `1px solid ${theme.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' as const }}>
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                <div style={{ fontSize: '40px' }}>🧾</div>
-                <div>
-                  <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '4px' }}>AU Tax Return Estimator</div>
-                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>
-                    {taxEstData.grossIncome
-                      ? `Based on $${parseInt(taxEstData.grossIncome).toLocaleString()} gross income · 2024–25`
-                      : 'Estimate your refund or bill — 2024–25 financial year'}
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setShowTaxEstimator(true)} style={{ ...btnPrimary, padding: '10px 20px', flexShrink: 0 }}>
-                {taxEstData.grossIncome ? 'Update estimate →' : 'Get estimate →'}
-              </button>
-            </div>
-
             {/* ACCOUNTABILITY CARD */}
             <div style={{ padding: '20px 24px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' as const }}>
               <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
@@ -9366,6 +9154,203 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
         </div>
       )}
 
+      {/* ==================== TELL AUREUS SOMETHING ==================== */}
+      {showTellAureus && (
+        <div style={{ position:'fixed' as const, top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.88)', zIndex:1055, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }} onClick={() => { if (!tellAureusLoading) { setShowTellAureus(false); setTellAureusText(''); setTellAureusResponse(null) } }}>
+          <div style={{ background:theme.cardBg, borderRadius:'20px', padding:'28px', maxWidth:'480px', width:'100%' }} onClick={e => e.stopPropagation()}>
+            {tellAureusResponse ? (
+              <div>
+                <div style={{ color:theme.accent, fontSize:'11px', fontWeight:700, letterSpacing:'1px', marginBottom:'12px' }}>AUREUS</div>
+                <p style={{ color:theme.text, fontSize:'15px', lineHeight:1.7, margin:'0 0 20px' }}>{tellAureusResponse}</p>
+                <div style={{ display:'flex', gap:'10px' }}>
+                  <button onClick={() => { setActiveTab('chat'); setShowTellAureus(false); setTellAureusResponse(null) }} style={{ flex:1, padding:'12px', background:'transparent', border:'1px solid '+theme.accent+'40', borderRadius:'10px', color:theme.accent, cursor:'pointer', fontSize:'13px', fontWeight:600 }}>Continue in chat →</button>
+                  <button onClick={() => { setShowTellAureus(false); setTellAureusText(''); setTellAureusResponse(null) }} style={{ padding:'12px 16px', background:theme.accent, color:'#111111', border:'none', borderRadius:'10px', cursor:'pointer', fontWeight:700, fontSize:'13px' }}>Done</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom:'20px' }}>
+                  <h3 style={{ color:theme.text, fontSize:'20px', margin:'0 0 8px', fontFamily:'Cinzel, serif' }}>Tell Aureus Something</h3>
+                  <p style={{ color:theme.textMuted, fontSize:'13px', margin:0, lineHeight:1.6 }}>No forms. No categories. No judgment. Just say what's on your mind — the spending you're not proud of, the debt you haven't mentioned, the thing you've been avoiding.</p>
+                </div>
+                <textarea
+                  placeholder="What's really going on with your money right now?"
+                  value={tellAureusText}
+                  onChange={e => setTellAureusText(e.target.value)}
+                  style={{ ...inputStyle, width:'100%', height:'120px', resize:'none' as const, fontSize:'14px', lineHeight:1.6, marginBottom:'12px' }}
+                  autoFocus
+                />
+                <div style={{ padding:'10px 14px', background:theme.bg, borderRadius:'8px', marginBottom:'16px', fontSize:'12px', color:theme.textMuted, borderLeft:'3px solid '+theme.accent }}>
+                  Aureus doesn't care what your finances should look like. It cares what they actually look like.
+                </div>
+                <button onClick={async () => {
+                  if (!tellAureusText.trim()) return
+                  setTellAureusLoading(true)
+                  try {
+                    const res = await fetch('/api/budget-coach', {
+                      method:'POST', headers:{'Content-Type':'application/json'},
+                      body: JSON.stringify({
+                        mode: 'question',
+                        question: `[NO JUDGMENT ZONE] The user is being radically honest. Respond with radical acceptance first — acknowledge what they've shared without any judgment or "you should have". Then, if helpful, offer one practical thought. Keep it under 4 sentences. Their message: "${tellAureusText}"`,
+                        financialData: { income: incomeStreams, expenses },
+                        memory: budgetMemory, countryConfig: currentCountryConfig
+                      })
+                    })
+                    const data = await res.json()
+                    setTellAureusResponse(data.message || data.advice || '')
+                  } catch { setTellAureusResponse("I hear you. Let's work from exactly where you are.") }
+                  setTellAureusLoading(false)
+                }} disabled={!tellAureusText.trim() || tellAureusLoading}
+                  style={{ width:'100%', padding:'14px', background:'linear-gradient(135deg,#D4AF37,#BC6A1F)', color:'#111111', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:800, fontSize:'15px', opacity:!tellAureusText.trim()?0.5:1 }}>
+                  {tellAureusLoading ? '⏳ Aureus is listening...' : 'Tell Aureus →'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MONEY DEBRIEF ==================== */}
+      {showMoneyDebrief && (
+        <div style={{ position:'fixed' as const, top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.88)', zIndex:1055, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }} onClick={() => { if (!debriefLoading) { setShowMoneyDebrief(false); setDebriefEmotion(null); setDebriefText(''); setDebriefResponse(null) } }}>
+          <div style={{ background:theme.cardBg, borderRadius:'20px', padding:'28px', maxWidth:'480px', width:'100%' }} onClick={e => e.stopPropagation()}>
+            {debriefResponse ? (
+              <div>
+                <div style={{ color:theme.accent, fontSize:'11px', fontWeight:700, letterSpacing:'1px', marginBottom:'12px' }}>AUREUS · DAILY DEBRIEF</div>
+                <p style={{ color:theme.text, fontSize:'15px', lineHeight:1.7, margin:'0 0 20px' }}>{debriefResponse}</p>
+                <div style={{ display:'flex', gap:'10px' }}>
+                  <button onClick={() => { setActiveTab('chat'); setShowMoneyDebrief(false); setDebriefResponse(null) }} style={{ flex:1, padding:'12px', background:'transparent', border:'1px solid '+theme.accent+'40', borderRadius:'10px', color:theme.accent, cursor:'pointer', fontSize:'13px', fontWeight:600 }}>Keep talking →</button>
+                  <button onClick={() => { setShowMoneyDebrief(false); setDebriefEmotion(null); setDebriefText(''); setDebriefResponse(null) }} style={{ padding:'12px 16px', background:theme.accent, color:'#111111', border:'none', borderRadius:'10px', cursor:'pointer', fontWeight:700 }}>Done</button>
+                </div>
+              </div>
+            ) : !debriefEmotion ? (
+              <>
+                <div style={{ marginBottom:'20px' }}>
+                  <h3 style={{ color:theme.text, fontSize:'20px', margin:'0 0 8px', fontFamily:'Cinzel, serif' }}>Daily Money Debrief</h3>
+                  <p style={{ color:theme.textMuted, fontSize:'13px', margin:0, lineHeight:1.6 }}>How are you feeling about money today?</p>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'16px' }}>
+                  {[
+                    { emoji:'😤', label:'Stressed', color:'#e74c3c' },
+                    { emoji:'😌', label:'Confident', color:'#27ae60' },
+                    { emoji:'😔', label:'Guilty', color:'#8e44ad' },
+                    { emoji:'🏆', label:'Proud', color:'#D4AF37' },
+                    { emoji:'😤', label:'Frustrated', color:'#e67e22' },
+                    { emoji:'😬', label:'Anxious', color:'#3498db' },
+                    { emoji:'😐', label:'Numb', color:'#7f8c8d' },
+                    { emoji:'✨', label:'Excited', color:'#16a085' },
+                  ].map(opt => (
+                    <button key={opt.label} onClick={() => setDebriefEmotion(opt.label)}
+                      style={{ padding:'12px', background:theme.bg, border:'1px solid '+theme.border, borderRadius:'10px', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px', textAlign:'left' as const }}>
+                      <span style={{ fontSize:'20px' }}>{opt.emoji}</span>
+                      <span style={{ color:theme.text, fontSize:'13px', fontWeight:600 }}>{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setShowMoneyDebrief(false)} style={{ width:'100%', padding:'10px', background:'none', border:'none', color:theme.textMuted, cursor:'pointer', fontSize:'13px' }}>Not tonight</button>
+              </>
+            ) : (
+              <>
+                <div style={{ marginBottom:'16px' }}>
+                  <div style={{ color:theme.accent, fontSize:'11px', fontWeight:700, letterSpacing:'1px', marginBottom:'8px' }}>FEELING {debriefEmotion.toUpperCase()}</div>
+                  <p style={{ color:theme.textMuted, fontSize:'13px', margin:0, lineHeight:1.6 }}>What happened with money today? (You can be completely honest — no judgment here.)</p>
+                </div>
+                <textarea
+                  placeholder="Anything from 'paid a bill' to 'blew the budget on takeaway because I'm exhausted' — all of it helps Aureus understand."
+                  value={debriefText}
+                  onChange={e => setDebriefText(e.target.value)}
+                  style={{ ...inputStyle, width:'100%', height:'100px', resize:'none' as const, fontSize:'13px', lineHeight:1.6, marginBottom:'12px' }}
+                  autoFocus
+                />
+                <button onClick={async () => {
+                  setDebriefLoading(true)
+                  try {
+                    const context = debriefText.trim() ? `Feeling: ${debriefEmotion}. What happened: "${debriefText}"` : `Feeling: ${debriefEmotion}. No details provided.`
+                    const res = await fetch('/api/budget-coach', {
+                      method:'POST', headers:{'Content-Type':'application/json'},
+                      body: JSON.stringify({
+                        mode: 'question',
+                        question: `[DAILY MONEY DEBRIEF] The user has completed their daily money check-in. Respond with warmth and zero judgment. Acknowledge the emotion first. If they mentioned why they spent (e.g. exhaustion, stress), address THAT not just the money. Give one insight or one action — not both. Keep it under 4 sentences. Context: ${context}. Their financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, baby step ${currentBabyStep.step}.`,
+                        financialData: { income: incomeStreams, expenses },
+                        memory: budgetMemory, countryConfig: currentCountryConfig
+                      })
+                    })
+                    const data = await res.json()
+                    setDebriefResponse(data.message || data.advice || "That's real data. Thank you for the honest check-in.")
+                  } catch { setDebriefResponse("Thanks for checking in. That's how we keep the picture accurate.") }
+                  setDebriefLoading(false)
+                }} disabled={debriefLoading}
+                  style={{ width:'100%', padding:'14px', background:'linear-gradient(135deg,#D4AF37,#BC6A1F)', color:'#111111', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:800, fontSize:'15px' }}>
+                  {debriefLoading ? '⏳ Aureus is reading this...' : 'Submit debrief →'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MONEY MIRROR (monthly) ==================== */}
+      {showMoneyMirror && (
+        <div style={{ position:'fixed' as const, top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.88)', zIndex:1055, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }} onClick={() => { if (!mirrorLoading) { setShowMoneyMirror(false); setMirrorStory(''); setMirrorResponse(null) } }}>
+          <div style={{ background:theme.cardBg, borderRadius:'20px', padding:'28px', maxWidth:'520px', width:'100%' }} onClick={e => e.stopPropagation()}>
+            {mirrorResponse ? (
+              <div>
+                <div style={{ color:theme.accent, fontSize:'11px', fontWeight:700, letterSpacing:'1px', marginBottom:'12px' }}>THE MONEY MIRROR</div>
+                <div style={{ color:theme.text, fontSize:'15px', lineHeight:1.7, whiteSpace:'pre-wrap' as const }}>{mirrorResponse}</div>
+                <div style={{ display:'flex', gap:'10px', marginTop:'20px' }}>
+                  <button onClick={() => { setActiveTab('chat'); setShowMoneyMirror(false); setMirrorResponse(null) }} style={{ flex:1, padding:'12px', background:'transparent', border:'1px solid '+theme.accent+'40', borderRadius:'10px', color:theme.accent, cursor:'pointer', fontSize:'13px', fontWeight:600 }}>Explore in chat →</button>
+                  <button onClick={() => { setShowMoneyMirror(false); setMirrorStory(''); setMirrorResponse(null); setLastMirrorMonth(new Date().toISOString().slice(0,7)) }} style={{ padding:'12px 16px', background:theme.accent, color:'#111111', border:'none', borderRadius:'10px', cursor:'pointer', fontWeight:700 }}>Done</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ textAlign:'center' as const, marginBottom:'24px' }}>
+                  <div style={{ fontSize:'40px', marginBottom:'10px' }}>🪞</div>
+                  <h3 style={{ color:theme.accent, fontSize:'22px', margin:'0 0 8px', fontFamily:'Cinzel, serif' }}>The Money Mirror</h3>
+                  <p style={{ color:theme.textMuted, fontSize:'13px', margin:0, lineHeight:1.7 }}>What story are you telling yourself about money right now? Say it out loud — even if it's "I'm hopeless with money" or "I'll never get ahead." Aureus will reflect back what the evidence actually shows.</p>
+                </div>
+                <textarea
+                  placeholder="What story are you telling yourself about money right now?"
+                  value={mirrorStory}
+                  onChange={e => setMirrorStory(e.target.value)}
+                  style={{ ...inputStyle, width:'100%', height:'100px', resize:'none' as const, fontSize:'14px', lineHeight:1.6, marginBottom:'16px' }}
+                  autoFocus
+                />
+                <button onClick={async () => {
+                  if (!mirrorStory.trim()) return
+                  setMirrorLoading(true)
+                  try {
+                    const evidence = [
+                      wins.length > 0 ? `${wins.length} financial wins logged` : '',
+                      streak >= 3 ? `${streak}-day engagement streak` : '',
+                      debts.some((d: any) => parseFloat(d.balance||'0') < parseFloat(d.originalBalance||d.balance||'1') * 0.95) ? 'Has reduced at least one debt balance' : '',
+                      emergencyFund >= 1000 ? `$${emergencyFund.toFixed(0)} emergency fund built` : '',
+                      monthlySurplus > 0 ? `$${monthlySurplus.toFixed(0)}/month surplus` : '',
+                      goals.some((g: any) => parseFloat(g.savedAmount||'0') > 0) ? 'Making progress on savings goals' : '',
+                    ].filter(Boolean).join('; ')
+                    const res = await fetch('/api/budget-coach', {
+                      method:'POST', headers:{'Content-Type':'application/json'},
+                      body: JSON.stringify({
+                        mode: 'question',
+                        question: `[MONEY MIRROR] The user has shared the story they tell themselves about money: "${mirrorStory}".  Evidence from their actual financial data: ${evidence || 'Limited data available'}. Saving rate: ${Math.round((monthlyGoalSavings/Math.max(1,monthlyIncome))*100)}% | Baby step: ${currentBabyStep.step} | Net worth: $${netWorth.toLocaleString()}  Your job: Reflect back what the data actually shows. If their story is harsher than reality, gently show them evidence that contradicts it. If their story matches reality, acknowledge it honestly and then offer one specific, achievable reframe. Don't be falsely positive — be accurate. 3-5 sentences max. No bullet points.`,
+                        financialData: { income: incomeStreams, expenses },
+                        memory: budgetMemory, countryConfig: currentCountryConfig
+                      })
+                    })
+                    const data = await res.json()
+                    setMirrorResponse(data.message || data.advice || '')
+                  } catch { setMirrorResponse("Let's look at this together. The story you tell yourself about money matters more than most people realise.") }
+                  setMirrorLoading(false)
+                }} disabled={!mirrorStory.trim() || mirrorLoading}
+                  style={{ width:'100%', padding:'14px', background:'linear-gradient(135deg,#D4AF37,#BC6A1F)', color:'#111111', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:800, fontSize:'15px', opacity:!mirrorStory.trim()?0.5:1 }}>
+                  {mirrorLoading ? '⏳ Reflecting...' : 'Show me the mirror →'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ==================== RETURN VISIT CARD ==================== */}
       {returnCard && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1090, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setReturnCard(null)}>
@@ -9461,7 +9446,7 @@ Each insight: one sentence, starts with an emoji, references actual numbers from
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 mode: 'question',
-                question: `Weekly spending check-in from ${userName || 'user'}. Spending so far this month: ${lines}. Monthly income $${monthlyIncome.toFixed(0)}, surplus $${monthlySurplus.toFixed(0)}. Give ONE short sentence of coaching — direct, specific, encouraging. No bullet points. Max 25 words.`,
+                question: `Weekly spending check-in from ${userName || 'user'}. Spending this month: ${lines}. Monthly income $${monthlyIncome.toFixed(0)}, surplus $${monthlySurplus.toFixed(0)}, baby step ${currentBabyStep.step}.  Give ONE coaching response — max 30 words. Use STORY LANGUAGE (e.g. "You've bought back X weeks of freedom" not just numbers). Zero judgment. If they're over budget somewhere, acknowledge and give ONE specific redirect. If they're on track, celebrate it specifically.`,
                 financialData: { income: incomeStreams, expenses },
                 memory: budgetMemory,
                 countryConfig: currentCountryConfig
@@ -9972,6 +9957,15 @@ Tracking with Aureus 🏛️`
                       <option value="fortnightly">Fortnightly</option>
                     </select>
                   </div>
+                  <div style={{ padding: '12px 14px', background: theme.accent + '08', borderRadius: '10px', border: '1px solid ' + theme.accent + '20' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={monthlyMealPlanOptIn} onChange={e => setMonthlyMealPlanOptIn(e.target.checked)} style={{ accentColor: theme.accent, marginTop: '2px', flexShrink: 0 }} />
+                      <div>
+                        <div style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>🍽️ Monthly meal plan email</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '2px', lineHeight: 1.5 }}>Receive a 7-day budget meal plan on the 1st of each month, tailored to your household size and grocery budget. No app needed — straight to your inbox.</div>
+                      </div>
+                    </label>
+                  </div>
                 </div>
                 <div style={{ padding:'12px 14px', background:theme.bg, borderRadius:'10px', border:'1px solid '+theme.border, marginBottom:'16px', fontSize:'12px', color:theme.textMuted }}>
                   📧 They'll receive: your saving rate, surplus, top goal progress, recent win, and your next coach action. Nothing sensitive. Just progress.
@@ -10115,7 +10109,13 @@ Tracking with Aureus 🏛️`
           if (!userToken) { userToken = 'aureus_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('aureus_user_token', userToken) }
           const topGoal = goals[0]
           const topWin = wins.slice(-1)[0]
-          const upcomingBills = upcoming.slice(0, 10).map((u: any) => ({ name: u.name, amount: u.amount, dayOffset: u.dayOffset }))
+          const upcomingBills = upcoming.slice(0, 14).map((u: any) => ({
+                name: u.name,
+                amount: u.amount,
+                dayOffset: u.dayOffset,
+                automatic: u.automatic || hasAutomatedPayments || false,
+                itemType: u.itemType
+              })).filter((u: any) => u.itemType === 'expense')
           try {
             await fetch('/api/save-notification-prefs', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -10123,6 +10123,11 @@ Tracking with Aureus 🏛️`
                 userToken, email: notificationEmail, userName,
                 frequency: emailNotifFrequency,
                 notifyWeeklySnapshot: true, notifyOverdueBills: true, notifyMoneyDate: true,
+                notifyMonthlyMealPlan: monthlyMealPlanOptIn,
+                householdSize: parseInt(mealPlanPrefs?.people || '4'),
+                mealBudget: parseInt(mealPlanPrefs?.budget || '150'),
+                mealDislikes: mealPlanPrefs?.dislikes || '',
+                mealDietary: mealPlanPrefs?.dietaryNeeds || '',
                 moneyDateDay: checkInSchedule.moneyDateDay || 'Sunday',
                 moneyDateTime: checkInSchedule.moneyDateTime || '18:00',
                 savingRate: Math.round((monthlyGoalSavings / Math.max(1, monthlyIncome)) * 100),
