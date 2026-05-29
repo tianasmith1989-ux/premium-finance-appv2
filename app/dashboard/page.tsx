@@ -1763,37 +1763,38 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
   // ── COMPLIANCE OUTPUT FILTER (Part A decision test) ──
   // Checks AI responses for advice-like content before displaying
   const checkComplianceFilter = (text: string): { safe: boolean; rewrite?: string } => {
-    const lower = text.toLowerCase()
-
-    // Don't flag responses that are already declining — they contain the right words but are safe
+    // Don't flag responses already declining properly
     const isAlreadyDeclining = (
-      lower.includes("not licensed") ||
-      lower.includes("isn't licensed") ||
-      lower.includes("aureus isn't") ||
-      lower.includes("can't give") ||
-      lower.includes("cannot give") ||
-      lower.includes("financial advice and aureus") ||
-      lower.includes("speak with a licensed") ||
-      lower.includes("moneysmart") ||
-      lower.includes("yoursuper")
+      text.includes("not licensed") ||
+      text.includes("isn't licensed") ||
+      text.includes("Aureus isn't") ||
+      text.includes("can't give financial advice") ||
+      text.includes("financial advice and Aureus") ||
+      (text.includes("speak with a licensed") && !text.includes("should")) ||
+      text.includes("moneysmart.gov.au") ||
+      text.includes("yoursuper.gov.au")
     )
     if (isAlreadyDeclining) return { safe: true }
 
-    // Only flag if actually recommending/evaluating a named product
-    const productAdvicePatterns = [
-      /\b(you should|i'd recommend|i recommend|my recommendation|go with|switch to|move to|get the|invest in)\b.{0,80}(super|fund|etf|shares|stock|loan|mortgage|credit card|bnpl)/i,
-      /\b(aussuper|australian super|vanguard|betashares|raiz|spaceship|ubank|ing|macquarie).{0,60}(is (a )?(good|great|best|solid|strong|worth|excellent)|i'?d (choose|pick|recommend|go with))/i,
-      /\byou (can|could) claim.{0,30}(deduction|as a deduction)/i,
-      /\breduce your tax\b.{0,40}(by|through|if you|with)/i,
-      /\bstructure.{0,30}(to (minimise|reduce|save on) tax)/i,
-      /\bshould (refinance|pay off|consolidate|get a|apply for).{0,40}(loan|mortgage|card|credit)/i,
+    // Patterns that indicate actual product advice slipped through
+    const advicePatterns = [
+      // Evaluating a named fund/product
+      /\b(australiansuper|aust(?:ralian)? super|vanguard|betashares|raiz|spaceship|commsec|ubank|ing direct|macquarie|hostplus|sunsuper|rest super|cbus|hesta)\b.{0,100}(well.?regarded|competitive|strong (returns?|performance)|solid|good (choice|option|fund)|known for|one of the (best|top|largest))/i,
+      // "My suggestion" or "I suggest/recommend" about a product
+      /\bmy (suggestion|recommendation|advice)\b.{0,60}(super|fund|etf|shares|loan|card|invest)/i,
+      /\b(i'?d |you should |i suggest |i recommend ).{0,80}(super|fund|etf|shares|loan|mortgage|credit card|switch|move|invest)/i,
+      // Tax advice
+      /\byou (can|could|should) claim.{0,40}(deduction|as a tax|on your tax)/i,
+      /\breduce (your )?tax\b.{0,60}(by|through|structur|if you|consider)/i,
+      // Credit advice
+      /\b(should|i'?d) (refinance|consolidate|get a|pay off the card|apply for).{0,40}(loan|mortgage|card|credit)/i,
     ]
 
-    const hasActualAdvice = productAdvicePatterns.some(p => p.test(text))
+    const hasActualAdvice = advicePatterns.some(p => p.test(text))
     if (hasActualAdvice) {
       return {
         safe: false,
-        rewrite: "That question touches on financial product recommendations — I'm not licensed to give those. I can show you your own numbers and point you to the right tools, but for product decisions please speak with a licensed financial adviser. Want me to show you what the ATO's YourSuper tool or ASIC's Moneysmart can help with instead?"
+        rewrite: `I need to step back — I'm not licensed to give financial product recommendations, and my response was crossing that line.\n\nWhat I can do: show you your own tracked numbers, explain how things work, and point you to the right tools.\n\n**For comparing super funds:** Use the ATO's [YourSuper tool](https://yoursuper.gov.au) — it shows fees and net returns side by side across all funds.\n\n**For product decisions:** A licensed financial adviser can assess your specific situation.\n\nWant me to show you what's tracked in your Aureus data instead?`
       }
     }
     return { safe: true }
@@ -1827,6 +1828,33 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
       setRecipeError(e?.message || 'Could not load recipe. Check that /api/recipe/route.ts is deployed.')
     }
     setFetchingRecipe(null)
+  }
+
+  // ── Chat message markdown renderer (handles links, bold, bullets) ──
+  const renderChatMessage = (content: string, isUser: boolean) => {
+    if (isUser) return <span>{content}</span>
+    const lines = content.split('\n')
+    return (
+      <>
+        {lines.map((line, i) => {
+          const withLinks = line.replace(
+            /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+            (_: string, text: string, url: string) => `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:${theme.accent};text-decoration:underline;font-weight:600;">${text}</a>`
+          )
+          const withBold = withLinks.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight:700;">$1</strong>')
+          if (line.startsWith('• ') || line.startsWith('- ')) {
+            return (
+              <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '2px' }}>
+                <span style={{ color: theme.accent, flexShrink: 0, marginTop: '1px' }}>•</span>
+                <span dangerouslySetInnerHTML={{ __html: withBold.replace(/^[•\-]\s/, '') }} />
+              </div>
+            )
+          }
+          if (line.trim() === '') return <div key={i} style={{ height: '6px' }} />
+          return <div key={i} dangerouslySetInnerHTML={{ __html: withBold }} style={{ marginBottom: '1px' }} />
+        })}
+      </>
+    )
   }
 
   const generateMealPlan = async () => {
@@ -5646,7 +5674,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                 <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
                   {chatMessages.slice(-6).map((msg, idx) => (
                     <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                      <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
+                      <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5 }}>{renderChatMessage(msg.content, msg.role === 'user')}</div>
                     </div>
                   ))}
                   {isLoading && <div style={{ padding: '8px', color: theme.textMuted, fontSize: '13px' }}>Aureus is thinking...</div>}
@@ -5863,7 +5891,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                 {chatMessages.map((msg, idx) => (
                   <div key={idx} style={{ marginBottom: '16px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                     <div style={{ maxWidth: '85%' }}>
-                      <div style={{ padding: '14px 18px', borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? '#111111' : theme.text, fontSize: '15px', lineHeight: 1.6, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
+                      <div style={{ padding: '14px 18px', borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? '#111111' : theme.text, fontSize: '15px', lineHeight: 1.6 }}>{renderChatMessage(msg.content, msg.role === 'user')}</div>
                       {msg.usedWebSearch && (
                         <div style={{ marginTop: '4px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                           <span style={{ fontSize: '10px', color: theme.accent, padding: '2px 8px', background: theme.accent + '15', borderRadius: '10px', border: '1px solid ' + theme.accent + '30' }}>🔍 Live web data</span>
@@ -7605,7 +7633,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                 <div ref={chatContainerRef} style={{ maxHeight: '200px', overflowY: 'auto' as const, marginBottom: '12px', padding: '8px', background: darkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
                   {chatMessages.slice(-6).map((msg, idx) => (
                     <div key={idx} style={{ marginBottom: '10px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                      <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5, whiteSpace: 'pre-wrap' as const }}>{msg.content}</div>
+                      <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? 'white' : theme.text, fontSize: '13px', lineHeight: 1.5 }}>{renderChatMessage(msg.content, msg.role === 'user')}</div>
                     </div>
                   ))}
                   {isLoading && <div style={{ padding: '8px', color: theme.textMuted, fontSize: '13px' }}>Aureus is thinking...</div>}
