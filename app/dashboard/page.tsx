@@ -2016,8 +2016,10 @@ ${mortgageAccel.balance ? (() => {
         const bal = parseFloat(mortgageAccel.balance || '0')
         const annualRate = parseFloat(mortgageAccel.rate || '0') / 100
         const weeklyRate = annualRate / 52
-        const weeklyPay = parseFloat(mortgageAccel.weeklyPayment || mortgageAccel.payment || '0')
-        const monthlyPay = parseFloat(mortgageAccel.monthlyPayment || '0') || weeklyPay * 52 / 12
+        const currentRepayment = parseFloat(mortgageAccel.currentRepayment || '0')
+        const repaymentFreq = mortgageAccel.repaymentFrequency || 'monthly'
+        const weeklyPay = repaymentFreq === 'weekly' ? currentRepayment : repaymentFreq === 'fortnightly' ? currentRepayment / 2 : currentRepayment * 12 / 52
+        const monthlyPay = repaymentFreq === 'monthly' ? currentRepayment : weeklyPay * 52 / 12
 
         // Calculate months to payoff
         const calcMonths = (balance: number, monthlyPayment: number, monthlyRate: number): number => {
