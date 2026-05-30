@@ -198,6 +198,39 @@ export default function Dashboard() {
   const [mirrorResponse, setMirrorResponse] = useState<string | null>(null)
   const [mirrorLoading, setMirrorLoading] = useState(false)
   const [lastMirrorMonth, setLastMirrorMonth] = useState<string | null>(null)
+
+  // ==================== CHANGE PSYCHOLOGY SYSTEM ====================
+  // The Dickens Process
+  const [showDickens, setShowDickens] = useState(false)
+  const [dickensStep, setDickensStep] = useState(0)
+  const [dickensAnswers, setDickensAnswers] = useState<string[]>([])
+  const [dickensInput, setDickensInput] = useState('')
+  const [dickensResponse, setDickensResponse] = useState<string | null>(null)
+  const [dickensLoading, setDickensLoading] = useState(false)
+
+  // Values elicitation
+  const [showValuesElicitation, setShowValuesElicitation] = useState(false)
+  const [valuesStep, setValuesStep] = useState(0)
+  const [valuesAnswers, setValuesAnswers] = useState<Record<string, string>>({})
+  const [valuesInput, setValuesInput] = useState('')
+  const [coreValues, setCoreValues] = useState<string[]>([])
+  const [identityStatement, setIdentityStatement] = useState('')
+  const [valuesLoading, setValuesLoading] = useState(false)
+
+  // Should → Must (gap question + leverage finder)
+  const [showShouldToMust, setShowShouldToMust] = useState(false)
+  const [shouldToMustStep, setShouldToMustStep] = useState(0)
+  const [shouldToMustAnswers, setShouldToMustAnswers] = useState<string[]>([])
+  const [shouldToMustInput, setShouldToMustInput] = useState('')
+  const [shouldToMustResponse, setShouldToMustResponse] = useState<string | null>(null)
+  const [shouldToMustLoading, setShouldToMustLoading] = useState(false)
+  const [mustStatement, setMustStatement] = useState('')
+
+  // Compelling future visualisation
+  const [showCompellingFuture, setShowCompellingFuture] = useState(false)
+  const [futureVision, setFutureVision] = useState('')
+  const [futureResponse, setFutureResponse] = useState<string | null>(null)
+  const [futureLoading, setFutureLoading] = useState(false)
   const [fetchingRecipe, setFetchingRecipe] = useState<string | null>(null)
   const [recipeModal, setRecipeModal] = useState<{ meal: string; text: string } | null>(null)
 
@@ -5310,6 +5343,34 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                 )
               })()}
 
+              {/* ── CHANGE PSYCHOLOGY ENTRY POINTS ── */}
+              {onboardingComplete && (
+                <div style={{ padding: '20px 22px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}>
+                  <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '14px' }}>⚡ CHANGE WORK</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    {[
+                      { icon: '🕯️', title: 'The Dickens Process', desc: 'See the real cost of inaction', action: () => { setDickensStep(0); setDickensAnswers([]); setDickensResponse(null); setDickensInput(''); setShowDickens(true) } },
+                      { icon: '🧭', title: 'Find Your Values', desc: 'Turn "should" into "must"', action: () => { setValuesStep(0); setValuesAnswers({}); setValuesInput(''); setShowValuesElicitation(true) } },
+                      { icon: '🌅', title: 'Compelling Future', desc: 'Make your vision visceral', action: () => { setFutureVision(''); setFutureResponse(null); setShowCompellingFuture(true) } },
+                      { icon: '🪞', title: 'Money Mirror', desc: 'Rewrite your money story', action: () => { setMirrorStory(''); setMirrorResponse(null); setShowMoneyMirror(true) } },
+                    ].map((item, i) => (
+                      <button key={i} onClick={item.action}
+                        style={{ padding: '14px 12px', background: theme.bg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'left' as const, transition: 'border-color 0.2s' }}>
+                        <div style={{ fontSize: '22px', marginBottom: '6px' }}>{item.icon}</div>
+                        <div style={{ color: theme.text, fontSize: '13px', fontWeight: 700, marginBottom: '2px' }}>{item.title}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px' }}>{item.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                  {identityStatement && (
+                    <div style={{ marginTop: '12px', padding: '10px 14px', background: theme.accent + '10', borderRadius: '8px', border: '1px solid ' + theme.accent + '25' }}>
+                      <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, marginBottom: '4px' }}>YOUR IDENTITY</div>
+                      <div style={{ color: theme.text, fontSize: '13px', fontStyle: 'italic' }}>"{identityStatement}"</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ── MONEY MIRROR — monthly reflection ── */}
               {onboardingComplete && monthlyIncome > 0 && (() => {
                 const thisMonth = new Date().toISOString().slice(0, 7)
@@ -9271,6 +9332,314 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                 <button onClick={() => togglePaid(item.itemId, item)} style={{ padding: '8px 16px', background: item.isPaid ? '#6b7280' : theme.success, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{item.isPaid ? '✓ Done' : 'Mark Done'}</button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== THE DICKENS PROCESS ==================== */}
+      {showDickens && (() => {
+        const dickensQuestions = [
+          {
+            q: "What has your current relationship with money already cost you?",
+            sub: "Think honestly — relationships, opportunities, stress, things you didn't do, experiences you missed, who you haven't become yet.",
+            placeholder: "Be honest. This is just for you."
+          },
+          {
+            q: "What is it costing you right now?",
+            sub: "Not just money — your peace of mind, your confidence, your relationship, your options. What is the daily cost of staying where you are?",
+            placeholder: "What does staying here cost you every single day?"
+          },
+          {
+            q: "If nothing changes — if you're still in this exact financial position in 5 years — what does your life look like?",
+            sub: "Be specific. Where are you living? What are you doing? How do you feel? Who have you become?",
+            placeholder: "Describe that life honestly..."
+          },
+          {
+            q: "And in 10 years. Nothing has changed. Same patterns, same avoidance, same story.",
+            sub: "What has that cost the people you love? What have you given up? Who are you?",
+            placeholder: "Paint that picture clearly..."
+          },
+          {
+            q: "Now flip it. If you changed everything — starting today — what does your life look like in 5 years?",
+            sub: "Make it real. Specific. What do you have, what do you do, how do you feel, who have you become?",
+            placeholder: "Describe the life you're capable of building..."
+          }
+        ]
+        const isComplete = dickensStep >= dickensQuestions.length
+        const currentQ = isComplete ? null : dickensQuestions[dickensStep]
+
+        const handleDickensNext = async () => {
+          const newAnswers = [...dickensAnswers, dickensInput]
+          setDickensAnswers(newAnswers)
+          setDickensInput('')
+
+          if (newAnswers.length >= dickensQuestions.length) {
+            // Generate the synthesis
+            setDickensLoading(true)
+            try {
+              const res = await fetch('/api/budget-coach', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  mode: 'question',
+                  question: `[DICKENS PROCESS — CHANGE PSYCHOLOGY]
+The user has just completed a deep reflection exercise based on the cost of inaction vs the reward of change.
+
+Their name: ${userName || 'Builder'}
+Their financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, baby step ${currentBabyStep.step}, ${debts.length > 0 ? 'has debt' : 'debt free'}
+
+Their 5 answers:
+1. What has this pattern already cost them: "${newAnswers[0]}"
+2. What it costs them right now: "${newAnswers[1]}"
+3. Life in 5 years if nothing changes: "${newAnswers[2]}"
+4. Life in 10 years if nothing changes: "${newAnswers[3]}"
+5. Life in 5 years if they change everything: "${newAnswers[4]}"
+
+Write a powerful, personal synthesis. Your job:
+- Reflect back what they said with emotional weight — make the cost of inaction visceral
+- Name the specific gap between their "nothing changes" future and their "everything changes" future
+- Identify the single most powerful reason change must happen NOW, not someday
+- End with ONE concrete first action they can take TODAY from their Aureus data
+- Write as if you're speaking directly to them. No bullet points. 4-6 sentences. Raw and real.
+- Do NOT give financial product advice. Stay in coaching/psychology territory.`,
+                  financialData: { income: incomeStreams, expenses, debts, goals },
+                  memory: budgetMemory, countryConfig: currentCountryConfig
+                })
+              })
+              const data = await res.json()
+              setDickensResponse(data.message || data.advice || '')
+            } catch { setDickensResponse('The gap between those two futures is real. The only question is which one you choose.') }
+            setDickensLoading(false)
+          } else {
+            setDickensStep(dickensStep + 1)
+          }
+        }
+
+        return (
+          <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 1055, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => { if (!dickensLoading) setShowDickens(false) }}>
+            <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '32px 28px', maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+              {dickensResponse ? (
+                <div>
+                  <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '16px' }}>THE DICKENS PROCESS</div>
+                  <div style={{ padding: '20px', background: theme.bg, borderRadius: '14px', border: '1px solid ' + theme.accent + '30', marginBottom: '20px' }}>
+                    <p style={{ color: theme.text, fontSize: '15px', lineHeight: 1.8, margin: 0, whiteSpace: 'pre-wrap' as const }}>{dickensResponse}</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button onClick={() => { setActiveTab('chat'); setShowDickens(false) }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid ' + theme.accent + '40', borderRadius: '10px', color: theme.accent, cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>Talk to Aureus →</button>
+                    <button onClick={() => { setShowDickens(false); setDickensStep(0); setDickensAnswers([]); setDickensResponse(null) }} style={{ padding: '12px 20px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 800 }}>I'm ready</button>
+                  </div>
+                </div>
+              ) : dickensLoading ? (
+                <div style={{ textAlign: 'center' as const, padding: '40px 0' }}>
+                  <div style={{ fontSize: '40px', marginBottom: '16px' }}>🪞</div>
+                  <div style={{ color: theme.textMuted, fontSize: '14px' }}>Aureus is processing your answers...</div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div>
+                      <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>THE DICKENS PROCESS · {dickensStep + 1} of {dickensQuestions.length}</div>
+                      <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+                        {dickensQuestions.map((_, i) => (
+                          <div key={i} style={{ width: '24px', height: '3px', borderRadius: '2px', background: i < dickensStep ? theme.accent : i === dickensStep ? theme.accent + '60' : theme.border }} />
+                        ))}
+                      </div>
+                    </div>
+                    <button onClick={() => setShowDickens(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '20px' }}>×</button>
+                  </div>
+                  <h3 style={{ color: theme.text, fontSize: '20px', fontWeight: 800, margin: '0 0 10px 0', lineHeight: 1.3, fontFamily: 'Cinzel, serif' }}>{currentQ?.q}</h3>
+                  <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, margin: '0 0 20px 0' }}>{currentQ?.sub}</p>
+                  <textarea
+                    placeholder={currentQ?.placeholder}
+                    value={dickensInput}
+                    onChange={e => setDickensInput(e.target.value)}
+                    style={{ ...inputStyle, width: '100%', height: '120px', resize: 'none' as const, fontSize: '14px', lineHeight: 1.6, marginBottom: '16px' }}
+                    autoFocus
+                  />
+                  <button onClick={() => { if (dickensInput.trim()) handleDickensNext() }}
+                    disabled={!dickensInput.trim()}
+                    style={{ width: '100%', padding: '14px', background: dickensInput.trim() ? 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)' : theme.border, color: dickensInput.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '12px', cursor: dickensInput.trim() ? 'pointer' : 'default', fontWeight: 800, fontSize: '15px' }}>
+                    {dickensStep < dickensQuestions.length - 1 ? 'Next →' : 'Complete the process →'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ==================== VALUES ELICITATION ==================== */}
+      {showValuesElicitation && (() => {
+        const valuesQs = [
+          { key: 'topValue', q: "What's most important to you in life?", sub: "Not what should be — what actually is. Family, freedom, security, adventure, status, legacy, love, contribution. What drives you?", placeholder: "Be honest about what actually moves you..." },
+          { key: 'moneyMeaning', q: `And when you think about money in relation to ${valuesAnswers.topValue || 'that'} — what does having financial freedom give you?`, sub: "Not the money itself. What does it enable? What does it protect? What does it create?", placeholder: "Money is a vehicle. Where does it take you?" },
+          { key: 'currentGap', q: "Right now, on a scale of 1-10 — how aligned is your relationship with money with what you just said?", sub: "1 = completely misaligned, 10 = living it fully. Be honest.", placeholder: "Give me a number and tell me why..." },
+          { key: 'mustReason', q: `What would have to be true for getting your finances right to become a MUST — not a should, not a someday — but a must?`, sub: "Find the reason that makes inaction unbearable. It's usually connected to someone you love or something you refuse to lose.", placeholder: "What makes this non-negotiable?" },
+        ]
+
+        const currentVQ = valuesQs[valuesStep]
+        const isComplete = valuesStep >= valuesQs.length
+
+        const handleValuesNext = async () => {
+          const newAnswers = { ...valuesAnswers, [currentVQ.key]: valuesInput }
+          setValuesAnswers(newAnswers)
+          setValuesInput('')
+
+          if (valuesStep >= valuesQs.length - 1) {
+            setValuesLoading(true)
+            try {
+              const res = await fetch('/api/budget-coach', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  mode: 'question',
+                  question: `[VALUES ELICITATION — IDENTITY CREATION]
+User: ${userName || 'Builder'}
+Their core value: "${newAnswers.topValue}"
+What money enables for them: "${newAnswers.moneyMeaning}"
+Current alignment score: "${newAnswers.currentGap}"
+Their "must" reason: "${newAnswers.mustReason}"
+Financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, baby step ${currentBabyStep.step}
+
+Your job — three things:
+1. Reflect their values back powerfully — show them you heard what actually matters to them
+2. Connect their "must reason" to their specific Aureus numbers (e.g. "At $X surplus/month, you can have Y in Z months")
+3. Help them write their IDENTITY STATEMENT — "I am someone who..." that captures who they're becoming, not who they've been
+
+Format:
+- Para 1: Powerful reflection of their values and what money really means to them (2-3 sentences)
+- Para 2: Connect to their numbers — what's possible (1-2 sentences, no product advice)
+- "Your identity statement: I am someone who..." (complete this for them based on their answers)
+
+Raw and personal. No generic motivation. Use their actual words back at them.`,
+                  financialData: { income: incomeStreams, expenses, debts, goals },
+                  memory: budgetMemory, countryConfig: currentCountryConfig
+                })
+              })
+              const data = await res.json()
+              const response = data.message || data.advice || ''
+              // Extract identity statement if present
+              const identityMatch = response.match(/I am someone who[^.]+\./i)
+              if (identityMatch) setIdentityStatement(identityMatch[0])
+              setCoreValues([newAnswers.topValue, newAnswers.mustReason].filter(Boolean))
+              setValuesAnswers({ ...newAnswers, synthesis: response })
+            } catch {}
+            setValuesLoading(false)
+            setValuesStep(valuesStep + 1)
+          } else {
+            setValuesStep(valuesStep + 1)
+          }
+        }
+
+        return (
+          <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 1055, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowValuesElicitation(false)}>
+            <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '32px 28px', maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto' as const }} onClick={e => e.stopPropagation()}>
+              {valuesLoading ? (
+                <div style={{ textAlign: 'center' as const, padding: '40px 0' }}>
+                  <div style={{ fontSize: '40px', marginBottom: '16px' }}>✨</div>
+                  <div style={{ color: theme.textMuted, fontSize: '14px' }}>Building your identity statement...</div>
+                </div>
+              ) : isComplete ? (
+                <div>
+                  <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '16px' }}>YOUR VALUES · COMPLETE</div>
+                  {valuesAnswers.synthesis && (
+                    <div style={{ padding: '20px', background: theme.bg, borderRadius: '14px', border: '1px solid ' + theme.accent + '30', marginBottom: '16px' }}>
+                      <p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.8, margin: 0 }}>{valuesAnswers.synthesis}</p>
+                    </div>
+                  )}
+                  {identityStatement && (
+                    <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, ' + theme.accent + '15, transparent)', border: '2px solid ' + theme.accent + '40', borderRadius: '12px', marginBottom: '20px' }}>
+                      <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>YOUR IDENTITY STATEMENT</div>
+                      <div style={{ color: theme.text, fontSize: '16px', fontWeight: 700, lineHeight: 1.5, fontStyle: 'italic' }}>"{identityStatement}"</div>
+                    </div>
+                  )}
+                  <button onClick={() => { setShowValuesElicitation(false); setValuesStep(0) }} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '15px' }}>
+                    This is who I am now →
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div>
+                      <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>VALUES ELICITATION · {valuesStep + 1} of {valuesQs.length}</div>
+                      <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+                        {valuesQs.map((_, i) => <div key={i} style={{ width: '24px', height: '3px', borderRadius: '2px', background: i < valuesStep ? theme.accent : i === valuesStep ? theme.accent + '60' : theme.border }} />)}
+                      </div>
+                    </div>
+                    <button onClick={() => setShowValuesElicitation(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '20px' }}>×</button>
+                  </div>
+                  <h3 style={{ color: theme.text, fontSize: '20px', fontWeight: 800, margin: '0 0 10px 0', lineHeight: 1.3, fontFamily: 'Cinzel, serif' }}>{currentVQ.q}</h3>
+                  <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, margin: '0 0 20px 0' }}>{currentVQ.sub}</p>
+                  <textarea placeholder={currentVQ.placeholder} value={valuesInput} onChange={e => setValuesInput(e.target.value)}
+                    style={{ ...inputStyle, width: '100%', height: '100px', resize: 'none' as const, fontSize: '14px', lineHeight: 1.6, marginBottom: '16px' }} autoFocus />
+                  <button onClick={() => { if (valuesInput.trim()) handleValuesNext() }} disabled={!valuesInput.trim()}
+                    style={{ width: '100%', padding: '14px', background: valuesInput.trim() ? 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)' : theme.border, color: valuesInput.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '12px', cursor: valuesInput.trim() ? 'pointer' : 'default', fontWeight: 800, fontSize: '15px' }}>
+                    {valuesStep < valuesQs.length - 1 ? 'Next →' : 'Create my identity →'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ==================== COMPELLING FUTURE ==================== */}
+      {showCompellingFuture && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 1055, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowCompellingFuture(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '32px 28px', maxWidth: '520px', width: '100%' }} onClick={e => e.stopPropagation()}>
+            {futureResponse ? (
+              <div>
+                <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '16px' }}>YOUR COMPELLING FUTURE</div>
+                <div style={{ padding: '20px', background: theme.bg, borderRadius: '14px', border: '1px solid ' + theme.accent + '30', marginBottom: '20px' }}>
+                  <p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.8, margin: 0 }}>{futureResponse}</p>
+                </div>
+                <button onClick={() => { setShowCompellingFuture(false); setFutureResponse(null); setFutureVision('') }}
+                  style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '15px' }}>
+                  This is where I'm going →
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: '40px', textAlign: 'center' as const, marginBottom: '16px' }}>🌅</div>
+                <h3 style={{ color: theme.text, fontSize: '22px', fontWeight: 800, margin: '0 0 8px 0', textAlign: 'center' as const, fontFamily: 'Cinzel, serif' }}>Your Compelling Future</h3>
+                <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, margin: '0 0 20px 0', textAlign: 'center' as const }}>
+                  It's five years from today. You made the changes. Everything worked out. Describe your life in as much detail as you can — where you are, what you're doing, who you're with, how you feel. Make it real.
+                </p>
+                <textarea placeholder="Five years from now, I am..." value={futureVision} onChange={e => setFutureVision(e.target.value)}
+                  style={{ ...inputStyle, width: '100%', height: '140px', resize: 'none' as const, fontSize: '14px', lineHeight: 1.6, marginBottom: '16px' }} autoFocus />
+                <button onClick={async () => {
+                  if (!futureVision.trim()) return
+                  setFutureLoading(true)
+                  try {
+                    const res = await fetch('/api/budget-coach', {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        mode: 'question',
+                        question: `[COMPELLING FUTURE VISUALISATION]
+User: ${userName || 'Builder'}
+Their 5-year vision: "${futureVision}"
+Current situation: surplus $${monthlySurplus.toFixed(0)}/mo, baby step ${currentBabyStep.step}, net worth $${netWorth.toLocaleString()}
+Core values: ${coreValues.join(', ') || 'not yet elicited'}
+
+Your job:
+1. Amplify their vision — add vivid, specific detail that makes it feel real and close
+2. Connect their Aureus numbers to that future — what needs to happen financially to get there (no product advice — just their own data and timelines)
+3. Name the single most important financial habit that bridges where they are to where they described
+4. End with: "Your first step today is..." — one specific thing from their Aureus data
+
+Write as if speaking directly to them. Personal, warm, specific, inspiring but grounded in reality. 5-7 sentences.`,
+                        financialData: { income: incomeStreams, expenses, debts, goals },
+                        memory: budgetMemory, countryConfig: currentCountryConfig
+                      })
+                    })
+                    const data = await res.json()
+                    setFutureResponse(data.message || data.advice || '')
+                  } catch { setFutureResponse('That future is more achievable than you think. The gap between here and there is bridged by consistent decisions, not perfect ones.') }
+                  setFutureLoading(false)
+                }} disabled={!futureVision.trim() || futureLoading}
+                  style={{ width: '100%', padding: '14px', background: futureVision.trim() ? 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)' : theme.border, color: futureVision.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '12px', cursor: futureVision.trim() ? 'pointer' : 'default', fontWeight: 800, fontSize: '15px' }}>
+                  {futureLoading ? '⏳ Building your future...' : 'Show me how to get there →'}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
