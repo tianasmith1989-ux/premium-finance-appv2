@@ -2012,6 +2012,20 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
       }
     }
 
+    // ── Detect stuck/win patterns → invite change work ──
+    const stuckPatterns = [
+      /i (just )?can'?t (seem to |)save/i,
+      /keep (spending|buying|overspending)/i,
+      /always (broke|struggling|behind)/i,
+      /feel (like|) i'?m (failing|hopeless|behind|never going to)/i,
+      /never (seem to |)(get ahead|save|make progress)/i,
+      /same (pattern|thing|problem) (every|each|over and over)/i,
+      /why (do|can'?t) i (keep|never|always)/i,
+    ]
+    const isStuckPattern = stuckPatterns.some(p => p.test(message))
+    const winPatterns = [/paid (off|down)/i, /finally saved/i, /hit my (goal|target)/i, /so (proud|happy|excited)/i]
+    const isWinMoment = winPatterns.some(p => p.test(message))
+
     try {
       // Build full conversation history for the API route
       const conversationHistory = updatedMessages.slice(-20).map(m => ({
@@ -2081,6 +2095,25 @@ Be specific, warm, direct. Use their actual numbers. Australia-specific advice. 
       const complianceCheck = checkComplianceFilter(rawReply)
       const reply = complianceCheck.safe ? rawReply : (complianceCheck.rewrite || rawReply)
       setChatMessages(prev => [...prev, { role: 'assistant', content: reply, usedWebSearch: didSearch }])
+
+      // ── Invite change work at the right moment ──
+      if (isStuckPattern) {
+        setTimeout(() => {
+          setChatMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `\n\n---\n💡 **${userName || 'Builder'}, can I ask you something?**\n\nBefore I give you another tip — I've noticed a pattern in what you're describing. The most powerful thing we could do right now isn't another budgeting strategy.\n\nWould you try something different? The **Dickens Process** takes 10 minutes and gets to the *real* reason this keeps happening. It's on your Home tab under Change Work.`,
+            usedWebSearch: false
+          }])
+        }, 800)
+      } else if (isWinMoment) {
+        setTimeout(() => {
+          setChatMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `\n\n---\n🏆 **This is worth sitting with for a moment.**\n\nYou just proved something about yourself. While you're feeling this — your **Values Elicitation** on the Home tab takes 5 minutes and turns this momentum into a permanent identity shift. Worth doing now while it's real.`,
+            usedWebSearch: false
+          }])
+        }, 800)
+      }
     } catch (e) {
       console.error('Chat error:', e)
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I had trouble connecting. Please try again.' }])
@@ -4235,10 +4268,85 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                   <button onClick={() => advanceMission(null, 2)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px', flexShrink: 0 }}>
                     Skip
                   </button>
-                  <button onClick={() => advanceMission(null, 2)} style={{ flex: 1, padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 800 }}>
-                    {sinkingFunds.length > 0 ? `Save ${sinkingFunds.length} fund${sinkingFunds.length !== 1 ? 's' : ''} & build my roadmap →` : 'Build my roadmap →'}
+                  <button onClick={() => { setShowCompellingFuture(true) }} style={{ flex: 1, padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 800 }}>
+                    {sinkingFunds.length > 0 ? `Save ${sinkingFunds.length} fund${sinkingFunds.length !== 1 ? 's' : ''} & set my vision →` : 'Set my vision →'}
                   </button>
                 </div>
+
+                {/* Override the CompellingFuture modal close to go to roadmap instead */}
+                {showCompellingFuture && (
+                  <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '32px 28px', maxWidth: '520px', width: '100%' }}>
+                      {futureResponse ? (
+                        <div>
+                          <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '16px' }}>YOUR VISION IS SET</div>
+                          <div style={{ padding: '20px', background: theme.bg, borderRadius: '14px', border: '1px solid ' + theme.accent + '30', marginBottom: '20px' }}>
+                            <p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.8, margin: 0 }}>{futureResponse}</p>
+                          </div>
+                          <button onClick={() => { setShowCompellingFuture(false); setFutureResponse(null); advanceMission(null, 2) }}
+                            style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '16px', fontFamily: 'Cinzel, serif' }}>
+                            Now build my roadmap →
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: '40px', textAlign: 'center' as const, marginBottom: '12px' }}>🌅</div>
+                          <h3 style={{ color: theme.accent, fontSize: '22px', fontWeight: 800, margin: '0 0 8px 0', textAlign: 'center' as const, fontFamily: 'Cinzel, serif' }}>One last thing, {userName || 'Builder'}.</h3>
+                          <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.7, margin: '0 0 6px 0', textAlign: 'center' as const }}>
+                            Before we build your roadmap — describe the life you're building toward.
+                          </p>
+                          <p style={{ color: theme.textMuted, fontSize: '12px', lineHeight: 1.6, margin: '0 0 20px 0', textAlign: 'center' as const, fontStyle: 'italic' }}>
+                            5 years from today, everything worked out. Where are you? What are you doing? How does it feel?
+                          </p>
+                          <textarea
+                            placeholder="Five years from now, I am..."
+                            value={futureVision}
+                            onChange={e => setFutureVision(e.target.value)}
+                            style={{ ...inputStyle, width: '100%', height: '120px', resize: 'none' as const, fontSize: '14px', lineHeight: 1.6, marginBottom: '14px' }}
+                            autoFocus
+                          />
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <button onClick={() => { setShowCompellingFuture(false); advanceMission(null, 2) }}
+                              style={{ padding: '14px 16px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '10px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>
+                              Skip
+                            </button>
+                            <button onClick={async () => {
+                              if (!futureVision.trim()) { advanceMission(null, 2); return }
+                              setFutureLoading(true)
+                              try {
+                                const res = await fetch('/api/budget-coach', {
+                                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    mode: 'question',
+                                    question: `[ONBOARDING — COMPELLING FUTURE]
+New Aureus user: ${userName || 'Builder'}
+Just finished setting up their budget. Their 5-year vision: "${futureVision}"
+Their numbers: surplus $${monthlySurplus.toFixed(0)}/mo, ${debts.length} debts, ${goals.length} goals.
+
+Write 3 sentences ONLY:
+1. Amplify their vision with one specific vivid detail
+2. Connect it to their actual surplus — what that number enables toward this vision
+3. "Every number you track in Aureus from today is a step toward [something specific from their vision]."
+
+Personal, warm, grounded. No generic motivation. Use their actual words back.`,
+                                    financialData: { income: incomeStreams, expenses, debts, goals },
+                                    memory: budgetMemory, countryConfig: currentCountryConfig
+                                  })
+                                })
+                                const data = await res.json()
+                                setFutureResponse(data.message || data.advice || '')
+                              } catch { setShowCompellingFuture(false); advanceMission(null, 2) }
+                              setFutureLoading(false)
+                            }} disabled={futureLoading}
+                              style={{ flex: 1, padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>
+                              {futureLoading ? '⏳ Processing...' : futureVision.trim() ? 'Connect this to my plan →' : 'Build my roadmap →'}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })()}
@@ -9902,6 +10010,7 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => { const c = celebration; setCelebration(null); setShareWinContext({ title: c?.title, subtitle: c?.subtitle, emoji: c?.emoji, amount: c?.amount }); setShowShareWinCard(true) }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid ' + theme.accent + '50', borderRadius: '10px', color: theme.accent, cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>📊 Share this win</button>
               <button onClick={() => setCelebration(null)} style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>Keep building 🔥</button>
+              <button onClick={() => { setCelebration(null); setValuesStep(0); setValuesAnswers({}); setValuesInput(''); setShowValuesElicitation(true) }} style={{ width: '100%', marginTop: '10px', padding: '10px', background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>✨ Use this momentum — do your Values Elicitation →</button>
             </div>
           </div>
         </div>
@@ -9968,6 +10077,13 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
                     <button onClick={() => { setShowSpendCheckIn(false); setCheckInResult(null) }} style={{ flex: 1, padding: '12px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }}>Done</button>
                     <button onClick={() => { setActiveTab('chat'); setShowSpendCheckIn(false); setCheckInResult(null) }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '10px', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>Ask follow-up →</button>
                   </div>
+                  {/* If they went over budget, invite the Dickens Process */}
+                  {Object.entries(checkInSliders).some(([cat, amt]) => parseFloat(String((categoryBudgets as any)[cat] || 0)) > 0 && (amt as number) > parseFloat(String((categoryBudgets as any)[cat] || 0))) && (
+                    <button onClick={() => { setShowSpendCheckIn(false); setCheckInResult(null); setDickensStep(0); setDickensAnswers([]); setDickensResponse(null); setDickensInput(''); setShowDickens(true) }}
+                      style={{ width: '100%', marginTop: '10px', padding: '10px', background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>
+                      🕯️ Want to understand why this keeps happening? Try the Dickens Process →
+                    </button>
+                  )}
                 </div>
               ) : (
                 // Slider screen
