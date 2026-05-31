@@ -245,6 +245,7 @@ export default function Dashboard() {
   const [showManualSpend, setShowManualSpend] = useState(false)
   const [manualSpendCat, setManualSpendCat] = useState('')
   const [manualSpendAmt, setManualSpendAmt] = useState('')
+  const [expandedGoalAccel, setExpandedGoalAccel] = useState<string | null>(null)
 
   // ==================== RETURN VISIT ENGAGEMENT ====================
   const [returnCard, setReturnCard] = useState<{ title: string; body: string; cta: string; action: string; emoji: string } | null>(null)
@@ -5035,6 +5036,18 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 </div>
               </div>
 
+              {/* ── Name nudge for users who skipped name entry ── */}
+              {onboardingComplete && !userName.trim() && (
+                <div style={{ padding: '14px 18px', background: theme.accent + '10', borderRadius: '12px', border: '1px solid ' + theme.accent + '30', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ fontSize: '24px' }}>👋</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px', marginBottom: '2px' }}>Aureus doesn't know your name yet</div>
+                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>Add it so Aureus can greet you properly and personalise your coaching.</div>
+                  </div>
+                  <button onClick={() => setActiveTab('insights' as any)} style={{ padding: '8px 14px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>Add name →</button>
+                </div>
+              )}
+
               {/* ── FEATURE 1: THE ONE THING ── */}
               {onboardingComplete && (() => {
                 // Derive the single most important action from live data
@@ -7008,7 +7021,8 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                     const goalDate = weeksToGoalCurrent ? (() => { const d = new Date(); d.setDate(d.getDate() + weeksToGoalCurrent * 7); return d.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' }) })() : null
                     const goalDate50 = (() => { const d = new Date(); d.setDate(d.getDate() + weeksExtra50 * 7); return d.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' }) })()
                     const goalDate100 = (() => { const d = new Date(); d.setDate(d.getDate() + weeksExtra100 * 7); return d.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' }) })()
-                    const [showAccel, setShowAccel] = React.useState(false)
+                    const showAccel = expandedGoalAccel === goal.id
+                    const setShowAccel = (v: boolean) => setExpandedGoalAccel(v ? goal.id : null)
                     return (
                       <div key={goal.id} style={{ padding: '14px', marginBottom: '8px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -10545,7 +10559,13 @@ Tracking with Aureus 🏛️`
                 <div style={{ textAlign:'center' as const, marginBottom:'24px' }}>
                   <div style={{ fontSize:'44px', marginBottom:'10px' }}>🤝</div>
                   <h3 style={{ color:theme.text, fontSize:'20px', margin:'0 0 8px 0' }}>Accountability Partner</h3>
-                  <p style={{ color:theme.textMuted, fontSize:'13px', lineHeight:1.6 }}>Choose one person — partner, friend, coach — who gets your weekly Aureus snapshot. No sign-up needed on their end. Just an email.</p>
+                  <p style={{ color:theme.textMuted, fontSize:'13px', lineHeight:1.6 }}>
+                    Pick one person — partner, friend, family member, coach — who will receive a weekly email showing your financial progress. 
+                    They don't need to sign up or download anything. They just get an email from Aureus each week showing how you're tracking.
+                  </p>
+                  <p style={{ color:theme.textMuted, fontSize:'12px', marginTop:'8px', lineHeight:1.5, fontStyle:'italic' }}>
+                    Research shows people who share financial progress with one trusted person are significantly more likely to reach their goals.
+                  </p>
                 </div>
                 <div style={{ display:'flex', flexDirection:'column' as const, gap:'10px', marginBottom:'20px' }}>
                   <div>
@@ -10564,17 +10584,40 @@ Tracking with Aureus 🏛️`
                     </select>
                   </div>
                   <div style={{ padding: '12px 14px', background: theme.accent + '08', borderRadius: '10px', border: '1px solid ' + theme.accent + '20' }}>
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginBottom: monthlyMealPlanOptIn ? '12px' : '0' }}>
                       <input type="checkbox" checked={monthlyMealPlanOptIn} onChange={e => setMonthlyMealPlanOptIn(e.target.checked)} style={{ accentColor: theme.accent, marginTop: '2px', flexShrink: 0 }} />
                       <div>
-                        <div style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>🍽️ Monthly meal plan email</div>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '2px', lineHeight: 1.5 }}>Receive a 7-day budget meal plan on the 1st of each month, tailored to your household size and grocery budget. No app needed — straight to your inbox.</div>
+                        <div style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>🍽️ Monthly meal plan — sent to YOU</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '2px', lineHeight: 1.5 }}>
+                          On the 1st of each month, Aureus emails <strong style={{ color: theme.text }}>you</strong> a personalised 7-day budget meal plan — 
+                          not your partner. Built around your household size and grocery budget. Nothing to open in the app.
+                        </div>
                       </div>
                     </label>
+                    {monthlyMealPlanOptIn && (
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>HOUSEHOLD SIZE</label>
+                          <select value={mealPlanPrefs?.people || '4'} onChange={e => setMealPlanPrefs((prev: any) => ({...prev, people: e.target.value}))} style={{...inputStyle, width: '100%', fontSize: '13px'}}>
+                            {['1','2','3','4','5','6'].map(n => <option key={n} value={n}>{n} {n === '1' ? 'person' : 'people'}</option>)}
+                          </select>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>WEEKLY GROCERY BUDGET</label>
+                          <input type="number" placeholder="e.g. 150" value={mealPlanPrefs?.budget || ''} onChange={e => setMealPlanPrefs((prev: any) => ({...prev, budget: e.target.value}))} style={{...inputStyle, width: '100%', fontSize: '13px'}} />
+                        </div>
+                      </div>
+                    )}
+                    {monthlyMealPlanOptIn && (
+                      <div style={{ marginTop: '8px' }}>
+                        <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>ANY DISLIKES OR DIETARY NEEDS? (optional)</label>
+                        <input placeholder="e.g. no seafood, gluten free..." value={mealPlanPrefs?.dislikes || ''} onChange={e => setMealPlanPrefs((prev: any) => ({...prev, dislikes: e.target.value}))} style={{...inputStyle, width: '100%', fontSize: '13px'}} />
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div style={{ padding:'12px 14px', background:theme.bg, borderRadius:'10px', border:'1px solid '+theme.border, marginBottom:'16px', fontSize:'12px', color:theme.textMuted }}>
-                  📧 They'll receive: your saving rate, surplus, top goal progress, recent win, and your next coach action. Nothing sensitive. Just progress.
+                <div style={{ padding:'12px 14px', background:theme.bg, borderRadius:'10px', border:'1px solid '+theme.border, marginBottom:'16px', fontSize:'12px', color:theme.textMuted, lineHeight: 1.6 }}>
+                  📧 <strong style={{ color: theme.text }}>What your partner receives each week:</strong> your saving rate, monthly surplus, top goal progress bar, your most recent win, and your next action from Aureus. No account balances, no debt details — just progress and momentum. Nothing sensitive.
                 </div>
                 <button onClick={async () => {
                   if (!accountabilityEmail || !accountabilityName) return
