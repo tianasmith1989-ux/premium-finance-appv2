@@ -1,100 +1,152 @@
-// app/api/meal-plan/route.ts
+// app/api/send-meal-plan-email/route.ts
+// Called by the cron job on the 1st of each month for opted-in users.
+// Generates a personalised 7-day budget meal plan and emails it.
 
 import { NextRequest, NextResponse } from 'next/server'
 
+const FROM = 'Aureus <noreply@aureusplutus.app>'
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { people, budget, dietaryNeeds, dislikes, useDetailedPricing, catalogText, meals } = body
+    const { email, userName, people, weeklyBudget, dislikes, dietaryNeeds } = await request.json()
+
+    const resendKey = process.env.RESEND_API_KEY
+    const anthropicKey = process.env.ANTHROPIC_API_KEY
+
+    if (!resendKey || !anthropicKey) {
+      return NextResponse.json({ error: 'Missing API keys' }, { status: 500 })
+    }
+
     const n = parseInt(people) || 4
-    const selectedMeals: string[] = meals && meals.length > 0 ? meals : ['breakfast', 'lunch', 'dinner']
-    const hasBreakfast = selectedMeals.includes('breakfast')
-    const hasLunch = selectedMeals.includes('lunch')
-    const hasDinner = selectedMeals.includes('dinner')
-    const hasDessert = selectedMeals.includes('dessert')
-    const mealLabel = selectedMeals.map((m: string) => m.charAt(0).toUpperCase() + m.slice(1)).join(' + ')
+    const budget = weeklyBudget || 150
+    const month = new Date().toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
 
-    const systemPrompt = `You are a practical Australian meal planning assistant. You create realistic, budget-conscious 7-day meal plans using current Woolworths, Coles, and Aldi prices. You ALWAYS use real dollar amounts — never placeholders. You respond ONLY with the meal plan content — no preamble, no sign-off.`
-
-    const exampleDay = [
-      hasBreakfast ? `🌅 Breakfast: Rolled oats with banana and honey (${n} serves) ~$3.20` : '',
-      hasLunch     ? `☀️ Lunch: Vegemite and cheese sandwiches (${n} serves) ~$4.50` : '',
-      hasDinner    ? `🌙 Dinner: Spaghetti bolognese (${n} serves) ~$14.00 _(batch: double batch — leftover pasta Tue lunch)_` : '',
-      hasDessert   ? `🍮 Dessert: Banana with honey yoghurt (${n} serves) ~$3.00` : '',
-    ].filter(Boolean).join('\n')
-
-    const exampleDay2 = [
-      hasBreakfast ? `🌅 Breakfast: Weetbix with milk (${n} serves) ~$2.80` : '',
-      hasLunch     ? `☀️ Lunch: Leftover bolognese on toast (${n} serves) ~$1.50` : '',
-      hasDinner    ? `🌙 Dinner: Baked chicken drumsticks with roast potatoes (${n} serves) ~$16.00` : '',
-      hasDessert   ? `🍮 Dessert: Tinned fruit with ice cream (${n} serves) ~$4.50` : '',
-    ].filter(Boolean).join('\n')
-
-    const userPrompt = [
-      `Create a 7-day meal plan (${mealLabel}) for ${n} people with a weekly grocery budget of $${budget} AUD.`,
-      dislikes ? `Do NOT include: ${dislikes}.` : '',
-      dietaryNeeds ? `Dietary requirements: ${dietaryNeeds}.` : '',
-      `MEALS TO INCLUDE: Only generate ${mealLabel}. Do not add extra meal types.`,
-      hasDinner ? `Batch cook dinners for ${n} — leftovers become next-day lunches where possible.` : '',
-      hasDessert ? `Desserts should be simple, budget-friendly, and use affordable AU ingredients (tinned fruit, yoghurt, custard, jelly, simple biscuit slices, stewed fruit). Keep dessert cost under $1.50 per serve.` : '',
-      useDetailedPricing ? `Use real 2024-25 AU prices: chicken thighs 1kg $8, beef mince 500g $7, eggs 12pk $5.50, milk 2L $3.20, bread loaf $3.50, pasta 500g $1.80, rice 1kg $3, frozen veg 1kg $4.50, rolled oats 1kg $3.50, bananas 1kg $3.50, cheese 500g block $9, ice cream 2L $5.50, yoghurt 1kg $5, tinned fruit 825g $2.50, custard 1L $3.50. Scale for ${n} people.` : '',
-      catalogText ? `\nThis week's catalog specials:\n${String(catalogText).slice(0, 600)}` : '',
+    // Generate meal plan via Anthropic
+    const prompt = [
+      `Create a 7-day budget meal plan for an Australian family.`,
+      `Household: ${n} people | Weekly grocery budget: $${budget} AUD`,
+      dislikes ? `Do NOT include: ${dislikes}` : '',
+      dietaryNeeds ? `Dietary needs: ${dietaryNeeds}` : '',
+      `Use realistic 2024-25 AU prices (Woolworths/Coles/Aldi home-brand).`,
+      `Prioritise batch cooking, cheap proteins (eggs, chicken thighs, legumes), seasonal vegetables.`,
       ``,
-      `IMPORTANT — TWO COST TOTALS:`,
-      `1. MEAL COST: Cost of ingredients actually consumed this week (portions used).`,
-      `2. SHOP TOTAL: What you'll spend at checkout — full pack prices. Will be higher because pantry staples last weeks.`,
+      `Format EXACTLY as follows:`,
       ``,
-      `Use EXACTLY this format — real dollar amounts only:`,
-      ``,
-      `**Meal cost (ingredients used): $[real number] | Checkout total (whole packs): ~$[real number] | Savings vs eating out: ~$[real number]**`,
-      `💡 The checkout total is higher because pantry staples like rice, honey and spices last 2–4 weeks — your real weekly food cost is closer to the meal cost figure.`,
+      `**Estimated weekly cost: $X | Checkout total: ~$X | Savings vs eating out: ~$X**`,
+      `💡 Checkout total is higher because pantry staples last 2-4 weeks.`,
       ``,
       `## Monday`,
-      exampleDay,
+      `🌅 Breakfast: [meal] ~$X`,
+      `☀️ Lunch: [meal] ~$X`,
+      `🌙 Dinner: [meal] ~$X _(batch: note)_`,
       ``,
-      `## Tuesday`,
-      exampleDay2,
-      ``,
-      `[Continue for Wednesday, Thursday, Friday, Saturday, Sunday in the same format with real prices]`,
+      `[Repeat for Tuesday–Sunday]`,
       ``,
       `## Shopping List`,
-      `- Beef mince 500g — 2 packs ~$14.00 _(used in full this week)_`,
-      `- Rolled oats 1kg — 1 bag ~$3.50 _(lasts ~3 weeks)_`,
-      `[List every ingredient needed with real AU prices. Add _(lasts X weeks)_ for pantry staples not fully used.]`,
+      `- [item] — [qty] ~$X _(lasts X weeks)_ for pantry items`,
       ``,
-      `## Budget Tips`,
-      `- [3 specific tips for a ${n}-person household on $${budget}/week]`,
-    ].filter(s => s !== undefined && s !== null).join('\n')
+      `## 3 Budget Tips for ${month}`,
+      `- [tip specific to this household]`,
+    ].filter(Boolean).join('\n')
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
+        'x-api-key': anthropicKey,
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 3000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }]
+        max_tokens: 2500,
+        system: 'You are a practical Australian meal planning assistant. You create realistic, budget-conscious meal plans using current Woolworths, Coles, and Aldi prices. Respond ONLY with the meal plan — no preamble, no sign-off.',
+        messages: [{ role: 'user', content: prompt }]
       })
     })
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      return NextResponse.json({ error: (err as any)?.error?.message || `API error ${response.status}` }, { status: 500 })
+    if (!aiRes.ok) {
+      return NextResponse.json({ error: 'AI generation failed' }, { status: 500 })
     }
 
-    const data = await response.json()
-    const text: string = (data.content || [])
+    const aiData = await aiRes.json()
+    const mealPlanText: string = (aiData.content || [])
       .filter((c: any) => c.type === 'text')
       .map((c: any) => c.text)
       .join('')
 
-    return NextResponse.json({ text })
+    if (!mealPlanText) {
+      return NextResponse.json({ error: 'No meal plan generated' }, { status: 500 })
+    }
+
+    // Convert meal plan text to HTML
+    const mealPlanHtml = mealPlanText.split('\n').map(line => {
+      if (line.startsWith('## ')) return `<h3 style="color:#D4AF37;font-size:15px;font-weight:800;margin:20px 0 8px;border-bottom:1px solid rgba(212,175,55,0.2);padding-bottom:4px;">${line.slice(3)}</h3>`
+      if (line.startsWith('**') && line.endsWith('**')) return `<p style="color:#F5F5F5;font-size:13px;font-weight:700;margin:0 0 4px;">${line.replace(/\*\*/g, '')}</p>`
+      if (line.startsWith('💡')) return `<div style="background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:8px;padding:10px 14px;margin:8px 0;color:#9a8a6a;font-size:12px;">${line}</div>`
+      if (line.match(/^[🌅☀️🌙]/)) {
+        const clean = line.replace(/~\$([\d.]+)/g, '<span style="color:#9a8a6a;font-size:11px"> ~$$1</span>')
+          .replace(/_(.*?)_/g, '<em style="color:#6b8f6b;font-size:11px"> · $1</em>')
+        return `<div style="color:#F5F5F5;font-size:13px;padding:4px 0;">${clean}</div>`
+      }
+      if (line.startsWith('- ')) {
+        const clean = line.slice(2).replace(/~\$([\d.]+)/g, '<span style="color:#D4AF37"> ~$$1</span>')
+          .replace(/\(lasts (.*?)\)/g, '<span style="color:#6b8f6b;font-size:11px"> ♻️ lasts $1</span>')
+        return `<div style="color:#9a8a6a;font-size:12px;padding:3px 0 3px 12px;border-left:2px solid #2e2618;">${clean}</div>`
+      }
+      if (line.trim() === '') return '<div style="height:4px;"></div>'
+      return `<div style="color:#9a8a6a;font-size:12px;">${line}</div>`
+    }).join('')
+
+    const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="background:#111111;margin:0;padding:16px;font-family:Inter,Arial,sans-serif;">
+<div style="max-width:540px;margin:0 auto;">
+
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#1a1810,#111111);border:1px solid rgba(212,175,55,0.3);border-radius:16px;padding:24px 28px;margin-bottom:12px;">
+    <div style="color:#D4AF37;font-size:20px;font-weight:900;letter-spacing:2px;">AUREUS</div>
+    <div style="color:#9a8a6a;font-size:11px;letter-spacing:1px;margin-top:2px;">MONTHLY MEAL PLAN · ${month.toUpperCase()}</div>
+    <p style="color:#F5F5F5;font-size:15px;margin:14px 0 0;line-height:1.5;">
+      Hey ${userName || 'Builder'}, here's your personalised ${month} meal plan for ${n} people on a $${budget}/week budget.
+    </p>
+  </div>
+
+  <!-- Meal plan content -->
+  <div style="background:#1a1810;border:1px solid #2e2618;border-radius:12px;padding:20px 24px;margin-bottom:12px;">
+    ${mealPlanHtml}
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align:center;padding:16px;">
+    <div style="color:#3a2e1e;font-size:11px;letter-spacing:1px;">WEALTH THROUGH DISCIPLINE · AUREUS</div>
+    <div style="color:#3a2e1e;font-size:10px;margin-top:4px;">Monthly meal plan · Open Aureus to update your preferences</div>
+  </div>
+
+</div>
+</body>
+</html>`
+
+    // Send via Resend
+    const emailRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendKey}` },
+      body: JSON.stringify({
+        from: FROM,
+        to: [email],
+        subject: `🍽️ Your Aureus meal plan for ${month} — $${budget}/week for ${n} people`,
+        html
+      })
+    })
+
+    if (!emailRes.ok) {
+      const err = await emailRes.json().catch(() => ({}))
+      return NextResponse.json({ error: (err as any)?.message || 'Email send failed' }, { status: 500 })
+    }
+
+    return NextResponse.json({ ok: true })
   } catch (error: any) {
-    console.error('Meal plan API error:', error)
-    return NextResponse.json({ error: error?.message || 'Failed to generate meal plan' }, { status: 500 })
+    console.error('Meal plan email error:', error)
+    return NextResponse.json({ error: error?.message || 'Failed' }, { status: 500 })
   }
 }
