@@ -1,6 +1,6 @@
 // app/api/cron-notify/route.ts
-// Called automatically by Vercel Cron — do not call manually in production.
-// Sends weekly snapshots, overdue bill alerts, and money date reminders.
+// Runs daily at 8am AEST (10pm UTC) via Vercel Cron
+// Sends personalised morning financial brief to all subscribers
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -11,11 +11,12 @@ const supabase = createClient(
 )
 
 const RESEND_KEY = process.env.RESEND_API_KEY!
-const FROM = 'Aureus <onboarding@resend.dev>'
+const FROM = 'Aureus <noreply@aureusplutus.app>'
+
 const today = new Date()
 const todayStr = today.toISOString().split('T')[0]
 const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][today.getDay()]
-const hour = today.getHours()
+const dateFormatted = today.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
 async function sendEmail(to: string, subject: string, html: string) {
   const res = await fetch('https://api.resend.com/emails', {
@@ -26,118 +27,211 @@ async function sendEmail(to: string, subject: string, html: string) {
   return res.ok
 }
 
-function weeklySnapshotHtml(u: any): string {
-  return `<!DOCTYPE html>
-<html>
-<body style="background:#111111;margin:0;padding:24px;font-family:Inter,Arial,sans-serif;">
-<div style="max-width:480px;margin:0 auto;background:#1a1810;border-radius:16px;border:1px solid #2e2618;overflow:hidden;">
-  <div style="background:linear-gradient(135deg,#1a1810,#111111);padding:24px 28px;border-bottom:1px solid rgba(212,175,55,0.2);">
-    <div style="color:#D4AF37;font-size:22px;font-weight:900;letter-spacing:2px;">AUREUS</div>
-    <div style="color:#9a8a6a;font-size:11px;letter-spacing:1px;margin-top:4px;">WEEKLY SNAPSHOT · ${today.toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric' }).toUpperCase()}</div>
-  </div>
-  <div style="padding:24px 28px;">
-    <p style="color:#F5F5F5;font-size:15px;line-height:1.6;margin:0 0 20px;">
-      Hey ${u.user_name || 'Builder'}, here's your weekly Aureus snapshot.
-    </p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
-      <div style="background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:10px;padding:14px;">
-        <div style="color:#9a8a6a;font-size:10px;letter-spacing:1px;margin-bottom:4px;">SAVING RATE</div>
-        <div style="color:#D4AF37;font-size:22px;font-weight:800;">${u.saving_rate || 0}%</div>
-      </div>
-      <div style="background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:10px;padding:14px;">
-        <div style="color:#9a8a6a;font-size:10px;letter-spacing:1px;margin-bottom:4px;">MONTHLY SURPLUS</div>
-        <div style="color:#D4AF37;font-size:22px;font-weight:800;">$${(u.monthly_surplus || 0).toLocaleString()}</div>
-      </div>
-    </div>
-    ${u.top_goal_name ? `
-    <div style="background:rgba(255,255,255,0.03);border:1px solid #2e2618;border-radius:10px;padding:14px;margin-bottom:12px;">
-      <div style="color:#9a8a6a;font-size:10px;letter-spacing:1px;margin-bottom:8px;">TOP GOAL</div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-        <span style="color:#F5F5F5;font-size:14px;">${u.top_goal_name}</span>
-        <span style="color:#D4AF37;font-weight:700;">${u.top_goal_pct}%</span>
-      </div>
-      <div style="height:6px;background:rgba(255,255,255,0.1);border-radius:3px;">
-        <div style="width:${Math.min(100, u.top_goal_pct || 0)}%;height:100%;background:linear-gradient(90deg,#D4AF37,#BC6A1F);border-radius:3px;"></div>
-      </div>
-    </div>` : ''}
-    ${u.top_win ? `<div style="padding:12px 14px;background:rgba(180,212,55,0.06);border:1px solid rgba(180,212,55,0.2);border-radius:10px;margin-bottom:12px;color:#9a8a6a;font-size:13px;">🏆 <strong style="color:#F5F5F5;">Latest win:</strong> ${u.top_win}</div>` : ''}
-    ${u.next_action ? `<div style="padding:12px 14px;background:rgba(212,175,55,0.06);border:1px solid rgba(212,175,55,0.2);border-radius:10px;margin-bottom:16px;color:#9a8a6a;font-size:13px;">⚡ <strong style="color:#D4AF37;">This week:</strong> ${u.next_action}</div>` : ''}
-    ${u.streak >= 3 ? `<div style="padding:10px 14px;background:rgba(212,175,55,0.05);border-radius:8px;color:#9a8a6a;font-size:12px;margin-bottom:16px;">🔥 ${u.streak}-day streak — keep it going.</div>` : ''}
-    <p style="color:#6b5e3e;font-size:11px;margin:0;line-height:1.6;">
-      You're receiving this because you enabled weekly snapshots in Aureus.<br>
-      Open Aureus → Insights → Notifications to unsubscribe.
-    </p>
-  </div>
-  <div style="padding:16px 28px;border-top:1px solid rgba(212,175,55,0.1);text-align:center;">
-    <div style="color:#6b5e3e;font-size:11px;letter-spacing:1px;">WEALTH THROUGH DISCIPLINE · AUREUS</div>
-  </div>
-</div>
-</body>
-</html>`
-}
+function buildDailyBriefHtml(u: any): string {
+  const bills: any[] = u.upcoming_bills || []
+  const name = u.user_name || 'Builder'
 
-function overdueHtml(u: any, bills: any[]): string {
-  const billList = bills.map(b => `
-    <div style="display:flex;justify-content:space-between;padding:10px 14px;background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.25);border-radius:8px;margin-bottom:8px;">
-      <span style="color:#F5F5F5;font-size:14px;">${b.name}</span>
-      <span style="color:#e74c3c;font-weight:700;">$${parseFloat(b.amount).toFixed(0)} overdue</span>
-    </div>`).join('')
-  return `<!DOCTYPE html>
-<html>
-<body style="background:#111111;margin:0;padding:24px;font-family:Inter,Arial,sans-serif;">
-<div style="max-width:480px;margin:0 auto;background:#1a1810;border-radius:16px;border:1px solid #2e2618;overflow:hidden;">
-  <div style="padding:24px 28px;border-bottom:1px solid rgba(212,175,55,0.2);">
-    <div style="color:#D4AF37;font-size:20px;font-weight:900;letter-spacing:2px;">AUREUS</div>
-    <div style="color:#e74c3c;font-size:13px;font-weight:700;margin-top:6px;">⚠️ Payment reminder</div>
-  </div>
-  <div style="padding:24px 28px;">
-    <p style="color:#F5F5F5;font-size:15px;margin:0 0 16px;">Hey ${u.user_name || 'Builder'}, you have ${bills.length} overdue payment${bills.length > 1 ? 's' : ''} in Aureus:</p>
-    ${billList}
-    <p style="color:#9a8a6a;font-size:13px;margin:16px 0 0;line-height:1.6;">Open Aureus and tick these off once paid to keep your budget accurate.</p>
-  </div>
-  <div style="padding:16px 28px;border-top:1px solid rgba(212,175,55,0.1);text-align:center;">
-    <div style="color:#6b5e3e;font-size:11px;letter-spacing:1px;">WEALTH THROUGH DISCIPLINE · AUREUS</div>
-  </div>
-</div>
-</body>
-</html>`
-}
+  // Categorise bills for this week (next 7 days)
+  const thisWeekBills = bills.filter((b: any) => b.dayOffset >= 0 && b.dayOffset <= 7)
+  const overdueBills = bills.filter((b: any) => b.dayOffset < 0)
+  const nextWeekBills = bills.filter((b: any) => b.dayOffset > 7 && b.dayOffset <= 14)
 
-function moneyDateHtml(u: any): string {
+  // Total due this week
+  const thisWeekTotal = thisWeekBills.reduce((s: number, b: any) => s + parseFloat(b.amount || '0'), 0)
+  const overdueTotal = overdueBills.reduce((s: number, b: any) => s + parseFloat(b.amount || '0'), 0)
+
+  // Savings & fun money from surplus
+  const surplus = u.monthly_surplus || 0
+  const weeklySurplus = Math.round(surplus / 4.3)
+  const savingRate = u.saving_rate || 0
+
+  // Contextual greeting based on day
+  const dayGreeting: Record<string, string> = {
+    Monday: `New week, new moves. Here's what's ahead, ${name}.`,
+    Tuesday: `Tuesday — the real start of the week. Stay on track.`,
+    Wednesday: `Midweek check. You're halfway there, ${name}.`,
+    Thursday: `Almost there. One more push before the weekend.`,
+    Friday: `Friday brief. Review the week before the weekend spending starts.`,
+    Saturday: `Weekend — great time to check in on the week's numbers.`,
+    Sunday: `Sunday reset. Plan the week ahead, ${name}.`,
+  }
+  const greeting = dayGreeting[dayName] || `Good morning, ${name}.`
+
+  // Urgency colour for overdue
+  const hasOverdue = overdueBills.length > 0
+  const hasThisWeek = thisWeekBills.length > 0
+
+  // Build bill rows
+  const buildBillRow = (b: any, highlight: string) => {
+    const dueText = b.dayOffset === 0 ? 'DUE TODAY' : b.dayOffset < 0 ? `${Math.abs(b.dayOffset)} DAYS OVERDUE` : `Due in ${b.dayOffset} day${b.dayOffset !== 1 ? 's' : ''}`
+    const isAutomatic = b.automatic
+    return `
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #2e2618;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="color:#F5F5F5;font-size:14px;font-weight:600;">${b.name}</div>
+            <div style="color:${highlight};font-size:11px;font-weight:700;margin-top:2px;">${dueText}</div>
+            ${isAutomatic 
+              ? `<div style="color:#6b8f6b;font-size:10px;margin-top:2px;">✅ Auto-payment set up</div>`
+              : `<div style="color:#bc6a1f;font-size:10px;margin-top:2px;">⚠️ Check payment is arranged</div>`
+            }
+          </div>
+          <div style="color:#D4AF37;font-size:16px;font-weight:800;text-align:right;">$${parseFloat(b.amount || '0').toFixed(0)}</div>
+        </div>
+      </td>
+    </tr>`
+  }
+
   return `<!DOCTYPE html>
 <html>
-<body style="background:#111111;margin:0;padding:24px;font-family:Inter,Arial,sans-serif;">
-<div style="max-width:480px;margin:0 auto;background:#1a1810;border-radius:16px;border:1px solid rgba(212,175,55,0.3);overflow:hidden;">
-  <div style="padding:24px 28px;border-bottom:1px solid rgba(212,175,55,0.2);">
-    <div style="color:#D4AF37;font-size:20px;font-weight:900;letter-spacing:2px;">AUREUS</div>
-  </div>
-  <div style="padding:24px 28px;text-align:center;">
-    <div style="font-size:48px;margin-bottom:16px;">📅</div>
-    <h2 style="color:#D4AF37;font-family:serif;margin:0 0 12px;">Money Date Tonight</h2>
-    <p style="color:#F5F5F5;font-size:15px;line-height:1.7;margin:0 0 20px;">
-      Hey ${u.user_name || 'Builder'}, your ${u.money_date_day} money date is tonight at ${u.money_date_time}.
-    </p>
-    <div style="background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:12px;padding:16px;margin-bottom:20px;">
-      <div style="color:#9a8a6a;font-size:12px;margin-bottom:8px;">YOUR AGENDA</div>
-      <div style="color:#F5F5F5;font-size:13px;line-height:2;text-align:left;">
-        ✅ Review this week's actual spending<br>
-        💰 Check surplus vs projection<br>
-        🎯 Update goal progress<br>
-        ⚡ Set one financial move for next week
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="background:#111111;margin:0;padding:16px;font-family:Inter,Arial,sans-serif;">
+<div style="max-width:520px;margin:0 auto;">
+
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#1a1810 0%,#111111 100%);border:1px solid rgba(212,175,55,0.3);border-radius:16px;padding:24px 28px;margin-bottom:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div style="color:#D4AF37;font-size:20px;font-weight:900;letter-spacing:2px;">AUREUS</div>
+        <div style="color:#9a8a6a;font-size:11px;letter-spacing:1px;margin-top:2px;">DAILY BRIEF · ${dateFormatted.toUpperCase()}</div>
       </div>
+      <div style="color:#9a8a6a;font-size:11px;text-align:right;">${dayName.toUpperCase()}</div>
     </div>
-    <p style="color:#6b5e3e;font-size:11px;margin:0;">Open Aureus to do your check-in.</p>
+    <p style="color:#F5F5F5;font-size:16px;margin:16px 0 0;line-height:1.5;">${greeting}</p>
   </div>
-  <div style="padding:16px 28px;border-top:1px solid rgba(212,175,55,0.1);text-align:center;">
-    <div style="color:#6b5e3e;font-size:11px;letter-spacing:1px;">WEALTH THROUGH DISCIPLINE · AUREUS</div>
+
+  <!-- Overdue alert (only if overdue bills exist) -->
+  ${hasOverdue ? `
+  <div style="background:rgba(192,57,43,0.12);border:1px solid rgba(192,57,43,0.4);border-radius:12px;padding:16px 20px;margin-bottom:12px;">
+    <div style="color:#e74c3c;font-weight:800;font-size:13px;margin-bottom:10px;">🔴 ${overdueBills.length} OVERDUE PAYMENT${overdueBills.length > 1 ? 'S' : ''} — $${overdueTotal.toFixed(0)} total</div>
+    <table style="width:100%;border-collapse:collapse;">
+      ${overdueBills.map((b: any) => buildBillRow(b, '#e74c3c')).join('')}
+    </table>
+    <p style="color:#9a8a6a;font-size:12px;margin:10px 0 0;">Open Aureus and tick these off once paid to keep your budget accurate.</p>
+  </div>` : ''}
+
+  <!-- This week's bills -->
+  <div style="background:#1a1810;border:1px solid #2e2618;border-radius:12px;padding:20px 24px;margin-bottom:12px;">
+    <div style="color:#9a8a6a;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:14px;">📅 THIS WEEK'S PAYMENTS</div>
+    ${hasThisWeek ? `
+    <table style="width:100%;border-collapse:collapse;">
+      ${thisWeekBills.map((b: any) => buildBillRow(b, b.dayOffset === 0 ? '#D4AF37' : '#9a8a6a')).join('')}
+    </table>
+    <div style="margin-top:14px;padding:12px 16px;background:rgba(212,175,55,0.08);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="color:#9a8a6a;font-size:13px;">Total due this week</span>
+      <span style="color:#D4AF37;font-size:18px;font-weight:800;">$${thisWeekTotal.toFixed(0)}</span>
+    </div>` : `
+    <p style="color:#6b5e3e;font-size:13px;margin:0;">✅ No payments due this week. Clear run ahead.</p>`}
   </div>
+
+  <!-- Weekly money summary -->
+  <div style="background:#1a1810;border:1px solid #2e2618;border-radius:12px;padding:20px 24px;margin-bottom:12px;">
+    <div style="color:#9a8a6a;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:14px;">💰 THIS WEEK'S MONEY BREAKDOWN</div>
+    <table style="width:100%;border-collapse:collapse;">
+      <tr>
+        <td style="padding:8px 0;border-bottom:1px solid #2e2618;">
+          <span style="color:#9a8a6a;font-size:13px;">Living expenses (bills, groceries, transport)</span>
+        </td>
+        <td style="padding:8px 0;border-bottom:1px solid #2e2618;text-align:right;">
+          <span style="color:#F5F5F5;font-size:14px;font-weight:700;">~$${(thisWeekTotal + Math.round(weeklySurplus * 0.6)).toFixed(0)}</span>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;border-bottom:1px solid #2e2618;">
+          <span style="color:#9a8a6a;font-size:13px;">Savings & goals this week</span>
+        </td>
+        <td style="padding:8px 0;border-bottom:1px solid #2e2618;text-align:right;">
+          <span style="color:#D4AF37;font-size:14px;font-weight:700;">$${Math.round(weeklySurplus * 0.7)}</span>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;border-bottom:1px solid #2e2618;">
+          <span style="color:#9a8a6a;font-size:13px;">Fun money (discretionary)</span>
+        </td>
+        <td style="padding:8px 0;border-bottom:1px solid #2e2618;text-align:right;">
+          <span style="color:#6b8f6b;font-size:14px;font-weight:700;">$${Math.round(weeklySurplus * 0.3)}</span>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:10px 0 0;">
+          <span style="color:#F5F5F5;font-size:13px;font-weight:700;">Monthly saving rate</span>
+        </td>
+        <td style="padding:10px 0 0;text-align:right;">
+          <span style="color:#D4AF37;font-size:16px;font-weight:800;">${savingRate}%</span>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Next week preview -->
+  ${nextWeekBills.length > 0 ? `
+  <div style="background:#1a1810;border:1px solid #2e2618;border-radius:12px;padding:16px 20px;margin-bottom:12px;">
+    <div style="color:#9a8a6a;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:10px;">👀 COMING NEXT WEEK</div>
+    ${nextWeekBills.map((b: any) => `
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e1a10;">
+      <span style="color:#6b5e3e;font-size:13px;">${b.name} — in ${b.dayOffset} days</span>
+      <span style="color:#6b5e3e;font-size:13px;">$${parseFloat(b.amount||'0').toFixed(0)}</span>
+    </div>`).join('')}
+  </div>` : ''}
+
+  <!-- Goal progress -->
+  ${u.top_goal_name ? `
+  <div style="background:#1a1810;border:1px solid #2e2618;border-radius:12px;padding:16px 20px;margin-bottom:12px;">
+    <div style="color:#9a8a6a;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:10px;">🎯 YOUR TOP GOAL</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+      <span style="color:#F5F5F5;font-size:14px;">${u.top_goal_name}</span>
+      <span style="color:#D4AF37;font-weight:700;">${u.top_goal_pct}%</span>
+    </div>
+    <div style="height:8px;background:rgba(255,255,255,0.08);border-radius:4px;">
+      <div style="width:${Math.min(100, u.top_goal_pct || 0)}%;height:100%;background:linear-gradient(90deg,#D4AF37,#BC6A1F);border-radius:4px;"></div>
+    </div>
+  </div>` : ''}
+
+  <!-- Coach action -->
+  ${u.next_action ? `
+  <div style="background:rgba(212,175,55,0.06);border:1px solid rgba(212,175,55,0.2);border-radius:12px;padding:16px 20px;margin-bottom:12px;">
+    <div style="color:#9a8a6a;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:6px;">⚡ YOUR ONE THING TODAY</div>
+    <div style="color:#F5F5F5;font-size:14px;line-height:1.6;">${u.next_action}</div>
+  </div>` : ''}
+
+  <!-- Streak -->
+  ${u.streak >= 3 ? `
+  <div style="background:rgba(212,175,55,0.04);border:1px solid #2e2618;border-radius:12px;padding:14px 20px;margin-bottom:12px;text-align:center;">
+    <span style="color:#D4AF37;font-size:22px;">🔥</span>
+    <span style="color:#9a8a6a;font-size:13px;margin-left:8px;">${u.streak}-day streak — discipline creates freedom.</span>
+  </div>` : ''}
+
+  <!-- Weekly challenge / engagement hook -->
+  <div style="background:#1a1810;border:1px solid rgba(212,175,55,0.15);border-radius:12px;padding:16px 20px;margin-bottom:12px;">
+    <div style="color:#9a8a6a;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:8px;">💡 AUREUS INSIGHT</div>
+    <div style="color:#F5F5F5;font-size:13px;line-height:1.6;">
+      ${dayName === 'Monday' ? 'People who review their finances on Monday spend 12% less across the week. You're already ahead.' :
+        dayName === 'Wednesday' ? 'The average Australian spends $3,000/year on impulse purchases. Knowing your numbers prevents it.' :
+        dayName === 'Friday' ? 'Weekend spending accounts for 35% of most people's discretionary budget. Go in with a number in mind.' :
+        dayName === 'Sunday' ? 'A 10-minute Sunday money review is worth 2 hours of stress on a Wednesday. This is that 10 minutes.' :
+        'Every dollar you track is a dollar you control. Every dollar you ignore controls you.'}
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div style="text-align:center;padding:8px 0 16px;">
+    <a href="https://aureusplutus.app" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#D4AF37,#BC6A1F);color:#111111;font-weight:800;font-size:14px;border-radius:10px;text-decoration:none;letter-spacing:0.5px;">Open Aureus →</a>
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align:center;padding:8px 0 16px;">
+    <div style="color:#3a2e1e;font-size:11px;letter-spacing:1px;">WEALTH THROUGH DISCIPLINE · AUREUS</div>
+    <div style="color:#3a2e1e;font-size:10px;margin-top:4px;">Open Aureus to update your numbers · Reply to unsubscribe</div>
+  </div>
+
 </div>
 </body>
 </html>`
 }
 
 export async function GET(request: NextRequest) {
-  // Security: Vercel signs cron requests — verify in production
+  // Verify cron secret
   const authHeader = request.headers.get('authorization')
   if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -145,7 +239,7 @@ export async function GET(request: NextRequest) {
 
   if (!RESEND_KEY) return NextResponse.json({ error: 'RESEND_API_KEY not set' }, { status: 500 })
 
-  const results = { sent: 0, skipped: 0, errors: 0 }
+  const results = { sent: 0, skipped: 0, errors: 0, users: 0 }
 
   try {
     const { data: users, error } = await supabase
@@ -153,74 +247,79 @@ export async function GET(request: NextRequest) {
       .select('*')
 
     if (error) throw new Error(error.message)
-    if (!users?.length) return NextResponse.json({ ...results, message: 'No subscribers' })
+    if (!users?.length) return NextResponse.json({ ...results, message: 'No subscribers yet' })
+
+    results.users = users.length
 
     for (const u of users) {
       try {
-        // ── Weekly snapshot (every Sunday or their chosen day) ──
-        if (u.notify_weekly_snapshot && u.last_weekly_sent !== todayStr) {
-          const isWeeklyDay = u.frequency === 'weekly' ? dayName === 'Sunday' : dayName === 'Sunday' && getWeekNumber() % 2 === 0
-          if (isWeeklyDay && hour >= 8 && hour < 10) {
-            const sent = await sendEmail(
-              u.email,
-              `Your Aureus weekly snapshot 🏛️`,
-              weeklySnapshotHtml(u)
-            )
-            if (sent) {
-              await supabase.from('notification_prefs').update({ last_weekly_sent: todayStr }).eq('user_token', u.user_token)
-              results.sent++
-            } else results.errors++
-          } else results.skipped++
-        }
+        // Skip if already sent today
+        if (u.last_weekly_sent === todayStr) { results.skipped++; continue }
 
-        // ── Overdue bill alerts (daily at 8am) ──
-        if (u.notify_overdue_bills && u.last_overdue_sent !== todayStr && hour >= 8 && hour < 9) {
-          const bills = u.upcoming_bills || []
-          const overdue = bills.filter((b: any) => b.dayOffset < 0)
-          if (overdue.length > 0) {
-            const sent = await sendEmail(
-              u.email,
-              `⚠️ You have ${overdue.length} overdue payment${overdue.length > 1 ? 's' : ''} in Aureus`,
-              overdueHtml(u, overdue)
-            )
-            if (sent) {
-              await supabase.from('notification_prefs').update({ last_overdue_sent: todayStr }).eq('user_token', u.user_token)
-              results.sent++
-            } else results.errors++
-          }
-        }
+        const overdue = (u.upcoming_bills || []).filter((b: any) => b.dayOffset < 0)
+        const thisWeek = (u.upcoming_bills || []).filter((b: any) => b.dayOffset >= 0 && b.dayOffset <= 7)
+        const thisWeekTotal = thisWeek.reduce((s: number, b: any) => s + parseFloat(b.amount || '0'), 0)
 
-        // ── Money date reminder (2 hours before their scheduled time) ──
-        if (u.notify_money_date && dayName === u.money_date_day) {
-          const [schedHour] = (u.money_date_time || '18:00').split(':').map(Number)
-          if (hour === schedHour - 2) {
-            const sent = await sendEmail(
-              u.email,
-              `📅 Money date tonight, ${u.user_name || 'Builder'}`,
-              moneyDateHtml(u)
-            )
-            if (sent) results.sent++
-            else results.errors++
-          }
-        }
+        // Varied subject lines that feel personal and create curiosity
+        const subject = (() => {
+          const name = u.user_name || 'Builder'
+          if (overdue.length > 0) return `⚠️ ${name}, you have an overdue payment`
+          const todayBill = thisWeek.find((b: any) => b.dayOffset === 0)
+          if (todayBill) return `📅 ${todayBill.name} is due today — $${parseFloat(todayBill.amount||'0').toFixed(0)}`
+          if (dayName === 'Monday') return `🏛️ New week, ${name}. Here's your money brief`
+          if (dayName === 'Friday') return `🎯 Week review, ${name} — how did you track?`
+          if (dayName === 'Sunday') return `📊 ${name}'s weekly Aureus snapshot`
+          if (u.saving_rate >= 20) return `🔥 ${name}, you're saving ${u.saving_rate}% — keep it going`
+          if (u.streak >= 7) return `⚡ ${u.streak}-day streak, ${name}. Don't break it`
+          if (thisWeekTotal > 0) return `💰 $${thisWeekTotal.toFixed(0)} due this week — ${name}'s brief`
+          return `🏛️ Your Aureus brief, ${name} — ${dayName}`
+        })()
 
+        const html = buildDailyBriefHtml(u)
+        const sent = await sendEmail(u.email, subject, html)
+
+        if (sent) {
+          await supabase
+            .from('notification_prefs')
+            .update({ last_weekly_sent: todayStr })
+            .eq('user_token', u.user_token)
+          results.sent++
+        } else {
+          results.errors++
+        }
       } catch (userErr: any) {
-        console.error(`Error processing user ${u.user_token}:`, userErr?.message)
+        console.error(`Error processing ${u.user_token}:`, userErr?.message)
         results.errors++
       }
     }
 
-    return NextResponse.json({ ok: true, ...results, usersProcessed: users.length })
+    // ── Monthly meal plan email (1st of each month) ──
+    if (new Date().getDate() === 1) {
+      const mealPlanUsers = users.filter((u: any) => u.notify_monthly_meal_plan && u.email)
+      for (const u of mealPlanUsers) {
+        try {
+          await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://aureusplutus.app'}/api/send-meal-plan-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: u.email,
+              userName: u.user_name,
+              people: u.household_size || 4,
+              weeklyBudget: u.meal_budget || 150,
+              dislikes: u.meal_dislikes || '',
+              dietaryNeeds: u.meal_dietary || ''
+            })
+          })
+          results.sent++
+        } catch (e) {
+          results.errors++
+        }
+      }
+    }
+
+    return NextResponse.json({ ok: true, ...results })
   } catch (e: any) {
     console.error('Cron error:', e)
     return NextResponse.json({ error: e?.message }, { status: 500 })
   }
-}
-
-function getWeekNumber(): number {
-  const d = new Date()
-  d.setHours(0,0,0,0)
-  d.setDate(d.getDate() + 4 - (d.getDay() || 7))
-  const yearStart = new Date(d.getFullYear(), 0, 1)
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
 }
