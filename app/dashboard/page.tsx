@@ -239,6 +239,7 @@ export default function Dashboard() {
     setChangeMode(mode)
     setChangeSessionTitle(title)
     setChangeSession([])
+    setChangeLoading(true) // show loading immediately before API call
     sendChangeMessage('', opener)
   }
   const [showMoneyMirror, setShowMoneyMirror] = useState(false)
@@ -580,8 +581,8 @@ export default function Dashboard() {
         setMissionStep(0)
         setMissionNavLocked(true)
       }
-      // Existing users who never set their name — flag for name prompt
-      if (data.missionComplete && !data.userName) {
+      // Existing users who never set their name — block app until name entered
+      if (data.missionComplete && (!data.userName || !data.userName.trim())) {
         setShowNamePrompt(true)
       }
       if (data.proactiveInsights) setProactiveInsights(data.proactiveInsights)
@@ -1943,6 +1944,13 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
       </>
     )
   }
+
+  // ── Show name prompt any time onboarding is done but name is missing ──
+  useEffect(() => {
+    if (onboardingComplete && !userName.trim()) {
+      setShowNamePrompt(true)
+    }
+  }, [onboardingComplete])
 
   const generateMealPlan = async () => {
     setGeneratingMealPlan(true)
@@ -8398,7 +8406,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             },
           ]
 
-          if (changeMode !== 'menu' && changeSession.length > 0) {
+          if (changeMode !== 'menu') {
             // Active session view
             return (
               <div style={{ display: 'flex', flexDirection: 'column' as const, height: 'calc(100vh - 180px)', gap: '0' }}>
