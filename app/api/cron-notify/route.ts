@@ -206,11 +206,11 @@ function buildDailyBriefHtml(u: any): string {
   <div style="background:#1a1810;border:1px solid rgba(212,175,55,0.15);border-radius:12px;padding:16px 20px;margin-bottom:12px;">
     <div style="color:#9a8a6a;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:8px;">💡 AUREUS INSIGHT</div>
     <div style="color:#F5F5F5;font-size:13px;line-height:1.6;">
-      ${dayName === 'Monday' ? 'People who review their finances on Monday spend 12% less across the week. You're already ahead.' :
-        dayName === 'Wednesday' ? 'The average Australian spends $3,000/year on impulse purchases. Knowing your numbers prevents it.' :
-        dayName === 'Friday' ? 'Weekend spending accounts for 35% of most people's discretionary budget. Go in with a number in mind.' :
-        dayName === 'Sunday' ? 'A 10-minute Sunday money review is worth 2 hours of stress on a Wednesday. This is that 10 minutes.' :
-        'Every dollar you track is a dollar you control. Every dollar you ignore controls you.'}
+      ${dayName === 'Monday' ? "People who review their finances on Monday spend 12% less across the week. You are already ahead." :
+        dayName === 'Wednesday' ? "The average Australian spends $3,000/year on impulse purchases. Knowing your numbers prevents it." :
+        dayName === 'Friday' ? "Weekend spending accounts for 35% of most discretionary spending. Go in with a number in mind." :
+        dayName === 'Sunday' ? "A 10-minute Sunday money review is worth 2 hours of stress on a Wednesday. This is that 10 minutes." :
+        "Every dollar you track is a dollar you control. Every dollar you ignore controls you."}
     </div>
   </div>
 
