@@ -10794,7 +10794,7 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
                     {/* The Calendly inline embed widget */}
                     <div
                       className="calendly-inline-widget"
-                      data-url="https://calendly.com/tiana-aureusplutus/30-minute-meeting?hide_gdpr_banner=1&background_color=1a1810&text_color=f5f5f5&primary_color=D4AF37"
+                      data-url="https://calendly.com/tiana-aureusplutus/30min?hide_gdpr_banner=1&background_color=1a1810&text_color=f5f5f5&primary_color=D4AF37"
                       style={{ minWidth: '100%', height: '500px' }}
                     />
                   </div>
