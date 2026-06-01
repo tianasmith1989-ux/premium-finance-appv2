@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
         Authorization: `Bearer ${resendKey}`
       },
       body: JSON.stringify({
-        from: 'Aureus <onboarding@resend.dev>',
+        from: 'Aureus <noreply@aureusplutus.app>',
         to: [partnerEmail],
         subject: `${userName || 'Your friend'}'s Aureus ${freqLabel} snapshot 🏛️`,
         html,
