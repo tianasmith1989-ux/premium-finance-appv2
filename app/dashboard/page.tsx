@@ -3438,7 +3438,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
               setAppMode('budget')
               setShowModeSelector(false)
               setMissionPhase(1)
-              setMissionStep(1)
+              setMissionStep(0)
               setMissionNavLocked(true)
               setActiveTab('chat')
             }}
