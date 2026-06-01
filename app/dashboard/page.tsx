@@ -192,7 +192,57 @@ export default function Dashboard() {
   const [tellAureusResponse, setTellAureusResponse] = useState<string | null>(null)
   const [tellAureusLoading, setTellAureusLoading] = useState(false)
 
-  // ==================== MONEY MIRROR (monthly reflection) ====================
+  // ==================== CHANGE WORK TAB ====================
+  const [changeSession, setChangeSession] = useState<{role:'user'|'coach', content:string}[]>([])
+  const [changeInput, setChangeInput] = useState('')
+  const [changeLoading, setChangeLoading] = useState(false)
+  const [changeMode, setChangeMode] = useState<'menu'|'chat'|'dickens'|'values'|'future'|'mirror'|'identity'>('menu')
+  const [changeSessionTitle, setChangeSessionTitle] = useState('')
+  const changeEndRef = useRef<HTMLDivElement>(null)
+
+  const sendChangeMessage = async (message: string, systemOverride?: string) => {
+    if (!message.trim() && !systemOverride) return
+    const userMsg = message.trim()
+    setChangeInput('')
+    if (userMsg) setChangeSession(prev => [...prev, { role: 'user', content: userMsg }])
+    setChangeLoading(true)
+    try {
+      // Build full system prompt for this session
+      const modeContexts: Record<string, string> = {
+        dickens: `You are running Tony Robbins' Dickens Process. Your role: help the user feel the full emotional weight of the cost of staying the same, AND the extraordinary possibility of change. Ask one powerful question at a time. Build slowly. Never rush to solutions. Use their answers to go deeper — "tell me more about that", "what does that cost the people you love?", "paint that picture". When the pain is real, flip to the compelling future with equal intensity. End by anchoring a single must-do action from their Aureus data.`,
+        values: `You are running a deep values elicitation. Your role: discover what this person ACTUALLY values most — not what they think they should value. Ask "what's most important to you?" then go deeper: "and what does having that give you?" Keep asking "and what does THAT give you?" until you hit bedrock values (love, freedom, security, significance, growth, connection). Once found, help them write an identity statement: "I AM someone who..." Connect every financial decision back to those values.`,
+        future: `You are building the user's Compelling Future. Your role: help them construct a vivid, emotional, specific vision of their ideal life in 5 years. Ask about every dimension: financial freedom, relationships, health, contribution, experiences. Make it specific — not "I want to be wealthy" but "I wake up at 6am in our house in Byron Bay, the mortgage is paid, I have coffee while watching the kids play, I know today's bills are covered for years." Then connect their Aureus numbers to that vision.`,
+        mirror: `You are running the Money Mirror. Ask: "What story are you telling yourself about money?" Then reflect back the EVIDENCE from their life that contradicts the limiting story. Challenge beliefs like "I'm bad with money" with specific counter-evidence. Help them author a new empowering story that's equally true. End with: "Write your new money story in one sentence starting with I AM."`,
+        identity: `You are running an Identity Transformation session. Help the user shift from "I should save money" to "I AM someone who builds wealth." Use Tony Robbins' principle: identity drives behaviour, not the other way around. Ask: who do you need to BECOME to achieve your financial goals? What would that person do differently today? How do they think about money? Help them write 3 identity statements they commit to.`,
+        chat: `You are a world-class change psychology coach modelled on the best of Tony Robbins, NLP, and behavioural science. You combine deep empathy with direct, powerful coaching. You ask one penetrating question at a time. You listen for what's NOT being said. You find leverage — the emotional reasons change becomes non-negotiable. You are warm, direct, and never settle for surface answers. You do NOT give financial product advice. You focus on mindset, behaviour, identity, and the psychology of change.`
+      }
+      const baseSystem = modeContexts[changeMode] || modeContexts.chat
+      const userContext = `User: ${userName || 'Builder'} | Financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, baby step ${currentBabyStep.step}, ${debts.length} debts totalling $${debts.reduce((s:any,d:any)=>s+parseFloat(d.balance||'0'),0).toLocaleString()}, net worth $${netWorth.toLocaleString()} | Why statement: "${whyStatement || 'not set'}" | Core values from previous sessions: "${coreValues.join(', ') || 'not yet discovered'}" | Must statement: "${mustStatement || 'not yet set'}"`
+      const conversationContext = changeSession.slice(-12).map(m => `${m.role === 'user' ? userName || 'User' : 'Coach'}: ${m.content}`).join('\n')
+      const fullSystem = systemOverride || `${baseSystem}\n\n${userContext}\n\nCONVERSATION SO FAR:\n${conversationContext}\n\nIMPORTANT: Ask ONE question at a time. Be direct but warm. Never give lists unless asked. Max 4 sentences per response. Make every word count.`
+      const res = await fetch('/api/budget-coach', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'question',
+          question: userMsg || '[START SESSION]',
+          financialData: { income: incomeStreams, expenses, debts, goals },
+          memory: budgetMemory, countryConfig: currentCountryConfig
+        })
+      })
+      const data = await res.json()
+      const reply = data.message || data.advice || "I'm here. Tell me what's going on."
+      setChangeSession(prev => [...prev, { role: 'coach', content: reply }])
+    } catch { setChangeSession(prev => [...prev, { role: 'coach', content: "I'm here with you. What's coming up for you right now?" }]) }
+    setChangeLoading(false)
+    setTimeout(() => changeEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  }
+
+  const startChangeSession = (mode: typeof changeMode, title: string, opener: string) => {
+    setChangeMode(mode)
+    setChangeSessionTitle(title)
+    setChangeSession([])
+    sendChangeMessage('', opener)
+  }
   const [showMoneyMirror, setShowMoneyMirror] = useState(false)
   const [mirrorStory, setMirrorStory] = useState('')
   const [mirrorResponse, setMirrorResponse] = useState<string | null>(null)
@@ -246,6 +296,7 @@ export default function Dashboard() {
   const [manualSpendCat, setManualSpendCat] = useState('')
   const [manualSpendAmt, setManualSpendAmt] = useState('')
   const [expandedGoalAccel, setExpandedGoalAccel] = useState<string | null>(null)
+  const [showNamePrompt, setShowNamePrompt] = useState(false)
 
   // ==================== RETURN VISIT ENGAGEMENT ====================
   const [returnCard, setReturnCard] = useState<{ title: string; body: string; cta: string; action: string; emoji: string } | null>(null)
@@ -530,6 +581,10 @@ export default function Dashboard() {
         setMissionPhase(1)
         setMissionStep(0)
         setMissionNavLocked(true)
+      }
+      // Existing users who never set their name — flag for name prompt
+      if (data.missionComplete && !data.userName) {
+        setShowNamePrompt(true)
       }
       if (data.proactiveInsights) setProactiveInsights(data.proactiveInsights)
       if (data.insightsGeneratedAt) setInsightsGeneratedAt(data.insightsGeneratedAt)
@@ -4903,6 +4958,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
           {[
             { id: 'home',      label: '🏠 Home' },
             { id: 'chat',      label: '💬 Aureus' },
+            { id: 'change',    label: '⚡ Change' },
             { id: 'dashboard', label: '🏛️ Treasury' },
             { id: 'path',      label: '🛤️ Roadmap' },
             { id: 'wins',      label: `🏆 Wins${wins.length > 0 ? ` (${wins.length})` : ''}` },
@@ -8273,6 +8329,199 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
         {/* ==================== INSIGHTS TAB ==================== */}
         {/* Meal Planning moved to monthly email opt-in in notification settings */}
 
+        {/* ==================== CHANGE WORK TAB ==================== */}
+        {activeTab === 'change' && (() => {
+          const sessions = [
+            {
+              id: 'dickens',
+              icon: '🕯️',
+              title: 'The Dickens Process',
+              subtitle: 'Tony Robbins\' most powerful change tool',
+              desc: 'Explore the full cost of staying the same — then build an emotionally compelling future. Most people change when the pain of staying is greater than the pain of changing. This makes that real.',
+              duration: '15–20 min',
+              intensity: 'Deep',
+              color: '#8B0000',
+              opener: `[DICKENS PROCESS — START] Begin the Dickens Process with ${userName || 'this user'}. Open warmly but powerfully. Ask your first question to explore the cost of their current financial patterns. Make it personal and specific to their situation. One question only.`
+            },
+            {
+              id: 'values',
+              icon: '🧭',
+              title: 'Values Elicitation',
+              subtitle: 'Discover what actually drives you',
+              desc: 'Most people pursue money without knowing why. This session discovers your bedrock values — what money is actually FOR — and connects every financial decision to what matters most.',
+              duration: '20–30 min',
+              intensity: 'Deep',
+              color: '#1a3a5c',
+              opener: `[VALUES ELICITATION — START] Begin a deep values elicitation with ${userName || 'this user'}. Start with the question "What's most important to you in life?" — not what should be, what actually is. One question only. Warm and curious tone.`
+            },
+            {
+              id: 'future',
+              icon: '🌅',
+              title: 'Compelling Future',
+              subtitle: 'Build a vision so vivid it pulls you forward',
+              desc: 'Your brain moves toward what it can clearly see. This session builds a specific, emotional, detailed picture of your ideal life — then Aureus connects your numbers to that vision.',
+              duration: '15–20 min',
+              intensity: 'Inspiring',
+              color: '#1a2a1a',
+              opener: `[COMPELLING FUTURE — START] Begin building a compelling future vision with ${userName || 'this user'}. Ask them to describe their ideal life in 5 years — but make it specific. Not "I want to be wealthy" but the actual day, the feelings, who they're with. One question only.`
+            },
+            {
+              id: 'mirror',
+              icon: '🪞',
+              title: 'The Money Mirror',
+              subtitle: 'Rewrite the story you tell about money',
+              desc: '"I\'m bad with money." "I\'ll never get ahead." These stories drive behaviour more than budgets ever will. This session surfaces your money story, finds the evidence that contradicts it, and helps you author a new one.',
+              duration: '15–20 min',
+              intensity: 'Reflective',
+              color: '#2a1a3a',
+              opener: `[MONEY MIRROR — START] Begin the Money Mirror session with ${userName || 'this user'}. Ask: "What story are you telling yourself about money right now? Be honest — not what you think you should say, what's actually running in the background." One question only.`
+            },
+            {
+              id: 'identity',
+              icon: '⚔️',
+              title: 'Identity Shift',
+              subtitle: 'From "I should" to "I AM"',
+              desc: 'Behaviour follows identity. "I should save more" never works. "I am someone who builds wealth" changes everything. This session helps you define and anchor who you\'re becoming — not who you\'ve been.',
+              duration: '15–20 min',
+              intensity: 'Transformative',
+              color: '#1a1a2a',
+              opener: `[IDENTITY SHIFT — START] Begin an identity transformation session with ${userName || 'this user'}. Ask: "Right now, when you think about money, how would you describe the kind of person you are with money?" One question only. Non-judgmental, curious tone.`
+            },
+            {
+              id: 'chat',
+              icon: '💬',
+              title: 'Open Coaching',
+              subtitle: 'Bring anything. No agenda.',
+              desc: 'Sometimes you need to talk it out. Bring a money problem, a pattern you can\'t break, a decision you\'re wrestling with, or just where you\'re at. The coach will find the thread.',
+              duration: 'Open',
+              intensity: 'Flexible',
+              color: '#1a1810',
+              opener: `[OPEN COACHING — START] ${userName || 'This user'} has opened an open coaching session. Start by asking what\'s present for them today — financially, emotionally, or whatever is taking up space. Warm, open, curious. One question only.`
+            },
+          ]
+
+          if (changeMode !== 'menu' && changeSession.length > 0) {
+            // Active session view
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column' as const, height: 'calc(100vh - 180px)', gap: '0' }}>
+                {/* Session header */}
+                <div style={{ padding: '14px 20px', background: theme.cardBg, borderRadius: '14px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.border }}>
+                  <div>
+                    <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>⚡ CHANGE WORK</div>
+                    <div style={{ color: theme.text, fontSize: '15px', fontWeight: 700 }}>{changeSessionTitle}</div>
+                  </div>
+                  <button onClick={() => setChangeMode('menu')} style={{ padding: '8px 14px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>
+                    ← Back
+                  </button>
+                </div>
+
+                {/* Messages */}
+                <div style={{ flex: 1, overflowY: 'auto' as const, display: 'flex', flexDirection: 'column' as const, gap: '16px', paddingBottom: '12px' }}>
+                  {changeSession.map((msg, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                      {msg.role === 'coach' && (
+                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 900, color: '#111111', flexShrink: 0, marginRight: '10px', marginTop: '2px' }}>A</div>
+                      )}
+                      <div style={{ maxWidth: '82%', padding: '14px 18px', borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? '#111111' : theme.text, fontSize: '15px', lineHeight: 1.7, border: msg.role === 'coach' ? '1px solid ' + theme.border : 'none' }}>
+                        {renderChatMessage(msg.content, msg.role === 'user')}
+                      </div>
+                    </div>
+                  ))}
+                  {changeLoading && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 900, color: '#111111' }}>A</div>
+                      <div style={{ padding: '14px 18px', background: theme.cardBg, borderRadius: '18px 18px 18px 4px', border: '1px solid ' + theme.border }}>
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', height: '20px' }}>
+                          {[0,1,2].map(i => <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.accent, animation: `pulse 1.2s ${i*0.2}s infinite` }} />)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={changeEndRef} />
+                </div>
+
+                {/* Input */}
+                <div style={{ display: 'flex', gap: '10px', paddingTop: '12px', borderTop: '1px solid ' + theme.border }}>
+                  <textarea
+                    value={changeInput}
+                    onChange={e => setChangeInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (changeInput.trim() && !changeLoading) sendChangeMessage(changeInput) } }}
+                    placeholder="Respond honestly..."
+                    style={{ ...inputStyle, flex: 1, resize: 'none' as const, height: '52px', fontSize: '14px', lineHeight: 1.5 }}
+                  />
+                  <button onClick={() => { if (changeInput.trim() && !changeLoading) sendChangeMessage(changeInput) }} disabled={!changeInput.trim() || changeLoading}
+                    style={{ padding: '0 20px', background: changeInput.trim() ? 'linear-gradient(135deg, #D4AF37, #BC6A1F)' : theme.border, color: changeInput.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '12px', cursor: changeInput.trim() ? 'pointer' : 'default', fontWeight: 800, fontSize: '15px', flexShrink: 0 }}>
+                    →
+                  </button>
+                </div>
+              </div>
+            )
+          }
+
+          // Menu view
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
+              {/* Header */}
+              <div style={{ padding: '24px 24px 20px', background: 'linear-gradient(135deg, #1a1208, #111111)', borderRadius: '20px', border: '1px solid ' + theme.accent + '30' }}>
+                <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '2px', marginBottom: '8px' }}>⚡ CHANGE WORK</div>
+                <h2 style={{ color: theme.text, fontSize: '24px', fontWeight: 900, margin: '0 0 10px 0', fontFamily: 'Cinzel, serif', lineHeight: 1.2 }}>
+                  The fastest path to financial freedom isn't a better budget.
+                </h2>
+                <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.7, margin: '0 0 16px 0' }}>
+                  It's becoming the person for whom financial freedom is inevitable. These sessions are modelled on the change methodology that top coaches charge thousands per hour to deliver.
+                </p>
+                {(mustStatement || identityStatement) && (
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                    {mustStatement && (
+                      <div style={{ padding: '10px 14px', background: theme.accent + '15', borderRadius: '8px', border: '1px solid ' + theme.accent + '30' }}>
+                        <div style={{ color: theme.accent, fontSize: '10px', fontWeight: 700, letterSpacing: '1px', marginBottom: '3px' }}>YOUR MUST STATEMENT</div>
+                        <div style={{ color: theme.text, fontSize: '13px', fontStyle: 'italic' }}>"{mustStatement}"</div>
+                      </div>
+                    )}
+                    {identityStatement && (
+                      <div style={{ padding: '10px 14px', background: theme.accent + '10', borderRadius: '8px', border: '1px solid ' + theme.accent + '20' }}>
+                        <div style={{ color: theme.accent, fontSize: '10px', fontWeight: 700, letterSpacing: '1px', marginBottom: '3px' }}>YOUR IDENTITY</div>
+                        <div style={{ color: theme.text, fontSize: '13px', fontStyle: 'italic' }}>"{identityStatement}"</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Session cards */}
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
+                {sessions.map(session => (
+                  <button key={session.id} onClick={() => startChangeSession(session.id as any, session.title, session.opener)}
+                    style={{ padding: '20px 22px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '16px', cursor: 'pointer', textAlign: 'left' as const, transition: 'border-color 0.2s', display: 'flex', gap: '18px', alignItems: 'flex-start' }}>
+                    <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: session.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>
+                      {session.icon}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                        <div style={{ color: theme.text, fontSize: '16px', fontWeight: 800 }}>{session.title}</div>
+                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: '12px' }}>
+                          <span style={{ padding: '2px 8px', background: theme.bg, border: '1px solid ' + theme.border, borderRadius: '20px', color: theme.textMuted, fontSize: '10px' }}>{session.duration}</span>
+                          <span style={{ padding: '2px 8px', background: theme.accent + '15', border: '1px solid ' + theme.accent + '30', borderRadius: '20px', color: theme.accent, fontSize: '10px' }}>{session.intensity}</span>
+                        </div>
+                      </div>
+                      <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>{session.subtitle}</div>
+                      <div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.5 }}>{session.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Wisdom quote */}
+              <div style={{ padding: '16px 20px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.border, textAlign: 'center' as const }}>
+                <p style={{ color: theme.textMuted, fontSize: '13px', fontStyle: 'italic', margin: 0, lineHeight: 1.6 }}>
+                  "It is not the man who has too little, but the man who craves more, that is poor."
+                </p>
+                <div style={{ color: theme.accent + '80', fontSize: '11px', marginTop: '6px' }}>— Seneca</div>
+              </div>
+            </div>
+          )
+        })()}
+
         {activeTab === 'insights' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
 
@@ -9963,6 +10212,33 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
         </div>
       )}
 
+      {/* ==================== NAME PROMPT (existing users) ==================== */}
+      {showNamePrompt && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.97)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '40px 32px', maxWidth: '440px', width: '100%', textAlign: 'center' as const }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: '36px', color: '#111111', fontWeight: 900, boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}>A</div>
+            <h2 style={{ color: theme.text, fontSize: '26px', fontWeight: 800, margin: '0 0 10px 0', fontFamily: 'Cinzel, serif' }}>One quick thing.</h2>
+            <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 28px 0' }}>
+              Aureus has been calling you "Builder" — but that's not your name. What should Aureus call you?
+            </p>
+            <input
+              placeholder="Your first name"
+              value={userName}
+              onChange={e => setUserName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && userName.trim()) setShowNamePrompt(false) }}
+              style={{ ...inputStyle, width: '100%', fontSize: '20px', padding: '16px 20px', textAlign: 'center' as const, marginBottom: '16px', borderColor: theme.accent + '60' }}
+              autoFocus
+            />
+            <button
+              onClick={() => { if (userName.trim()) setShowNamePrompt(false) }}
+              disabled={!userName.trim()}
+              style={{ width: '100%', padding: '16px', background: userName.trim() ? 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)' : theme.border, color: userName.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '14px', cursor: userName.trim() ? 'pointer' : 'default', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
+              {userName.trim() ? `Nice to meet you, ${userName.trim()} →` : 'Enter your name'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ==================== RETURN VISIT CARD ==================== */}
       {returnCard && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1090, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setReturnCard(null)}>
@@ -10583,42 +10859,7 @@ Tracking with Aureus 🏛️`
                       <option value="fortnightly">Fortnightly</option>
                     </select>
                   </div>
-                  <div style={{ padding: '12px 14px', background: theme.accent + '08', borderRadius: '10px', border: '1px solid ' + theme.accent + '20' }}>
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginBottom: monthlyMealPlanOptIn ? '12px' : '0' }}>
-                      <input type="checkbox" checked={monthlyMealPlanOptIn} onChange={e => setMonthlyMealPlanOptIn(e.target.checked)} style={{ accentColor: theme.accent, marginTop: '2px', flexShrink: 0 }} />
-                      <div>
-                        <div style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>🍽️ Monthly meal plan — sent to YOU</div>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '2px', lineHeight: 1.5 }}>
-                          On the 1st of each month, Aureus emails <strong style={{ color: theme.text }}>you</strong> a personalised 7-day budget meal plan — 
-                          not your partner. Built around your household size and grocery budget. Nothing to open in the app.
-                        </div>
-                      </div>
-                    </label>
-                    {monthlyMealPlanOptIn && (
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                        <div style={{ flex: 1 }}>
-                          <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>HOUSEHOLD SIZE</label>
-                          <select value={mealPlanPrefs?.people || '4'} onChange={e => setMealPlanPrefs((prev: any) => ({...prev, people: e.target.value}))} style={{...inputStyle, width: '100%', fontSize: '13px'}}>
-                            {['1','2','3','4','5','6'].map(n => <option key={n} value={n}>{n} {n === '1' ? 'person' : 'people'}</option>)}
-                          </select>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>WEEKLY GROCERY BUDGET</label>
-                          <input type="number" placeholder="e.g. 150" value={mealPlanPrefs?.budget || ''} onChange={e => setMealPlanPrefs((prev: any) => ({...prev, budget: e.target.value}))} style={{...inputStyle, width: '100%', fontSize: '13px'}} />
-                        </div>
-                      </div>
-                    )}
-                    {monthlyMealPlanOptIn && (
-                      <div style={{ marginTop: '8px' }}>
-                        <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>ANY DISLIKES OR DIETARY NEEDS? (optional)</label>
-                        <input placeholder="e.g. no seafood, gluten free..." value={mealPlanPrefs?.dislikes || ''} onChange={e => setMealPlanPrefs((prev: any) => ({...prev, dislikes: e.target.value}))} style={{...inputStyle, width: '100%', fontSize: '13px'}} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div style={{ padding:'12px 14px', background:theme.bg, borderRadius:'10px', border:'1px solid '+theme.border, marginBottom:'16px', fontSize:'12px', color:theme.textMuted, lineHeight: 1.6 }}>
-                  📧 <strong style={{ color: theme.text }}>What your partner receives each week:</strong> your saving rate, monthly surplus, top goal progress bar, your most recent win, and your next action from Aureus. No account balances, no debt details — just progress and momentum. Nothing sensitive.
-                </div>
+                <div style={{ padding: '12px 14px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border, marginBottom: '16px', fontSize: '12px', color: theme.textMuted, lineHeight: 1.6 }}>📧 <strong style={{ color: theme.text }}>What your partner receives each week:</strong> your saving rate, monthly surplus, top goal progress, most recent win, and next coach action. No account balances or debt details. Nothing sensitive.</div>
                 <button onClick={async () => {
                   if (!accountabilityEmail || !accountabilityName) return
                   setAccountabilitySending(true)
@@ -10645,6 +10886,7 @@ Tracking with Aureus 🏛️`
                   style={{ width:'100%', padding:'14px', background:theme.accent, color:'#111111', border:'none', borderRadius:'12px', cursor:'pointer', fontWeight:800, fontSize:'15px', opacity:!accountabilityEmail||!accountabilityName?0.5:1 }}>
                   {accountabilitySending ? '⏳ Sending...' : `Send snapshot to ${accountabilityName || 'partner'} →`}
                 </button>
+              </div>
               </>
             )}
           </div>
@@ -10828,29 +11070,68 @@ Tracking with Aureus 🏛️`
                 ))}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
-                <button onClick={async () => {
-                  if ('Notification' in window) {
-                    const permission = await Notification.requestPermission()
-                    if (permission === 'granted') {
-                      new Notification('Aureus', { body: '✅ Browser notifications enabled!' })
-                    }
-                  }
-                }} style={{ ...btnSuccess, padding: '14px' }}>
-                  🔔 Enable browser notifications
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>YOUR EMAIL — for daily brief, bill reminders & meal plan</label>
+                  <input
+                    type="email"
+                    placeholder="your@email.com"
+                    value={notificationEmail}
+                    onChange={e => setNotificationEmail(e.target.value)}
+                    style={{ ...inputStyle, width: '100%' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>SEND FREQUENCY</label>
+                  <select value={emailNotifFrequency} onChange={e => setEmailNotifFrequency(e.target.value as any)} style={{ ...inputStyle, width: '100%' }}>
+                    <option value="weekly">Weekly snapshot</option>
+                    <option value="fortnightly">Fortnightly snapshot</option>
+                  </select>
+                </div>
+
+                {/* Monthly meal plan opt-in — goes to USER's email above */}
+                <div style={{ padding: '12px 14px', background: theme.accent + '08', borderRadius: '10px', border: '1px solid ' + theme.accent + '20' }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={monthlyMealPlanOptIn} onChange={e => setMonthlyMealPlanOptIn(e.target.checked)} style={{ accentColor: theme.accent, marginTop: '2px', flexShrink: 0 }} />
+                    <div>
+                      <div style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>🍽️ Monthly meal plan — sent to you</div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '2px', lineHeight: 1.5 }}>
+                        On the 1st of each month, Aureus emails <strong style={{ color: theme.text }}>you</strong> a personalised 7-day budget meal plan. Sent to the email above.
+                      </div>
+                    </div>
+                  </label>
+                  {monthlyMealPlanOptIn && (
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>HOUSEHOLD SIZE</label>
+                        <select value={mealPlanPrefs?.people || '4'} onChange={e => setMealPlanPrefs((prev: any) => ({ ...prev, people: e.target.value }))} style={{ ...inputStyle, width: '100%', fontSize: '13px' }}>
+                          {['1','2','3','4','5','6'].map(n => <option key={n} value={n}>{n} {n === '1' ? 'person' : 'people'}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>WEEKLY GROCERY BUDGET</label>
+                        <input type="number" placeholder="e.g. 150" value={mealPlanPrefs?.budget || ''} onChange={e => setMealPlanPrefs((prev: any) => ({ ...prev, budget: e.target.value }))} style={{ ...inputStyle, width: '100%', fontSize: '13px' }} />
+                      </div>
+                    </div>
+                  )}
+                  {monthlyMealPlanOptIn && (
+                    <div style={{ marginTop: '8px' }}>
+                      <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>DISLIKES / DIETARY NEEDS (optional)</label>
+                      <input placeholder="e.g. no seafood, gluten free..." value={mealPlanPrefs?.dislikes || ''} onChange={e => setMealPlanPrefs((prev: any) => ({ ...prev, dislikes: e.target.value }))} style={{ ...inputStyle, width: '100%', fontSize: '13px' }} />
+                    </div>
+                  )}
+                </div>
+
+                <button onClick={handleEnableEmail} disabled={!notificationEmail || !notificationEmail.includes('@')}
+                  style={{ padding: '14px', background: notificationEmail?.includes('@') ? theme.accent : theme.border, color: notificationEmail?.includes('@') ? '#111111' : theme.textMuted, border: 'none', borderRadius: '10px', cursor: notificationEmail?.includes('@') ? 'pointer' : 'default', fontWeight: 800, fontSize: '15px' }}>
+                  {notificationEmail?.includes('@') ? '✅ Save & enable email notifications' : 'Enter your email above'}
                 </button>
-                {pwaInstallPrompt && (
-                  <button onClick={async () => {
-                    if (pwaInstallPrompt) {
-                      pwaInstallPrompt.prompt()
-                      const { outcome } = await pwaInstallPrompt.userChoice
-                      if (outcome === 'accepted') setPwaInstallPrompt(null)
-                    }
-                  }} style={{ ...btnPrimary, padding: '14px' }}>
-                    📱 Add Aureus to home screen (for real push notifications)
+                {notificationsEnabled && (
+                  <button onClick={handleDisable} style={{ padding: '10px', background: 'transparent', border: '1px solid ' + theme.danger + '40', borderRadius: '8px', color: theme.danger, cursor: 'pointer', fontSize: '13px' }}>
+                    Turn off notifications
                   </button>
                 )}
-                <button onClick={() => setShowNotifSetup(false)} style={{ padding: '12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
+                <button onClick={() => setShowNotifSetup(false)} style={{ padding: '10px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>
                   Not now
                 </button>
               </div>
