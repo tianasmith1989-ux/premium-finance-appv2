@@ -4,8 +4,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 
-const FROM = 'Aureus Support <onboarding@resend.dev>'
-const TEAM_EMAIL = process.env.SUPPORT_EMAIL || 'tianasmith1989@gmail.com'
+const FROM = 'Aureus Support <noreply@aureusplutus.app>'
+const TEAM_EMAIL = process.env.SUPPORT_EMAIL || 'hello@aureusplutus.app'
 
 export async function POST(request: NextRequest) {
   try {
