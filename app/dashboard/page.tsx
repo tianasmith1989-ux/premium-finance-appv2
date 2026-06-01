@@ -204,35 +204,33 @@ export default function Dashboard() {
     if (!message.trim() && !systemOverride) return
     const userMsg = message.trim()
     setChangeInput('')
-    if (userMsg) setChangeSession(prev => [...prev, { role: 'user', content: userMsg }])
+    if (userMsg && userMsg !== '[START SESSION]') {
+      setChangeSession(prev => [...prev, { role: 'user', content: userMsg }])
+    }
     setChangeLoading(true)
     try {
-      // Build full system prompt for this session
-      const modeContexts: Record<string, string> = {
-        dickens: `You are running Tony Robbins' Dickens Process. Your role: help the user feel the full emotional weight of the cost of staying the same, AND the extraordinary possibility of change. Ask one powerful question at a time. Build slowly. Never rush to solutions. Use their answers to go deeper — "tell me more about that", "what does that cost the people you love?", "paint that picture". When the pain is real, flip to the compelling future with equal intensity. End by anchoring a single must-do action from their Aureus data.`,
-        values: `You are running a deep values elicitation. Your role: discover what this person ACTUALLY values most — not what they think they should value. Ask "what's most important to you?" then go deeper: "and what does having that give you?" Keep asking "and what does THAT give you?" until you hit bedrock values (love, freedom, security, significance, growth, connection). Once found, help them write an identity statement: "I AM someone who..." Connect every financial decision back to those values.`,
-        future: `You are building the user's Compelling Future. Your role: help them construct a vivid, emotional, specific vision of their ideal life in 5 years. Ask about every dimension: financial freedom, relationships, health, contribution, experiences. Make it specific — not "I want to be wealthy" but "I wake up at 6am in our house in Byron Bay, the mortgage is paid, I have coffee while watching the kids play, I know today's bills are covered for years." Then connect their Aureus numbers to that vision.`,
-        mirror: `You are running the Money Mirror. Ask: "What story are you telling yourself about money?" Then reflect back the EVIDENCE from their life that contradicts the limiting story. Challenge beliefs like "I'm bad with money" with specific counter-evidence. Help them author a new empowering story that's equally true. End with: "Write your new money story in one sentence starting with I AM."`,
-        identity: `You are running an Identity Transformation session. Help the user shift from "I should save money" to "I AM someone who builds wealth." Use Tony Robbins' principle: identity drives behaviour, not the other way around. Ask: who do you need to BECOME to achieve your financial goals? What would that person do differently today? How do they think about money? Help them write 3 identity statements they commit to.`,
-        chat: `You are a world-class change psychology coach modelled on the best of Tony Robbins, NLP, and behavioural science. You combine deep empathy with direct, powerful coaching. You ask one penetrating question at a time. You listen for what's NOT being said. You find leverage — the emotional reasons change becomes non-negotiable. You are warm, direct, and never settle for surface answers. You do NOT give financial product advice. You focus on mindset, behaviour, identity, and the psychology of change.`
-      }
-      const baseSystem = modeContexts[changeMode] || modeContexts.chat
-      const userContext = `User: ${userName || 'Builder'} | Financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, baby step ${currentBabyStep.step}, ${debts.length} debts totalling $${debts.reduce((s:any,d:any)=>s+parseFloat(d.balance||'0'),0).toLocaleString()}, net worth $${netWorth.toLocaleString()} | Why statement: "${whyStatement || 'not set'}" | Core values from previous sessions: "${coreValues.join(', ') || 'not yet discovered'}" | Must statement: "${mustStatement || 'not yet set'}"`
-      const conversationContext = changeSession.slice(-12).map(m => `${m.role === 'user' ? userName || 'User' : 'Coach'}: ${m.content}`).join('\n')
-      const fullSystem = systemOverride || `${baseSystem}\n\n${userContext}\n\nCONVERSATION SO FAR:\n${conversationContext}\n\nIMPORTANT: Ask ONE question at a time. Be direct but warm. Never give lists unless asked. Max 4 sentences per response. Make every word count.`
-      const res = await fetch('/api/budget-coach', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const financialContext = `Financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, baby step ${currentBabyStep.step}, ${debts.length} debts totalling $${debts.reduce((s: any, d: any) => s + parseFloat(d.balance || '0'), 0).toLocaleString()}, net worth $${netWorth.toLocaleString()}, ${goals.length} active goals`
+      const res = await fetch('/api/change-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mode: 'question',
-          question: userMsg || '[START SESSION]',
-          financialData: { income: incomeStreams, expenses, debts, goals },
-          memory: budgetMemory, countryConfig: currentCountryConfig
+          sessionType: changeMode,
+          message: userMsg || '[START SESSION]',
+          conversationHistory: changeSession.slice(-16),
+          userName,
+          financialContext,
+          coreValues,
+          identityStatement,
+          mustStatement,
+          whyStatement
         })
       })
       const data = await res.json()
-      const reply = data.message || data.advice || "I'm here. Tell me what's going on."
+      const reply = data.message || "I'm here with you. What's present for you right now?"
       setChangeSession(prev => [...prev, { role: 'coach', content: reply }])
-    } catch { setChangeSession(prev => [...prev, { role: 'coach', content: "I'm here with you. What's coming up for you right now?" }]) }
+    } catch {
+      setChangeSession(prev => [...prev, { role: 'coach', content: "I'm here. Tell me what's going on." }])
+    }
     setChangeLoading(false)
     setTimeout(() => changeEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
   }
