@@ -192,7 +192,18 @@ export default function Dashboard() {
   const [tellAureusResponse, setTellAureusResponse] = useState<string | null>(null)
   const [tellAureusLoading, setTellAureusLoading] = useState(false)
 
-  // ==================== CHANGE WORK TAB ====================
+  // ==================== HELP & SUPPORT ====================
+  const [showSupport, setShowSupport] = useState(false)
+  const [supportTab, setSupportTab] = useState<'chat'|'book'|'email'>('chat')
+  const [supportMessages, setSupportMessages] = useState<{role:'user'|'agent', content:string}[]>([])
+  const [supportInput, setSupportInput] = useState('')
+  const [supportLoading, setSupportLoading] = useState(false)
+  const [supportName, setSupportName] = useState('')
+  const [supportEmail, setSupportEmail] = useState('')
+  const [supportMessage, setSupportMessage] = useState('')
+  const [supportSent, setSupportSent] = useState(false)
+  const [supportSending, setSupportSending] = useState(false)
+  const supportEndRef = useRef<HTMLDivElement>(null)
   const [changeSession, setChangeSession] = useState<{role:'user'|'coach', content:string}[]>([])
   const [changeInput, setChangeInput] = useState('')
   const [changeLoading, setChangeLoading] = useState(false)
@@ -581,8 +592,9 @@ export default function Dashboard() {
         setMissionStep(0)
         setMissionNavLocked(true)
       }
-      // Existing users who never set their name — block app until name entered
-      if (data.missionComplete && (!data.userName || !data.userName.trim())) {
+      // Returning users who completed onboarding without entering a name
+      // Only show prompt if they fully completed onboarding (missionComplete = true)
+      if (data.missionComplete === true && (!data.userName || !data.userName.trim())) {
         setShowNamePrompt(true)
       }
       if (data.proactiveInsights) setProactiveInsights(data.proactiveInsights)
@@ -1918,7 +1930,54 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
     setFetchingRecipe(null)
   }
 
-  // ── Chat message markdown renderer (handles links, bold, bullets) ──
+  // ── Support AI chat handler ──
+  const handleSupportMessage = async (message: string) => {
+    setSupportLoading(true)
+    try {
+      const res = await fetch('/api/budget-coach', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'question',
+          question: `[AUREUS SUPPORT — APP HELP ONLY. Answer the support question below. You are a friendly app support agent, NOT a financial coach.]
+
+APP STRUCTURE users need to know:
+- TABS: Home, 💬 Aureus (chat), ⚡ Change, 🏛️ Treasury, 📈 Grow & FIRE, 🏆 Wins, 🧠 Insights
+- INCOME/EXPENSES/DEBTS/GOALS/ASSETS: all in Treasury tab
+- CHANGE WORK: ⚡ Change tab — Dickens Process, Values, Compelling Future, Money Mirror, Identity, Open Coaching
+- NOTIFICATIONS + PARTNER EMAIL + MEAL PLAN: Insights tab → scroll to notification section
+- NAME: Insights tab → Settings → Your Profile
+- COACH CHAT: 💬 Aureus tab
+- SUPPORT: tap the ? button (bottom of screen)
+
+User question: "${message}"
+
+Answer in 2-4 sentences. Be specific about which tab and section. If technical error, suggest refresh then email hello@aureus.com.au`,
+          financialData: {}, memory: {}, countryConfig: currentCountryConfig
+        })
+      })
+      const data = await res.json()
+      setSupportMessages(prev => [...prev, { role: 'agent', content: data.message || data.advice || 'Try refreshing the app. If the issue persists, email hello@aureus.com.au and we\'ll sort it out.' }])
+    } catch {
+      setSupportMessages(prev => [...prev, { role: 'agent', content: "I'm having trouble connecting. Please email hello@aureus.com.au and we'll help you directly." }])
+    }
+    setSupportLoading(false)
+    setTimeout(() => supportEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  }
+
+  // ── Load Calendly widget when booking tab is opened ──
+  useEffect(() => {
+    if (showSupport && supportTab === 'book') {
+      if (!document.getElementById('calendly-script')) {
+        const script = document.createElement('script')
+        script.id = 'calendly-script'
+        script.src = 'https://assets.calendly.com/assets/external/widget.js'
+        script.async = true
+        document.head.appendChild(script)
+      }
+    }
+  }, [showSupport, supportTab])
+
+  // ── Chat message markdown renderer ──
   const renderChatMessage = (content: string, isUser: boolean) => {
     if (isUser) return <span>{content}</span>
     const lines = content.split('\n')
@@ -1944,13 +2003,6 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
       </>
     )
   }
-
-  // ── Show name prompt any time onboarding is done but name is missing ──
-  useEffect(() => {
-    if (onboardingComplete && !userName.trim()) {
-      setShowNamePrompt(true)
-    }
-  }, [onboardingComplete])
 
   const generateMealPlan = async () => {
     setGeneratingMealPlan(true)
@@ -3515,8 +3567,8 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                 </>
               )}
               <button onClick={() => { setMissionComplete(true); setMissionNavLocked(false); setOnboardingComplete(true); setActiveTab('home' as any) }}
-                style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', marginTop: '14px', fontSize: '13px' }}>
-                Skip setup — I'll do this later
+                style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', marginTop: '14px', fontSize: '12px', opacity: 0.5 }}>
+                I've used Aureus before — skip setup
               </button>
             </div>
           )}
@@ -10214,6 +10266,179 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
                 </button>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Floating help button ── */}
+      {onboardingComplete && !showSupport && (
+        <button onClick={() => { setShowSupport(true); setSupportTab('chat'); setSupportMessages([]) }}
+          style={{ position: 'fixed' as const, bottom: '80px', right: '16px', width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', color: '#111111', border: 'none', cursor: 'pointer', fontSize: '20px', fontWeight: 900, zIndex: 999, boxShadow: '0 4px 20px rgba(212,175,55,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          title="Help & Support">
+          ?
+        </button>
+      )}
+
+      {/* ==================== HELP & SUPPORT MODAL ==================== */}
+      {showSupport && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.90)', zIndex: 1060, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setShowSupport(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px 24px 0 0', padding: '0', maxWidth: '520px', width: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' as const }} onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div>
+                  <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>AUREUS SUPPORT</div>
+                  <div style={{ color: theme.text, fontSize: '18px', fontWeight: 800 }}>How can we help?</div>
+                </div>
+                <button onClick={() => setShowSupport(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '22px', padding: '4px' }}>×</button>
+              </div>
+              {/* Tab switcher */}
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', background: theme.bg, padding: '4px', borderRadius: '10px' }}>
+                {([['chat', '💬 Ask AI'], ['book', '📅 Book a Call'], ['email', '✉️ Email Us']] as const).map(([id, label]) => (
+                  <button key={id} onClick={() => setSupportTab(id)}
+                    style={{ flex: 1, padding: '8px 4px', background: supportTab === id ? theme.cardBg : 'transparent', border: supportTab === id ? '1px solid ' + theme.border : 'none', borderRadius: '8px', color: supportTab === id ? theme.text : theme.textMuted, cursor: 'pointer', fontSize: '12px', fontWeight: supportTab === id ? 700 : 400, transition: 'all 0.15s' }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tab content */}
+            <div style={{ flex: 1, overflowY: 'auto' as const, padding: '0 24px 24px' }}>
+
+              {/* ── AI SUPPORT CHAT ── */}
+              {supportTab === 'chat' && (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, height: '420px' }}>
+                  <div style={{ flex: 1, overflowY: 'auto' as const, display: 'flex', flexDirection: 'column' as const, gap: '12px', paddingBottom: '12px' }}>
+                    {supportMessages.length === 0 && (
+                      <div style={{ padding: '16px', background: theme.bg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                        <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>👋 Hi! I'm Aureus Support.</div>
+                        <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, margin: '0 0 12px' }}>Ask me anything about using the app — how to add income, find a feature, fix something not working, or understand how anything works.</p>
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
+                          {['How do I add my income?', 'Where is the debt tracker?', 'Why isn\'t my email sending?', 'How does the change work tab work?'].map(q => (
+                            <button key={q} onClick={() => {
+                              setSupportMessages([{ role: 'user', content: q }])
+                              handleSupportMessage(q)
+                            }} style={{ padding: '8px 12px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px', textAlign: 'left' as const }}>
+                              {q} →
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {supportMessages.map((msg, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                        <div style={{ maxWidth: '85%', padding: '12px 16px', borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: msg.role === 'user' ? theme.accent : theme.bg, color: msg.role === 'user' ? '#111111' : theme.text, fontSize: '14px', lineHeight: 1.6, border: msg.role === 'agent' ? '1px solid ' + theme.border : 'none' }}>
+                          {renderChatMessage(msg.content, msg.role === 'user')}
+                        </div>
+                      </div>
+                    ))}
+                    {supportLoading && (
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', padding: '12px 16px', background: theme.bg, borderRadius: '16px', width: 'fit-content', border: '1px solid ' + theme.border }}>
+                        {[0,1,2].map(i => <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.accent, opacity: 0.6 }} />)}
+                      </div>
+                    )}
+                    <div ref={supportEndRef} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '1px solid ' + theme.border }}>
+                    <input value={supportInput} onChange={e => setSupportInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && supportInput.trim() && !supportLoading) { setSupportMessages(prev => [...prev, { role: 'user', content: supportInput }]); handleSupportMessage(supportInput); setSupportInput('') } }}
+                      placeholder="Ask anything about Aureus..."
+                      style={{ ...inputStyle, flex: 1, fontSize: '14px' }} />
+                    <button onClick={() => { if (supportInput.trim() && !supportLoading) { setSupportMessages(prev => [...prev, { role: 'user', content: supportInput }]); handleSupportMessage(supportInput); setSupportInput('') } }}
+                      disabled={!supportInput.trim() || supportLoading}
+                      style={{ padding: '0 16px', background: supportInput.trim() ? theme.accent : theme.border, color: supportInput.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '10px', cursor: supportInput.trim() ? 'pointer' : 'default', fontWeight: 700 }}>→</button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── BOOK A CALL ── */}
+              {supportTab === 'book' && (
+                <div>
+                  <div style={{ padding: '16px 18px', background: theme.bg, borderRadius: '14px', border: '1px solid ' + theme.border, marginBottom: '16px' }}>
+                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>📅 30-minute Aureus session</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6 }}>
+                      Book a free 30-minute call with the Aureus team. We'll walk through your budget setup, answer questions, and make sure you're getting the most out of the app.
+                    </div>
+                  </div>
+
+                  {/* Calendly embed container */}
+                  <div style={{ borderRadius: '14px', overflow: 'hidden', border: '1px solid ' + theme.border, background: theme.bg, minHeight: '500px' }}>
+                    {/* The Calendly inline embed widget */}
+                    <div
+                      className="calendly-inline-widget"
+                      data-url="https://calendly.com/YOUR_CALENDLY_USERNAME/aureus-support?hide_gdpr_banner=1&background_color=1a1810&text_color=f5f5f5&primary_color=D4AF37"
+                      style={{ minWidth: '100%', height: '500px' }}
+                    />
+                  </div>
+
+                  <div style={{ marginTop: '14px', padding: '12px 16px', background: theme.accent + '08', borderRadius: '10px', border: '1px solid ' + theme.accent + '25', fontSize: '12px', color: theme.textMuted, lineHeight: 1.6 }}>
+                    <strong style={{ color: theme.text }}>What happens after you book:</strong> You'll receive a confirmation email with a Google Meet link. We'll also get a notification so we're ready. Sessions are free during beta.
+                  </div>
+                </div>
+              )}
+
+              {/* ── EMAIL SUPPORT ── */}
+              {supportTab === 'email' && (
+                <div>
+                  {supportSent ? (
+                    <div style={{ textAlign: 'center' as const, padding: '40px 20px' }}>
+                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
+                      <div style={{ color: theme.text, fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>Message sent!</div>
+                      <div style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, marginBottom: '20px' }}>We'll get back to you within 24 hours at the email you provided.</div>
+                      <button onClick={() => { setSupportSent(false); setSupportMessage(''); setSupportEmail(''); setSupportName('') }}
+                        style={{ padding: '10px 20px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' }}>
+                        Send another →
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                      <div style={{ padding: '12px 16px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.border, fontSize: '13px', color: theme.textMuted, lineHeight: 1.6 }}>
+                        We typically respond within 24 hours. For urgent issues, use the AI chat above or book a call.
+                      </div>
+                      <div>
+                        <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px', fontWeight: 700, letterSpacing: '0.5px' }}>YOUR NAME</label>
+                        <input value={supportName} onChange={e => setSupportName(e.target.value)} placeholder="First name" style={{ ...inputStyle, width: '100%' }} />
+                      </div>
+                      <div>
+                        <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px', fontWeight: 700, letterSpacing: '0.5px' }}>YOUR EMAIL</label>
+                        <input type="email" value={supportEmail} onChange={e => setSupportEmail(e.target.value)} placeholder="your@email.com" style={{ ...inputStyle, width: '100%' }} />
+                      </div>
+                      <div>
+                        <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px', fontWeight: 700, letterSpacing: '0.5px' }}>HOW CAN WE HELP?</label>
+                        <textarea value={supportMessage} onChange={e => setSupportMessage(e.target.value)}
+                          placeholder="Describe what you need help with, what you've tried, and any error messages you're seeing..."
+                          style={{ ...inputStyle, width: '100%', height: '120px', resize: 'none' as const, fontSize: '14px', lineHeight: 1.6 }} />
+                      </div>
+                      <button onClick={async () => {
+                        if (!supportName || !supportEmail || !supportMessage) return
+                        setSupportSending(true)
+                        try {
+                          await fetch('/api/send-support', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              name: supportName,
+                              email: supportEmail,
+                              message: supportMessage,
+                              userName
+                            })
+                          })
+                          setSupportSent(true)
+                        } catch { alert('Could not send — please email hello@aureus.com.au directly.') }
+                        setSupportSending(false)
+                      }} disabled={!supportName || !supportEmail || !supportMessage || supportSending}
+                        style={{ padding: '14px', background: (supportName && supportEmail && supportMessage) ? 'linear-gradient(135deg, #D4AF37, #BC6A1F)' : theme.border, color: (supportName && supportEmail && supportMessage) ? '#111111' : theme.textMuted, border: 'none', borderRadius: '12px', cursor: (supportName && supportEmail && supportMessage) ? 'pointer' : 'default', fontWeight: 800, fontSize: '15px' }}>
+                        {supportSending ? '⏳ Sending...' : 'Send message →'}
+                      </button>
+                      <div style={{ textAlign: 'center' as const, color: theme.textMuted, fontSize: '12px' }}>
+                        Or email us directly: <a href="mailto:hello@aureus.com.au" style={{ color: theme.accent }}>hello@aureus.com.au</a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
           </div>
         </div>
       )}
