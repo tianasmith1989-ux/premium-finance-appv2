@@ -10794,7 +10794,7 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
                     {/* The Calendly inline embed widget */}
                     <div
                       className="calendly-inline-widget"
-                      data-url="https://calendly.com/YOUR_CALENDLY_USERNAME/aureusplutus-support?hide_gdpr_banner=1&background_color=1a1810&text_color=f5f5f5&primary_color=D4AF37"
+                      data-url="https://calendly.com/tiana-aureusplutus/30-minute-meeting?hide_gdpr_banner=1&background_color=1a1810&text_color=f5f5f5&primary_color=D4AF37"
                       style={{ minWidth: '100%', height: '500px' }}
                     />
                   </div>
@@ -10871,7 +10871,14 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
       )}
 
       {/* ==================== NAME PROMPT (existing users) ==================== */}
-      {showNamePrompt && (
+      {showNamePrompt && (() => {
+        // Use a local ref to avoid re-render on every keystroke
+        const nameRef = React.useRef<HTMLInputElement>(null)
+        const handleSaveName = () => {
+          const val = nameRef.current?.value?.trim()
+          if (val) { setUserName(val); setShowNamePrompt(false) }
+        }
+        return (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.97)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '40px 32px', maxWidth: '440px', width: '100%', textAlign: 'center' as const }}>
             <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: '36px', color: '#111111', fontWeight: 900, boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}>A</div>
@@ -10880,22 +10887,22 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
               Aureus has been calling you "Builder" — but that's not your name. What should Aureus call you?
             </p>
             <input
+              ref={nameRef}
+              defaultValue={userName}
               placeholder="Your first name"
-              value={userName}
-              onChange={e => setUserName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && userName.trim()) setShowNamePrompt(false) }}
+              onKeyDown={e => { if (e.key === 'Enter') handleSaveName() }}
               style={{ ...inputStyle, width: '100%', fontSize: '20px', padding: '16px 20px', textAlign: 'center' as const, marginBottom: '16px', borderColor: theme.accent + '60' }}
               autoFocus
             />
             <button
-              onClick={() => { if (userName.trim()) setShowNamePrompt(false) }}
-              disabled={!userName.trim()}
-              style={{ width: '100%', padding: '16px', background: userName.trim() ? 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)' : theme.border, color: userName.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '14px', cursor: userName.trim() ? 'pointer' : 'default', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
-              {userName.trim() ? `Nice to meet you, ${userName.trim()} →` : 'Enter your name'}
+              onClick={handleSaveName}
+              style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
+              Save my name →
             </button>
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {/* ==================== RETURN VISIT CARD ==================== */}
       {returnCard && (
