@@ -1951,14 +1951,14 @@ APP STRUCTURE users need to know:
 
 User question: "${message}"
 
-Answer in 2-4 sentences. Be specific about which tab and section. If technical error, suggest refresh then email hello@aureus.com.au`,
+Answer in 2-4 sentences. Be specific about which tab and section. If technical error, suggest refresh then email hello@aureusplutus.app`,
           financialData: {}, memory: {}, countryConfig: currentCountryConfig
         })
       })
       const data = await res.json()
-      setSupportMessages(prev => [...prev, { role: 'agent', content: data.message || data.advice || 'Try refreshing the app. If the issue persists, email hello@aureus.com.au and we\'ll sort it out.' }])
+      setSupportMessages(prev => [...prev, { role: 'agent', content: data.message || data.advice || 'Try refreshing the app. If the issue persists, email hello@aureusplutus.app and we\'ll sort it out.' }])
     } catch {
-      setSupportMessages(prev => [...prev, { role: 'agent', content: "I'm having trouble connecting. Please email hello@aureus.com.au and we'll help you directly." }])
+      setSupportMessages(prev => [...prev, { role: 'agent', content: "I'm having trouble connecting. Please email hello@aureusplutus.app and we'll help you directly." }])
     }
     setSupportLoading(false)
     setTimeout(() => supportEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
@@ -10367,7 +10367,7 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
                     {/* The Calendly inline embed widget */}
                     <div
                       className="calendly-inline-widget"
-                      data-url="https://calendly.com/YOUR_CALENDLY_USERNAME/aureus-support?hide_gdpr_banner=1&background_color=1a1810&text_color=f5f5f5&primary_color=D4AF37"
+                      data-url="https://calendly.com/YOUR_CALENDLY_USERNAME/aureusplutus-support?hide_gdpr_banner=1&background_color=1a1810&text_color=f5f5f5&primary_color=D4AF37"
                       style={{ minWidth: '100%', height: '500px' }}
                     />
                   </div>
@@ -10424,14 +10424,14 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
                             })
                           })
                           setSupportSent(true)
-                        } catch { alert('Could not send — please email hello@aureus.com.au directly.') }
+                        } catch { alert('Could not send — please email hello@aureusplutus.app directly.') }
                         setSupportSending(false)
                       }} disabled={!supportName || !supportEmail || !supportMessage || supportSending}
                         style={{ padding: '14px', background: (supportName && supportEmail && supportMessage) ? 'linear-gradient(135deg, #D4AF37, #BC6A1F)' : theme.border, color: (supportName && supportEmail && supportMessage) ? '#111111' : theme.textMuted, border: 'none', borderRadius: '12px', cursor: (supportName && supportEmail && supportMessage) ? 'pointer' : 'default', fontWeight: 800, fontSize: '15px' }}>
                         {supportSending ? '⏳ Sending...' : 'Send message →'}
                       </button>
                       <div style={{ textAlign: 'center' as const, color: theme.textMuted, fontSize: '12px' }}>
-                        Or email us directly: <a href="mailto:hello@aureus.com.au" style={{ color: theme.accent }}>hello@aureus.com.au</a>
+                        Or email us directly: <a href="mailto:hello@aureusplutus.app" style={{ color: theme.accent }}>hello@aureusplutus.app</a>
                       </div>
                     </div>
                   )}
@@ -11195,7 +11195,7 @@ Tracking with Aureus 🏛️`
                 )}
                 <div style={{ borderTop:'1px solid rgba(212,175,55,0.2)', paddingTop:'12px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <div style={{ color:'#9a8a6a', fontSize:'10px', letterSpacing:'1px' }}>WEALTH THROUGH DISCIPLINE</div>
-                  <div style={{ color:'#D4AF37', fontSize:'10px', letterSpacing:'1px' }}>AUREUS.APP</div>
+                  <div style={{ color:'#D4AF37', fontSize:'10px', letterSpacing:'1px' }}>AUREUSPLUTUS.APP</div>
                 </div>
               </div>
               {/* Action buttons */}
