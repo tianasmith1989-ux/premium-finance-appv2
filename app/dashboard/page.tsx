@@ -20,7 +20,7 @@ export default function Dashboard() {
   const [missionP2Proposals, setMissionP2Proposals] = useState<any[]>([])
   const [missionP2Confirmed, setMissionP2Confirmed] = useState<boolean[]>([])
   const [missionNavLocked, setMissionNavLocked] = useState(true) // locks nav during phase 1
-  const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'learn' | 'wins' | 'mortgage' | 'insights' | 'grow' | 'review' | 'property' | 'meals' | 'change'>('home')
+  const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'learn' | 'wins' | 'mortgage' | 'insights' | 'grow' | 'review' | 'property' | 'meals' | 'change' | 'business'>('home')
   const [darkMode, setDarkMode] = useState(true)
 
   // ==================== ONBOARDING FLOW ====================
@@ -192,7 +192,20 @@ export default function Dashboard() {
   const [tellAureusResponse, setTellAureusResponse] = useState<string | null>(null)
   const [tellAureusLoading, setTellAureusLoading] = useState(false)
 
-  // ==================== HELP & SUPPORT ====================
+  // ==================== BUSINESS HUB ====================
+  const [businessProfile, setBusinessProfile] = useState<{name:string,abn:string,type:string,industry:string,startDate:string}>({name:'',abn:'',type:'sole_trader',industry:'',startDate:''})
+  const [businessRevenue, setBusinessRevenue] = useState<any[]>([])
+  const [businessExpenses, setBusinessExpenses] = useState<any[]>([])
+  const [businessGoals, setBusinessGoals] = useState<any[]>([])
+  const [newBizRevenue, setNewBizRevenue] = useState({name:'',amount:'',frequency:'monthly',category:'sales'})
+  const [newBizExpense, setNewBizExpense] = useState({name:'',amount:'',frequency:'monthly',category:'operations'})
+  const [newBizGoal, setNewBizGoal] = useState({name:'',target:'',current:'',deadline:''})
+  const [bizTab, setBizTab] = useState<'dashboard'|'revenue'|'expenses'|'goals'|'coach'>('dashboard')
+  const [bizChatMessages, setBizChatMessages] = useState<{role:'user'|'assistant',content:string}[]>([])
+  const [bizChatInput, setBizChatInput] = useState('')
+  const [bizChatLoading, setBizChatLoading] = useState(false)
+  const [showBizSetup, setShowBizSetup] = useState(false)
+  const bizChatEndRef = useRef<HTMLDivElement>(null)
   const [showSupport, setShowSupport] = useState(false)
   const [supportTab, setSupportTab] = useState<'chat'|'book'|'email'>('chat')
   const [supportMessages, setSupportMessages] = useState<{role:'user'|'agent', content:string}[]>([])
@@ -1963,6 +1976,63 @@ Answer in 2-4 sentences. Be specific about which tab and section. If technical e
     setSupportLoading(false)
     setTimeout(() => supportEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
   }
+
+  // ── Business coach chat handler ──
+  const handleBizChat = async (message: string) => {
+    if (!message.trim()) return
+    setBizChatMessages(prev => [...prev, { role: 'user', content: message }])
+    setBizChatInput('')
+    setBizChatLoading(true)
+    try {
+      const totalRevenue = businessRevenue.reduce((s: number, r: any) => s + parseFloat(r.amount || '0') * (r.frequency === 'weekly' ? 52 : r.frequency === 'fortnightly' ? 26 : 12) / 12, 0)
+      const totalExpenses = businessExpenses.reduce((s: number, e: any) => s + parseFloat(e.amount || '0') * (e.frequency === 'weekly' ? 52 : e.frequency === 'fortnightly' ? 26 : 12) / 12, 0)
+      const profit = totalRevenue - totalExpenses
+      const res = await fetch('/api/budget-coach', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'question',
+          question: `[BUSINESS HUB — NO BUSINESS/LEGAL/TAX ADVICE]
+You help users TRACK and UNDERSTAND their business numbers only.
+NEVER advise on: business structure, tax deductions, GST, BAS, employment law, contracts, accounting methods, business loans.
+For those topics: decline and refer to accountant, lawyer, BAS agent, or ato.gov.au / business.gov.au / fairwork.gov.au.
+YOU CAN: explain what numbers mean, calculate margins/runway/break-even, explain concepts neutrally, point to government resources.
+
+Business: ${businessProfile.name || 'unnamed'} | ${businessProfile.type} | ${businessProfile.industry}
+Monthly revenue: $${totalRevenue.toFixed(0)} | expenses: $${totalExpenses.toFixed(0)} | profit: $${profit.toFixed(0)}
+Revenue: ${businessRevenue.map((r: any) => r.name + ' $' + r.amount + '/' + r.frequency).join(', ') || 'none'}
+Expenses: ${businessExpenses.map((e: any) => e.name + ' $' + e.amount + '/' + e.frequency).join(', ') || 'none'}
+
+User: "${message}"`,
+          financialData: {}, memory: budgetMemory, countryConfig: currentCountryConfig
+        })
+      })
+      const data = await res.json()
+      setBizChatMessages(prev => [...prev, { role: 'assistant', content: data.message || data.advice || "I can help you understand your business numbers." }])
+    } catch { setBizChatMessages(prev => [...prev, { role: 'assistant', content: "Having trouble connecting. Try again shortly." }]) }
+    setBizChatLoading(false)
+    setTimeout(() => bizChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  }
+
+  // ── Persist business data to localStorage ──
+  useEffect(() => {
+    const saved = localStorage.getItem('aureus_business')
+    if (saved) {
+      try {
+        const d = JSON.parse(saved)
+        if (d.profile) setBusinessProfile(d.profile)
+        if (d.revenue) setBusinessRevenue(d.revenue)
+        if (d.expenses) setBusinessExpenses(d.expenses)
+        if (d.goals) setBusinessGoals(d.goals)
+      } catch {}
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('aureus_business', JSON.stringify({
+      profile: businessProfile, revenue: businessRevenue,
+      expenses: businessExpenses, goals: businessGoals
+    }))
+  }, [businessProfile, businessRevenue, businessExpenses, businessGoals])
 
   // ── Load Calendly widget when booking tab is opened ──
   useEffect(() => {
@@ -5017,6 +5087,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             { id: 'home',      label: '🏠 Home' },
             { id: 'chat',      label: '💬 Aureus' },
             { id: 'change',    label: '⚡ Change' },
+            { id: 'business',  label: '🏢 Business' },
             { id: 'dashboard', label: '🏛️ Treasury' },
             { id: 'path',      label: '🛤️ Roadmap' },
             { id: 'wins',      label: `🏆 Wins${wins.length > 0 ? ` (${wins.length})` : ''}` },
@@ -8386,6 +8457,362 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
 
         {/* ==================== INSIGHTS TAB ==================== */}
         {/* Meal Planning moved to monthly email opt-in in notification settings */}
+
+        {/* ==================== BUSINESS HUB TAB ==================== */}
+        {activeTab === 'business' && (() => {
+          const monthlyRev = businessRevenue.reduce((s: number, r: any) => s + parseFloat(r.amount || '0') * (r.frequency === 'weekly' ? 52 : r.frequency === 'fortnightly' ? 26 : 12) / 12, 0)
+          const monthlyExp = businessExpenses.reduce((s: number, e: any) => s + parseFloat(e.amount || '0') * (e.frequency === 'weekly' ? 52 : e.frequency === 'fortnightly' ? 26 : 12) / 12, 0)
+          const monthlyProfit = monthlyRev - monthlyExp
+          const profitMargin = monthlyRev > 0 ? (monthlyProfit / monthlyRev * 100) : 0
+          const annualRev = monthlyRev * 12
+          const runway = monthlyExp > 0 ? (businessGoals.reduce((s: number, g: any) => s + parseFloat(g.current || '0'), 0) / monthlyExp).toFixed(1) : '∞'
+
+          const COMPLIANCE_DISCLAIMER = (
+            <div style={{ padding: '10px 14px', background: theme.bg, borderRadius: '8px', border: '1px solid ' + theme.border, fontSize: '11px', color: theme.textMuted, lineHeight: 1.6, marginBottom: '12px' }}>
+              <strong style={{ color: theme.text }}>Aureus Business Hub is a tracking tool, not a business adviser.</strong> It cannot give advice on business structure, tax, GST, employment law, or accounting. For those, speak with a registered accountant, BAS agent, or lawyer.
+              {' '}<a href="https://business.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>business.gov.au</a>
+              {' · '}<a href="https://ato.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>ato.gov.au</a>
+            </div>
+          )
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px' }}>
+
+              {/* Header */}
+              <div style={{ padding: '20px 22px', background: 'linear-gradient(135deg, #111820, #111111)', borderRadius: '16px', border: '1px solid ' + theme.accent + '30' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '2px', marginBottom: '4px' }}>🏢 BUSINESS HUB</div>
+                    <div style={{ color: theme.text, fontSize: '22px', fontWeight: 900, fontFamily: 'Cinzel, serif' }}>
+                      {businessProfile.name || 'Your Business'}
+                    </div>
+                    {businessProfile.abn && <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>ABN: {businessProfile.abn}</div>}
+                  </div>
+                  <button onClick={() => setShowBizSetup(true)} style={{ padding: '8px 14px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>
+                    {businessProfile.name ? 'Edit →' : '+ Setup'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Sub-tabs */}
+              <div style={{ display: 'flex', gap: '6px', background: theme.bg, padding: '4px', borderRadius: '12px' }}>
+                {([['dashboard','📊 Dashboard'],['revenue','💰 Revenue'],['expenses','💸 Expenses'],['goals','🎯 Goals'],['coach','💬 Coach']] as const).map(([id, label]) => (
+                  <button key={id} onClick={() => setBizTab(id)}
+                    style={{ flex: 1, padding: '8px 4px', background: bizTab === id ? theme.cardBg : 'transparent', border: bizTab === id ? '1px solid ' + theme.border : 'none', borderRadius: '8px', color: bizTab === id ? theme.text : theme.textMuted, cursor: 'pointer', fontSize: '11px', fontWeight: bizTab === id ? 700 : 400 }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* ── DASHBOARD ── */}
+              {bizTab === 'dashboard' && (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                  {COMPLIANCE_DISCLAIMER}
+
+                  {/* KPI cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    {[
+                      { label: 'MONTHLY REVENUE', value: '$' + monthlyRev.toLocaleString('en-AU', {maximumFractionDigits:0}), color: theme.success, sub: '$' + (annualRev).toLocaleString('en-AU', {maximumFractionDigits:0}) + '/yr' },
+                      { label: 'MONTHLY EXPENSES', value: '$' + monthlyExp.toLocaleString('en-AU', {maximumFractionDigits:0}), color: theme.danger, sub: '$' + (monthlyExp*12).toLocaleString('en-AU', {maximumFractionDigits:0}) + '/yr' },
+                      { label: 'MONTHLY PROFIT', value: '$' + monthlyProfit.toLocaleString('en-AU', {maximumFractionDigits:0}), color: monthlyProfit >= 0 ? theme.accent : theme.danger, sub: profitMargin.toFixed(1) + '% margin' },
+                      { label: 'EXPENSE RATIO', value: monthlyRev > 0 ? (monthlyExp/monthlyRev*100).toFixed(0) + '%' : '—', color: theme.textMuted, sub: 'of revenue' },
+                    ].map((kpi, i) => (
+                      <div key={i} style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                        <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, letterSpacing: '1px', marginBottom: '6px' }}>{kpi.label}</div>
+                        <div style={{ color: kpi.color, fontSize: '22px', fontWeight: 800 }}>{kpi.value}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '2px' }}>{kpi.sub}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* P&L bar */}
+                  {monthlyRev > 0 && (
+                    <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '10px' }}>REVENUE vs EXPENSES</div>
+                      <div style={{ height: '10px', background: theme.border, borderRadius: '5px', overflow: 'hidden', marginBottom: '8px' }}>
+                        <div style={{ width: Math.min(100, monthlyRev > 0 ? monthlyExp/monthlyRev*100 : 0) + '%', height: '100%', background: profitMargin > 20 ? 'linear-gradient(90deg,#27ae60,#2ecc71)' : profitMargin > 0 ? 'linear-gradient(90deg,#D4AF37,#BC6A1F)' : theme.danger, borderRadius: '5px' }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                        <span style={{ color: theme.success }}>Revenue: ${monthlyRev.toFixed(0)}</span>
+                        <span style={{ color: theme.danger }}>Expenses: ${monthlyExp.toFixed(0)}</span>
+                        <span style={{ color: monthlyProfit >= 0 ? theme.accent : theme.danger }}>Profit: ${monthlyProfit.toFixed(0)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bridge to personal */}
+                  {monthlyProfit > 0 && (
+                    <div style={{ padding: '14px 18px', background: theme.accent + '08', borderRadius: '12px', border: '1px solid ' + theme.accent + '25' }}>
+                      <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '6px' }}>💼 → 🏛️ BUSINESS TO PERSONAL</div>
+                      <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6 }}>
+                        Your business is generating <strong style={{ color: theme.accent }}>${monthlyProfit.toFixed(0)}/month</strong> profit.
+                        Consider how much to transfer to your personal budget for living expenses vs reinvesting in the business.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Resource links */}
+                  <div style={{ padding: '14px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '10px' }}>🔗 OFFICIAL RESOURCES</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                      {[
+                        ['business.gov.au', 'Business registration, licences, support', 'https://business.gov.au'],
+                        ['ATO — Business', 'Tax obligations, GST, BAS, super for employers', 'https://ato.gov.au/businesses-and-organisations'],
+                        ['ASIC — Companies', 'Company registration, compliance', 'https://asic.gov.au'],
+                        ['Fair Work', 'Employment obligations, minimum wages', 'https://fairwork.gov.au'],
+                        ['Find a BAS agent', 'For GST/BAS/bookkeeping help', 'https://www.tpb.gov.au/find-tax-agent-bas-agent-or-payroll-service-provider'],
+                      ].map(([name, desc, url]) => (
+                        <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid ' + theme.border, textDecoration: 'none' }}>
+                          <div>
+                            <div style={{ color: theme.accent, fontSize: '13px', fontWeight: 600 }}>{name}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '11px' }}>{desc}</div>
+                          </div>
+                          <span style={{ color: theme.textMuted, fontSize: '14px' }}>→</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── REVENUE ── */}
+              {bizTab === 'revenue' && (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                  <div style={{ padding: '14px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>+ ADD REVENUE STREAM</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                      <input placeholder="Revenue name (e.g. Client retainer, Product sales)" value={newBizRevenue.name} onChange={e => setNewBizRevenue(p => ({...p, name: e.target.value}))} style={{...inputStyle, width:'100%'}} />
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input type="number" placeholder="Amount $" value={newBizRevenue.amount} onChange={e => setNewBizRevenue(p => ({...p, amount: e.target.value}))} style={{...inputStyle, flex: 1}} />
+                        <select value={newBizRevenue.frequency} onChange={e => setNewBizRevenue(p => ({...p, frequency: e.target.value}))} style={inputStyle}>
+                          <option value="weekly">Weekly</option>
+                          <option value="fortnightly">Fortnightly</option>
+                          <option value="monthly">Monthly</option>
+                          <option value="quarterly">Quarterly</option>
+                          <option value="yearly">Yearly</option>
+                        </select>
+                        <select value={newBizRevenue.category} onChange={e => setNewBizRevenue(p => ({...p, category: e.target.value}))} style={inputStyle}>
+                          <option value="sales">Sales</option>
+                          <option value="services">Services</option>
+                          <option value="retainer">Retainer</option>
+                          <option value="subscription">Subscription</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <button onClick={() => { if (newBizRevenue.name && newBizRevenue.amount) { setBusinessRevenue(prev => [...prev, {...newBizRevenue, id: Date.now()}]); setNewBizRevenue({name:'',amount:'',frequency:'monthly',category:'sales'}) } }}
+                        style={{ padding: '10px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}>Add Revenue Stream</button>
+                    </div>
+                  </div>
+                  {businessRevenue.length === 0 ? (
+                    <div style={{ textAlign: 'center' as const, padding: '30px', color: theme.textMuted, fontSize: '14px' }}>No revenue streams added yet</div>
+                  ) : businessRevenue.map((r: any) => {
+                    const monthly = parseFloat(r.amount||'0') * (r.frequency==='weekly'?52:r.frequency==='fortnightly'?26:r.frequency==='quarterly'?4:r.frequency==='yearly'?1:12)/12
+                    return (
+                      <div key={r.id} style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{r.name}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>${r.amount}/{r.frequency} · {r.category}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' as const, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div>
+                            <div style={{ color: theme.success, fontWeight: 700, fontSize: '16px' }}>${monthly.toFixed(0)}/mo</div>
+                            <div style={{ color: theme.textMuted, fontSize: '11px' }}>${(monthly*12).toFixed(0)}/yr</div>
+                          </div>
+                          <button onClick={() => setBusinessRevenue(prev => prev.filter((x:any) => x.id !== r.id))} style={{ padding: '3px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {businessRevenue.length > 0 && (
+                    <div style={{ padding: '12px 16px', background: theme.success + '10', borderRadius: '10px', border: '1px solid ' + theme.success + '30', display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: theme.text, fontWeight: 700 }}>Total monthly revenue</span>
+                      <span style={{ color: theme.success, fontWeight: 800, fontSize: '18px' }}>${monthlyRev.toFixed(0)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── EXPENSES ── */}
+              {bizTab === 'expenses' && (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                  {COMPLIANCE_DISCLAIMER}
+                  <div style={{ padding: '14px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>+ ADD BUSINESS EXPENSE</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                      <input placeholder="Expense name (e.g. Software, Rent, Marketing)" value={newBizExpense.name} onChange={e => setNewBizExpense(p => ({...p, name: e.target.value}))} style={{...inputStyle, width:'100%'}} />
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input type="number" placeholder="Amount $" value={newBizExpense.amount} onChange={e => setNewBizExpense(p => ({...p, amount: e.target.value}))} style={{...inputStyle, flex: 1}} />
+                        <select value={newBizExpense.frequency} onChange={e => setNewBizExpense(p => ({...p, frequency: e.target.value}))} style={inputStyle}>
+                          <option value="weekly">Weekly</option>
+                          <option value="fortnightly">Fortnightly</option>
+                          <option value="monthly">Monthly</option>
+                          <option value="quarterly">Quarterly</option>
+                          <option value="yearly">Yearly</option>
+                        </select>
+                        <select value={newBizExpense.category} onChange={e => setNewBizExpense(p => ({...p, category: e.target.value}))} style={inputStyle}>
+                          <option value="operations">Operations</option>
+                          <option value="software">Software</option>
+                          <option value="marketing">Marketing</option>
+                          <option value="premises">Premises</option>
+                          <option value="staff">Staff</option>
+                          <option value="equipment">Equipment</option>
+                          <option value="professional">Professional services</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <button onClick={() => { if (newBizExpense.name && newBizExpense.amount) { setBusinessExpenses(prev => [...prev, {...newBizExpense, id: Date.now()}]); setNewBizExpense({name:'',amount:'',frequency:'monthly',category:'operations'}) } }}
+                        style={{ padding: '10px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}>Add Expense</button>
+                    </div>
+                  </div>
+                  {businessExpenses.length === 0 ? (
+                    <div style={{ textAlign: 'center' as const, padding: '30px', color: theme.textMuted, fontSize: '14px' }}>No business expenses added yet</div>
+                  ) : businessExpenses.map((e: any) => {
+                    const monthly = parseFloat(e.amount||'0') * (e.frequency==='weekly'?52:e.frequency==='fortnightly'?26:e.frequency==='quarterly'?4:e.frequency==='yearly'?1:12)/12
+                    return (
+                      <div key={e.id} style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>{e.name}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>${e.amount}/{e.frequency} · {e.category}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' as const, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div>
+                            <div style={{ color: theme.danger, fontWeight: 700, fontSize: '16px' }}>${monthly.toFixed(0)}/mo</div>
+                            <div style={{ color: theme.textMuted, fontSize: '11px' }}>${(monthly*12).toFixed(0)}/yr</div>
+                          </div>
+                          <button onClick={() => setBusinessExpenses(prev => prev.filter((x:any) => x.id !== e.id))} style={{ padding: '3px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>×</button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {businessExpenses.length > 0 && (
+                    <div style={{ padding: '12px 16px', background: theme.danger + '10', borderRadius: '10px', border: '1px solid ' + theme.danger + '30', display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: theme.text, fontWeight: 700 }}>Total monthly expenses</span>
+                      <span style={{ color: theme.danger, fontWeight: 800, fontSize: '18px' }}>${monthlyExp.toFixed(0)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── GOALS ── */}
+              {bizTab === 'goals' && (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                  <div style={{ padding: '14px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>+ ADD BUSINESS GOAL</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                      <input placeholder="Goal name (e.g. Monthly revenue target, Emergency fund)" value={newBizGoal.name} onChange={e => setNewBizGoal(p => ({...p, name: e.target.value}))} style={{...inputStyle, width:'100%'}} />
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input type="number" placeholder="Target $" value={newBizGoal.target} onChange={e => setNewBizGoal(p => ({...p, target: e.target.value}))} style={{...inputStyle, flex: 1}} />
+                        <input type="number" placeholder="Current $" value={newBizGoal.current} onChange={e => setNewBizGoal(p => ({...p, current: e.target.value}))} style={{...inputStyle, flex: 1}} />
+                        <input type="date" value={newBizGoal.deadline} onChange={e => setNewBizGoal(p => ({...p, deadline: e.target.value}))} style={{...inputStyle, flex: 1}} />
+                      </div>
+                      <button onClick={() => { if (newBizGoal.name && newBizGoal.target) { setBusinessGoals(prev => [...prev, {...newBizGoal, id: Date.now()}]); setNewBizGoal({name:'',target:'',current:'',deadline:''}) } }}
+                        style={{ padding: '10px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}>Add Goal</button>
+                    </div>
+                  </div>
+                  {businessGoals.length === 0 ? (
+                    <div style={{ textAlign: 'center' as const, padding: '30px', color: theme.textMuted, fontSize: '14px' }}>No business goals added yet</div>
+                  ) : businessGoals.map((g: any) => {
+                    const pct = parseFloat(g.target||'1') > 0 ? Math.min(100, parseFloat(g.current||'0') / parseFloat(g.target||'1') * 100) : 0
+                    return (
+                      <div key={g.id} style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <div style={{ color: theme.text, fontWeight: 600 }}>{g.name}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ color: theme.accent, fontWeight: 700 }}>{pct.toFixed(0)}%</span>
+                            <button onClick={() => setBusinessGoals(prev => prev.filter((x:any) => x.id !== g.id))} style={{ padding: '2px 6px', background: theme.danger, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>×</button>
+                          </div>
+                        </div>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '8px' }}>
+                          ${parseFloat(g.current||'0').toLocaleString()} of ${parseFloat(g.target||'0').toLocaleString()}
+                          {g.deadline && <span style={{ marginLeft: '8px', color: theme.accent }}>→ {new Date(g.deadline+'T12:00:00').toLocaleDateString('en-AU', {day:'numeric',month:'short',year:'numeric'})}</span>}
+                        </div>
+                        <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ width: pct + '%', height: '100%', background: 'linear-gradient(90deg, #D4AF37, #BC6A1F)', borderRadius: '3px' }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* ── BUSINESS COACH ── */}
+              {bizTab === 'coach' && (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                  {COMPLIANCE_DISCLAIMER}
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, height: '480px' }}>
+                    <div style={{ flex: 1, overflowY: 'auto' as const, display: 'flex', flexDirection: 'column' as const, gap: '12px', paddingBottom: '12px' }}>
+                      {bizChatMessages.length === 0 && (
+                        <div style={{ padding: '16px', background: theme.bg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                          <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>🏢 Business numbers assistant</div>
+                          <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, margin: '0 0 12px' }}>I can help you understand your business numbers, explain metrics, and point you to the right resources. I can't give business structure, tax, or legal advice.</p>
+                          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
+                            {['What is my profit margin?', 'What does break-even mean for my business?', 'Where do I register my business in Australia?', 'What is a BAS agent?'].map(q => (
+                              <button key={q} onClick={() => handleBizChat(q)}
+                                style={{ padding: '8px 12px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px', textAlign: 'left' as const }}>
+                                {q} →
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {bizChatMessages.map((msg, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                          <div style={{ maxWidth: '85%', padding: '12px 16px', borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? '#111111' : theme.text, fontSize: '14px', lineHeight: 1.6, border: msg.role === 'assistant' ? '1px solid ' + theme.border : 'none' }}>
+                            {renderChatMessage(msg.content, msg.role === 'user')}
+                          </div>
+                        </div>
+                      ))}
+                      {bizChatLoading && (
+                        <div style={{ padding: '12px 16px', background: theme.cardBg, borderRadius: '16px', width: 'fit-content', border: '1px solid ' + theme.border }}>
+                          <div style={{ display: 'flex', gap: '4px' }}>{[0,1,2].map(i => <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.accent, opacity: 0.6 }} />)}</div>
+                        </div>
+                      )}
+                      <div ref={bizChatEndRef} />
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '1px solid ' + theme.border }}>
+                      <input value={bizChatInput} onChange={e => setBizChatInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && bizChatInput.trim() && !bizChatLoading) handleBizChat(bizChatInput) }}
+                        placeholder="Ask about your business numbers..."
+                        style={{ ...inputStyle, flex: 1, fontSize: '14px' }} />
+                      <button onClick={() => { if (bizChatInput.trim() && !bizChatLoading) handleBizChat(bizChatInput) }}
+                        disabled={!bizChatInput.trim() || bizChatLoading}
+                        style={{ padding: '0 16px', background: bizChatInput.trim() ? theme.accent : theme.border, color: bizChatInput.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '10px', cursor: bizChatInput.trim() ? 'pointer' : 'default', fontWeight: 700 }}>→</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )
+        })()}
+
+        {/* Business setup modal */}
+        {showBizSetup && (
+          <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.88)', zIndex: 1055, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowBizSetup(false)}>
+            <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '480px', width: '100%' }} onClick={e => e.stopPropagation()}>
+              <h3 style={{ color: theme.text, fontSize: '20px', fontWeight: 800, margin: '0 0 20px' }}>🏢 Business Profile</h3>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px', fontWeight: 700 }}>BUSINESS NAME</label><input placeholder="e.g. Aureus Plutus Pty Ltd" value={businessProfile.name} onChange={e => setBusinessProfile(p => ({...p, name: e.target.value}))} style={{...inputStyle, width:'100%'}} /></div>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px', fontWeight: 700 }}>ABN (optional)</label><input placeholder="12 345 678 901" value={businessProfile.abn} onChange={e => setBusinessProfile(p => ({...p, abn: e.target.value}))} style={{...inputStyle, width:'100%'}} /></div>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px', fontWeight: 700 }}>BUSINESS TYPE</label>
+                  <select value={businessProfile.type} onChange={e => setBusinessProfile(p => ({...p, type: e.target.value}))} style={{...inputStyle, width:'100%'}}>
+                    <option value="sole_trader">Sole Trader</option>
+                    <option value="pty_ltd">Pty Ltd Company</option>
+                    <option value="partnership">Partnership</option>
+                    <option value="trust">Trust</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div><label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px', fontWeight: 700 }}>INDUSTRY</label><input placeholder="e.g. Technology, Retail, Consulting" value={businessProfile.industry} onChange={e => setBusinessProfile(p => ({...p, industry: e.target.value}))} style={{...inputStyle, width:'100%'}} /></div>
+                <div style={{ padding: '10px 14px', background: theme.bg, borderRadius: '8px', fontSize: '12px', color: theme.textMuted, lineHeight: 1.6 }}>
+                  Aureus stores this for your reference only. For advice on business structure, speak with an accountant or lawyer.
+                </div>
+                <button onClick={() => setShowBizSetup(false)} style={{ padding: '14px', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '15px' }}>Save profile →</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ==================== CHANGE WORK TAB ==================== */}
         {activeTab === 'change' && (() => {
