@@ -3,6 +3,44 @@
 import { useUser } from '@clerk/nextjs'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 
+
+// ── Aureus Plutus Logo SVG component ──
+const AureusLogo = ({ size = 40 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+    <defs>
+      <linearGradient id="apGoldA" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#F5D878"/>
+        <stop offset="35%" stopColor="#D4AF37"/>
+        <stop offset="65%" stopColor="#B8860B"/>
+        <stop offset="100%" stopColor="#BC6A1F"/>
+      </linearGradient>
+      <linearGradient id="apGoldRing" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#F5D878"/>
+        <stop offset="50%" stopColor="#D4AF37"/>
+        <stop offset="100%" stopColor="#8B6914"/>
+      </linearGradient>
+      <linearGradient id="apGoldOrbit" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#F5D878" stopOpacity="0.3"/>
+        <stop offset="30%" stopColor="#D4AF37" stopOpacity="0.9"/>
+        <stop offset="60%" stopColor="#F5D878" stopOpacity="1"/>
+        <stop offset="100%" stopColor="#8B6914" stopOpacity="0.4"/>
+      </linearGradient>
+    </defs>
+    <rect width="400" height="400" rx="200" fill="#111111"/>
+    <circle cx="200" cy="200" r="148" fill="none" stroke="url(#apGoldRing)" strokeWidth="2.5"/>
+    <path d="M 68 280 Q 150 180 200 170 Q 260 158 330 230 Q 360 265 345 310 Q 330 355 290 340" fill="none" stroke="url(#apGoldOrbit)" strokeWidth="4" strokeLinecap="round"/>
+    <path d="M 200 88 L 118 305 L 143 305 L 200 142 L 257 305 L 282 305 Z" fill="url(#apGoldA)"/>
+    <path d="M 155 225 L 245 225 L 240 245 L 160 245 Z" fill="url(#apGoldA)"/>
+    <path d="M 108 305 L 153 305 L 153 312 L 108 312 Z" fill="url(#apGoldA)"/>
+    <path d="M 247 305 L 292 305 L 292 312 L 247 312 Z" fill="url(#apGoldA)"/>
+    <path d="M 190 88 L 210 88 L 210 96 L 190 96 Z" fill="url(#apGoldA)"/>
+    <path d="M 200 95 L 142 295 L 150 295 L 200 118 Z" fill="#F5E070" opacity="0.2"/>
+    <path d="M 200 346 L 203 355 L 212 358 L 203 361 L 200 370 L 197 361 L 188 358 L 197 355 Z" fill="#F5D878"/>
+    <line x1="175" y1="358" x2="188" y2="358" stroke="#D4AF37" strokeWidth="1.5" opacity="0.8"/>
+    <line x1="212" y1="358" x2="225" y2="358" stroke="#D4AF37" strokeWidth="1.5" opacity="0.8"/>
+  </svg>
+)
+
 export default function Dashboard() {
   const { user } = useUser()
 
@@ -2055,6 +2093,12 @@ User: "${message}"`,
       setSubStatus('active')
       setShowPaywall(false)
       window.history.replaceState({}, '', '/dashboard')
+      // If new user (no name yet), start onboarding
+      if (!missionComplete) {
+        setMissionPhase(1)
+        setMissionStep(0)
+        setMissionNavLocked(true)
+      }
     }
   }, [])
 
@@ -3549,8 +3593,8 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
       <div style={{ minHeight: '100vh', background: theme.bg, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <div style={{ maxWidth: '480px', width: '100%', textAlign: 'center' as const }}>
           {/* Logo */}
-          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 32px rgba(212,175,55,0.3)', border: '4px solid #D4AF37', margin: '0 auto 24px' }}>
-            <span style={{ color: '#111111', fontWeight: 800, fontSize: '40px' }}>A</span>
+          <div style={{ width: '80px', height: '80px', borderRadius: '50%', overflow: 'hidden', boxShadow: '0 8px 32px rgba(212,175,55,0.3)', border: '2px solid #D4AF37', margin: '0 auto 24px' }}>
+            <img src="/logo.svg" alt="Aureus" style={{ width: '80px', height: '80px', objectFit: 'contain' }}/>
           </div>
           <h1 style={{ fontSize: '38px', fontWeight: 800, color: theme.text, margin: '0 0 12px 0' }}>Meet Aureus</h1>
           <p style={{ fontSize: '18px', color: theme.textMuted, margin: '0 0 8px 0', lineHeight: 1.5 }}>Your AI budgeting assistant. I'll help you understand your money, pay your mortgage off years early, and eliminate debt.</p>
@@ -3614,13 +3658,13 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
           MISSION OVERLAY — Phase 1 (setup) & Phase 2 (roadmap)
           Covers full screen, guides user step by step
       ═══════════════════════════════════════════════════ */}
-      {!missionComplete && missionPhase === 1 && (
+      {!missionComplete && missionPhase === 1 && !showPaywall && subStatus !== 'loading' && (subStatus === 'active' || subStatus === 'trialing') && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: theme.bg, zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
 
           {/* Mission header */}
           <div style={{ padding: '16px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#111111', fontSize: '16px' }}>A</div>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}><img src="/logo.svg" alt="Aureus" style={{ width: '32px', height: '32px', objectFit: 'contain' }}/></div>
               <div>
                 <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Aureus Setup</div>
                 <div style={{ color: theme.textMuted, fontSize: '11px' }}>{missionStep === 0 ? 'Welcome' : `Step ${missionStep} of 8`}</div>
@@ -3647,7 +3691,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
           {/* STEP 0 — Welcome */}
           {missionStep === 0 && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '40px 24px', maxWidth: '520px', margin: '0 auto', width: '100%', textAlign: 'center' as const }}>
-              <div style={{ width: '90px', height: '90px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: '44px', fontWeight: 800, color: '#111111', boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}>A</div>
+              <div style={{ width: '90px', height: '90px', borderRadius: '50%', overflow: 'hidden', margin: '0 auto 24px', boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}><img src="/logo.svg" alt="Aureus" style={{ width: '90px', height: '90px', objectFit: 'contain' }}/></div>
 
               {!userName.trim() ? (
                 // ── Phase A: Name first ──
@@ -4612,7 +4656,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
       {!missionComplete && missionPhase === 2 && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: theme.bg, zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
           <div style={{ padding: '16px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', gap: '12px', position: 'sticky' as const, top: 0, zIndex: 1 }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#111111', fontSize: '16px' }}>A</div>
+            <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}><img src="/logo.svg" alt="Aureus" style={{ width: '32px', height: '32px', objectFit: 'contain' }}/></div>
             <div><div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Building your roadmap</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>Almost there</div></div>
           </div>
 
@@ -5112,7 +5156,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #D4AF37 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #D4AF37' }}>
-              <span style={{ color: '#111111', fontWeight: 800, fontSize: '18px' }}>A</span>
+              <span style={{ width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden', display: 'inline-flex' }}><img src="/logo.svg" alt="Aureus" style={{ width: '28px', height: '28px', objectFit: 'contain' }}/></span>
             </div>
             <div>
               <span style={{ color: theme.text, fontWeight: 700, fontSize: '20px' }}>Aureus</span>
@@ -6020,7 +6064,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 )
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#111111', flexShrink: 0 }}>A</div>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}><img src="/logo.svg" alt="Aureus" style={{ width: '44px', height: '44px', objectFit: 'contain' }}/></div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                       <div style={{ color: coachNextAction.urgency === 'high' ? theme.warning : coachNextAction.urgency === 'medium' ? theme.accent : theme.success, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>
@@ -6103,7 +6147,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             {/* AUREUS CHAT WIDGET */}
             <div style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#111111' }}>A</div>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden' }}><img src="/logo.svg" alt="Aureus" style={{ width: '44px', height: '44px', objectFit: 'contain' }}/></div>
                 <div><div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div><div style={{ color: theme.textMuted, fontSize: '11px' }}>{currentBabyStep.title}</div></div>
               </div>
               {chatMessages.length > 0 && (
@@ -6246,7 +6290,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             <div style={{ background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, border: '2px solid ' + theme.success, borderRadius: '20px', padding: '24px', minHeight: '70vh', display: 'flex', flexDirection: 'column' as const }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid ' + theme.border }}>
                 <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #fbbf24 0%, #D4AF37 50%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #D4AF37' }}>
-                  <span style={{ color: '#111111', fontWeight: 800, fontSize: '28px' }}>A</span>
+                  <span style={{ width: '36px', height: '36px', borderRadius: '50%', overflow: 'hidden', display: 'inline-flex' }}><img src="/logo.svg" alt="Aureus" style={{ width: '36px', height: '36px', objectFit: 'contain' }}/></span>
                 </div>
                 <div>
                   <div style={{ color: theme.text, fontWeight: 700, fontSize: '22px' }}>Aureus</div>
@@ -8051,7 +8095,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             {/* Aureus Chat Widget */}
             <div data-aureus-chat="true" style={{ padding: '20px', background: `linear-gradient(135deg, ${theme.success}15, ${theme.purple}15)`, borderRadius: '16px', border: '2px solid ' + theme.success }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 800, color: '#111111' }}>A</div>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden' }}><img src="/logo.svg" alt="Aureus" style={{ width: '44px', height: '44px', objectFit: 'contain' }}/></div>
                 <div>
                   <div style={{ color: theme.text, fontWeight: 600 }}>Aureus</div>
                   <div style={{ color: theme.textMuted, fontSize: '11px' }}>
@@ -8974,7 +9018,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                   {changeSession.map((msg, i) => (
                     <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                       {msg.role === 'coach' && (
-                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 900, color: '#111111', flexShrink: 0, marginRight: '10px', marginTop: '2px' }}>A</div>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, marginRight: '10px', marginTop: '2px' }}><img src="/logo.svg" alt="Aureus" style={{ width: '32px', height: '32px', objectFit: 'contain' }}/></div>
                       )}
                       <div style={{ maxWidth: '82%', padding: '14px 18px', borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: msg.role === 'user' ? theme.accent : theme.cardBg, color: msg.role === 'user' ? '#111111' : theme.text, fontSize: '15px', lineHeight: 1.7, border: msg.role === 'coach' ? '1px solid ' + theme.border : 'none' }}>
                         {renderChatMessage(msg.content, msg.role === 'user')}
@@ -8983,7 +9027,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                   ))}
                   {changeLoading && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 900, color: '#111111' }}>A</div>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden' }}><img src="/logo.svg" alt="Aureus" style={{ width: '32px', height: '32px', objectFit: 'contain' }}/></div>
                       <div style={{ padding: '14px 18px', background: theme.cardBg, borderRadius: '18px 18px 18px 4px', border: '1px solid ' + theme.border }}>
                         <div style={{ display: 'flex', gap: '4px', alignItems: 'center', height: '20px' }}>
                           {[0,1,2].map(i => <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.accent, animation: `pulse 1.2s ${i*0.2}s infinite` }} />)}
@@ -10770,7 +10814,7 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.96)', zIndex: 9998, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '36px 32px', maxWidth: '480px', width: '100%', maxHeight: '90vh', overflowY: 'auto' as const }}>
             <div style={{ textAlign: 'center' as const, marginBottom: '28px' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: '28px', color: '#111111', fontWeight: 900 }}>A</div>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', overflow: 'hidden', margin: '0 auto 16px' }}><img src="/logo.svg" alt="Aureus" style={{ width: '64px', height: '64px', objectFit: 'contain' }}/></div>
               <h2 style={{ color: theme.text, fontSize: '24px', fontWeight: 900, margin: '0 0 8px', fontFamily: 'Cinzel, serif' }}>Start your Aureus Plutus journey</h2>
               <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>
                 Try the full app for just $1 this week. Then $14.99/month or $99/year — cancel anytime.
@@ -11609,7 +11653,7 @@ Tracking with Aureus 🏛️`
             {/* Step 0: Welcome */}
             {onboardingStep === 0 && (
               <div style={{ textAlign: 'center' as const }}>
-                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37 0%, #B6B82E 40%, #BC6A1F 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: '40px', fontWeight: 800, color: '#111111' }}>A</div>
+                <div style={{ width: '80px', height: '80px', borderRadius: '50%', overflow: 'hidden', margin: '0 auto 24px', boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}><img src="/logo.svg" alt="Aureus" style={{ width: '80px', height: '80px', objectFit: 'contain' }}/></div>
                 <h2 style={{ color: theme.text, fontSize: '28px', margin: '0 0 12px 0' }}>G'day! I'm Aureus.</h2>
                 <p style={{ color: theme.textMuted, fontSize: '16px', lineHeight: 1.7, marginBottom: '24px' }}>Your AI budgeting assistant — built to help you understand your money, pay off debt faster, and build real wealth. Let me learn about how you think about money so I can help you properly.</p>
                 <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '28px' }}>Takes about 5 minutes. Everything is stored only on your device.</p>
