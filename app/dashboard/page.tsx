@@ -192,7 +192,14 @@ export default function Dashboard() {
   const [tellAureusResponse, setTellAureusResponse] = useState<string | null>(null)
   const [tellAureusLoading, setTellAureusLoading] = useState(false)
 
-  // ==================== BUSINESS HUB ====================
+  // ==================== SUBSCRIPTION / PAYWALL ====================
+  const [subStatus, setSubStatus] = useState<'trial'|'trialing'|'active'|'past_due'|'cancelled'|'loading'>('loading')
+  const [trialDaysLeft, setTrialDaysLeft] = useState(30)
+  const [showPaywall, setShowPaywall] = useState(false)
+  const [paywallPromo, setPaywallPromo] = useState('')
+  const [paywallLoading, setPaywallLoading] = useState(false)
+  const [paywallError, setPaywallError] = useState('')
+  const [selectedPlan, setSelectedPlan] = useState<'monthly'|'annual'>('monthly')
   const [businessProfile, setBusinessProfile] = useState<{name:string,abn:string,type:string,industry:string,startDate:string}>({name:'',abn:'',type:'sole_trader',industry:'',startDate:''})
   const [businessRevenue, setBusinessRevenue] = useState<any[]>([])
   const [businessExpenses, setBusinessExpenses] = useState<any[]>([])
@@ -2011,6 +2018,68 @@ User: "${message}"`,
     } catch { setBizChatMessages(prev => [...prev, { role: 'assistant', content: "Having trouble connecting. Try again shortly." }]) }
     setBizChatLoading(false)
     setTimeout(() => bizChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  }
+
+  // ── Check subscription status on load ──
+  useEffect(() => {
+    const checkSub = async () => {
+      let userToken = localStorage.getItem('aureus_user_token')
+      if (!userToken) {
+        userToken = 'aureus_' + Math.random().toString(36).slice(2) + Date.now().toString(36)
+        localStorage.setItem('aureus_user_token', userToken)
+      }
+      // Check Supabase for active subscription
+      try {
+        const { createClient } = await import('@supabase/supabase-js')
+        // Next.js inlines NEXT_PUBLIC_ vars at build time
+        const supabaseUrl = (globalThis as any).__SUPABASE_URL__ || ''
+        const supabaseKey = (globalThis as any).__SUPABASE_KEY__ || ''
+        const sb = createClient(supabaseUrl, supabaseKey)
+        const { data } = await sb.from('subscriptions').select('*').eq('user_token', userToken).single()
+        if (data && (data.status === 'active' || data.status === 'trialing')) {
+          setSubStatus(data.status)
+          return
+        }
+      } catch {}
+      // No active subscription — show paywall
+      setSubStatus('cancelled')
+      setShowPaywall(true)
+    }
+    checkSub()
+  }, [])
+
+  // ── Handle successful checkout return ──
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('checkout') === 'success') {
+      setSubStatus('active')
+      setShowPaywall(false)
+      window.history.replaceState({}, '', '/dashboard')
+    }
+  }, [])
+
+  // ── Launch checkout ──
+  const launchCheckout = async (plan: 'monthly' | 'annual') => {
+    setPaywallLoading(true)
+    setPaywallError('')
+    const userToken = localStorage.getItem('aureus_user_token') || ''
+    const monthlyPriceId = (window as any).AUREUS_MONTHLY_PRICE_ID || ''
+    const annualPriceId = (window as any).AUREUS_ANNUAL_PRICE_ID || ''
+    try {
+      const res = await fetch('/api/create-checkout', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan,
+          userToken,
+          promoCode: paywallPromo.trim() || undefined,
+          email: notificationEmail || undefined
+        })
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else setPaywallError(data.error || 'Could not start checkout. Please try again.')
+    } catch { setPaywallError('Connection error. Please try again.') }
+    setPaywallLoading(false)
   }
 
   // ── Persist business data to localStorage ──
@@ -10696,406 +10765,57 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
           </div>
         </div>
       )}
-
-      {/* ── Floating help button ── */}
-      {onboardingComplete && !showSupport && (
-        <button onClick={() => { setShowSupport(true); setSupportTab('chat'); setSupportMessages([]) }}
-          style={{ position: 'fixed' as const, bottom: '80px', right: '16px', width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', color: '#111111', border: 'none', cursor: 'pointer', fontSize: '20px', fontWeight: 900, zIndex: 999, boxShadow: '0 4px 20px rgba(212,175,55,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          title="Help & Support">
-          ?
-        </button>
-      )}
-
-      {/* ==================== HELP & SUPPORT MODAL ==================== */}
-      {showSupport && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.90)', zIndex: 1060, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setShowSupport(false)}>
-          <div style={{ background: theme.cardBg, borderRadius: '24px 24px 0 0', padding: '0', maxWidth: '520px', width: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' as const }} onClick={e => e.stopPropagation()}>
-            {/* Header */}
-            <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div>
-                  <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>AUREUS SUPPORT</div>
-                  <div style={{ color: theme.text, fontSize: '18px', fontWeight: 800 }}>How can we help?</div>
-                </div>
-                <button onClick={() => setShowSupport(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '22px', padding: '4px' }}>×</button>
-              </div>
-              {/* Tab switcher */}
-              <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', background: theme.bg, padding: '4px', borderRadius: '10px' }}>
-                {([['chat', '💬 Ask AI'], ['book', '📅 Book a Call'], ['email', '✉️ Email Us']] as const).map(([id, label]) => (
-                  <button key={id} onClick={() => setSupportTab(id)}
-                    style={{ flex: 1, padding: '8px 4px', background: supportTab === id ? theme.cardBg : 'transparent', border: supportTab === id ? '1px solid ' + theme.border : 'none', borderRadius: '8px', color: supportTab === id ? theme.text : theme.textMuted, cursor: 'pointer', fontSize: '12px', fontWeight: supportTab === id ? 700 : 400, transition: 'all 0.15s' }}>
-                    {label}
-                  </button>
-                ))}
-              </div>
+      {/* ==================== PAYWALL MODAL ==================== */}
+      {showPaywall && subStatus !== 'active' && subStatus !== 'trialing' && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.96)', zIndex: 9998, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '36px 32px', maxWidth: '480px', width: '100%', maxHeight: '90vh', overflowY: 'auto' as const }}>
+            <div style={{ textAlign: 'center' as const, marginBottom: '28px' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: '28px', color: '#111111', fontWeight: 900 }}>A</div>
+              <h2 style={{ color: theme.text, fontSize: '24px', fontWeight: 900, margin: '0 0 8px', fontFamily: 'Cinzel, serif' }}>Start your Aureus Plutus journey</h2>
+              <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>
+                Try the full app for just $1 this week. Then $14.99/month or $99/year — cancel anytime.
+              </p>
             </div>
-
-            {/* Tab content */}
-            <div style={{ flex: 1, overflowY: 'auto' as const, padding: '0 24px 24px' }}>
-
-              {/* ── AI SUPPORT CHAT ── */}
-              {supportTab === 'chat' && (
-                <div style={{ display: 'flex', flexDirection: 'column' as const, height: '420px' }}>
-                  <div style={{ flex: 1, overflowY: 'auto' as const, display: 'flex', flexDirection: 'column' as const, gap: '12px', paddingBottom: '12px' }}>
-                    {supportMessages.length === 0 && (
-                      <div style={{ padding: '16px', background: theme.bg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
-                        <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>👋 Hi! I'm Aureus Support.</div>
-                        <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, margin: '0 0 12px' }}>Ask me anything about using the app — how to add income, find a feature, fix something not working, or understand how anything works.</p>
-                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
-                          {['How do I add my income?', 'Where is the debt tracker?', 'Why isn\'t my email sending?', 'How does the change work tab work?'].map(q => (
-                            <button key={q} onClick={() => {
-                              setSupportMessages([{ role: 'user', content: q }])
-                              handleSupportMessage(q)
-                            }} style={{ padding: '8px 12px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px', textAlign: 'left' as const }}>
-                              {q} →
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {supportMessages.map((msg, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                        <div style={{ maxWidth: '85%', padding: '12px 16px', borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: msg.role === 'user' ? theme.accent : theme.bg, color: msg.role === 'user' ? '#111111' : theme.text, fontSize: '14px', lineHeight: 1.6, border: msg.role === 'agent' ? '1px solid ' + theme.border : 'none' }}>
-                          {renderChatMessage(msg.content, msg.role === 'user')}
-                        </div>
-                      </div>
-                    ))}
-                    {supportLoading && (
-                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', padding: '12px 16px', background: theme.bg, borderRadius: '16px', width: 'fit-content', border: '1px solid ' + theme.border }}>
-                        {[0,1,2].map(i => <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.accent, opacity: 0.6 }} />)}
-                      </div>
-                    )}
-                    <div ref={supportEndRef} />
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '1px solid ' + theme.border }}>
-                    <input value={supportInput} onChange={e => setSupportInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && supportInput.trim() && !supportLoading) { setSupportMessages(prev => [...prev, { role: 'user', content: supportInput }]); handleSupportMessage(supportInput); setSupportInput('') } }}
-                      placeholder="Ask anything about Aureus..."
-                      style={{ ...inputStyle, flex: 1, fontSize: '14px' }} />
-                    <button onClick={() => { if (supportInput.trim() && !supportLoading) { setSupportMessages(prev => [...prev, { role: 'user', content: supportInput }]); handleSupportMessage(supportInput); setSupportInput('') } }}
-                      disabled={!supportInput.trim() || supportLoading}
-                      style={{ padding: '0 16px', background: supportInput.trim() ? theme.accent : theme.border, color: supportInput.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '10px', cursor: supportInput.trim() ? 'pointer' : 'default', fontWeight: 700 }}>→</button>
-                  </div>
+            <div style={{ padding: '16px 18px', background: theme.bg, borderRadius: '14px', marginBottom: '20px' }}>
+              <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>EVERYTHING INCLUDED</div>
+              {[['🏛️','Full budget tracking — income, expenses, debts, goals'],['💬','AI budgeting coach with your financial data'],['⚡','Change Work — Dickens Process, Values, Identity sessions'],['🏢','Business Hub — P&L tracking and business coach'],['📧','Daily brief emails, accountability partner, meal plans'],['📅','30-min support calls with the Aureus team']].map(([icon, text]) => (
+                <div key={text as string} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '16px', flexShrink: 0 }}>{icon}</span>
+                  <span style={{ color: theme.text, fontSize: '13px', lineHeight: 1.5 }}>{text}</span>
                 </div>
-              )}
-
-              {/* ── BOOK A CALL ── */}
-              {supportTab === 'book' && (
-                <div>
-                  <div style={{ padding: '16px 18px', background: theme.bg, borderRadius: '14px', border: '1px solid ' + theme.border, marginBottom: '16px' }}>
-                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>📅 30-minute Aureus session</div>
-                    <div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6 }}>
-                      Book a free 30-minute call with the Aureus team. We'll walk through your budget setup, answer questions, and make sure you're getting the most out of the app.
-                    </div>
-                  </div>
-
-                  {/* Calendly embed container */}
-                  <div style={{ borderRadius: '14px', overflow: 'hidden', border: '1px solid ' + theme.border, background: theme.bg, minHeight: '500px' }}>
-                    {/* The Calendly inline embed widget */}
-                    <div
-                      className="calendly-inline-widget"
-                      data-url="https://calendly.com/tiana-aureusplutus/30min?hide_gdpr_banner=1&background_color=1a1810&text_color=f5f5f5&primary_color=D4AF37"
-                      style={{ minWidth: '100%', height: '500px' }}
-                    />
-                  </div>
-
-                  <div style={{ marginTop: '14px', padding: '12px 16px', background: theme.accent + '08', borderRadius: '10px', border: '1px solid ' + theme.accent + '25', fontSize: '12px', color: theme.textMuted, lineHeight: 1.6 }}>
-                    <strong style={{ color: theme.text }}>What happens after you book:</strong> You'll receive a confirmation email with a Google Meet link. We'll also get a notification so we're ready. Sessions are free during beta.
-                  </div>
-                </div>
-              )}
-
-              {/* ── EMAIL SUPPORT ── */}
-              {supportTab === 'email' && (
-                <div>
-                  {supportSent ? (
-                    <div style={{ textAlign: 'center' as const, padding: '40px 20px' }}>
-                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
-                      <div style={{ color: theme.text, fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>Message sent!</div>
-                      <div style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, marginBottom: '20px' }}>We'll get back to you within 24 hours at the email you provided.</div>
-                      <button onClick={() => { setSupportSent(false); setSupportMessage(''); setSupportEmail(''); setSupportName('') }}
-                        style={{ padding: '10px 20px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' }}>
-                        Send another →
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
-                      <div style={{ padding: '12px 16px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.border, fontSize: '13px', color: theme.textMuted, lineHeight: 1.6 }}>
-                        We typically respond within 24 hours. For urgent issues, use the AI chat above or book a call.
-                      </div>
-                      <div>
-                        <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px', fontWeight: 700, letterSpacing: '0.5px' }}>YOUR NAME</label>
-                        <input value={supportName} onChange={e => setSupportName(e.target.value)} placeholder="First name" style={{ ...inputStyle, width: '100%' }} />
-                      </div>
-                      <div>
-                        <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px', fontWeight: 700, letterSpacing: '0.5px' }}>YOUR EMAIL</label>
-                        <input type="email" value={supportEmail} onChange={e => setSupportEmail(e.target.value)} placeholder="your@email.com" style={{ ...inputStyle, width: '100%' }} />
-                      </div>
-                      <div>
-                        <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px', fontWeight: 700, letterSpacing: '0.5px' }}>HOW CAN WE HELP?</label>
-                        <textarea value={supportMessage} onChange={e => setSupportMessage(e.target.value)}
-                          placeholder="Describe what you need help with, what you've tried, and any error messages you're seeing..."
-                          style={{ ...inputStyle, width: '100%', height: '120px', resize: 'none' as const, fontSize: '14px', lineHeight: 1.6 }} />
-                      </div>
-                      <button onClick={async () => {
-                        if (!supportName || !supportEmail || !supportMessage) return
-                        setSupportSending(true)
-                        try {
-                          await fetch('/api/send-support', {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              name: supportName,
-                              email: supportEmail,
-                              message: supportMessage,
-                              userName
-                            })
-                          })
-                          setSupportSent(true)
-                        } catch { alert('Could not send — please email hello@aureusplutus.app directly.') }
-                        setSupportSending(false)
-                      }} disabled={!supportName || !supportEmail || !supportMessage || supportSending}
-                        style={{ padding: '14px', background: (supportName && supportEmail && supportMessage) ? 'linear-gradient(135deg, #D4AF37, #BC6A1F)' : theme.border, color: (supportName && supportEmail && supportMessage) ? '#111111' : theme.textMuted, border: 'none', borderRadius: '12px', cursor: (supportName && supportEmail && supportMessage) ? 'pointer' : 'default', fontWeight: 800, fontSize: '15px' }}>
-                        {supportSending ? '⏳ Sending...' : 'Send message →'}
-                      </button>
-                      <div style={{ textAlign: 'center' as const, color: theme.textMuted, fontSize: '12px' }}>
-                        Or email us directly: <a href="mailto:hello@aureusplutus.app" style={{ color: theme.accent }}>hello@aureusplutus.app</a>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
+              ))}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==================== NAME PROMPT (existing users) ==================== */}
-      {showNamePrompt && (() => {
-        // Use a local ref to avoid re-render on every keystroke
-        const nameRef = React.useRef<HTMLInputElement>(null)
-        const handleSaveName = () => {
-          const val = nameRef.current?.value?.trim()
-          if (val) { setUserName(val); setShowNamePrompt(false) }
-        }
-        return (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.97)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '40px 32px', maxWidth: '440px', width: '100%', textAlign: 'center' as const }}>
-            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', fontSize: '36px', color: '#111111', fontWeight: 900, boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}>A</div>
-            <h2 style={{ color: theme.text, fontSize: '26px', fontWeight: 800, margin: '0 0 10px 0', fontFamily: 'Cinzel, serif' }}>One quick thing.</h2>
-            <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 28px 0' }}>
-              Aureus has been calling you "Builder" — but that's not your name. What should Aureus call you?
-            </p>
-            <input
-              ref={nameRef}
-              defaultValue={userName}
-              placeholder="Your first name"
-              onKeyDown={e => { if (e.key === 'Enter') handleSaveName() }}
-              style={{ ...inputStyle, width: '100%', fontSize: '20px', padding: '16px 20px', textAlign: 'center' as const, marginBottom: '16px', borderColor: theme.accent + '60' }}
-              autoFocus
-            />
-            <button
-              onClick={handleSaveName}
-              style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
-              Save my name →
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+              {([['monthly','$1 first week','then $14.99/month · cancel anytime'],['annual','$99/year','Save 45% · just $8.25/month']] as const).map(([plan, price, sub]) => (
+                <button key={plan} onClick={() => setSelectedPlan(plan)}
+                  style={{ flex: 1, padding: '16px 12px', background: selectedPlan === plan ? theme.accent + '15' : theme.bg, border: '2px solid ' + (selectedPlan === plan ? theme.accent : theme.border), borderRadius: '12px', cursor: 'pointer', textAlign: 'center' as const }}>
+                  <div style={{ color: selectedPlan === plan ? theme.accent : theme.text, fontSize: '18px', fontWeight: 900 }}>{price}</div>
+                  <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>{sub}</div>
+                  {plan === 'annual' && <div style={{ marginTop: '6px', padding: '2px 8px', background: theme.accent, color: '#111111', borderRadius: '4px', fontSize: '10px', fontWeight: 800, display: 'inline-block' }}>BEST VALUE</div>}
+                </button>
+              ))}
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <input placeholder="Promo code (optional)" value={paywallPromo} onChange={e => setPaywallPromo(e.target.value.toUpperCase())}
+                style={{ ...inputStyle, width: '100%', fontSize: '14px' }} />
+            </div>
+            {paywallError && (
+              <div style={{ padding: '10px 14px', background: theme.danger + '15', border: '1px solid ' + theme.danger + '30', borderRadius: '8px', color: theme.danger, fontSize: '13px', marginBottom: '12px' }}>
+                {paywallError}
+              </div>
+            )}
+            <button onClick={() => launchCheckout(selectedPlan)} disabled={paywallLoading}
+              style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '14px', cursor: 'pointer', fontWeight: 900, fontSize: '17px', marginBottom: '12px', opacity: paywallLoading ? 0.7 : 1 }}>
+              {paywallLoading ? '⏳ Loading...' : selectedPlan === 'monthly' ? 'Start for $1 this week →' : 'Get annual access — $99 →'}
             </button>
-          </div>
-        </div>
-        )
-      })()}
-
-      {/* ==================== RETURN VISIT CARD ==================== */}
-      {returnCard && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1090, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setReturnCard(null)}>
-          <div style={{ background: 'linear-gradient(135deg, #1a1810 0%, #111111 100%)', border: '2px solid ' + theme.accent + '50', borderRadius: '24px', padding: '36px 32px', maxWidth: '420px', width: '100%', textAlign: 'center' as const }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: '56px', marginBottom: '16px' }}>{returnCard.emoji}</div>
-            <h2 style={{ color: theme.accent, fontSize: '24px', fontWeight: 900, margin: '0 0 12px 0', fontFamily: 'Cinzel, serif' }}>{returnCard.title}</h2>
-            <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.7, margin: '0 0 24px 0' }}>{returnCard.body}</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => {
-                setReturnCard(null)
-                if (returnCard.action === 'checkin') setShowSpendCheckIn(true)
-                else if (returnCard.action !== 'home') setActiveTab(returnCard.action as any)
-              }} style={{ flex: 1, padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '14px', fontFamily: 'Cinzel, serif' }}>
-                {returnCard.cta}
-              </button>
-              <button onClick={() => setReturnCard(null)} style={{ padding: '14px 16px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>
-                Later
-              </button>
+            <div style={{ textAlign: 'center' as const, color: theme.textMuted, fontSize: '12px', lineHeight: 1.6 }}>
+              {selectedPlan === 'monthly' ? '$1 charged today. $14.99/month after 7 days — cancel anytime.' : '$99 charged today. Cancel anytime before renewal.'}
+              <br />Secure payment via Stripe.
             </div>
           </div>
         </div>
       )}
 
-      {/* ==================== CELEBRATION MODAL ==================== */}
-      {celebration && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setCelebration(null)}>
-          {/* Confetti */}
-          <div style={{ position: 'absolute' as const, inset: 0, overflow: 'hidden', pointerEvents: 'none' as const }}>
-            {Array.from({ length: 40 }).map((_, i) => (
-              <div key={i} style={{
-                position: 'absolute' as const,
-                left: `${Math.random() * 100}%`,
-                top: `-10px`,
-                width: `${6 + Math.random() * 8}px`,
-                height: `${6 + Math.random() * 8}px`,
-                background: ['#D4AF37','#B68B2E','#4ade80','#60a5fa','#f472b6','#fb923c'][i % 6],
-                borderRadius: Math.random() > 0.5 ? '50%' : '2px',
-                animation: `confettiFall ${2 + Math.random() * 3}s ${Math.random() * 2}s linear forwards`,
-                opacity: 0,
-              }} />
-            ))}
-          </div>
-          <style>{`
-            @keyframes confettiFall {
-              0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-              100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-            }
-            @keyframes celebrationPop {
-              0% { transform: scale(0.5); opacity: 0; }
-              70% { transform: scale(1.05); }
-              100% { transform: scale(1); opacity: 1; }
-            }
-          `}</style>
-          <div style={{ background: 'linear-gradient(135deg, #1a1208, #0f0a04)', border: '2px solid ' + theme.accent, borderRadius: '24px', padding: '40px 36px', maxWidth: '420px', width: '100%', textAlign: 'center' as const, animation: 'celebrationPop 0.4s ease-out forwards' }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: '72px', marginBottom: '16px', lineHeight: 1 }}>{celebration.emoji}</div>
-            <h2 style={{ color: theme.accent, fontSize: '26px', fontWeight: 900, margin: '0 0 10px 0', fontFamily: 'Cinzel, serif', lineHeight: 1.2 }}>{celebration.title}</h2>
-            {celebration.amount && <div style={{ display: 'inline-block', padding: '6px 16px', background: theme.accent + '20', border: '1px solid ' + theme.accent + '50', borderRadius: '20px', color: theme.accent, fontWeight: 800, fontSize: '18px', marginBottom: '14px' }}>{celebration.amount}</div>}
-            <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 28px 0' }}>{celebration.subtitle}</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => { const c = celebration; setCelebration(null); setShareWinContext({ title: c?.title, subtitle: c?.subtitle, emoji: c?.emoji, amount: c?.amount }); setShowShareWinCard(true) }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid ' + theme.accent + '50', borderRadius: '10px', color: theme.accent, cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>📊 Share this win</button>
-              <button onClick={() => setCelebration(null)} style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>Keep building 🔥</button>
-              <button onClick={() => { setCelebration(null); setValuesStep(0); setValuesAnswers({}); setValuesInput(''); setShowValuesElicitation(true) }} style={{ width: '100%', marginTop: '10px', padding: '10px', background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>✨ Use this momentum — do your Values Elicitation →</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==================== 60-SECOND SPENDING CHECK-IN ==================== */}
-      {showSpendCheckIn && (() => {
-        const spendCats = [
-          { id: 'food', label: 'Groceries', icon: '🛒', emoji: '🛒' },
-          { id: 'eating_out', label: 'Eating out', icon: '🍔', emoji: '🍔' },
-          { id: 'entertainment', label: 'Fun & entertainment', icon: '🎬', emoji: '🎬' },
-          { id: 'transport', label: 'Transport & fuel', icon: '🚗', emoji: '🚗' },
-          { id: 'other', label: 'Everything else', icon: '📦', emoji: '📦' },
-        ].filter(c => parseFloat(String(categoryBudgets[c.id] || 0)) > 0 || c.id === 'other')
-
-        const handleSubmit = async () => {
-          setCheckInSubmitting(true)
-          // Apply slider values to actualSpend
-          const updates: Record<string, number> = {}
-          spendCats.forEach(cat => {
-            if (checkInSliders[cat.id] !== undefined) {
-              updates[cat.id] = Math.round(checkInSliders[cat.id])
-            }
-          })
-          setActualSpend((prev: any) => ({ ...prev, ...updates }))
-
-          // Get a 1-sentence coach reaction
-          try {
-            const lines = spendCats.map(cat => `${cat.label}: $${Math.round(checkInSliders[cat.id] || parseFloat(String((actualSpend as any)[cat.id] || 0)) || 0)} (budget $${parseFloat(String((categoryBudgets as any)[cat.id] || 0)) || 0})`).join(', ')
-            const response = await fetch('/api/budget-coach', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                mode: 'question',
-                question: `Weekly spending check-in from ${userName || 'user'}. Spending this month: ${lines}. Monthly income $${monthlyIncome.toFixed(0)}, surplus $${monthlySurplus.toFixed(0)}, baby step ${currentBabyStep.step}.  Give ONE coaching response — max 30 words. Use STORY LANGUAGE (e.g. "You've bought back X weeks of freedom" not just numbers). Zero judgment. If they're over budget somewhere, acknowledge and give ONE specific redirect. If they're on track, celebrate it specifically.`,
-                financialData: { income: incomeStreams, expenses },
-                memory: budgetMemory,
-                countryConfig: currentCountryConfig
-              })
-            })
-            if (response.ok) {
-              const data = await response.json()
-              setCheckInResult(data.message || data.advice || '')
-            }
-          } catch { /* silent */ }
-          setLastCheckIn(new Date().toISOString())
-          setCheckInSubmitting(false)
-        }
-
-        return (
-          <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.82)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => { setShowSpendCheckIn(false); setCheckInResult(null) }}>
-            <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '28px', maxWidth: '480px', width: '100%' }} onClick={e => e.stopPropagation()}>
-
-              {checkInResult ? (
-                // Result screen
-                <div style={{ textAlign: 'center' as const }}>
-                  <div style={{ fontSize: '56px', marginBottom: '16px' }}>✅</div>
-                  <h3 style={{ color: theme.text, fontSize: '20px', margin: '0 0 12px 0' }}>Check-in saved</h3>
-                  <div style={{ padding: '16px 20px', background: theme.accent + '15', border: '1px solid ' + theme.accent + '30', borderRadius: '12px', marginBottom: '20px' }}>
-                    <p style={{ color: theme.text, fontSize: '15px', lineHeight: 1.6, margin: 0, fontStyle: 'italic' }}>"{checkInResult}"</p>
-                    <div style={{ color: theme.accent, fontSize: '11px', marginTop: '8px' }}>— Aureus</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={() => { setShowSpendCheckIn(false); setCheckInResult(null) }} style={{ flex: 1, padding: '12px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700 }}>Done</button>
-                    <button onClick={() => { setActiveTab('chat'); setShowSpendCheckIn(false); setCheckInResult(null) }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '10px', cursor: 'pointer', color: theme.textMuted, fontSize: '13px' }}>Ask follow-up →</button>
-                  </div>
-                  {/* If they went over budget, invite the Dickens Process */}
-                  {Object.entries(checkInSliders).some(([cat, amt]) => parseFloat(String((categoryBudgets as any)[cat] || 0)) > 0 && (amt as number) > parseFloat(String((categoryBudgets as any)[cat] || 0))) && (
-                    <button onClick={() => { setShowSpendCheckIn(false); setCheckInResult(null); setDickensStep(0); setDickensAnswers([]); setDickensResponse(null); setDickensInput(''); setShowDickens(true) }}
-                      style={{ width: '100%', marginTop: '10px', padding: '10px', background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>
-                      🕯️ Want to understand why this keeps happening? Try the Dickens Process →
-                    </button>
-                  )}
-                </div>
-              ) : (
-                // Slider screen
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                    <div>
-                      <h3 style={{ color: theme.text, fontSize: '20px', margin: '0 0 2px 0' }}>⚡ Weekly check-in</h3>
-                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>Drag each slider to where you actually spent. Takes 60 seconds.</div>
-                    </div>
-                    <button onClick={() => setShowSpendCheckIn(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '22px', cursor: 'pointer' }}>×</button>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '16px', marginBottom: '20px' }}>
-                    {spendCats.map(cat => {
-                      const budget = parseFloat(String((categoryBudgets as any)[cat.id] || 0)) || 200
-                      const _mp = new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate()
-                      const current = checkInSliders[cat.id] ?? (parseFloat(String((actualSpend as any)[cat.id] || 0)) || Math.round(budget * _mp))
-                      const pct = Math.min(1, current / budget)
-                      const isOver = current > budget
-                      return (
-                        <div key={cat.id}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                            <span style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>{cat.icon} {cat.label}</span>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              <span style={{ color: isOver ? theme.danger : theme.success, fontWeight: 700, fontSize: '14px' }}>${Math.round(current)}</span>
-                              <span style={{ color: theme.textMuted, fontSize: '11px' }}>/ ${budget}</span>
-                              {isOver && <span style={{ color: theme.danger, fontSize: '10px', fontWeight: 700 }}>OVER</span>}
-                            </div>
-                          </div>
-                          <div style={{ position: 'relative' as const, height: '36px', display: 'flex', alignItems: 'center' }}>
-                            {/* Budget marker */}
-                            <div style={{ position: 'absolute' as const, left: '100%', top: '50%', transform: 'translate(-1px, -50%)', width: '2px', height: '18px', background: theme.border, borderRadius: '1px' }} />
-                            <input type="range" min={0} max={Math.round(budget * 1.5)} step={5}
-                              value={current}
-                              onChange={e => setCheckInSliders(prev => ({ ...prev, [cat.id]: parseFloat(e.target.value) }))}
-                              style={{ width: '100%', accentColor: isOver ? theme.danger : theme.accent, cursor: 'pointer' }} />
-                          </div>
-                          <div style={{ height: '4px', background: theme.border, borderRadius: '2px', overflow: 'hidden' }}>
-                            <div style={{ width: Math.min(100, pct * 100) + '%', height: '100%', background: isOver ? theme.danger : theme.accent, borderRadius: '2px', transition: 'width 0.1s' }} />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <textarea placeholder="Anything notable this week? (optional)" value={checkInNote} onChange={e => setCheckInNote(e.target.value)}
-                    style={{ ...inputStyle, width: '100%', height: '60px', resize: 'none' as const, marginBottom: '12px' }} />
-
-                  <button onClick={handleSubmit} disabled={checkInSubmitting} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '15px', opacity: checkInSubmitting ? 0.7 : 1 }}>
-                    {checkInSubmitting ? '⏳ Getting your feedback...' : '✓ Save check-in & get feedback'}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        )
-      })()}
 
       {/* ==================== RECIPE MODAL ==================== */}
       {recipeModal && (() => {
