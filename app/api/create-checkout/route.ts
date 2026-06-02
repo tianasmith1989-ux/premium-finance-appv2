@@ -31,11 +31,6 @@ export async function POST(request: NextRequest) {
       client_reference_id: userToken,
       'metadata[userToken]': userToken,
       'metadata[source]': 'aureus_app',
-      // $1 trial for 7 days on monthly plan only
-      ...(plan === 'monthly' ? {
-        'subscription_data[trial_period_days]': '7',
-        'subscription_data[trial_settings][end_behavior][missing_payment_method]': 'cancel',
-      } : {}),
       'subscription_data[metadata][userToken]': userToken,
     }
 
@@ -48,9 +43,7 @@ export async function POST(request: NextRequest) {
 
     // Add $1 for the trial period on monthly plan
     if (plan === 'monthly') {
-      params['subscription_data[trial_end]'] = ''
-      // Use add_invoice_items to charge $1 upfront
-      params['payment_intent_data[setup_future_usage]'] = 'off_session'
+      params['subscription_data[trial_period_days]'] = '7'
     }
 
     const formBody = Object.entries(params)
