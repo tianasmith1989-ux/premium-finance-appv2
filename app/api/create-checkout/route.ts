@@ -1,5 +1,5 @@
 // app/api/create-checkout/route.ts
-// $1 for 7 days → $14.99/month or $99/year
+// $1 upfront trial fee + 7-day subscription trial → $14.99/month or $99/year
 
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -19,13 +19,17 @@ export async function POST(request: NextRequest) {
     }
 
     const priceId = plan === 'annual' ? annualPriceId : monthlyPriceId
+    const isMonthly = plan === 'monthly'
 
-    // Build params as URL-encoded string for Stripe API
+    // Build params
     const params: Record<string, any> = {
       mode: 'subscription',
       'payment_method_types[0]': 'card',
+
+      // Line item 0: the subscription
       'line_items[0][price]': priceId,
       'line_items[0][quantity]': '1',
+
       success_url: `${appUrl}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/dashboard?checkout=cancelled`,
       client_reference_id: userToken,
@@ -34,16 +38,26 @@ export async function POST(request: NextRequest) {
       'subscription_data[metadata][userToken]': userToken,
     }
 
+    // For monthly plan: charge $1 upfront as a one-time fee + 7-day trial
+    if (isMonthly) {
+      // One-time $1 trial fee charged immediately at checkout
+      params['line_items[1][price_data][currency]'] = 'aud'
+      params['line_items[1][price_data][unit_amount]'] = '100' // $1.00 in cents
+      params['line_items[1][price_data][product_data][name]'] = '7-Day Trial Access'
+      params['line_items[1][price_data][product_data][description]'] = 'One-time access fee for your first 7 days'
+      params['line_items[1][quantity]'] = '1'
+      // 7-day trial on the subscription (so $14.99 doesn't charge until day 8)
+      params['subscription_data[trial_period_days]'] = '7'
+    }
+
+    // Email pre-fill
     if (email) params['customer_email'] = email
+
+    // Promo code
     if (promoCode) {
       params['discounts[0][promotion_code]'] = promoCode
     } else {
       params['allow_promotion_codes'] = 'true'
-    }
-
-    // Add $1 for the trial period on monthly plan
-    if (plan === 'monthly') {
-      params['subscription_data[trial_period_days]'] = '7'
     }
 
     const formBody = Object.entries(params)
