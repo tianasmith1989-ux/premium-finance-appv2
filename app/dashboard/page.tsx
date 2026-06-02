@@ -41,6 +41,18 @@ const AureusLogo = ({ size = 40 }: { size?: number }) => (
   </svg>
 )
 
+// ── Supabase client singleton ──
+let _sb: any = null
+const getSb = async () => {
+  if (_sb) return _sb
+  const { createClient } = await import('@supabase/supabase-js')
+  _sb = createClient(
+    (process as any).env?.NEXT_PUBLIC_SUPABASE_URL || '',
+    (process as any).env?.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  )
+  return _sb
+}
+
 export default function Dashboard() {
   const { user } = useUser()
 
@@ -229,6 +241,15 @@ export default function Dashboard() {
   const [tellAureusText, setTellAureusText] = useState('')
   const [tellAureusResponse, setTellAureusResponse] = useState<string | null>(null)
   const [tellAureusLoading, setTellAureusLoading] = useState(false)
+
+  // ==================== SUPABASE AUTH + CLOUD SYNC ====================
+  const [authUser, setAuthUser] = useState<any>(null)
+  const [showAuthModal, setShowAuthModal] = useState<'none'|'create'|'login'>('none')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authError, setAuthError] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<'idle'|'saving'|'saved'|'error'>('idle')
 
   // ==================== SUBSCRIPTION / PAYWALL ====================
   const [subStatus, setSubStatus] = useState<'trial'|'trialing'|'active'|'past_due'|'cancelled'|'loading'>('loading')
@@ -1988,6 +2009,178 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
     setFetchingRecipe(null)
   }
 
+  // ── Build snapshot of all user data ──
+  const buildSnapshot = () => ({
+    aureus_token: localStorage.getItem('aureus_user_token') || '',
+    userName, whyStatement, budgetMemory, userCountry,
+    incomeStreams, expenses, debts, goals, assets, liabilities,
+    sinkingFunds, categoryBudgets, actualSpend,
+    superData, mealPlanPrefs, mealPlanHistory,
+    missionComplete, missionPhase, missionStep,
+    missionP2Proposals, missionP2Confirmed, missionP2Step,
+    onboardingComplete, houseStatus, fireGoal, moneyPersonality,
+    wins, streak, lastCheckIn, whyStatement: whyStatement,
+    coreValues, identityStatement, mustStatement, futureVision,
+    identityStatements, proactiveInsights, insightsGeneratedAt,
+    businessProfile, businessRevenue, businessExpenses, businessGoals,
+    notificationEmail, emailNotifEnabled, emailNotifFrequency,
+    monthlyMealPlanOptIn, accountabilityEmail, accountabilityName,
+    mortgageAccel, investmentProperties, lastMirrorMonth,
+    roadmapMilestones, sinkingFunds: sinkingFunds,
+    latteItems, dailyCheckInLog, moneyDateLog, annualReviews,
+    coachNextAction, dismissedTriggers, lastAppOpen,
+    personalityAnswers, deepWhyAnswers, deepWhyComplete,
+    saved_at: new Date().toISOString()
+  })
+
+  // ── Save snapshot to Supabase ──
+  const saveToCloud = async (user?: any) => {
+    const u = user || authUser
+    if (!u) return
+    try {
+      setSyncStatus('saving')
+      const sb = await getSb()
+      const { error } = await sb.from('user_data').upsert({
+        user_id: u.id,
+        email: u.email,
+        aureus_token: localStorage.getItem('aureus_user_token') || '',
+        snapshot: buildSnapshot()
+      }, { onConflict: 'user_id' })
+      setSyncStatus(error ? 'error' : 'saved')
+    } catch { setSyncStatus('error') }
+  }
+
+  // ── Load snapshot from Supabase ──
+  const loadFromCloud = async (user: any): Promise<boolean> => {
+    try {
+      const sb = await getSb()
+      const { data } = await sb.from('user_data').select('snapshot, aureus_token').eq('user_id', user.id).single()
+      if (!data?.snapshot) return false
+      const s = data.snapshot
+      if (data.aureus_token) localStorage.setItem('aureus_user_token', data.aureus_token)
+      if (s.userName) setUserName(s.userName)
+      if (s.whyStatement) setWhyStatement(s.whyStatement)
+      if (s.budgetMemory) setBudgetMemory(s.budgetMemory)
+      if (s.userCountry) setUserCountry(s.userCountry)
+      if (s.incomeStreams?.length) setIncomeStreams(s.incomeStreams)
+      if (s.expenses?.length) setExpenses(s.expenses)
+      if (s.debts?.length) setDebts(s.debts)
+      if (s.goals?.length) setGoals(s.goals)
+      if (s.assets?.length) setAssets(s.assets)
+      if (s.liabilities?.length) setLiabilities(s.liabilities)
+      if (s.sinkingFunds?.length) setSinkingFunds(s.sinkingFunds)
+      if (s.categoryBudgets) setCategoryBudgets(s.categoryBudgets)
+      if (s.actualSpend) setActualSpend(s.actualSpend)
+      if (s.superData) setSuperData(s.superData)
+      if (s.mealPlanPrefs) setMealPlanPrefs(s.mealPlanPrefs)
+      if (s.mealPlanHistory?.length) setMealPlanHistory(s.mealPlanHistory)
+      if (s.missionComplete) { setMissionComplete(true); setOnboardingComplete(true) }
+      if (s.missionPhase) setMissionPhase(s.missionPhase)
+      if (s.missionStep !== undefined) setMissionStep(s.missionStep)
+      if (s.missionP2Proposals?.length) setMissionP2Proposals(s.missionP2Proposals)
+      if (s.missionP2Confirmed?.length) setMissionP2Confirmed(s.missionP2Confirmed)
+      if (s.wins?.length) setWins(s.wins)
+      if (s.streak) setStreak(s.streak)
+      if (s.coreValues?.length) setCoreValues(s.coreValues)
+      if (s.identityStatement) setIdentityStatement(s.identityStatement)
+      if (s.mustStatement) setMustStatement(s.mustStatement)
+      if (s.futureVision) setFutureVision(s.futureVision)
+      if (s.identityStatements?.length) setIdentityStatements(s.identityStatements)
+      if (s.businessProfile) setBusinessProfile(s.businessProfile)
+      if (s.businessRevenue?.length) setBusinessRevenue(s.businessRevenue)
+      if (s.businessExpenses?.length) setBusinessExpenses(s.businessExpenses)
+      if (s.businessGoals?.length) setBusinessGoals(s.businessGoals)
+      if (s.notificationEmail) setNotificationEmail(s.notificationEmail)
+      if (s.emailNotifFrequency) setEmailNotifFrequency(s.emailNotifFrequency)
+      if (s.monthlyMealPlanOptIn) setMonthlyMealPlanOptIn(s.monthlyMealPlanOptIn)
+      if (s.accountabilityEmail) setAccountabilityEmail(s.accountabilityEmail)
+      if (s.accountabilityName) setAccountabilityName(s.accountabilityName)
+      if (s.mortgageAccel) setMortgageAccel(s.mortgageAccel)
+      if (s.investmentProperties?.length) setInvestmentProperties(s.investmentProperties)
+      if (s.roadmapMilestones?.length) setRoadmapMilestones(s.roadmapMilestones)
+      if (s.latteItems?.length) setLatteItems(s.latteItems)
+      if (s.moneyDateLog?.length) setMoneyDateLog(s.moneyDateLog)
+      if (s.coachNextAction) setCoachNextAction(s.coachNextAction)
+      if (s.houseStatus) setHouseStatus(s.houseStatus)
+      if (s.moneyPersonality) setMoneyPersonality(s.moneyPersonality)
+      if (s.personalityAnswers) setPersonalityAnswers(s.personalityAnswers)
+      return true
+    } catch { return false }
+  }
+
+  // ── Handle auth (signup / login) ──
+  const handleAuth = async (mode: 'signup' | 'login') => {
+    if (!authEmail.trim() || !authPassword.trim()) {
+      setAuthError('Please enter your email and password.')
+      return
+    }
+    if (mode === 'signup' && authPassword.length < 8) {
+      setAuthError('Password must be at least 8 characters.')
+      return
+    }
+    setAuthLoading(true)
+    setAuthError('')
+    try {
+      const sb = await getSb()
+      if (mode === 'signup') {
+        const { data, error } = await sb.auth.signUp({ email: authEmail.trim(), password: authPassword })
+        if (error) throw error
+        if (data.user) {
+          setAuthUser(data.user)
+          await saveToCloud(data.user)
+          setShowAuthModal('none')
+        }
+      } else {
+        const { data, error } = await sb.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword })
+        if (error) throw error
+        if (data.user) {
+          setAuthUser(data.user)
+          const loaded = await loadFromCloud(data.user)
+          setSubStatus('active')
+          setShowPaywall(false)
+          setShowAuthModal('none')
+          if (!loaded) {
+            setMissionPhase(1); setMissionStep(0); setMissionNavLocked(true)
+          }
+        }
+      }
+    } catch (e: any) {
+      setAuthError(e.message?.includes('Invalid login') ? 'Incorrect email or password.' : e.message || 'Something went wrong. Please try again.')
+    }
+    setAuthLoading(false)
+  }
+
+  // ── Check for existing Supabase session on mount ──
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const sb = await getSb()
+        const { data } = await sb.auth.getSession()
+        if (data.session?.user) {
+          setAuthUser(data.session.user)
+          const hasLocal = !!localStorage.getItem('aureus_data')
+          if (!hasLocal) {
+            const loaded = await loadFromCloud(data.session.user)
+            if (loaded) { setSubStatus('active'); setShowPaywall(false) }
+          }
+        }
+      } catch {}
+    }
+    checkSession()
+  }, [])
+
+  // ── Auto-sync every 60 seconds when logged in ──
+  useEffect(() => {
+    if (!authUser || !onboardingComplete) return
+    const timer = setInterval(() => saveToCloud(), 60000)
+    return () => clearInterval(timer)
+  }, [authUser, onboardingComplete, incomeStreams, expenses, debts, goals, wins])
+
+  // ── Save to cloud when onboarding completes ──
+  useEffect(() => {
+    if (onboardingComplete && authUser) saveToCloud()
+  }, [onboardingComplete])
+
   // ── Support AI chat handler ──
   const handleSupportMessage = async (message: string) => {
     setSupportLoading(true)
@@ -2061,31 +2254,36 @@ User: "${message}"`,
   // ── Check subscription status on load ──
   useEffect(() => {
     const checkSub = async () => {
+      // If returning from Stripe checkout success — skip Supabase check entirely
+      if (window.location.search.includes('checkout=success')) {
+        setSubStatus('active')
+        setShowPaywall(false)
+        window.history.replaceState({}, '', '/dashboard')
+        return
+      }
       let userToken = localStorage.getItem('aureus_user_token')
       if (!userToken) {
         userToken = 'aureus_' + Math.random().toString(36).slice(2) + Date.now().toString(36)
         localStorage.setItem('aureus_user_token', userToken)
       }
-      // Check Supabase for active subscription
       try {
         const { createClient } = await import('@supabase/supabase-js')
-        // Next.js inlines NEXT_PUBLIC_ vars at build time
         const supabaseUrl = (globalThis as any).__SUPABASE_URL__ || ''
         const supabaseKey = (globalThis as any).__SUPABASE_KEY__ || ''
-        const sb = createClient(supabaseUrl, supabaseKey)
-        const { data } = await sb.from('subscriptions').select('*').eq('user_token', userToken).single()
-        if (data && (data.status === 'active' || data.status === 'trialing')) {
-          setSubStatus(data.status)
-          return
+        if (supabaseUrl && supabaseKey) {
+          const sb = createClient(supabaseUrl, supabaseKey)
+          const { data } = await sb.from('subscriptions').select('*').eq('user_token', userToken).single()
+          if (data && (data.status === 'active' || data.status === 'trialing')) {
+            setSubStatus(data.status)
+            return
+          }
         }
       } catch {}
-      // No active subscription — show paywall
       setSubStatus('cancelled')
       setShowPaywall(true)
     }
     checkSub()
   }, [])
-
   // ── Handle successful checkout return ──
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -2093,12 +2291,11 @@ User: "${message}"`,
       setSubStatus('active')
       setShowPaywall(false)
       window.history.replaceState({}, '', '/dashboard')
-      // If new user (no name yet), start onboarding
-      if (!missionComplete) {
-        setMissionPhase(1)
-        setMissionStep(0)
-        setMissionNavLocked(true)
-      }
+      // Show "create your account" to save their data
+      setAuthEmail('')
+      setAuthPassword('')
+      setAuthError('')
+      setShowAuthModal('create')
     }
   }, [])
 
@@ -10809,6 +11006,68 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
           </div>
         </div>
       )}
+      {/* ==================== CLOUD SYNC STATUS ==================== */}
+      {authUser && onboardingComplete && syncStatus !== 'idle' && (
+        <div style={{ position: 'fixed' as const, bottom: '140px', right: '16px', padding: '6px 12px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '20px', fontSize: '11px', color: syncStatus === 'saved' ? theme.success : syncStatus === 'saving' ? theme.accent : theme.danger, zIndex: 997, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {syncStatus === 'saving' ? '⏫ Saving...' : syncStatus === 'saved' ? '☁️ Saved' : '⚠️ Sync error'}
+        </div>
+      )}
+
+      {/* ==================== AUTH MODAL ==================== */}
+      {showAuthModal !== 'none' && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 9997, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '36px 32px', maxWidth: '440px', width: '100%' }}>
+            <div style={{ textAlign: 'center' as const, marginBottom: '24px' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', overflow: 'hidden', margin: '0 auto 16px' }}>
+                <img src="/logo.svg" alt="Aureus" style={{ width: '64px', height: '64px', objectFit: 'contain' }}/>
+              </div>
+              <h2 style={{ color: theme.text, fontSize: '22px', fontWeight: 900, margin: '0 0 8px', fontFamily: 'Cinzel, serif' }}>
+                {showAuthModal === 'create' ? 'Save your progress' : 'Welcome back'}
+              </h2>
+              <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>
+                {showAuthModal === 'create'
+                  ? 'Create an account so your data is saved across all your devices and never lost.'
+                  : 'Log in to restore your budget, goals, and progress.'}
+              </p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', display: 'block', marginBottom: '4px' }}>EMAIL</label>
+                <input type="email" placeholder="your@email.com" value={authEmail} onChange={e => setAuthEmail(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAuth(showAuthModal === 'create' ? 'signup' : 'login') }}
+                  style={{ ...inputStyle, width: '100%' }} autoFocus />
+              </div>
+              <div>
+                <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', display: 'block', marginBottom: '4px' }}>
+                  PASSWORD {showAuthModal === 'create' && <span style={{ color: theme.textMuted, fontWeight: 400 }}>(min 8 characters)</span>}
+                </label>
+                <input type="password" placeholder="••••••••" value={authPassword} onChange={e => setAuthPassword(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAuth(showAuthModal === 'create' ? 'signup' : 'login') }}
+                  style={{ ...inputStyle, width: '100%' }} />
+              </div>
+              {authError && (
+                <div style={{ padding: '10px 14px', background: theme.danger + '15', border: '1px solid ' + theme.danger + '30', borderRadius: '8px', color: theme.danger, fontSize: '13px' }}>
+                  {authError}
+                </div>
+              )}
+              <button onClick={() => handleAuth(showAuthModal === 'create' ? 'signup' : 'login')} disabled={authLoading}
+                style={{ padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '16px', opacity: authLoading ? 0.7 : 1 }}>
+                {authLoading ? '⏳ Please wait...' : showAuthModal === 'create' ? 'Create account & save data →' : 'Log in & restore data →'}
+              </button>
+              <button onClick={() => setShowAuthModal(showAuthModal === 'create' ? 'login' : 'create')}
+                style={{ background: 'none', border: 'none', color: theme.accent, cursor: 'pointer', fontSize: '13px', padding: '4px' }}>
+                {showAuthModal === 'create' ? 'Already have an account? Log in' : "Don't have an account? Sign up"}
+              </button>
+              <button onClick={() => { setShowAuthModal('none'); if (!missionComplete) { setMissionPhase(1); setMissionStep(0); setMissionNavLocked(true) } }}
+                style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '12px', padding: '4px' }}>
+                {showAuthModal === 'create' ? "Skip for now — I'll do this later" : 'Continue without logging in'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       {/* ==================== PAYWALL MODAL ==================== */}
       {showPaywall && subStatus !== 'active' && subStatus !== 'trialing' && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.96)', zIndex: 9998, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
