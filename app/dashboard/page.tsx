@@ -244,7 +244,7 @@ export default function Dashboard() {
 
   // ==================== SUPABASE AUTH + CLOUD SYNC ====================
   const [authUser, setAuthUser] = useState<any>(null)
-  const [showAuthModal, setShowAuthModal] = useState<'none'|'create'|'login'>('none')
+  const [showAuthModal, setShowAuthModal] = useState<'none'|'create'|'login'|'forgot'|'reset'>('none')
   const [authEmail, setAuthEmail] = useState('')
   const [authPassword, setAuthPassword] = useState('')
   const [authError, setAuthError] = useState('')
@@ -2111,6 +2111,43 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
     } catch { return false }
   }
 
+  // ── Forgot password ──
+  const handleForgotPassword = async () => {
+    if (!authEmail.trim()) { setAuthError('Please enter your email address.'); return }
+    setAuthLoading(true); setAuthError('')
+    try {
+      const sb = await getSb()
+      const { error } = await sb.auth.resetPasswordForEmail(authEmail.trim(), {
+        redirectTo: `${window.location.origin}/dashboard?reset=true`
+      })
+      if (error) throw error
+      setAuthError('✅ Reset email sent! Check your inbox and click the link to set a new password.')
+    } catch (e: any) {
+      setAuthError(e.message || 'Could not send reset email. Please try again.')
+    }
+    setAuthLoading(false)
+  }
+
+  // ── Update password after reset redirect ──
+  const handleResetPassword = async () => {
+    if (!authPassword.trim() || authPassword.length < 8) {
+      setAuthError('Password must be at least 8 characters.'); return
+    }
+    setAuthLoading(true); setAuthError('')
+    try {
+      const sb = await getSb()
+      const { error } = await sb.auth.updateUser({ password: authPassword })
+      if (error) throw error
+      setShowAuthModal('none')
+      setSubStatus('active')
+      setShowPaywall(false)
+      window.history.replaceState({}, '', '/dashboard')
+    } catch (e: any) {
+      setAuthError(e.message || 'Could not update password. Please try again.')
+    }
+    setAuthLoading(false)
+  }
+
   // ── Handle auth (signup / login) ──
   const handleAuth = async (mode: 'signup' | 'login') => {
     if (!authEmail.trim() || !authPassword.trim()) {
@@ -2156,6 +2193,13 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
   // ── Check for existing Supabase session on mount ──
   useEffect(() => {
     const checkSession = async () => {
+      // Handle password reset redirect
+      if (window.location.search.includes('reset=true')) {
+        setShowAuthModal('reset')
+        setSubStatus('active')
+        setShowPaywall(false)
+        return
+      }
       try {
         const sb = await getSb()
         const { data } = await sb.auth.getSession()
@@ -11049,51 +11093,72 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
                 <img src="/logo.svg" alt="Aureus" style={{ width: '64px', height: '64px', objectFit: 'contain' }}/>
               </div>
               <h2 style={{ color: theme.text, fontSize: '22px', fontWeight: 900, margin: '0 0 8px', fontFamily: 'Cinzel, serif' }}>
-                {showAuthModal === 'create' ? 'Save your progress' : 'Welcome back'}
+                {showAuthModal === 'create' ? 'Save your progress' : showAuthModal === 'forgot' ? 'Reset password' : showAuthModal === 'reset' ? 'Set new password' : 'Welcome back'}
               </h2>
               <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>
-                {showAuthModal === 'create'
-                  ? 'Create an account so your data is saved across all your devices and never lost.'
+                {showAuthModal === 'create' ? 'Create an account so your data is saved across all your devices and never lost.'
+                  : showAuthModal === 'forgot' ? "Enter your email and we'll send you a reset link."
+                  : showAuthModal === 'reset' ? 'Choose a new password for your account.'
                   : 'Log in to restore your budget, goals, and progress.'}
               </p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
-              <div>
-                <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', display: 'block', marginBottom: '4px' }}>EMAIL</label>
-                <input type="email" placeholder="your@email.com" value={authEmail} onChange={e => setAuthEmail(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAuth(showAuthModal === 'create' ? 'signup' : 'login') }}
-                  style={{ ...inputStyle, width: '100%' }} autoFocus />
-              </div>
-              <div>
-                <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', display: 'block', marginBottom: '4px' }}>
-                  PASSWORD {showAuthModal === 'create' && <span style={{ color: theme.textMuted, fontWeight: 400 }}>(min 8 characters)</span>}
-                </label>
-                <input type="password" placeholder="••••••••" value={authPassword} onChange={e => setAuthPassword(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAuth(showAuthModal === 'create' ? 'signup' : 'login') }}
-                  style={{ ...inputStyle, width: '100%' }} />
-              </div>
+              {showAuthModal !== 'reset' && (
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', display: 'block', marginBottom: '4px' }}>EMAIL</label>
+                  <input type="email" placeholder="your@email.com" value={authEmail} onChange={e => setAuthEmail(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') showAuthModal === 'forgot' ? handleForgotPassword() : handleAuth(showAuthModal === 'create' ? 'signup' : 'login') }}
+                    style={{ ...inputStyle, width: '100%' }} autoFocus />
+                </div>
+              )}
+              {(showAuthModal === 'create' || showAuthModal === 'login' || showAuthModal === 'reset') && (
+                <div>
+                  <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', display: 'block', marginBottom: '4px' }}>
+                    {showAuthModal === 'reset' ? 'NEW PASSWORD' : 'PASSWORD'}{showAuthModal === 'create' ? <span style={{ color: theme.textMuted, fontWeight: 400 }}> (min 8 characters)</span> : null}
+                  </label>
+                  <input type="password" placeholder="••••••••" value={authPassword} onChange={e => setAuthPassword(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') showAuthModal === 'reset' ? handleResetPassword() : handleAuth(showAuthModal === 'create' ? 'signup' : 'login') }}
+                    style={{ ...inputStyle, width: '100%' }} autoFocus={showAuthModal === 'reset'} />
+                </div>
+              )}
               {authError && (
-                <div style={{ padding: '10px 14px', background: theme.danger + '15', border: '1px solid ' + theme.danger + '30', borderRadius: '8px', color: theme.danger, fontSize: '13px' }}>
+                <div style={{ padding: '10px 14px', background: authError.startsWith('✅') ? theme.success + '15' : theme.danger + '15', border: '1px solid ' + (authError.startsWith('✅') ? theme.success : theme.danger) + '30', borderRadius: '8px', color: authError.startsWith('✅') ? theme.success : theme.danger, fontSize: '13px' }}>
                   {authError}
                 </div>
               )}
-              <button onClick={() => handleAuth(showAuthModal === 'create' ? 'signup' : 'login')} disabled={authLoading}
+              <button onClick={() => showAuthModal === 'forgot' ? handleForgotPassword() : showAuthModal === 'reset' ? handleResetPassword() : handleAuth(showAuthModal === 'create' ? 'signup' : 'login')} disabled={authLoading}
                 style={{ padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '16px', opacity: authLoading ? 0.7 : 1 }}>
-                {authLoading ? '⏳ Please wait...' : showAuthModal === 'create' ? 'Create account & save data →' : 'Log in & restore data →'}
+                {authLoading ? '⏳ Please wait...' : showAuthModal === 'create' ? 'Create account & save data →' : showAuthModal === 'forgot' ? 'Send reset email →' : showAuthModal === 'reset' ? 'Set new password →' : 'Log in & restore data →'}
               </button>
-              <button onClick={() => setShowAuthModal(showAuthModal === 'create' ? 'login' : 'create')}
-                style={{ background: 'none', border: 'none', color: theme.accent, cursor: 'pointer', fontSize: '13px', padding: '4px' }}>
-                {showAuthModal === 'create' ? 'Already have an account? Log in' : "Don't have an account? Sign up"}
-              </button>
-              <button onClick={() => { setShowAuthModal('none'); if (!missionComplete) { setMissionPhase(1); setMissionStep(0); setMissionNavLocked(true) } }}
-                style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '12px', padding: '4px' }}>
-                {showAuthModal === 'create' ? "Skip for now — I'll do this later" : 'Continue without logging in'}
-              </button>
+              {showAuthModal === 'login' && (
+                <button onClick={() => { setShowAuthModal('forgot'); setAuthError('') }}
+                  style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '12px', padding: '2px' }}>
+                  Forgot password?
+                </button>
+              )}
+              {(showAuthModal === 'create' || showAuthModal === 'forgot') && (
+                <button onClick={() => { setShowAuthModal('login'); setAuthError('') }}
+                  style={{ background: 'none', border: 'none', color: theme.accent, cursor: 'pointer', fontSize: '13px', padding: '4px' }}>
+                  {showAuthModal === 'create' ? 'Already have an account? Log in' : 'Back to log in'}
+                </button>
+              )}
+              {showAuthModal !== 'reset' && (
+                <button onClick={() => {
+                  setShowAuthModal('none')
+                  if (showAuthModal === 'login' || showAuthModal === 'forgot') {
+                    const token = localStorage.getItem('aureus_user_token')
+                    if (!token || (subStatus !== 'active' && subStatus !== 'trialing')) setShowPaywall(true)
+                  } else if (showAuthModal === 'create') {
+                    if (!missionComplete) { setMissionPhase(1); setMissionStep(0); setMissionNavLocked(true) }
+                  }
+                }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '12px', padding: '4px' }}>
+                  {showAuthModal === 'create' ? "Skip for now — I'll do this later" : showAuthModal === 'forgot' ? 'Cancel' : 'Continue without logging in'}
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
-
 
       {/* ==================== PAYWALL MODAL ==================== */}
       {showPaywall && subStatus !== 'active' && subStatus !== 'trialing' && (
@@ -11144,7 +11209,7 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
             </div>
             <div style={{ textAlign: 'center' as const, marginTop: '16px', paddingTop: '16px', borderTop: '1px solid ' + theme.border }}>
               <span style={{ color: theme.textMuted, fontSize: '13px' }}>Already have an account? </span>
-              <button onClick={() => { setShowPaywall(false); setShowAuthModal('login') }}
+              <button onClick={() => { setShowAuthModal('login') }}
                 style={{ background: 'none', border: 'none', color: theme.accent, cursor: 'pointer', fontSize: '13px', fontWeight: 700, padding: 0 }}>
                 Log in →
               </button>
