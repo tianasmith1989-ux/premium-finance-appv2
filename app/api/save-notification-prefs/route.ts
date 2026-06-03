@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       userToken, email, userName, frequency,
-      notifyWeeklySnapshot, notifyOverdueBills, notifyMoneyDate,
+      notifyWeeklySnapshot, notifyOverdueBills, notifyMoneyDate, notifyMonthlyMealPlan,
+      householdSize, mealBudget, mealDislikes, mealDietary,
       moneyDateDay, moneyDateTime,
       savingRate, monthlySurplus, topGoal, topWin, nextAction, streak,
       upcomingBills
@@ -35,6 +36,11 @@ export async function POST(request: NextRequest) {
         notify_weekly_snapshot: notifyWeeklySnapshot ?? true,
         notify_overdue_bills: notifyOverdueBills ?? true,
         notify_money_date: notifyMoneyDate ?? true,
+        notify_monthly_meal_plan: notifyMonthlyMealPlan ?? false,
+        household_size: householdSize || 4,
+        meal_budget: mealBudget || 150,
+        meal_dislikes: mealDislikes || null,
+        meal_dietary: mealDietary || null,
         money_date_day: moneyDateDay || 'Sunday',
         money_date_time: moneyDateTime || '18:00',
         saving_rate: savingRate || 0,
