@@ -5,23 +5,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
-const RESEND_KEY = process.env.RESEND_API_KEY!
 const FROM = 'Aureus <noreply@aureusplutus.app>'
 
-const today = new Date()
-const todayStr = today.toISOString().split('T')[0]
-const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][today.getDay()]
-const dateFormatted = today.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+// Re-evaluated per cold start (fine for date values)
+const _today = new Date()
+const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][_today.getDay()]
+const dateFormatted = _today.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
-async function sendEmail(to: string, subject: string, html: string) {
+async function sendEmail(to: string, subject: string, html: string, resendKey: string) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendKey}` },
     body: JSON.stringify({ from: FROM, to: [to], subject, html })
   })
   return res.ok
@@ -237,7 +231,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const RESEND_KEY = process.env.RESEND_API_KEY
   if (!RESEND_KEY) return NextResponse.json({ error: 'RESEND_API_KEY not set' }, { status: 500 })
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  )
+
+  const today = new Date()
+  const todayStr = today.toISOString().split('T')[0]
+  const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][today.getDay()]
+  const dateFormatted = today.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   const results = { sent: 0, skipped: 0, errors: 0, users: 0 }
 
@@ -276,7 +281,7 @@ export async function GET(request: NextRequest) {
         })()
 
         const html = buildDailyBriefHtml(u)
-        const sent = await sendEmail(u.email, subject, html)
+        const sent = await sendEmail(u.email, subject, html, RESEND_KEY)
 
         if (sent) {
           await supabase
