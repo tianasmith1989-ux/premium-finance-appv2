@@ -2019,7 +2019,7 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
     missionComplete, missionPhase, missionStep,
     missionP2Proposals, missionP2Confirmed, missionP2Step,
     onboardingComplete, houseStatus, fireGoal, moneyPersonality,
-    wins, streak, lastCheckIn, whyStatement: whyStatement,
+    wins, streak, lastCheckIn,
     coreValues, identityStatement, mustStatement, futureVision,
     identityStatements, proactiveInsights, insightsGeneratedAt,
     businessProfile, businessRevenue, businessExpenses, businessGoals,
