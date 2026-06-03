@@ -42,14 +42,17 @@ const AureusLogo = ({ size = 40 }: { size?: number }) => (
 )
 
 // ── Supabase client singleton ──
+// These are replaced at build time by Next.js — do not refactor the pattern
+// @ts-ignore
+const _SB_URL: string = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+// @ts-ignore
+const _SB_KEY: string = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+
 let _sb: any = null
 const getSb = async () => {
   if (_sb) return _sb
   const { createClient } = await import('@supabase/supabase-js')
-  _sb = createClient(
-    (process as any).env?.NEXT_PUBLIC_SUPABASE_URL || '',
-    (process as any).env?.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  )
+  _sb = createClient(_SB_URL, _SB_KEY)
   return _sb
 }
 
