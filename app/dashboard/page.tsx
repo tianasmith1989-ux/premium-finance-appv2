@@ -2026,7 +2026,7 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
     notificationEmail, emailNotifEnabled, emailNotifFrequency,
     monthlyMealPlanOptIn, accountabilityEmail, accountabilityName,
     mortgageAccel, investmentProperties, lastMirrorMonth,
-    roadmapMilestones, sinkingFunds: sinkingFunds,
+    roadmapMilestones,
     latteItems, dailyCheckInLog, moneyDateLog, annualReviews,
     coachNextAction, dismissedTriggers, lastAppOpen,
     personalityAnswers, deepWhyAnswers, deepWhyComplete,
