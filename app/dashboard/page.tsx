@@ -11115,6 +11115,13 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
               {selectedPlan === 'monthly' ? '$1 charged today. $14.99/month after 7 days — cancel anytime.' : '$99 charged today. Cancel anytime before renewal.'}
               <br />Secure payment via Stripe.
             </div>
+            <div style={{ textAlign: 'center' as const, marginTop: '16px', paddingTop: '16px', borderTop: '1px solid ' + theme.border }}>
+              <span style={{ color: theme.textMuted, fontSize: '13px' }}>Already have an account? </span>
+              <button onClick={() => { setShowPaywall(false); setShowAuthModal('login') }}
+                style={{ background: 'none', border: 'none', color: theme.accent, cursor: 'pointer', fontSize: '13px', fontWeight: 700, padding: 0 }}>
+                Log in →
+              </button>
+            </div>
           </div>
         </div>
       )}
