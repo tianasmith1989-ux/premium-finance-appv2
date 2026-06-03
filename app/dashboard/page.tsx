@@ -11086,7 +11086,7 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
 
       {/* ==================== AUTH MODAL ==================== */}
       {showAuthModal !== 'none' && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 9997, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '36px 32px', maxWidth: '440px', width: '100%' }}>
             <div style={{ textAlign: 'center' as const, marginBottom: '24px' }}>
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', overflow: 'hidden', margin: '0 auto 16px' }}>
