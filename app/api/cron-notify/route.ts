@@ -232,12 +232,13 @@ export async function GET(request: NextRequest) {
   }
 
   const RESEND_KEY = process.env.RESEND_API_KEY
-  if (!RESEND_KEY) return NextResponse.json({ error: 'RESEND_API_KEY not set' }, { status: 500 })
+  if (!RESEND_KEY) return NextResponse.json({ error: 'RESEND_API_KEY not set', env_keys: Object.keys(process.env).filter(k => k.includes('RESEND') || k.includes('SUPABASE') || k.includes('CRON')) }, { status: 200 })
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  )
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  if (!supabaseUrl || !supabaseKey) return NextResponse.json({ error: 'Supabase env vars not set', supabaseUrl: !!supabaseUrl, supabaseKey: !!supabaseKey }, { status: 200 })
+
+  const supabase = createClient(supabaseUrl, supabaseKey)
 
   const today = new Date()
   const todayStr = today.toISOString().split('T')[0]
