@@ -250,6 +250,9 @@ export default function Dashboard() {
   const [authError, setAuthError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
   const [syncStatus, setSyncStatus] = useState<'idle'|'saving'|'saved'|'error'>('idle')
+  const [showManageSub, setShowManageSub] = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
+  const [portalError, setPortalError] = useState('')
 
   // ==================== SUBSCRIPTION / PAYWALL ====================
   const [subStatus, setSubStatus] = useState<'trial'|'trialing'|'active'|'past_due'|'cancelled'|'loading'>('loading')
@@ -2180,6 +2183,30 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
   useEffect(() => {
     if (onboardingComplete && authUser) saveToCloud()
   }, [onboardingComplete])
+
+  // ── Open Stripe Customer Portal ──
+  const openCustomerPortal = async () => {
+    setPortalLoading(true)
+    setPortalError('')
+    try {
+      const userToken = localStorage.getItem('aureus_user_token') || ''
+      const email = authUser?.email || ''
+      const res = await fetch('/api/create-portal-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userToken, email })
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        setPortalError(data.error || 'Could not open billing portal. Please contact support.')
+      }
+    } catch {
+      setPortalError('Something went wrong. Please try again.')
+    }
+    setPortalLoading(false)
+  }
 
   // ── Support AI chat handler ──
   const handleSupportMessage = async (message: string) => {
@@ -12610,9 +12637,42 @@ Tracking with Aureus 🏛️`
         </div>
       )}
 
+      {/* ==================== MANAGE SUBSCRIPTION MODAL ==================== */}
+      {showManageSub && (
+        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 9996, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: theme.cardBg, borderRadius: '24px', padding: '32px', maxWidth: '420px', width: '100%' }}>
+            <h2 style={{ color: theme.text, fontSize: '20px', fontWeight: 900, margin: '0 0 8px', fontFamily: 'Cinzel, serif' }}>Manage Subscription</h2>
+            <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, margin: '0 0 24px' }}>
+              You'll be taken to Stripe's secure billing portal where you can update your payment method, view invoices, change your plan, or cancel your subscription.
+            </p>
+            {portalError && (
+              <div style={{ padding: '10px 14px', background: theme.danger + '15', border: '1px solid ' + theme.danger + '30', borderRadius: '8px', color: theme.danger, fontSize: '13px', marginBottom: '16px' }}>
+                {portalError}
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
+              <button onClick={openCustomerPortal} disabled={portalLoading}
+                style={{ padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '15px', opacity: portalLoading ? 0.7 : 1 }}>
+                {portalLoading ? '⏳ Opening portal...' : 'Open Billing Portal →'}
+              </button>
+              <button onClick={() => { setShowManageSub(false); setPortalError('') }}
+                style={{ padding: '12px', background: 'none', border: '1px solid ' + theme.border, color: theme.textMuted, borderRadius: '12px', cursor: 'pointer', fontSize: '14px' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <footer style={{ padding: '16px 24px', background: theme.cardBg, borderTop: '1px solid ' + theme.border, textAlign: 'center' as const }}>
         <p style={{ margin: '0 0 4px 0', color: theme.textMuted, fontSize: '11px' }}>⚠️ Aureus is an AI assistant for general education only — not financial, tax, or legal advice. Always verify information and consult licensed professionals before making financial decisions.</p>
-        <p style={{ margin: 0, color: theme.textMuted, fontSize: '10px' }}>© {new Date().getFullYear()} Aureus · Not affiliated with any financial institution · General information only</p>
+        <p style={{ margin: '0 0 8px 0', color: theme.textMuted, fontSize: '10px' }}>© {new Date().getFullYear()} Aureus · Not affiliated with any financial institution · General information only</p>
+        {(subStatus === 'active' || subStatus === 'trialing') && (
+          <button onClick={() => setShowManageSub(true)}
+            style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', padding: 0 }}>
+            Manage subscription / Cancel
+          </button>
+        )}
       </footer>
 
       <style>{`
