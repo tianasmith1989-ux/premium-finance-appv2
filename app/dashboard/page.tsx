@@ -96,6 +96,7 @@ export default function Dashboard() {
   const [moneyPersonality, setMoneyPersonality] = useState<string | null>(null)
   const [personalityAnswers, setPersonalityAnswers] = useState<{[key: number]: string}>({})
   const [userName, setUserName] = useState('')
+  const [nameSubmitted, setNameSubmitted] = useState(false)
   // Identity Statements
   const [identityStatements, setIdentityStatements] = useState<string[]>([])
   const [showIdentityEditor, setShowIdentityEditor] = useState(false)
@@ -4013,7 +4014,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '40px 24px', maxWidth: '520px', margin: '0 auto', width: '100%', textAlign: 'center' as const }}>
               <div style={{ width: '90px', height: '90px', borderRadius: '50%', overflow: 'hidden', margin: '0 auto 24px', boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}><img src="/logo.svg" alt="Aureus" style={{ width: '90px', height: '90px', objectFit: 'contain' }}/></div>
 
-              {!userName.trim() ? (
+              {!nameSubmitted ? (
                 // ── Phase A: Name first ──
                 <>
                   <h1 style={{ color: theme.text, fontSize: '30px', fontWeight: 800, margin: '0 0 10px 0', fontFamily: 'Cinzel, serif' }}>G'day, I'm Aureus.</h1>
@@ -4028,12 +4029,12 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                       placeholder="Your first name"
                       value={userName}
                       onChange={e => setUserName(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && e.currentTarget.value.trim()) advanceMission(1) }}
+                      onKeyDown={e => { if (e.key === 'Enter' && e.currentTarget.value.trim()) { setNameSubmitted(true); advanceMission(1) } }}
                       style={{ ...inputStyle, width: '100%', fontSize: '20px', padding: '16px 20px', textAlign: 'center' as const, borderColor: theme.accent + '60' }}
                     />
                     <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px' }}>Your data never leaves your device.</div>
                   </div>
-                  <button onClick={() => userName.trim() && advanceMission(1)}
+                  <button onClick={() => { if (userName.trim()) { setNameSubmitted(true); advanceMission(1) } }}
                     disabled={!userName.trim()}
                     style={{ width: '100%', maxWidth: '380px', padding: '16px', background: userName.trim() ? 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)' : theme.border, color: userName.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '14px', cursor: userName.trim() ? 'pointer' : 'default', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif', transition: 'all 0.2s' }}>
                     {userName.trim() ? `Nice to meet you, ${userName.trim()} →` : 'Enter your name to begin'}
