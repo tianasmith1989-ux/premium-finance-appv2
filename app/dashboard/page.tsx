@@ -281,6 +281,14 @@ export default function Dashboard() {
   const [showBizSetup, setShowBizSetup] = useState(false)
   const bizChatEndRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
+  const [promptModal, setPromptModal] = useState<{
+    title: string,
+    label: string,
+    defaultValue: string,
+    onConfirm: (val: string) => void
+  } | null>(null)
+  const [promptValue, setPromptValue] = useState('')
+  const promptInputRef = useRef<HTMLInputElement>(null)
   const [bizOffer, setBizOffer] = useState({ dreamOutcome:'', likelihood:5, timeDelay:5, effort:5, price:'', competitors:'', guarantee:'', conversionRate:'' })
   const [bizLeads, setBizLeads] = useState({ monthlyLeads:'', leadSource:[] as string[], cac:'', ltv:'', avgTransactionValue:'', purchasesPerYear:'', avgCustomerLifeYears:'' })
   const [bizGrowthFocus, setBizGrowthFocus] = useState<'customers'|'price'|'frequency'|null>(null)
@@ -4356,7 +4364,17 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
                   {presetBills.map(p => (
                     <button key={p.name} onClick={() => {
-                      const amt = prompt(`${p.name} — enter amount ($):`, (p as any).amount || '')
+                      setPromptValue((p as any).amount || '')
+                      setPromptModal({
+                        title: p.name,
+                        label: 'How much is this per ' + p.frequency + '?',
+                        defaultValue: (p as any).amount || '',
+                        onConfirm: (amt) => {
+                          if (!amt || isNaN(parseFloat(amt))) return
+                          setExpenses(prev => [...prev, { id: Date.now(), name: p.name, amount: amt, frequency: p.frequency, category: p.category, dueDate: (p.frequency === 'weekly' || p.frequency === 'fortnightly' ? (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })() : (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })()) }])
+                        }
+                      })
+                      const amt = null // handled by modal
                       if (amt) {
                         const dueDate = (p.frequency === 'weekly' || p.frequency === 'fortnightly')
                           ? (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })()
@@ -7355,7 +7373,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                                     {isOver && <span style={{ color: theme.danger, fontSize: '11px', fontWeight: 700 }}>⚠️ OVER</span>}
                                     {isAheadOfPace && <span style={{ color: theme.warning, fontSize: '11px', fontWeight: 700 }}>📈 PACE</span>}
                                     {/* Manual actual input */}
-                                    <button onClick={e => { e.stopPropagation(); const val = window.prompt(`Set actual spend for ${cat.label} this month ($):`, a.toFixed(0)); if (val !== null && !isNaN(parseFloat(val))) setActualForCategory(cat.id, parseFloat(val)) }}
+                                    <button onClick={e => { e.stopPropagation(); setPromptValue(a.toFixed(0)); setPromptModal({ title: 'Actual spend — ' + cat.label, label: 'Amount spent this month ($)', defaultValue: a.toFixed(0), onConfirm: (val) => { if (val !== null && !isNaN(parseFloat(val))) setActualForCategory(cat.id, parseFloat(val)) } }) }}
                                       style={{ padding: '3px 8px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '6px', cursor: 'pointer', color: theme.textMuted, fontSize: '11px' }}>
                                       ✏️ Edit
                                     </button>
@@ -7380,7 +7398,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                                 )}
                                 {/* Manual budget override */}
                                 {p === 0 && (
-                                  <button onClick={e => { e.stopPropagation(); const val = window.prompt(`Set monthly budget for ${cat.label} ($):`); if (val !== null && !isNaN(parseFloat(val))) setCategoryBudgets(prev => ({ ...prev, [cat.id]: val })) }}
+                                  <button onClick={e => { e.stopPropagation(); setPromptValue(''); setPromptModal({ title: 'Monthly budget — ' + cat.label, label: 'Budget amount ($)', defaultValue: '', onConfirm: (val) => { if (val !== null && !isNaN(parseFloat(val))) setCategoryBudgets(prev => ({ ...prev, [cat.id]: val })) } }) }}
                                     style={{ marginTop: '4px', padding: '3px 8px', background: theme.accent + '15', border: '1px solid ' + theme.accent + '30', borderRadius: '6px', cursor: 'pointer', color: theme.accent, fontSize: '11px' }}>
                                     + Set budget
                                   </button>
@@ -7698,7 +7716,18 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 </div>
                 {showPresets && (
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '12px', padding: '10px', background: theme.bg, borderRadius: '8px' }}>
-                    {presetBills.map(p => <button key={p.name} onClick={() => { const amt = prompt(`Amount for ${p.name}:`, (p as any).amount || ''); if (amt) setExpenses([...expenses, { id: Date.now(), name: p.name, amount: amt, frequency: p.frequency, category: p.category, dueDate: (p.frequency === 'weekly' || p.frequency === 'fortnightly' ? (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })() : (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })()) }]) }} style={{ padding: '4px 10px', background: theme.purple + '20', color: theme.purple, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>{p.name}</button>)}
+                    {presetBills.map(p => <button key={p.name} onClick={() => {
+  setPromptValue((p as any).amount || '')
+  setPromptModal({
+    title: p.name,
+    label: 'Amount per ' + p.frequency + ' ($)',
+    defaultValue: (p as any).amount || '',
+    onConfirm: (amt) => {
+      if (!amt || isNaN(parseFloat(amt))) return
+      setExpenses(prev => [...prev, { id: Date.now(), name: p.name, amount: amt, frequency: p.frequency, category: p.category, dueDate: (p.frequency === 'weekly' || p.frequency === 'fortnightly' ? (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })() : (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })()) }])
+    }
+  })
+}} style={{ padding: '4px 10px', background: theme.purple + '20', color: theme.purple, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>{p.name}</button>)}
                   </div>
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', marginBottom: '12px', padding: '12px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
@@ -8307,7 +8336,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                             </div>
                             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                               <div style={{ color: theme.accent, fontWeight: 800, fontSize: '16px' }}>{pct.toFixed(0)}%</div>
-                              <button onClick={() => { const amt = window.prompt(`Add to ${fund.name} ($):`); if (amt && !isNaN(parseFloat(amt))) addToSinkingFund(fund.id, parseFloat(amt)) }}
+                              <button onClick={() => { setPromptValue(''); setPromptModal({ title: 'Add to ' + fund.name, label: 'Amount to add ($)', defaultValue: '', onConfirm: (amt) => { if (amt && !isNaN(parseFloat(amt))) addToSinkingFund(fund.id, parseFloat(amt)) } }) }}
                                 style={{ padding: '4px 10px', background: theme.accent + '20', color: theme.accent, border: '1px solid ' + theme.accent + '40', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>+ Add</button>
                               <button onClick={() => deleteSinkingFund(fund.id)} style={{ padding: '4px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>×</button>
                             </div>
@@ -13663,6 +13692,57 @@ Tracking with Aureus 🏛️`
               )}
               <button onClick={() => { setShowManageSub(false); setPortalError('') }}
                 style={{ padding: '12px', background: 'none', border: '1px solid ' + theme.border, color: theme.textMuted, borderRadius: '12px', cursor: 'pointer', fontSize: '14px' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PROMPT MODAL — replaces window.prompt() for mobile compatibility ── */}
+      {promptModal && (
+        <div style={{ position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0' }}
+          onClick={() => setPromptModal(null)}>
+          <div style={{ background: theme.cardBg, borderRadius: '20px 20px 0 0', border: '1px solid ' + theme.border, width: '100%', maxWidth: '480px', padding: '24px' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ color: theme.text, fontWeight: 800, fontSize: '16px', marginBottom: '4px', fontFamily: 'Cinzel, serif' }}>{promptModal.title}</div>
+            <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '16px' }}>{promptModal.label}</div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+              <span style={{ position: 'absolute' as const, marginLeft: '12px', marginTop: '10px', color: theme.textMuted, fontSize: '16px', fontWeight: 700, zIndex: 1 }}>$</span>
+              <input
+                ref={promptInputRef}
+                type="number"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={promptValue}
+                onChange={e => setPromptValue(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && promptValue) {
+                    promptModal.onConfirm(promptValue)
+                    setPromptModal(null)
+                    setPromptValue('')
+                  }
+                }}
+                autoFocus
+                style={{ ...inputStyle, flex: 1, fontSize: '22px', fontWeight: 700, paddingLeft: '28px', paddingTop: '12px', paddingBottom: '12px' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => {
+                  if (promptValue) {
+                    promptModal.onConfirm(promptValue)
+                    setPromptModal(null)
+                    setPromptValue('')
+                  }
+                }}
+                disabled={!promptValue}
+                style={{ flex: 1, padding: '14px', background: promptValue ? 'linear-gradient(135deg, #D4AF37, #BC6A1F)' : theme.border, color: promptValue ? '#111111' : theme.textMuted, border: 'none', borderRadius: '12px', cursor: promptValue ? 'pointer' : 'default', fontWeight: 800, fontSize: '15px' }}>
+                Add →
+              </button>
+              <button
+                onClick={() => { setPromptModal(null); setPromptValue('') }}
+                style={{ padding: '14px 20px', background: 'transparent', border: '1px solid ' + theme.border, color: theme.textMuted, borderRadius: '12px', cursor: 'pointer', fontSize: '14px' }}>
                 Cancel
               </button>
             </div>
