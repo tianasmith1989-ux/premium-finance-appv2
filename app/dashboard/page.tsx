@@ -12578,7 +12578,7 @@ Tracking with Aureus 🏛️`
               <div style={{ textAlign:'center' as const }}>
                 <div style={{ fontSize:'52px', marginBottom:'12px' }}>✅</div>
                 <h3 style={{ color:theme.text, fontSize:'20px', margin:'0 0 8px 0' }}>Snapshot sent!</h3>
-                <p style={{ color:theme.textMuted, fontSize:'14px', lineHeight:1.6 }}>{accountabilityName} will get your weekly Aureus snapshot every {emailNotifFrequency === 'weekly' ? 'week' : 'fortnight'}.</p>
+                <p style={{ color:theme.textMuted, fontSize:'14px', lineHeight:1.6 }}>{accountabilityName} will get your daily Aureus brief every morning.</p>
                 <button onClick={() => { setShowAccountabilitySetup(false); setAccountabilitySent(false) }} style={{ marginTop:'16px', padding:'12px 24px', background:theme.accent, color:'#111111', border:'none', borderRadius:'10px', cursor:'pointer', fontWeight:700 }}>Done</button>
               </div>
             ) : (
@@ -12832,12 +12832,10 @@ Tracking with Aureus 🏛️`
                     style={{ ...inputStyle, width: '100%' }}
                   />
                 </div>
-                <div>
-                  <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>SEND FREQUENCY</label>
-                  <select value={emailNotifFrequency} onChange={e => setEmailNotifFrequency(e.target.value as any)} style={{ ...inputStyle, width: '100%' }}>
-                    <option value="weekly">Weekly snapshot</option>
-                    <option value="fortnightly">Fortnightly snapshot</option>
-                  </select>
+                <div style={{ padding: '10px 14px', background: theme.bg, borderRadius: '8px', border: '1px solid ' + theme.border }}>
+                  <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>SEND FREQUENCY</div>
+                  <div style={{ color: theme.text, fontSize: '14px', fontWeight: 600 }}>📧 Daily brief — every morning at 8am AEST</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>Bills due, budget status, goals & your one action for the day</div>
                 </div>
 
                 {/* Monthly meal plan opt-in — goes to USER's email above */}
