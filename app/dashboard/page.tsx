@@ -280,6 +280,7 @@ export default function Dashboard() {
   const [bizChatLoading, setBizChatLoading] = useState(false)
   const [showBizSetup, setShowBizSetup] = useState(false)
   const bizChatEndRef = useRef<HTMLDivElement>(null)
+  const nameInputRef = useRef<HTMLInputElement>(null)
   const [bizOffer, setBizOffer] = useState({ dreamOutcome:'', likelihood:5, timeDelay:5, effort:5, price:'', competitors:'', guarantee:'', conversionRate:'' })
   const [bizLeads, setBizLeads] = useState({ monthlyLeads:'', leadSource:[] as string[], cac:'', ltv:'', avgTransactionValue:'', purchasesPerYear:'', avgCustomerLifeYears:'' })
   const [bizGrowthFocus, setBizGrowthFocus] = useState<'customers'|'price'|'frequency'|null>(null)
@@ -4092,18 +4093,26 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                       First — what's your name?
                     </label>
                     <input
+                      ref={nameInputRef}
                       placeholder="Your first name"
-                      value={userName}
-                      onChange={e => setUserName(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && e.currentTarget.value.trim()) { setNameSubmitted(true); advanceMission(1) } }}
+                      defaultValue={userName}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          const val = nameInputRef.current?.value?.trim()
+                          if (val) { setUserName(val); setNameSubmitted(true); advanceMission(1) }
+                        }
+                      }}
                       style={{ ...inputStyle, width: '100%', fontSize: '20px', padding: '16px 20px', textAlign: 'center' as const, borderColor: theme.accent + '60' }}
+                      autoFocus
                     />
                     <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px' }}>Your data never leaves your device.</div>
                   </div>
-                  <button onClick={() => { if (userName.trim()) { setNameSubmitted(true); advanceMission(1) } }}
-                    disabled={!userName.trim()}
-                    style={{ width: '100%', maxWidth: '380px', padding: '16px', background: userName.trim() ? 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)' : theme.border, color: userName.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '14px', cursor: userName.trim() ? 'pointer' : 'default', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif', transition: 'all 0.2s' }}>
-                    {userName.trim() ? `Nice to meet you, ${userName.trim()} →` : 'Enter your name to begin'}
+                  <button onClick={() => {
+                    const val = nameInputRef.current?.value?.trim()
+                    if (val) { setUserName(val); setNameSubmitted(true); advanceMission(1) }
+                  }}
+                    style={{ width: '100%', maxWidth: '380px', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#111111', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif', transition: 'all 0.2s' }}>
+                    Continue →
                   </button>
                 </>
               ) : (
