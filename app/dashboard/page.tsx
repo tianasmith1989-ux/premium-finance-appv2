@@ -5264,7 +5264,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
       {/* ── SUPPORT MODAL (chat / email / book) ── */}
       {showSupport && (
         <div style={{ position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 9000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0' }} onClick={() => setShowSupport(false)}>
-          <div style={{ background: theme.cardBg, borderRadius: '20px 20px 0 0', border: '1px solid ' + theme.border, width: '100%', maxWidth: '640px', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' as const }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: theme.cardBg, borderRadius: '20px 20px 0 0', border: '1px solid ' + theme.border, width: '100%', maxWidth: '640px', height: supportTab === 'book' ? '92vh' : 'auto', maxHeight: supportTab === 'book' ? '92vh' : '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' as const }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid ' + theme.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ color: theme.accent, fontWeight: 800, fontSize: '16px' }}>❓ Help & Support</div>
               <button onClick={() => setShowSupport(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '22px' }}>×</button>
@@ -5355,16 +5355,14 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             )}
             {/* Book tab */}
             {supportTab === 'book' && (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const }}>
-                <div style={{ padding: '16px 20px', color: theme.textMuted, fontSize: '13px', lineHeight: 1.6 }}>
-                  Book a 30-minute call to get personal help setting up Aureus for your situation.
-                </div>
-                <div id="calendly-inline" style={{ flex: 1, minHeight: '600px', width: '100%' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' }}>
+                <div id="calendly-inline" style={{ flex: 1, minHeight: '0', width: '100%', overflow: 'auto' as const }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#666', fontSize: '13px' }}>Loading booking calendar...</div>
                 </div>
               </div>
             )}
             {/* Help guide link */}
+            {supportTab !== 'book' && (
             <div style={{ padding: '12px 20px', borderTop: '1px solid ' + theme.border, display: 'flex', gap: '8px' }}>
               <button onClick={() => { setShowSupport(false); setShowHelpGuide(true) }}
                 style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>
@@ -5375,6 +5373,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 ▶ Take the Tour
               </button>
             </div>
+            )}
           </div>
         </div>
       )}
