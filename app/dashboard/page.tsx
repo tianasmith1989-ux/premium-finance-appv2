@@ -6406,6 +6406,268 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
 
         {activeTab === 'quickview' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px' }}>
+
+            {/* ============================================================
+                MOBILE FINANCIAL SNAPSHOT — Research-backed quick view
+                Priority order: 1) Money left, 2) Bills due, 3) Budget vs actual,
+                4) Net worth trend, 5) Goals, 6) One action
+            ============================================================ */}
+            {(() => {
+              const today = new Date()
+              const monthKey = getMonthKey()
+              const projected = getProjectedByCategory()
+              const actual = actualSpend[monthKey] || {}
+
+              // Days left in month
+              const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+              const daysLeft = daysInMonth - today.getDate()
+              const daysPassed = today.getDate()
+              const monthProgress = daysPassed / daysInMonth
+
+              // Money left = surplus remaining this month (income - what's gone)
+              const totalActualSoFar = Object.values(actual).reduce((s: number, v: any) => s + v, 0)
+              const moneyLeft = monthlyIncome - totalActualSoFar
+              const moneyLeftPct = monthlyIncome > 0 ? (moneyLeft / monthlyIncome * 100) : 0
+
+              // Upcoming bills in next 7 days
+              const upcomingBills = expenses
+                .filter((e: any) => e.dueDate)
+                .map((e: any) => {
+                  const due = new Date(e.dueDate + 'T12:00:00')
+                  const diffMs = due.getTime() - today.getTime()
+                  const diffDays = Math.round(diffMs / 86400000)
+                  return { ...e, diffDays }
+                })
+                .filter((e: any) => e.diffDays >= 0 && e.diffDays <= 14)
+                .sort((a: any, b: any) => a.diffDays - b.diffDays)
+
+              // Next overdue/urgent bill
+              const overdueBills = expenses
+                .filter((e: any) => e.dueDate)
+                .map((e: any) => {
+                  const due = new Date(e.dueDate + 'T12:00:00')
+                  const diffDays = Math.round((due.getTime() - today.getTime()) / 86400000)
+                  return { ...e, diffDays }
+                })
+                .filter((e: any) => e.diffDays < 0)
+
+              // Net worth trend (last vs current)
+              const prevNetWorth = netWorthHistory.length > 0 ? netWorthHistory[netWorthHistory.length - 1]?.netWorth || 0 : 0
+              const netWorthChange = netWorth - prevNetWorth
+
+              // Top 4 categories by budget for budget vs actual bars
+              const topCats = EXPENSE_CATEGORIES
+                .filter(c => projected[c.id] > 0)
+                .sort((a, b) => (projected[b.id] || 0) - (projected[a.id] || 0))
+                .slice(0, 4)
+
+              // Goals with progress
+              const activeGoals = goals.filter((g: any) => g.targetAmount && parseFloat(g.targetAmount) > 0).slice(0, 3)
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+
+                  {/* ── 1. MONEY LEFT THIS MONTH — Hero number ── */}
+                  <div style={{ padding: '20px', background: moneyLeftPct > 30 ? 'linear-gradient(135deg, #0d2011, #111111)' : moneyLeftPct > 10 ? 'linear-gradient(135deg, #1a1500, #111111)' : 'linear-gradient(135deg, #1a0505, #111111)', borderRadius: '16px', border: '1px solid ' + (moneyLeftPct > 30 ? theme.success + '40' : moneyLeftPct > 10 ? theme.accent + '40' : theme.danger + '40') }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                      <div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1.5px', marginBottom: '4px' }}>MONEY LEFT THIS MONTH</div>
+                        <div style={{ color: moneyLeftPct > 30 ? theme.success : moneyLeftPct > 10 ? theme.accent : theme.danger, fontSize: '40px', fontWeight: 900, lineHeight: 1 }}>
+                          ${Math.abs(moneyLeft).toLocaleString('en-AU', { maximumFractionDigits: 0 })}
+                          {moneyLeft < 0 && <span style={{ fontSize: '16px', marginLeft: '4px' }}>over</span>}
+                        </div>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{daysLeft} days left · {daysLeft > 0 ? '$' + Math.round(moneyLeft / daysLeft) + '/day' : 'month ends today'}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' as const }}>
+                        <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>of ${monthlyIncome.toLocaleString('en-AU', { maximumFractionDigits: 0 })}</div>
+                        <div style={{ color: moneyLeftPct > 30 ? theme.success : moneyLeftPct > 10 ? theme.accent : theme.danger, fontSize: '18px', fontWeight: 800 }}>{Math.round(Math.abs(moneyLeftPct))}%</div>
+                        <div style={{ color: theme.textMuted, fontSize: '10px' }}>{moneyLeft >= 0 ? 'remaining' : 'over budget'}</div>
+                      </div>
+                    </div>
+                    {/* Month progress bar */}
+                    <div style={{ position: 'relative' as const, height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ position: 'absolute' as const, left: 0, top: 0, height: '100%', width: Math.min(100, (1 - moneyLeftPct / 100) * 100) + '%', background: moneyLeftPct > 30 ? 'linear-gradient(90deg, #27ae60, #2ecc71)' : moneyLeftPct > 10 ? 'linear-gradient(90deg, #D4AF37, #BC6A1F)' : 'linear-gradient(90deg, #c0392b, #e74c3c)', borderRadius: '4px' }} />
+                      {/* Day marker */}
+                      <div style={{ position: 'absolute' as const, left: (monthProgress * 100) + '%', top: '-2px', width: '2px', height: '12px', background: theme.text, opacity: 0.4, borderRadius: '1px' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: theme.textMuted, marginTop: '4px' }}>
+                      <span>1st</span>
+                      <span style={{ color: theme.text, fontWeight: 600 }}>Today ({today.getDate()}th)</span>
+                      <span>{daysInMonth}th</span>
+                    </div>
+                  </div>
+
+                  {/* ── 2. BILLS DUE SOON ── */}
+                  {(upcomingBills.length > 0 || overdueBills.length > 0) && (
+                    <div style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + (overdueBills.length > 0 ? theme.danger + '50' : theme.border) }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '10px' }}>
+                        {overdueBills.length > 0 ? '🔴 OVERDUE + UPCOMING BILLS' : '📅 BILLS DUE SOON'}
+                      </div>
+                      {/* Overdue first */}
+                      {overdueBills.slice(0, 2).map((b: any, i: number) => (
+                        <div key={'od' + i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid ' + theme.border }}>
+                          <div>
+                            <div style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>{b.name}</div>
+                            <div style={{ color: theme.danger, fontSize: '11px', fontWeight: 700 }}>{Math.abs(b.diffDays)} day{Math.abs(b.diffDays) !== 1 ? 's' : ''} overdue ⚠️</div>
+                          </div>
+                          <div style={{ color: theme.danger, fontWeight: 800, fontSize: '16px' }}>${parseFloat(b.amount || '0').toFixed(0)}</div>
+                        </div>
+                      ))}
+                      {/* Upcoming */}
+                      {upcomingBills.slice(0, 4).map((b: any, i: number) => (
+                        <div key={'up' + i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < Math.min(upcomingBills.length, 4) - 1 ? '1px solid ' + theme.border : 'none' }}>
+                          <div>
+                            <div style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>{b.name}</div>
+                            <div style={{ color: b.diffDays === 0 ? theme.danger : b.diffDays <= 3 ? theme.accent : theme.textMuted, fontSize: '11px' }}>
+                              {b.diffDays === 0 ? '🔴 Due TODAY' : b.diffDays === 1 ? '🟡 Due tomorrow' : `In ${b.diffDays} days`}
+                            </div>
+                          </div>
+                          <div style={{ color: b.diffDays <= 3 ? theme.accent : theme.text, fontWeight: 700, fontSize: '15px' }}>${parseFloat(b.amount || '0').toFixed(0)}</div>
+                        </div>
+                      ))}
+                      {(upcomingBills.length > 4) && (
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px', textAlign: 'center' as const }}>+{upcomingBills.length - 4} more in the next 14 days</div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── 3. BUDGET vs ACTUAL — Top categories ── */}
+                  {topCats.length > 0 && (
+                    <div style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>📊 BUDGET vs ACTUAL</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px' }}>{today.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}</div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
+                        {topCats.map(cat => {
+                          const budget = projected[cat.id] || 0
+                          const spent = actual[cat.id] || 0
+                          const pct = budget > 0 ? Math.min(100, spent / budget * 100) : 0
+                          const isOver = spent > budget && budget > 0
+                          const expectedByNow = budget * monthProgress
+                          const onTrack = spent <= expectedByNow * 1.1
+                          return (
+                            <div key={cat.id}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '13px' }}>{cat.icon}</span>
+                                  <span style={{ color: theme.text, fontSize: '13px', fontWeight: 500 }}>{cat.label}</span>
+                                  {isOver && <span style={{ color: theme.danger, fontSize: '10px', fontWeight: 700 }}>OVER</span>}
+                                  {!isOver && !onTrack && budget > 0 && <span style={{ color: theme.accent, fontSize: '10px' }}>watch</span>}
+                                </div>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                  <span style={{ color: isOver ? theme.danger : theme.text, fontSize: '13px', fontWeight: 700 }}>${Math.round(spent)}</span>
+                                  <span style={{ color: theme.textMuted, fontSize: '11px' }}>/ ${Math.round(budget)}</span>
+                                </div>
+                              </div>
+                              <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden', position: 'relative' as const }}>
+                                <div style={{ height: '100%', width: pct + '%', background: isOver ? 'linear-gradient(90deg, #c0392b, #e74c3c)' : pct > 80 ? 'linear-gradient(90deg, #D4AF37, #BC6A1F)' : 'linear-gradient(90deg, #27ae60, #2ecc71)', borderRadius: '3px', transition: 'width 0.3s' }} />
+                                {/* Expected by now marker */}
+                                {budget > 0 && (
+                                  <div style={{ position: 'absolute' as const, left: Math.min(99, monthProgress * 100) + '%', top: 0, width: '1.5px', height: '100%', background: theme.textMuted, opacity: 0.5 }} />
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {topCats.length < EXPENSE_CATEGORIES.filter(c => projected[c.id] > 0).length && (
+                        <button onClick={() => setActiveTab('dashboard')} style={{ background: 'none', border: 'none', color: theme.accent, cursor: 'pointer', fontSize: '12px', marginTop: '8px', padding: 0 }}>
+                          View all categories →
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── 4. NET WORTH SNAPSHOT ── */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>NET WORTH</div>
+                      <div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontSize: '22px', fontWeight: 800 }}>
+                        {netWorth >= 0 ? '' : '-'}${Math.abs(netWorth).toLocaleString('en-AU', { maximumFractionDigits: 0 })}
+                      </div>
+                      {netWorthChange !== 0 && (
+                        <div style={{ color: netWorthChange > 0 ? theme.success : theme.danger, fontSize: '11px', marginTop: '3px', fontWeight: 600 }}>
+                          {netWorthChange > 0 ? '↑' : '↓'} ${Math.abs(netWorthChange).toLocaleString('en-AU', { maximumFractionDigits: 0 })} since last snapshot
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>MONTHLY SURPLUS</div>
+                      <div style={{ color: monthlySurplus >= 0 ? theme.accent : theme.danger, fontSize: '22px', fontWeight: 800 }}>
+                        {monthlySurplus >= 0 ? '' : '-'}${Math.abs(monthlySurplus).toLocaleString('en-AU', { maximumFractionDigits: 0 })}
+                      </div>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '3px' }}>
+                        {savingsRate > 0 ? savingsRate.toFixed(0) + '% savings rate' : 'after all expenses'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── 5. GOAL PROGRESS ── */}
+                  {activeGoals.length > 0 && (
+                    <div style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '10px' }}>🎯 GOAL PROGRESS</div>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
+                        {activeGoals.map((g: any) => {
+                          const saved = parseFloat(g.savedAmount || g.currentAmount || '0')
+                          const target = parseFloat(g.targetAmount || '1')
+                          const pct = Math.min(100, saved / target * 100)
+                          const remaining = target - saved
+                          return (
+                            <div key={g.id}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <span style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>{g.name}</span>
+                                <span style={{ color: theme.accent, fontSize: '12px', fontWeight: 700 }}>{pct.toFixed(0)}%</span>
+                              </div>
+                              <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden', marginBottom: '3px' }}>
+                                <div style={{ height: '100%', width: pct + '%', background: 'linear-gradient(90deg, #D4AF37, #BC6A1F)', borderRadius: '3px' }} />
+                              </div>
+                              <div style={{ color: theme.textMuted, fontSize: '11px' }}>
+                                ${saved.toLocaleString('en-AU', { maximumFractionDigits: 0 })} of ${target.toLocaleString('en-AU', { maximumFractionDigits: 0 })}
+                                {remaining > 0 && g.paymentAmount && ` · ${Math.ceil(remaining / parseFloat(g.paymentAmount))} payments left`}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── 6. DEBT SNAPSHOT ── */}
+                  {debts.length > 0 && (
+                    <div style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '10px' }}>💳 DEBT TRACKER</div>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                        {debts.slice(0, 3).map((d: any) => {
+                          const balance = parseFloat(d.balance || '0')
+                          const original = parseFloat(d.originalBalance || d.balance || '1')
+                          const paidPct = original > 0 ? Math.min(100, (1 - balance / original) * 100) : 0
+                          return (
+                            <div key={d.id}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                                <span style={{ color: theme.text, fontSize: '13px' }}>{d.name}</span>
+                                <span style={{ color: theme.danger, fontSize: '13px', fontWeight: 700 }}>${balance.toLocaleString('en-AU', { maximumFractionDigits: 0 })}</span>
+                              </div>
+                              <div style={{ height: '5px', background: theme.danger + '30', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: paidPct + '%', background: 'linear-gradient(90deg, #27ae60, #2ecc71)', borderRadius: '3px' }} />
+                              </div>
+                              <div style={{ color: theme.textMuted, fontSize: '10px', marginTop: '2px' }}>{paidPct.toFixed(0)}% paid off · {d.rate}% p.a.</div>
+                            </div>
+                          )
+                        })}
+                        {debts.length > 3 && <div style={{ color: theme.textMuted, fontSize: '11px', textAlign: 'center' as const }}>+{debts.length - 3} more debts</div>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid ' + theme.border, marginTop: '4px' }}>
+                          <span style={{ color: theme.textMuted, fontSize: '12px' }}>Total debt</span>
+                          <span style={{ color: theme.danger, fontSize: '14px', fontWeight: 800 }}>${totalDebtBalance.toLocaleString('en-AU', { maximumFractionDigits: 0 })}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              )
+            })()}
+
             {/* WHY STATEMENT BANNER */}
             {whyStatement ? (
               <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #D4AF3715, #B68B2E15)', borderRadius: '12px', border: '2px solid #D4AF3740', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
