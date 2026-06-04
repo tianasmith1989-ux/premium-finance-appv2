@@ -6453,10 +6453,19 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
               const daysPassed = today.getDate()
               const monthProgress = daysPassed / daysInMonth
 
-              // Money left = surplus remaining this month (income - what's gone)
+              // Money left = monthly surplus minus what's been manually logged as spent
+              // Falls back to full surplus if no actual spend tracked yet
               const totalActualSoFar = Object.values(actual).reduce((s: number, v: any) => s + v, 0)
-              const moneyLeft = monthlyIncome - totalActualSoFar
-              const moneyLeftPct = monthlyIncome > 0 ? (moneyLeft / monthlyIncome * 100) : 0
+              // Monthly committed outgoings (expenses + debt payments + goal savings + sinking funds)
+              const totalMonthlyCommitted = monthlyIncome - monthlySurplus
+              // Discretionary surplus = what's left after all committed bills/debts/goals
+              const discretionarySurplus = monthlySurplus
+              // How much of the discretionary surplus has been spent (from actual spend tracking)
+              const discretionarySpent = Math.max(0, totalActualSoFar - totalMonthlyCommitted * monthProgress)
+              const moneyLeft = Math.max(0, discretionarySurplus - discretionarySpent)
+              // If no actual spend tracked, show full surplus (what they have to work with)
+              const moneyLeftDisplay = totalActualSoFar === 0 ? discretionarySurplus : moneyLeft
+              const moneyLeftPct = discretionarySurplus > 0 ? (moneyLeftDisplay / discretionarySurplus * 100) : 0
 
               // Upcoming bills in next 7 days
               const upcomingBills = expenses
@@ -6500,22 +6509,21 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                   <div style={{ padding: '20px', background: moneyLeftPct > 30 ? 'linear-gradient(135deg, #0d2011, #111111)' : moneyLeftPct > 10 ? 'linear-gradient(135deg, #1a1500, #111111)' : 'linear-gradient(135deg, #1a0505, #111111)', borderRadius: '16px', border: '1px solid ' + (moneyLeftPct > 30 ? theme.success + '40' : moneyLeftPct > 10 ? theme.accent + '40' : theme.danger + '40') }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                       <div>
-                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1.5px', marginBottom: '4px' }}>MONEY LEFT THIS MONTH</div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1.5px', marginBottom: '4px' }}>MONTHLY SURPLUS — YOURS TO SPEND</div>
                         <div style={{ color: moneyLeftPct > 30 ? theme.success : moneyLeftPct > 10 ? theme.accent : theme.danger, fontSize: '40px', fontWeight: 900, lineHeight: 1 }}>
-                          ${Math.abs(moneyLeft).toLocaleString('en-AU', { maximumFractionDigits: 0 })}
-                          {moneyLeft < 0 && <span style={{ fontSize: '16px', marginLeft: '4px' }}>over</span>}
+                          ${moneyLeftDisplay.toLocaleString('en-AU', { maximumFractionDigits: 0 })}
                         </div>
-                        <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{daysLeft} days left · {daysLeft > 0 ? '$' + Math.round(moneyLeft / daysLeft) + '/day' : 'month ends today'}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>{daysLeft} days left · {daysLeft > 0 && moneyLeftDisplay > 0 ? '$' + Math.round(moneyLeftDisplay / daysLeft) + '/day' : 'month ends today'}</div>
                       </div>
                       <div style={{ textAlign: 'right' as const }}>
-                        <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>of ${monthlyIncome.toLocaleString('en-AU', { maximumFractionDigits: 0 })}</div>
+                        <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '2px' }}>of ${discretionarySurplus.toLocaleString('en-AU', { maximumFractionDigits: 0 })} surplus</div>
                         <div style={{ color: moneyLeftPct > 30 ? theme.success : moneyLeftPct > 10 ? theme.accent : theme.danger, fontSize: '18px', fontWeight: 800 }}>{Math.round(Math.abs(moneyLeftPct))}%</div>
                         <div style={{ color: theme.textMuted, fontSize: '10px' }}>{moneyLeft >= 0 ? 'remaining' : 'over budget'}</div>
                       </div>
                     </div>
                     {/* Month progress bar */}
                     <div style={{ position: 'relative' as const, height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ position: 'absolute' as const, left: 0, top: 0, height: '100%', width: Math.min(100, (1 - moneyLeftPct / 100) * 100) + '%', background: moneyLeftPct > 30 ? 'linear-gradient(90deg, #27ae60, #2ecc71)' : moneyLeftPct > 10 ? 'linear-gradient(90deg, #D4AF37, #BC6A1F)' : 'linear-gradient(90deg, #c0392b, #e74c3c)', borderRadius: '4px' }} />
+                      <div style={{ position: 'absolute' as const, left: 0, top: 0, height: '100%', width: Math.min(100, 100 - moneyLeftPct) + '%', background: moneyLeftPct > 30 ? 'linear-gradient(90deg, #27ae60, #2ecc71)' : moneyLeftPct > 10 ? 'linear-gradient(90deg, #D4AF37, #BC6A1F)' : 'linear-gradient(90deg, #c0392b, #e74c3c)', borderRadius: '4px' }} />
                       {/* Day marker */}
                       <div style={{ position: 'absolute' as const, left: (monthProgress * 100) + '%', top: '-2px', width: '2px', height: '12px', background: theme.text, opacity: 0.4, borderRadius: '1px' }} />
                     </div>
