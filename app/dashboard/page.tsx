@@ -637,6 +637,7 @@ export default function Dashboard() {
     const saved = localStorage.getItem('aureus_data')
     if (saved) {
       const data = JSON.parse(saved)
+      // Safety check — if this data belongs to a different user, don't load it
       if (data.incomeStreams) setIncomeStreams(data.incomeStreams)
       if (data.expenses) setExpenses(data.expenses)
       if (data.debts) setDebts(data.debts)
@@ -2080,6 +2081,9 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
       const { data } = await sb.from('user_data').select('snapshot, aureus_token').eq('user_id', user.id).single()
       if (!data?.snapshot) return false
       const s = data.snapshot
+      // Clear any previous user's local data before loading this user's cloud data
+      localStorage.removeItem('aureus_data')
+      localStorage.removeItem('aureus_business')
       if (data.aureus_token) localStorage.setItem('aureus_user_token', data.aureus_token)
       if (s.userName) setUserName(s.userName)
       if (s.whyStatement) setWhyStatement(s.whyStatement)
@@ -2189,12 +2193,21 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
           setAuthUser(data.user)
           await saveToCloud(data.user)
           setShowAuthModal('none')
+          // New user — start onboarding mission if not already complete
+          if (!missionComplete) {
+            setMissionPhase(1)
+            setMissionStep(0)
+            setMissionNavLocked(true)
+            setActiveTab('home')
+          }
         }
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword })
         if (error) throw error
         if (data.user) {
           setAuthUser(data.user)
+          // Store this user's ID so we can detect device-sharing
+          localStorage.setItem('aureus_last_user_id', data.user.id)
           const loaded = await loadFromCloud(data.user)
           setSubStatus('active')
           setShowPaywall(false)
@@ -2225,8 +2238,19 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
         const { data } = await sb.auth.getSession()
         if (data.session?.user) {
           setAuthUser(data.session.user)
+          // If a different user was last logged in on this device, clear their local data
+          const lastUserId = localStorage.getItem('aureus_last_user_id')
+          if (lastUserId && lastUserId !== data.session.user.id) {
+            localStorage.removeItem('aureus_data')
+            localStorage.removeItem('aureus_business')
+          }
+          localStorage.setItem('aureus_last_user_id', data.session.user.id)
           const hasLocal = !!localStorage.getItem('aureus_data')
           if (!hasLocal) {
+            const loaded = await loadFromCloud(data.session.user)
+            if (loaded) { setSubStatus('active'); setShowPaywall(false) }
+          } else {
+            // Always load from cloud to ensure we have the latest data for this user
             const loaded = await loadFromCloud(data.session.user)
             if (loaded) { setSubStatus('active'); setShowPaywall(false) }
           }
@@ -2391,6 +2415,12 @@ User: "${message}"`,
       setShowPaywall(false)
       window.history.replaceState({}, '', '/dashboard')
       // Prompt user to create account to save their data
+      // Also ensure onboarding is queued for after they sign up
+      if (!missionComplete) {
+        setMissionPhase(1)
+        setMissionStep(0)
+        setMissionNavLocked(true)
+      }
       setTimeout(() => {
         setAuthEmail('')
         setAuthPassword('')
