@@ -5624,7 +5624,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             </select>
           </div>
         </div>
-        {/* NAV TABS - all tabs in a single scrollable row, no More button */}
+        {/* NAV TABS - 6 core tabs only, everything else in Quick Access on Home */}
         <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' as const, paddingBottom: '2px', alignItems: 'center' }}>
           {[
             { id: 'home',      label: '🏠 Home' },
@@ -5633,15 +5633,6 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             { id: 'dashboard', label: '🏛️ Treasury' },
             { id: 'path',      label: '🛤️ Roadmap' },
             { id: 'wins',      label: `🏆 Wins${wins.length > 0 ? ` (${wins.length})` : ''}` },
-            { id: 'mortgage',  label: '🚀 Mortgage' },
-            { id: 'property',  label: '🏘️ Property' },
-            { id: 'grow',      label: '📈 Grow & FIRE' },
-            { id: 'insights',  label: '🧠 Insights' },
-            { id: 'review',    label: '🔄 Review' },
-            { id: 'overview',  label: '📊 Metrics' },
-            { id: 'learn',     label: '🎓 Learn' },
-            { id: 'quickview', label: '⚡ Quick View' },
-            { id: 'business',  label: '🏢 Business' },
           ].map(tab => (
             <button key={tab.id}
               onClick={() => { if (missionNavLocked) return; setActiveTab(tab.id as any) }}
@@ -6401,17 +6392,18 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px' }}>
                   {[
                     { id: 'chat',      icon: '💬', label: 'Ask Aureus',    desc: 'AI coach' },
-                    { id: 'dashboard', icon: '🏛️', label: 'Treasury', desc: 'Income, bills, goals' },
+                    { id: 'dashboard', icon: '🏛️', label: 'Treasury',      desc: 'Income, bills, goals' },
                     { id: 'path',      icon: '🛤️', label: 'Roadmap',       desc: 'Baby steps & milestones' },
                     { id: 'wins',      icon: '🏆', label: 'Wins',          desc: 'Your progress log' },
                     { id: 'mortgage',  icon: '🚀', label: 'Mortgage',      desc: 'Pay off faster' },
                     { id: 'property',  icon: '🏘️', label: 'Property',      desc: 'IP portfolio' },
                     { id: 'grow',      icon: '📈', label: 'Grow & FIRE',   desc: 'Investments & FI' },
-                      { id: 'insights',  icon: '🧠', label: 'Insights',      desc: 'AI analysis' },
+                    { id: 'insights',  icon: '🧠', label: 'Insights',      desc: 'AI analysis' },
                     { id: 'review',    icon: '🔄', label: 'Review',        desc: 'Monthly check-in' },
                     { id: 'overview',  icon: '📊', label: 'Metrics',       desc: 'Net worth & health' },
                     { id: 'learn',     icon: '🎓', label: 'Learn',         desc: 'Financial education' },
                     { id: 'quickview', icon: '⚡', label: 'Quick View',    desc: 'All-in-one snapshot' },
+                    { id: 'business',  icon: '🏢', label: 'Business',      desc: 'Hormozi framework' },
                   ].map(item => (
                     <button key={item.id} onClick={() => { setActiveTab(item.id as any) }}
                       style={{ padding: '12px', background: activeTab === item.id ? theme.accent + '20' : theme.bg, border: '1px solid ' + (activeTab === item.id ? theme.accent + '60' : theme.border), borderRadius: '10px', cursor: 'pointer', textAlign: 'left' as const }}
