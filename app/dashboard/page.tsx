@@ -5786,6 +5786,52 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 </div>
               </div>
 
+              {/* ── RESUME ONBOARDING — for users who skipped ── */}
+              {!missionComplete && onboardingComplete && (
+                <div style={{ padding: '18px 20px', background: 'linear-gradient(135deg, #111820, #111111)', borderRadius: '14px', border: '1px solid ' + theme.accent + '40' }}>
+                  <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                    <div style={{ fontSize: '28px', flexShrink: 0 }}>🏛️</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: theme.accent, fontWeight: 800, fontSize: '14px', marginBottom: '4px', fontFamily: 'Cinzel, serif' }}>
+                        Your setup isn't complete
+                      </div>
+                      <div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, marginBottom: '12px' }}>
+                        {missionStep > 0
+                          ? `You're on step ${missionStep} of 8. Finish setting up your budget so Aureus can coach you properly.`
+                          : 'Complete your budget setup so Aureus knows your numbers and can give you real coaching.'}
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                        <button
+                          onClick={() => {
+                            setMissionPhase(1)
+                            setMissionNavLocked(true)
+                            if (missionStep === 0) setMissionStep(0)
+                          }}
+                          style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 800, fontSize: '13px' }}>
+                          {missionStep > 0 ? `Resume setup — step ${missionStep} of 8 →` : 'Start setup →'}
+                        </button>
+                        <button
+                          onClick={() => { setMissionComplete(true); setOnboardingComplete(true); setMissionNavLocked(false) }}
+                          style={{ padding: '10px 14px', background: 'transparent', border: '1px solid ' + theme.border, color: theme.textMuted, borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>
+                          Skip for now
+                        </button>
+                      </div>
+                    </div>
+                    {missionStep > 0 && (
+                      <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
+                        <div style={{ color: theme.accent, fontSize: '20px', fontWeight: 900 }}>{Math.round(missionStep / 8 * 100)}%</div>
+                        <div style={{ color: theme.textMuted, fontSize: '10px' }}>complete</div>
+                      </div>
+                    )}
+                  </div>
+                  {missionStep > 0 && (
+                    <div style={{ marginTop: '12px', height: '4px', background: theme.border, borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ width: (missionStep / 8 * 100) + '%', height: '100%', background: 'linear-gradient(90deg, #D4AF37, #BC6A1F)', borderRadius: '2px' }} />
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ── Name nudge for users who skipped name entry ── */}
               {onboardingComplete && !userName.trim() && (
                 <div style={{ padding: '14px 18px', background: theme.accent + '10', borderRadius: '12px', border: '1px solid ' + theme.accent + '30' }}>
