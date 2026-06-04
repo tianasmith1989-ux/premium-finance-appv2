@@ -5645,6 +5645,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             { id: 'dashboard', label: '🏛️ Treasury' },
             { id: 'path',      label: '🛤️ Roadmap' },
             { id: 'wins',      label: `🏆 Wins${wins.length > 0 ? ` (${wins.length})` : ''}` },
+            { id: 'quickview', label: '⚡ Quick View' },
           ].map(tab => (
             <button key={tab.id}
               onClick={() => { if (missionNavLocked) return; setActiveTab(tab.id as any) }}
@@ -5738,13 +5739,29 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
 
               {/* ── Name nudge for users who skipped name entry ── */}
               {onboardingComplete && !userName.trim() && (
-                <div style={{ padding: '14px 18px', background: theme.accent + '10', borderRadius: '12px', border: '1px solid ' + theme.accent + '30', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <div style={{ fontSize: '24px' }}>👋</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px', marginBottom: '2px' }}>Aureus doesn't know your name yet</div>
-                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>Add it so Aureus can greet you properly and personalise your coaching.</div>
+                <div style={{ padding: '14px 18px', background: theme.accent + '10', borderRadius: '12px', border: '1px solid ' + theme.accent + '30' }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '24px' }}>👋</div>
+                    <div>
+                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '13px', marginBottom: '2px' }}>Aureus doesn't know your name yet</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>Add it so Aureus can greet you and personalise your coaching.</div>
+                    </div>
                   </div>
-                  <button onClick={() => setActiveTab('insights' as any)} style={{ padding: '8px 14px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>Add name →</button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      placeholder="Your first name"
+                      value={userName}
+                      onChange={e => setUserName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && userName.trim()) setNameSubmitted(true) }}
+                      style={{ ...inputStyle, flex: 1, fontSize: '14px' }}
+                    />
+                    <button
+                      onClick={() => { if (userName.trim()) setNameSubmitted(true) }}
+                      disabled={!userName.trim()}
+                      style={{ padding: '10px 16px', background: userName.trim() ? theme.accent : theme.border, color: userName.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '8px', cursor: userName.trim() ? 'pointer' : 'default', fontWeight: 700, fontSize: '13px', flexShrink: 0 }}>
+                      Save →
+                    </button>
+                  </div>
                 </div>
               )}
 
