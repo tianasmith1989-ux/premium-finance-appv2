@@ -1879,8 +1879,7 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
   const askAureusAbout = (context: string) => {
     setChatContext(context)
     setActiveTab('chat')
-    setShowMoreTabs(false)
-  }
+      }
 
   const togglePlanStep = (milestoneId: number, stepId: number) => {
     setRoadmapMilestones(prev => prev.map(m =>
@@ -5176,6 +5175,11 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             desc: 'Core financial concepts explained clearly. Baby Steps, the avalanche vs snowball method, how compound interest works, Australian-specific content (super, offset accounts, negative gearing). Learn as you go.',
             highlight: 'Baby Steps · Debt methods · Compound interest · Australian concepts'
           },
+          {
+            tab: 'business', icon: '🏢', title: 'Business Hub — Hormozi Framework',
+            desc: "Track your business numbers using Alex Hormozi's frameworks. See your Profit Engine (LTV:CAC), score your Offer out of 100, track your lead funnel, and get a Hormozi-trained AI coach to diagnose your biggest growth lever.",
+            highlight: 'Profit Engine · Offer Scorecard · Lead Funnel · LTV:CAC · 3 Growth Levers · Hormozi Coach'
+          },
         ]
         const step = tourSteps[tourStep]
         return (
@@ -5211,7 +5215,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                   </button>
                 )}
                 <button
-                  onClick={() => { setActiveTab(step.tab as any); setShowMoreTabs(false) }}
+                  onClick={() => { setActiveTab(step.tab as any) }}
                   style={{ padding: '10px 18px', background: theme.accent + '20', border: '1px solid ' + theme.accent + '50', borderRadius: '10px', cursor: 'pointer', color: theme.accent, fontSize: '13px', fontWeight: 600 }}>
                   Open {step.icon}
                 </button>
@@ -5233,6 +5237,122 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
       })()}
 
       {/* ==================== QUICK HELP GUIDE ==================== */}
+      {/* ── SUPPORT MODAL (chat / email / book) ── */}
+      {showSupport && (
+        <div style={{ position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 9000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0' }} onClick={() => setShowSupport(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: '20px 20px 0 0', border: '1px solid ' + theme.border, width: '100%', maxWidth: '640px', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' as const }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid ' + theme.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ color: theme.accent, fontWeight: 800, fontSize: '16px' }}>❓ Help & Support</div>
+              <button onClick={() => setShowSupport(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '22px' }}>×</button>
+            </div>
+            {/* Sub-tabs */}
+            <div style={{ display: 'flex', gap: '6px', padding: '12px 20px', borderBottom: '1px solid ' + theme.border }}>
+              {([['chat','💬 Chat'],['email','✉️ Email'],['book','📅 Book a call']] as const).map(([id, label]) => (
+                <button key={id} onClick={() => setSupportTab(id)}
+                  style={{ flex: 1, padding: '8px', background: supportTab === id ? theme.accent : 'transparent', color: supportTab === id ? '#111111' : theme.textMuted, border: '1px solid ' + (supportTab === id ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: supportTab === id ? 700 : 400 }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {/* Chat tab */}
+            {supportTab === 'chat' && (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' }}>
+                <div style={{ flex: 1, overflowY: 'auto' as const, padding: '16px 20px', display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
+                  {supportMessages.length === 0 && (
+                    <div style={{ padding: '14px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>App Support</div>
+                      <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, margin: '0 0 10px' }}>Ask me how to use any feature, or report a problem.</p>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
+                        {['How do I add my income?', 'How do I sync to cloud?', 'Where is the mortgage calculator?', 'How do I track my business?'].map(q => (
+                          <button key={q} onClick={() => handleSupportMessage(q)}
+                            style={{ padding: '8px 12px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px', textAlign: 'left' as const }}>
+                            {q} →
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {supportMessages.map((msg, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                      <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? theme.accent : theme.bg, color: msg.role === 'user' ? '#111111' : theme.text, fontSize: '13px', lineHeight: 1.5, border: msg.role === 'agent' ? '1px solid ' + theme.border : 'none' }}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                  {supportLoading && (
+                    <div style={{ padding: '10px 14px', background: theme.bg, borderRadius: '14px', width: 'fit-content', border: '1px solid ' + theme.border }}>
+                      <div style={{ display: 'flex', gap: '4px' }}>{[0,1,2].map(i => <div key={i} style={{ width: '5px', height: '5px', borderRadius: '50%', background: theme.accent, opacity: 0.6 }} />)}</div>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', padding: '12px 20px', borderTop: '1px solid ' + theme.border }}>
+                  <input value={supportInput} onChange={e => setSupportInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && supportInput.trim() && !supportLoading) { handleSupportMessage(supportInput); setSupportInput('') } }}
+                    placeholder="Ask about any feature..."
+                    style={{ flex: 1, padding: '10px 14px', background: theme.bg, border: '1px solid ' + theme.border, borderRadius: '10px', color: theme.text, fontSize: '13px', outline: 'none' }} />
+                  <button onClick={() => { if (supportInput.trim() && !supportLoading) { handleSupportMessage(supportInput); setSupportInput('') } }}
+                    disabled={!supportInput.trim() || supportLoading}
+                    style={{ padding: '0 16px', background: supportInput.trim() ? theme.accent : theme.border, color: supportInput.trim() ? '#111111' : theme.textMuted, border: 'none', borderRadius: '10px', cursor: supportInput.trim() ? 'pointer' : 'default', fontWeight: 700 }}>→</button>
+                </div>
+              </div>
+            )}
+            {/* Email tab */}
+            {supportTab === 'email' && (
+              <div style={{ padding: '20px', display: 'flex', flexDirection: 'column' as const, gap: '12px', overflowY: 'auto' as const }}>
+                {supportSent ? (
+                  <div style={{ textAlign: 'center' as const, padding: '30px' }}>
+                    <div style={{ fontSize: '40px', marginBottom: '12px' }}>✅</div>
+                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '6px' }}>Message sent!</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px' }}>We'll get back to you at {supportEmail} within 24 hours.</div>
+                    <button onClick={() => { setSupportSent(false); setSupportName(''); setSupportEmail(''); setSupportMessage('') }} style={{ marginTop: '16px', padding: '10px 20px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>Send another</button>
+                  </div>
+                ) : (
+                  <>
+                    <input placeholder="Your name" value={supportName} onChange={e => setSupportName(e.target.value)} style={{ padding: '10px 14px', background: theme.bg, border: '1px solid ' + theme.border, borderRadius: '10px', color: theme.text, fontSize: '13px', outline: 'none' }} />
+                    <input placeholder="Your email" type="email" value={supportEmail} onChange={e => setSupportEmail(e.target.value)} style={{ padding: '10px 14px', background: theme.bg, border: '1px solid ' + theme.border, borderRadius: '10px', color: theme.text, fontSize: '13px', outline: 'none' }} />
+                    <textarea placeholder="Describe what you need help with..." value={supportMessage} onChange={e => setSupportMessage(e.target.value)} rows={4} style={{ padding: '10px 14px', background: theme.bg, border: '1px solid ' + theme.border, borderRadius: '10px', color: theme.text, fontSize: '13px', outline: 'none', resize: 'none' as const }} />
+                    <button
+                      disabled={!supportName || !supportEmail || !supportMessage || supportSending}
+                      onClick={async () => {
+                        setSupportSending(true)
+                        try {
+                          await fetch('/api/send-support', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: supportName, email: supportEmail, message: supportMessage }) })
+                          setSupportSent(true)
+                        } catch { setSupportSent(true) }
+                        setSupportSending(false)
+                      }}
+                      style={{ padding: '12px', background: supportName && supportEmail && supportMessage ? theme.accent : theme.border, color: supportName && supportEmail && supportMessage ? '#111111' : theme.textMuted, border: 'none', borderRadius: '10px', cursor: supportName && supportEmail && supportMessage ? 'pointer' : 'default', fontWeight: 700, fontSize: '14px' }}>
+                      {supportSending ? 'Sending...' : 'Send message →'}
+                    </button>
+                    <div style={{ color: theme.textMuted, fontSize: '12px', textAlign: 'center' as const }}>Or email us directly: <a href="mailto:hello@aureusplutus.app" style={{ color: theme.accent }}>hello@aureusplutus.app</a></div>
+                  </>
+                )}
+              </div>
+            )}
+            {/* Book tab */}
+            {supportTab === 'book' && (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const }}>
+                <div style={{ padding: '16px 20px', color: theme.textMuted, fontSize: '13px', lineHeight: 1.6 }}>
+                  Book a 30-minute call to get personal help setting up Aureus for your situation.
+                </div>
+                <div id="calendly-inline" style={{ flex: 1, minHeight: '500px' }}></div>
+              </div>
+            )}
+            {/* Help guide link */}
+            <div style={{ padding: '12px 20px', borderTop: '1px solid ' + theme.border, display: 'flex', gap: '8px' }}>
+              <button onClick={() => { setShowSupport(false); setShowHelpGuide(true) }}
+                style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>
+                📖 Help Guide
+              </button>
+              <button onClick={() => { setShowSupport(false); setTourStep(0); setShowTour(true) }}
+                style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.accent, cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>
+                ▶ Take the Tour
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showHelpGuide && (
         <div style={{ position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 8000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowHelpGuide(false)}>
           <div style={{ background: theme.cardBg, borderRadius: '20px', border: '1px solid ' + theme.border, maxWidth: '620px', width: '100%', maxHeight: '85vh', overflow: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
@@ -5472,66 +5592,38 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button onClick={() => { setTourStep(0); setShowTour(true) }} title="Take a tour" style={{ padding: '7px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.accent, fontWeight: 700, fontSize: '13px' }}>▶ Tour</button>
-            <button onClick={() => setShowHelpGuide(true)} title="Help guide" style={{ padding: '7px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text, fontWeight: 700, fontSize: '14px' }}>?</button>
+            <button onClick={() => { setShowSupport(true); setSupportTab('chat') }} title="Help & support" style={{ padding: '7px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text, fontWeight: 700, fontSize: '14px' }}>?</button>
             <button onClick={() => setDarkMode(!darkMode)} style={{ padding: '7px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text }}>{darkMode ? '☀️' : '🌙'}</button>
             <select value={userCountry} onChange={e => setUserCountry(e.target.value as any)} style={{ padding: '6px 10px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', cursor: 'pointer', color: theme.text, fontSize: '14px' }}>
               <option value="AU">🇦🇺 AU</option><option value="US">🇺🇸 US</option><option value="UK">🇬🇧 UK</option><option value="NZ">🇳🇿 NZ</option><option value="CA">🇨🇦 CA</option>
             </select>
           </div>
         </div>
-        {/* NAV TABS - primary always visible, secondary in More drawer */}
+        {/* NAV TABS - all tabs in a single scrollable row, no More button */}
         <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' as const, paddingBottom: '2px', alignItems: 'center' }}>
           {[
             { id: 'home',      label: '🏠 Home' },
             { id: 'chat',      label: '💬 Aureus' },
             { id: 'change',    label: '⚡ Change' },
-            { id: 'business',  label: '🏢 Business' },
             { id: 'dashboard', label: '🏛️ Treasury' },
             { id: 'path',      label: '🛤️ Roadmap' },
             { id: 'wins',      label: `🏆 Wins${wins.length > 0 ? ` (${wins.length})` : ''}` },
+            { id: 'mortgage',  label: '🚀 Mortgage' },
+            { id: 'property',  label: '🏘️ Property' },
+            { id: 'grow',      label: '📈 Grow & FIRE' },
+            { id: 'insights',  label: '🧠 Insights' },
+            { id: 'review',    label: '🔄 Review' },
+            { id: 'overview',  label: '📊 Metrics' },
+            { id: 'learn',     label: '🎓 Learn' },
+            { id: 'quickview', label: '⚡ Quick View' },
+            { id: 'business',  label: '🏢 Business' },
           ].map(tab => (
             <button key={tab.id}
-              onClick={() => { if (missionNavLocked) return; setActiveTab(tab.id as any); setShowMoreTabs(false) }}
+              onClick={() => { if (missionNavLocked) return; setActiveTab(tab.id as any) }}
               style={{ padding: '7px 14px', background: activeTab === tab.id ? theme.accent : 'transparent', color: activeTab === tab.id ? '#111111' : missionNavLocked ? theme.textMuted + '60' : theme.text, border: '1px solid ' + (activeTab === tab.id ? theme.accent : theme.border), borderRadius: '8px', cursor: missionNavLocked ? 'default' : 'pointer', fontSize: '12px', fontWeight: activeTab === tab.id ? 700 : 500, whiteSpace: 'nowrap' as const, flexShrink: 0, opacity: missionNavLocked ? 0.4 : 1 }}>
               {tab.label}
             </button>
           ))}
-
-          {/* MORE DROPDOWN */}
-          <div style={{ position: 'relative' as const, flexShrink: 0 }}>
-            <button onClick={() => setShowMoreTabs(!showMoreTabs)}
-              style={{ padding: '7px 14px', background: ['mortgage','property','insights','grow','review','overview','learn','quickview'].includes(activeTab) ? theme.accent + '25' : 'transparent', color: ['mortgage','property','insights','grow','review','overview','learn','quickview'].includes(activeTab) ? theme.accent : theme.textMuted, border: '1px solid ' + (showMoreTabs ? theme.accent + '60' : theme.border), borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 500, whiteSpace: 'nowrap' as const }}>
-              {['mortgage','property','insights','grow','review','overview','learn','quickview'].includes(activeTab) ? '● More ▾' : 'More ▾'}
-            </button>
-            {showMoreTabs && (
-              <div style={{ position: 'absolute' as const, top: 'calc(100% + 6px)', left: 0, background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', padding: '8px', zIndex: 301, minWidth: '210px', boxShadow: '0 12px 40px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
-                <div style={{ color: theme.accent, fontSize: '10px', fontWeight: 700, padding: '4px 10px 8px', letterSpacing: '1px' }}>BUILD WEALTH</div>
-                {[
-                  { id: 'mortgage',  label: '🚀 Mortgage Accelerator' },
-                  { id: 'property',  label: '🏘️ Property Portfolio' },
-                  { id: 'grow',      label: '📈 Grow & FIRE' },
-                    ].map(tab => (
-                  <button key={tab.id} onClick={() => { setActiveTab(tab.id as any); setShowMoreTabs(false) }}
-                    style={{ display: 'block', width: '100%', padding: '9px 10px', background: activeTab === tab.id ? theme.accent + '20' : 'transparent', color: activeTab === tab.id ? theme.accent : theme.text, border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' as const, fontWeight: activeTab === tab.id ? 700 : 400 }}>
-                    {tab.label}
-                  </button>
-                ))}
-                <div style={{ color: theme.accent, fontSize: '10px', fontWeight: 700, padding: '10px 10px 8px', letterSpacing: '1px', borderTop: '1px solid ' + theme.border, marginTop: '4px' }}>REVIEW & LEARN</div>
-                {[
-                  { id: 'insights',  label: '🧠 Insights' },
-                  { id: 'review',    label: '🔄 Monthly Review' },
-                  { id: 'overview',  label: '📊 Metrics' },
-                  { id: 'learn',     label: '🎓 Learn' },
-                  { id: 'quickview', label: '⚡ Quick View' },
-                ].map(tab => (
-                  <button key={tab.id} onClick={() => { setActiveTab(tab.id as any); setShowMoreTabs(false) }}
-                    style={{ display: 'block', width: '100%', padding: '9px 10px', background: activeTab === tab.id ? theme.accent + '20' : 'transparent', color: activeTab === tab.id ? theme.accent : theme.text, border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', textAlign: 'left' as const, fontWeight: activeTab === tab.id ? 700 : 400 }}>
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
           {/* Phase 1 locked nav banner */}
           {missionNavLocked && (
@@ -5543,9 +5635,6 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
           )}
         </div>
       </header>
-
-      {/* Close More drawer on outside click */}
-      {showMoreTabs && <div style={{ position: 'fixed' as const, inset: 0, zIndex: 298 }} onClick={() => setShowMoreTabs(false)} />}
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
 
@@ -6135,7 +6224,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                       <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>⚡ YOUR NEXT ACTION</div>
                       <div style={{ fontSize: '28px', marginBottom: '8px' }}>{coachNextAction.icon}</div>
                       <div style={{ color: theme.text, fontSize: '15px', fontWeight: 600, lineHeight: 1.5, marginBottom: '14px' }}>{coachNextAction.message}</div>
-                      <button onClick={() => { setActiveTab(coachNextAction.tab as any); setShowMoreTabs(false) }}
+                      <button onClick={() => { setActiveTab(coachNextAction.tab as any) }}
                         style={{ padding: '10px 18px', background: coachNextAction.urgency === 'high' ? theme.danger : theme.accent, color: coachNextAction.urgency === 'high' ? 'white' : '#111111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
                         {coachNextAction.action} →
                       </button>
@@ -6299,7 +6388,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                     { id: 'learn',     icon: '🎓', label: 'Learn',         desc: 'Financial education' },
                     { id: 'quickview', icon: '⚡', label: 'Quick View',    desc: 'All-in-one snapshot' },
                   ].map(item => (
-                    <button key={item.id} onClick={() => { setActiveTab(item.id as any); setShowMoreTabs(false) }}
+                    <button key={item.id} onClick={() => { setActiveTab(item.id as any) }}
                       style={{ padding: '12px', background: activeTab === item.id ? theme.accent + '20' : theme.bg, border: '1px solid ' + (activeTab === item.id ? theme.accent + '60' : theme.border), borderRadius: '10px', cursor: 'pointer', textAlign: 'left' as const }}
                       onMouseEnter={e => (e.currentTarget.style.borderColor = theme.accent + '50')}
                       onMouseLeave={e => (e.currentTarget.style.borderColor = activeTab === item.id ? theme.accent + '60' : theme.border)}>
