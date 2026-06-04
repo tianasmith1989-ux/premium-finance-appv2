@@ -752,6 +752,19 @@ export default function Dashboard() {
     localStorage.setItem('aureus_data', JSON.stringify(data))
   }, [incomeStreams, expenses, debts, goals, assets, liabilities, budgetMemory, paidOccurrences, categoryBudgets, actualSpend, roadmapMilestones, budgetOnboarding, chatMessages, userCountry, wins, streak, lastCheckIn, whyStatement, mortgageAccel, documents, milestoneCheckIns, checkInSchedule, lastDailyCheckIn, dailyCheckInLog, coachNextAction, dismissedTriggers, lastAppOpen, missionPhase, missionStep, missionComplete, missionNavLocked, missionP2Proposals, missionP2Confirmed, missionP2Step, moneyPersonality, identityStatements, deepWhyAnswers, deepWhyComplete, fearAuditAnswers, fearAuditComplete, onboardingComplete, houseStatus, fireGoal, hasAutomatedPayments, investmentProperties, sinkingFunds, proactiveInsights, insightsGeneratedAt, oneDecision, oneDecisionDate, latteItems, moneyDateLog, annualReviews, superData, netWorthHistory, personalityAnswers, coupleMode, partnerName, partnerIncome, partnerFrequency, taxEstData, notificationsEnabled, wealthMilestones, accountabilityEmail, accountabilityName, emailNotifEnabled, emailNotifFrequency, notificationEmail])
 
+  // Debounced save for userName — avoids re-render loop that breaks name input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (userName) {
+        try {
+          const existing = JSON.parse(localStorage.getItem('aureus_data') || '{}')
+          localStorage.setItem('aureus_data', JSON.stringify({ ...existing, userName }))
+        } catch {}
+      }
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [userName])
+
   // Chat scroll
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
@@ -2341,11 +2354,8 @@ User: "${message}"`,
   // ── Check subscription status on load ──
   useEffect(() => {
     const checkSub = async () => {
-      // If returning from Stripe checkout success — skip Supabase check entirely
+      // If returning from Stripe checkout success — skip Supabase check (handled by other effect)
       if (window.location.search.includes('checkout=success')) {
-        setSubStatus('active')
-        setShowPaywall(false)
-        window.history.replaceState({}, '', '/dashboard')
         return
       }
       let userToken = localStorage.getItem('aureus_user_token')
@@ -2371,18 +2381,20 @@ User: "${message}"`,
     }
     checkSub()
   }, [])
-  // ── Handle successful checkout return ──
+  // ── Handle successful checkout return — show account creation ──
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get('checkout') === 'success') {
+    if (params.get('checkout') === 'success' || window.location.search.includes('checkout=success')) {
       setSubStatus('active')
       setShowPaywall(false)
       window.history.replaceState({}, '', '/dashboard')
-      // Show "create your account" to save their data
-      setAuthEmail('')
-      setAuthPassword('')
-      setAuthError('')
-      setShowAuthModal('create')
+      // Prompt user to create account to save their data
+      setTimeout(() => {
+        setAuthEmail('')
+        setAuthPassword('')
+        setAuthError('')
+        setShowAuthModal('create')
+      }, 800)
     }
   }, [])
 
@@ -4018,7 +4030,6 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                       onChange={e => setUserName(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && e.currentTarget.value.trim()) advanceMission(1) }}
                       style={{ ...inputStyle, width: '100%', fontSize: '20px', padding: '16px 20px', textAlign: 'center' as const, borderColor: theme.accent + '60' }}
-                      autoFocus
                     />
                     <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px' }}>Your data never leaves your device.</div>
                   </div>
@@ -11861,10 +11872,10 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
                 <img src="/logo.svg" alt="Aureus" style={{ width: '64px', height: '64px', objectFit: 'contain' }}/>
               </div>
               <h2 style={{ color: theme.text, fontSize: '22px', fontWeight: 900, margin: '0 0 8px', fontFamily: 'Cinzel, serif' }}>
-                {showAuthModal === 'create' ? 'Save your progress' : showAuthModal === 'forgot' ? 'Reset password' : showAuthModal === 'reset' ? 'Set new password' : 'Welcome back'}
+                {showAuthModal === 'create' ? '🎉 Welcome to Aureus!' : showAuthModal === 'forgot' ? 'Reset password' : showAuthModal === 'reset' ? 'Set new password' : 'Welcome back'}
               </h2>
               <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>
-                {showAuthModal === 'create' ? 'Create an account so your data is saved across all your devices and never lost.'
+                {showAuthModal === 'create' ? 'Your subscription is active! Create a password so your data is saved across all devices and never lost.'
                   : showAuthModal === 'forgot' ? "Enter your email and we'll send you a reset link."
                   : showAuthModal === 'reset' ? 'Choose a new password for your account.'
                   : 'Log in to restore your budget, goals, and progress.'}
