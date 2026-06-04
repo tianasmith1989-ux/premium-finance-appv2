@@ -2212,7 +2212,7 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
           setSubStatus('active')
           setShowPaywall(false)
           setShowAuthModal('none')
-          if (!loaded) {
+          if (!loaded || !missionComplete) {
             setMissionPhase(1); setMissionStep(0); setMissionNavLocked(true)
           }
         }
@@ -2248,11 +2248,28 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
           const hasLocal = !!localStorage.getItem('aureus_data')
           if (!hasLocal) {
             const loaded = await loadFromCloud(data.session.user)
-            if (loaded) { setSubStatus('active'); setShowPaywall(false) }
+            if (loaded) {
+              setSubStatus('active')
+              setShowPaywall(false)
+            } else {
+              // New user with no data — set active and trigger onboarding
+              setSubStatus('active')
+              setShowPaywall(false)
+              setMissionPhase(1)
+              setMissionStep(0)
+              setMissionNavLocked(true)
+            }
           } else {
             // Always load from cloud to ensure we have the latest data for this user
             const loaded = await loadFromCloud(data.session.user)
-            if (loaded) { setSubStatus('active'); setShowPaywall(false) }
+            if (loaded) {
+              setSubStatus('active')
+              setShowPaywall(false)
+            } else {
+              // Cloud empty but has local — still set active, check if onboarding needed
+              setSubStatus('active')
+              setShowPaywall(false)
+            }
           }
         }
       } catch {}
@@ -5786,8 +5803,8 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 </div>
               </div>
 
-              {/* ── RESUME ONBOARDING — for users who skipped ── */}
-              {!missionComplete && onboardingComplete && (
+              {/* ── RESUME ONBOARDING — for users who skipped or are new ── */}
+              {!missionComplete && (subStatus === 'active' || subStatus === 'trialing') && (
                 <div style={{ padding: '18px 20px', background: 'linear-gradient(135deg, #111820, #111111)', borderRadius: '14px', border: '1px solid ' + theme.accent + '40' }}>
                   <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
                     <div style={{ fontSize: '28px', flexShrink: 0 }}>🏛️</div>
