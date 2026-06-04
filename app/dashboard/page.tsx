@@ -272,12 +272,15 @@ export default function Dashboard() {
   const [newBizRevenue, setNewBizRevenue] = useState({name:'',amount:'',frequency:'monthly',category:'sales'})
   const [newBizExpense, setNewBizExpense] = useState({name:'',amount:'',frequency:'monthly',category:'operations'})
   const [newBizGoal, setNewBizGoal] = useState({name:'',target:'',current:'',deadline:''})
-  const [bizTab, setBizTab] = useState<'dashboard'|'revenue'|'expenses'|'goals'|'coach'>('dashboard')
+  const [bizTab, setBizTab] = useState<'dashboard'|'revenue'|'expenses'|'offer'|'leads'|'goals'|'coach'>('dashboard')
   const [bizChatMessages, setBizChatMessages] = useState<{role:'user'|'assistant',content:string}[]>([])
   const [bizChatInput, setBizChatInput] = useState('')
   const [bizChatLoading, setBizChatLoading] = useState(false)
   const [showBizSetup, setShowBizSetup] = useState(false)
   const bizChatEndRef = useRef<HTMLDivElement>(null)
+  const [bizOffer, setBizOffer] = useState({ dreamOutcome:'', likelihood:5, timeDelay:5, effort:5, price:'', competitors:'', guarantee:'', conversionRate:'' })
+  const [bizLeads, setBizLeads] = useState({ monthlyLeads:'', leadSource:[] as string[], cac:'', ltv:'', avgTransactionValue:'', purchasesPerYear:'', avgCustomerLifeYears:'' })
+  const [bizGrowthFocus, setBizGrowthFocus] = useState<'customers'|'price'|'frequency'|null>(null)
   const [showSupport, setShowSupport] = useState(false)
   const [supportTab, setSupportTab] = useState<'chat'|'book'|'email'>('chat')
   const [supportMessages, setSupportMessages] = useState<{role:'user'|'agent', content:string}[]>([])
@@ -2299,20 +2302,31 @@ Answer in 2-4 sentences. Be specific about which tab and section. If technical e
       const totalRevenue = businessRevenue.reduce((s: number, r: any) => s + parseFloat(r.amount || '0') * (r.frequency === 'weekly' ? 52 : r.frequency === 'fortnightly' ? 26 : 12) / 12, 0)
       const totalExpenses = businessExpenses.reduce((s: number, e: any) => s + parseFloat(e.amount || '0') * (e.frequency === 'weekly' ? 52 : e.frequency === 'fortnightly' ? 26 : 12) / 12, 0)
       const profit = totalRevenue - totalExpenses
+      const margin = totalRevenue > 0 ? (profit / totalRevenue * 100) : 0
+      const cacVal = parseFloat(bizLeads?.cac || '0')
+      const ltvVal = parseFloat(bizLeads?.ltv || '0') || (parseFloat(bizLeads?.avgTransactionValue || '0') * parseFloat(bizLeads?.purchasesPerYear || '0') * parseFloat(bizLeads?.avgCustomerLifeYears || '0'))
+      const ltvCacVal = cacVal > 0 && ltvVal > 0 ? ltvVal / cacVal : 0
+      const offerScoreVal = Math.round(((bizOffer?.dreamOutcome ? 1 : 0) * 20) + (bizOffer?.likelihood / 10 * 20) + (bizOffer?.timeDelay / 10 * 20) + (bizOffer?.effort / 10 * 20) + (bizOffer?.guarantee ? 20 : 0))
       const res = await fetch('/api/budget-coach', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'question',
-          question: `[BUSINESS HUB — NO BUSINESS/LEGAL/TAX ADVICE]
-You help users TRACK and UNDERSTAND their business numbers only.
+          question: `[BUSINESS GROWTH COACH — HORMOZI FRAMEWORK]
+You are a business growth coach who uses Alex Hormozi's frameworks from $100M Offers and $100M Leads.
 NEVER advise on: business structure, tax deductions, GST, BAS, employment law, contracts, accounting methods, business loans.
-For those topics: decline and refer to accountant, lawyer, BAS agent, or ato.gov.au / business.gov.au / fairwork.gov.au.
-YOU CAN: explain what numbers mean, calculate margins/runway/break-even, explain concepts neutrally, point to government resources.
+For those topics: decline and refer to accountant, BAS agent, ato.gov.au, business.gov.au.
+YOU DO help with: understanding metrics, offer strength, lead economics, LTV:CAC ratios, growth levers, pricing strategy, profit margins, and Hormozi frameworks.
+Be direct, specific, and actionable. Use Hormozi's language where relevant.
 
 Business: ${businessProfile.name || 'unnamed'} | ${businessProfile.type} | ${businessProfile.industry}
-Monthly revenue: $${totalRevenue.toFixed(0)} | expenses: $${totalExpenses.toFixed(0)} | profit: $${profit.toFixed(0)}
-Revenue: ${businessRevenue.map((r: any) => r.name + ' $' + r.amount + '/' + r.frequency).join(', ') || 'none'}
+Monthly Revenue: $${totalRevenue.toFixed(0)} | Expenses: $${totalExpenses.toFixed(0)} | Profit: $${profit.toFixed(0)} | Margin: ${margin.toFixed(1)}%
+Revenue streams: ${businessRevenue.map((r: any) => r.name + ' $' + r.amount + '/' + r.frequency).join(', ') || 'none'}
 Expenses: ${businessExpenses.map((e: any) => e.name + ' $' + e.amount + '/' + e.frequency).join(', ') || 'none'}
+CAC: $${bizLeads?.cac || 'not set'} | LTV: $${ltvVal > 0 ? ltvVal.toFixed(0) : 'not set'} | LTV:CAC: ${ltvCacVal > 0 ? ltvCacVal.toFixed(1) + 'x' : 'not set'}
+Monthly leads: ${bizLeads?.monthlyLeads || 'not set'} | Lead sources: ${bizLeads?.leadSource?.join(', ') || 'not set'}
+Conversion rate: ${bizOffer?.conversionRate || 'not set'}%
+Offer score: ${offerScoreVal}/100 | Dream outcome: ${bizOffer?.dreamOutcome || 'not defined'}
+Guarantee: ${bizOffer?.guarantee || 'none'} | Price: $${bizOffer?.price || 'not set'} | Competitors charge: $${bizOffer?.competitors || 'not set'}
 
 User: "${message}"`,
           financialData: {}, memory: budgetMemory, countryConfig: currentCountryConfig
@@ -8844,18 +8858,37 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
 
         {/* ==================== BUSINESS HUB TAB ==================== */}
         {activeTab === 'business' && (() => {
-          const monthlyRev = businessRevenue.reduce((s: number, r: any) => s + parseFloat(r.amount || '0') * (r.frequency === 'weekly' ? 52 : r.frequency === 'fortnightly' ? 26 : 12) / 12, 0)
-          const monthlyExp = businessExpenses.reduce((s: number, e: any) => s + parseFloat(e.amount || '0') * (e.frequency === 'weekly' ? 52 : e.frequency === 'fortnightly' ? 26 : 12) / 12, 0)
+          const monthlyRev = businessRevenue.reduce((s: number, r: any) => s + parseFloat(r.amount || '0') * (r.frequency === 'weekly' ? 52 : r.frequency === 'fortnightly' ? 26 : r.frequency === 'quarterly' ? 4 : r.frequency === 'yearly' ? 1 : 12) / 12, 0)
+          const monthlyExp = businessExpenses.reduce((s: number, e: any) => s + parseFloat(e.amount || '0') * (e.frequency === 'weekly' ? 52 : e.frequency === 'fortnightly' ? 26 : e.frequency === 'quarterly' ? 4 : e.frequency === 'yearly' ? 1 : 12) / 12, 0)
           const monthlyProfit = monthlyRev - monthlyExp
           const profitMargin = monthlyRev > 0 ? (monthlyProfit / monthlyRev * 100) : 0
           const annualRev = monthlyRev * 12
-          const runway = monthlyExp > 0 ? (businessGoals.reduce((s: number, g: any) => s + parseFloat(g.current || '0'), 0) / monthlyExp).toFixed(1) : '∞'
+
+          // Hormozi metrics
+          const cac = parseFloat(bizLeads?.cac || '0')
+          const ltv = parseFloat(bizLeads?.ltv || '0') ||
+            (parseFloat(bizLeads?.avgTransactionValue || '0') * parseFloat(bizLeads?.purchasesPerYear || '0') * parseFloat(bizLeads?.avgCustomerLifeYears || '0'))
+          const ltvCacRatio = cac > 0 && ltv > 0 ? ltv / cac : 0
+          const monthlyLeads = parseFloat(bizLeads?.monthlyLeads || '0')
+          const convRate = parseFloat(bizOffer?.conversionRate || '0') / 100
+          const newCustomers = Math.round(monthlyLeads * convRate)
+          const revenuePerLead = monthlyLeads > 0 ? monthlyRev / monthlyLeads : 0
+
+          // Offer scorecard (Hormozi value equation)
+          const offerScore = bizOffer ? Math.round(
+            ((bizOffer.dreamOutcome ? 1 : 0) * 20) +
+            (bizOffer.likelihood / 10 * 20) +
+            (bizOffer.timeDelay / 10 * 20) +
+            (bizOffer.effort / 10 * 20) +
+            (bizOffer.guarantee ? 20 : 0)
+          ) : 0
 
           const COMPLIANCE_DISCLAIMER = (
-            <div style={{ padding: '10px 14px', background: theme.bg, borderRadius: '8px', border: '1px solid ' + theme.border, fontSize: '11px', color: theme.textMuted, lineHeight: 1.6, marginBottom: '12px' }}>
-              <strong style={{ color: theme.text }}>Aureus Business Hub is a tracking tool, not a business adviser.</strong> It cannot give advice on business structure, tax, GST, employment law, or accounting. For those, speak with a registered accountant, BAS agent, or lawyer.
-              {' '}<a href="https://business.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>business.gov.au</a>
-              {' · '}<a href="https://ato.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>ato.gov.au</a>
+            <div style={{ padding: '10px 14px', background: theme.bg, borderRadius: '8px', border: '1px solid ' + theme.border, fontSize: '11px', color: theme.textMuted, lineHeight: 1.6, marginBottom: '4px' }}>
+              <strong style={{ color: theme.text }}>Aureus Business Hub is a tracking tool, not a business adviser.</strong> It cannot give advice on business structure, tax, GST, employment law, or accounting. For those, speak with a registered accountant, BAS agent, or lawyer.{' '}
+              <a href="https://business.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>business.gov.au</a>
+              {' · '}
+              <a href="https://ato.gov.au" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>ato.gov.au</a>
             </div>
           )
 
@@ -8871,6 +8904,13 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                       {businessProfile.name || 'Your Business'}
                     </div>
                     {businessProfile.abn && <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>ABN: {businessProfile.abn}</div>}
+                    {monthlyRev > 0 && (
+                      <div style={{ marginTop: '8px', display: 'flex', gap: '16px', flexWrap: 'wrap' as const }}>
+                        <span style={{ color: theme.success, fontSize: '13px', fontWeight: 700 }}>${monthlyRev.toFixed(0)}/mo revenue</span>
+                        <span style={{ color: monthlyProfit >= 0 ? theme.accent : theme.danger, fontSize: '13px', fontWeight: 700 }}>${monthlyProfit.toFixed(0)}/mo profit</span>
+                        {profitMargin > 0 && <span style={{ color: theme.textMuted, fontSize: '13px' }}>{profitMargin.toFixed(0)}% margin</span>}
+                      </div>
+                    )}
                   </div>
                   <button onClick={() => setShowBizSetup(true)} style={{ padding: '8px 14px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px' }}>
                     {businessProfile.name ? 'Edit →' : '+ Setup'}
@@ -8879,10 +8919,18 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
               </div>
 
               {/* Sub-tabs */}
-              <div style={{ display: 'flex', gap: '6px', background: theme.bg, padding: '4px', borderRadius: '12px' }}>
-                {([['dashboard','📊 Dashboard'],['revenue','💰 Revenue'],['expenses','💸 Expenses'],['goals','🎯 Goals'],['coach','💬 Coach']] as const).map(([id, label]) => (
-                  <button key={id} onClick={() => setBizTab(id)}
-                    style={{ flex: 1, padding: '8px 4px', background: bizTab === id ? theme.cardBg : 'transparent', border: bizTab === id ? '1px solid ' + theme.border : 'none', borderRadius: '8px', color: bizTab === id ? theme.text : theme.textMuted, cursor: 'pointer', fontSize: '11px', fontWeight: bizTab === id ? 700 : 400 }}>
+              <div style={{ display: 'flex', gap: '4px', background: theme.bg, padding: '4px', borderRadius: '12px', overflowX: 'auto' as const }}>
+                {([
+                  ['dashboard','📊 Dashboard'],
+                  ['revenue','💰 Revenue'],
+                  ['expenses','💸 Expenses'],
+                  ['offer','🎯 Offer'],
+                  ['leads','📈 Leads'],
+                  ['goals','🏆 Goals'],
+                  ['coach','💬 Coach'],
+                ] as const).map(([id, label]) => (
+                  <button key={id} onClick={() => setBizTab(id as any)}
+                    style={{ flex: '0 0 auto', padding: '8px 10px', background: bizTab === id ? theme.cardBg : 'transparent', border: bizTab === id ? '1px solid ' + theme.border : 'none', borderRadius: '8px', color: bizTab === id ? theme.text : theme.textMuted, cursor: 'pointer', fontSize: '11px', fontWeight: bizTab === id ? 700 : 400, whiteSpace: 'nowrap' as const }}>
                     {label}
                   </button>
                 ))}
@@ -8893,13 +8941,13 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
                   {COMPLIANCE_DISCLAIMER}
 
-                  {/* KPI cards */}
+                  {/* Core KPIs */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     {[
                       { label: 'MONTHLY REVENUE', value: '$' + monthlyRev.toLocaleString('en-AU', {maximumFractionDigits:0}), color: theme.success, sub: '$' + (annualRev).toLocaleString('en-AU', {maximumFractionDigits:0}) + '/yr' },
                       { label: 'MONTHLY EXPENSES', value: '$' + monthlyExp.toLocaleString('en-AU', {maximumFractionDigits:0}), color: theme.danger, sub: '$' + (monthlyExp*12).toLocaleString('en-AU', {maximumFractionDigits:0}) + '/yr' },
                       { label: 'MONTHLY PROFIT', value: '$' + monthlyProfit.toLocaleString('en-AU', {maximumFractionDigits:0}), color: monthlyProfit >= 0 ? theme.accent : theme.danger, sub: profitMargin.toFixed(1) + '% margin' },
-                      { label: 'EXPENSE RATIO', value: monthlyRev > 0 ? (monthlyExp/monthlyRev*100).toFixed(0) + '%' : '—', color: theme.textMuted, sub: 'of revenue' },
+                      { label: 'PROFIT PER HOUR', value: monthlyProfit > 0 ? '$' + (monthlyProfit / 160).toFixed(0) : '—', color: theme.accent, sub: 'based on 160hrs/mo' },
                     ].map((kpi, i) => (
                       <div key={i} style={{ padding: '14px 16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
                         <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, letterSpacing: '1px', marginBottom: '6px' }}>{kpi.label}</div>
@@ -8907,6 +8955,118 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                         <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '2px' }}>{kpi.sub}</div>
                       </div>
                     ))}
+                  </div>
+
+                  {/* Hormozi LTV:CAC */}
+                  {ltv > 0 && cac > 0 && (
+                    <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + (ltvCacRatio >= 3 ? theme.success : theme.danger) + '60' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>⚡ HORMOZI PROFIT ENGINE</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                        <div style={{ textAlign: 'center' as const }}>
+                          <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '4px' }}>COST TO ACQUIRE</div>
+                          <div style={{ color: theme.danger, fontSize: '20px', fontWeight: 800 }}>${cac.toFixed(0)}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '10px' }}>per customer</div>
+                        </div>
+                        <div style={{ textAlign: 'center' as const }}>
+                          <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '4px' }}>LIFETIME VALUE</div>
+                          <div style={{ color: theme.success, fontSize: '20px', fontWeight: 800 }}>${ltv.toFixed(0)}</div>
+                          <div style={{ color: theme.textMuted, fontSize: '10px' }}>per customer</div>
+                        </div>
+                        <div style={{ textAlign: 'center' as const }}>
+                          <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '4px' }}>LTV:CAC RATIO</div>
+                          <div style={{ color: ltvCacRatio >= 3 ? theme.success : ltvCacRatio >= 1 ? theme.accent : theme.danger, fontSize: '20px', fontWeight: 800 }}>{ltvCacRatio.toFixed(1)}x</div>
+                          <div style={{ color: theme.textMuted, fontSize: '10px' }}>target: 3x+</div>
+                        </div>
+                      </div>
+                      <div style={{ padding: '10px 14px', borderRadius: '8px', background: ltvCacRatio >= 3 ? theme.success + '12' : ltvCacRatio >= 1 ? theme.accent + '12' : theme.danger + '12', border: '1px solid ' + (ltvCacRatio >= 3 ? theme.success : ltvCacRatio >= 1 ? theme.accent : theme.danger) + '30' }}>
+                        <div style={{ color: ltvCacRatio >= 3 ? theme.success : ltvCacRatio >= 1 ? theme.accent : theme.danger, fontSize: '12px', lineHeight: 1.5 }}>
+                          {ltvCacRatio >= 3
+                            ? `✅ Strong unit economics. For every $1 spent acquiring customers, you get $${ltvCacRatio.toFixed(1)} back. Scale this.`
+                            : ltvCacRatio >= 1
+                            ? `⚠️ Profitable but thin. Hormozi's target is 3:1+. Increase LTV (charge more, sell more often) or reduce CAC.`
+                            : `🔴 Losing money on acquisition. You spend $${cac.toFixed(0)} to get a customer worth $${ltv.toFixed(0)}. Fix before scaling.`}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lead funnel */}
+                  {monthlyLeads > 0 && (
+                    <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>📈 LEAD FUNNEL</div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+                        {[
+                          { label: 'Leads/mo', value: monthlyLeads.toFixed(0), color: theme.text },
+                          { label: '→', value: '', color: theme.textMuted },
+                          { label: 'Conv. rate', value: (convRate * 100).toFixed(0) + '%', color: theme.accent },
+                          { label: '→', value: '', color: theme.textMuted },
+                          { label: 'New customers', value: newCustomers.toFixed(0), color: theme.success },
+                        ].map((item, i) => (
+                          <div key={i} style={{ textAlign: 'center' as const, flex: item.label === '→' ? '0' : '1' }}>
+                            {item.label !== '→' && <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '4px' }}>{item.label}</div>}
+                            <div style={{ color: item.color, fontSize: item.label === '→' ? '16px' : '18px', fontWeight: item.label === '→' ? 400 : 800 }}>{item.label === '→' ? '→' : item.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {revenuePerLead > 0 && (
+                        <div style={{ padding: '8px 12px', background: theme.accent + '10', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: theme.textMuted, fontSize: '12px' }}>Revenue per lead</span>
+                          <span style={{ color: theme.accent, fontWeight: 700, fontSize: '14px' }}>${revenuePerLead.toFixed(0)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Hormozi 3 growth levers */}
+                  <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>🚀 HORMOZI'S 3 WAYS TO GROW</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '12px' }}>Pick your primary lever. Don't do all three at once.</div>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                      {[
+                        {
+                          key: 'customers' as const,
+                          icon: '👥',
+                          title: 'More Customers',
+                          desc: 'Increase lead flow and conversion rate',
+                          impact: monthlyLeads > 0 ? `+10 leads/mo = +${(10 * convRate * (ltv || monthlyRev / Math.max(1, newCustomers))).toFixed(0)} revenue` : 'Track leads to see impact',
+                          action: 'Go to Leads tab →',
+                        },
+                        {
+                          key: 'price' as const,
+                          icon: '💲',
+                          title: 'Higher Price',
+                          desc: 'Increase price — highest leverage move with zero extra cost',
+                          impact: monthlyRev > 0 ? `+10% price = +$${(monthlyRev * 0.1).toFixed(0)}/mo profit` : 'Add revenue to see impact',
+                          action: 'Go to Offer tab →',
+                        },
+                        {
+                          key: 'frequency' as const,
+                          icon: '🔁',
+                          title: 'More Purchases',
+                          desc: 'Sell to existing customers more often — cheapest growth',
+                          impact: ltv > 0 && cac > 0 ? `LTV $${ltv.toFixed(0)} vs CAC $${cac.toFixed(0)} — ${ltv > cac * 3 ? 'great ratio' : 'increase LTV'}` : 'Track LTV to see impact',
+                          action: 'Go to Leads tab →',
+                        },
+                      ].map(lever => (
+                        <div key={lever.key}
+                          onClick={() => setBizGrowthFocus(bizGrowthFocus === lever.key ? null : lever.key)}
+                          style={{ padding: '12px 14px', background: bizGrowthFocus === lever.key ? theme.accent + '15' : theme.bg, borderRadius: '10px', border: '1px solid ' + (bizGrowthFocus === lever.key ? theme.accent : theme.border), cursor: 'pointer' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flex: 1 }}>
+                              <span style={{ fontSize: '18px' }}>{lever.icon}</span>
+                              <div>
+                                <div style={{ color: bizGrowthFocus === lever.key ? theme.accent : theme.text, fontWeight: 700, fontSize: '13px', marginBottom: '2px' }}>{lever.title}</div>
+                                <div style={{ color: theme.textMuted, fontSize: '12px', lineHeight: 1.4, marginBottom: '4px' }}>{lever.desc}</div>
+                                <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 600 }}>{lever.impact}</div>
+                              </div>
+                            </div>
+                            {bizGrowthFocus === lever.key && (
+                              <span style={{ color: theme.accent, fontSize: '11px', whiteSpace: 'nowrap' as const, marginLeft: '8px' }}>{lever.action}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   {/* P&L bar */}
@@ -8929,13 +9089,13 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                     <div style={{ padding: '14px 18px', background: theme.accent + '08', borderRadius: '12px', border: '1px solid ' + theme.accent + '25' }}>
                       <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '6px' }}>💼 → 🏛️ BUSINESS TO PERSONAL</div>
                       <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.6 }}>
-                        Your business is generating <strong style={{ color: theme.accent }}>${monthlyProfit.toFixed(0)}/month</strong> profit.
-                        Consider how much to transfer to your personal budget for living expenses vs reinvesting in the business.
+                        Your business generates <strong style={{ color: theme.accent }}>${monthlyProfit.toFixed(0)}/month</strong> profit.
+                        Consider how much to transfer to your personal budget vs reinvesting in the business.
                       </div>
                     </div>
                   )}
 
-                  {/* Resource links */}
+                  {/* Official resources */}
                   <div style={{ padding: '14px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
                     <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '10px' }}>🔗 OFFICIAL RESOURCES</div>
                     <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
@@ -9078,13 +9238,244 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 </div>
               )}
 
+              {/* ── OFFER SCORECARD ── */}
+              {bizTab === 'offer' && (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+                  {/* Score header */}
+                  <div style={{ padding: '20px', background: 'linear-gradient(135deg, #111820, #111111)', borderRadius: '14px', border: '1px solid ' + theme.accent + '30', textAlign: 'center' as const }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '2px', marginBottom: '8px' }}>🎯 OFFER SCORECARD</div>
+                    <div style={{ color: offerScore >= 80 ? theme.success : offerScore >= 50 ? theme.accent : theme.danger, fontSize: '52px', fontWeight: 900, lineHeight: 1 }}>{offerScore}</div>
+                    <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>out of 100</div>
+                    <div style={{ color: offerScore >= 80 ? theme.success : offerScore >= 50 ? theme.accent : theme.danger, fontSize: '13px', fontWeight: 700, marginTop: '6px' }}>
+                      {offerScore >= 80 ? '🔥 Grand Slam Offer territory' : offerScore >= 60 ? '⚡ Strong offer — sharpen the edges' : offerScore >= 40 ? '⚠️ Decent foundation — needs work' : '🔴 Weak offer — buyers will hesitate'}
+                    </div>
+                  </div>
+
+                  {/* Dream outcome */}
+                  <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>DREAM OUTCOME</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '8px' }}>What transformation do you deliver? Be specific. "Lose 10kg in 6 weeks" beats "get healthy".</div>
+                    <input
+                      placeholder='e.g. "Get 10 qualified leads/mo guaranteed or your money back"'
+                      value={bizOffer?.dreamOutcome || ''}
+                      onChange={e => setBizOffer(p => ({...p, dreamOutcome: e.target.value}))}
+                      style={{...inputStyle, width: '100%'}}
+                    />
+                    {bizOffer?.dreamOutcome && (
+                      <div style={{ marginTop: '8px', padding: '8px 12px', background: theme.success + '10', borderRadius: '8px', color: theme.success, fontSize: '12px' }}>
+                        ✅ Defined. Now make sure your pricing reflects this value.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Value equation sliders */}
+                  <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>HORMOZI VALUE EQUATION</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '14px' }}>Value = (Dream Outcome × Likelihood) ÷ (Time Delay × Effort). Maximise top, minimise bottom.</div>
+                    {[
+                      { key: 'likelihood' as const, label: 'Perceived Likelihood of Success', low: 'Uncertain', high: 'Guaranteed', tip: 'Add case studies, testimonials, guarantees' },
+                      { key: 'timeDelay' as const, label: 'Speed to Result', low: 'Slow (months)', high: 'Fast (days)', tip: 'What quick win can you deliver in week 1?' },
+                      { key: 'effort' as const, label: 'Ease for the Customer', low: 'Hard work', high: 'Done for them', tip: 'Remove friction. Do more of the work yourself.' },
+                    ].map(slider => (
+                      <div key={slider.key} style={{ marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <span style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>{slider.label}</span>
+                          <span style={{ color: theme.accent, fontWeight: 800, fontSize: '14px' }}>{bizOffer?.[slider.key] || 5}/10</span>
+                        </div>
+                        <input type="range" min="1" max="10" value={bizOffer?.[slider.key] || 5}
+                          onChange={e => setBizOffer(p => ({...p, [slider.key]: parseInt(e.target.value)}))}
+                          style={{ width: '100%', accentColor: '#D4AF37' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: theme.textMuted, marginTop: '2px' }}>
+                          <span>{slider.low}</span>
+                          <span>{slider.high}</span>
+                        </div>
+                        {(bizOffer?.[slider.key] || 5) < 6 && (
+                          <div style={{ marginTop: '6px', padding: '6px 10px', background: theme.accent + '10', borderRadius: '6px', color: theme.accent, fontSize: '11px' }}>
+                            💡 {slider.tip}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pricing */}
+                  <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>PRICING</div>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Your price</div>
+                        <input type="number" placeholder="$0" value={bizOffer?.price || ''}
+                          onChange={e => setBizOffer(p => ({...p, price: e.target.value}))}
+                          style={{...inputStyle, width: '100%'}} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Competitors charge</div>
+                        <input type="number" placeholder="$0" value={bizOffer?.competitors || ''}
+                          onChange={e => setBizOffer(p => ({...p, competitors: e.target.value}))}
+                          style={{...inputStyle, width: '100%'}} />
+                      </div>
+                    </div>
+                    {bizOffer?.price && bizOffer?.competitors && (
+                      <div style={{ padding: '10px 14px', borderRadius: '8px', background: parseFloat(bizOffer.price) > parseFloat(bizOffer.competitors) ? theme.success + '12' : theme.accent + '12', border: '1px solid ' + (parseFloat(bizOffer.price) > parseFloat(bizOffer.competitors) ? theme.success : theme.accent) + '30' }}>
+                        <div style={{ color: parseFloat(bizOffer.price) > parseFloat(bizOffer.competitors) ? theme.success : theme.accent, fontSize: '12px' }}>
+                          {parseFloat(bizOffer.price) > parseFloat(bizOffer.competitors)
+                            ? `✅ You charge ${((parseFloat(bizOffer.price) / parseFloat(bizOffer.competitors) - 1) * 100).toFixed(0)}% more than competitors. Make sure your offer justifies it.`
+                            : `⚠️ You're cheaper than competitors. Hormozi says: don't compete on price — compete on value. Consider raising prices.`}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Guarantee */}
+                  <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>GUARANTEE</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '8px' }}>Hormozi: "The strength of your guarantee is proportional to how much you believe in your product." A strong guarantee removes risk from the buyer and transfers it to you.</div>
+                    <input
+                      placeholder='e.g. "If you don&apos;t get 10 leads in 90 days, I work free until you do"'
+                      value={bizOffer?.guarantee || ''}
+                      onChange={e => setBizOffer(p => ({...p, guarantee: e.target.value}))}
+                      style={{...inputStyle, width: '100%'}}
+                    />
+                    {!bizOffer?.guarantee && (
+                      <div style={{ marginTop: '8px', padding: '8px 12px', background: theme.danger + '10', borderRadius: '8px', color: theme.danger, fontSize: '12px' }}>
+                        🔴 No guarantee = higher perceived risk for buyer = lower conversion rate
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Conversion rate */}
+                  <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>CONVERSION RATE</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <input type="number" placeholder="%" min="0" max="100" value={bizOffer?.conversionRate || ''}
+                        onChange={e => setBizOffer(p => ({...p, conversionRate: e.target.value}))}
+                        style={{...inputStyle, width: '80px'}} />
+                      <div style={{ color: theme.textMuted, fontSize: '13px' }}>% of leads become customers</div>
+                    </div>
+                    {bizOffer?.conversionRate && (
+                      <div style={{ marginTop: '8px', color: parseFloat(bizOffer.conversionRate) >= 20 ? theme.success : parseFloat(bizOffer.conversionRate) >= 10 ? theme.accent : theme.danger, fontSize: '12px' }}>
+                        {parseFloat(bizOffer.conversionRate) >= 20 ? '✅ Strong conversion. Offer is resonating.' : parseFloat(bizOffer.conversionRate) >= 10 ? '⚠️ Room to improve. Test your guarantee and pricing.' : '🔴 Low conversion. The offer needs a rework or you\'re targeting the wrong people.'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ── LEADS TAB ── */}
+              {bizTab === 'leads' && (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+
+                  {/* Lead volume */}
+                  <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>📥 LEAD VOLUME</div>
+                    <div style={{ flex: 1, marginBottom: '12px' }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '4px' }}>Leads per month</div>
+                      <input type="number" placeholder="0" value={bizLeads?.monthlyLeads || ''}
+                        onChange={e => setBizLeads(p => ({...p, monthlyLeads: e.target.value}))}
+                        style={{...inputStyle, width: '100%'}} />
+                    </div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>LEAD SOURCES (select all that apply)</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '6px' }}>
+                      {['Referrals', 'Instagram', 'Facebook', 'Google', 'LinkedIn', 'Cold outreach', 'Word of mouth', 'Events', 'Content/SEO', 'Ads', 'Other'].map(source => {
+                        const active = bizLeads?.leadSource?.includes(source)
+                        return (
+                          <button key={source}
+                            onClick={() => setBizLeads(p => ({
+                              ...p,
+                              leadSource: active
+                                ? (p.leadSource || []).filter((s: string) => s !== source)
+                                : [...(p.leadSource || []), source]
+                            }))}
+                            style={{ padding: '6px 12px', background: active ? theme.accent + '20' : theme.bg, border: '1px solid ' + (active ? theme.accent : theme.border), borderRadius: '20px', color: active ? theme.accent : theme.textMuted, cursor: 'pointer', fontSize: '12px', fontWeight: active ? 700 : 400 }}>
+                            {source}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {bizLeads?.leadSource?.length > 0 && bizLeads?.leadSource?.length < 3 && (
+                      <div style={{ marginTop: '10px', padding: '8px 12px', background: theme.accent + '10', borderRadius: '8px', color: theme.accent, fontSize: '12px' }}>
+                        💡 Hormozi: "One channel is fragile. Two is a business. Three is a machine." Add more lead sources.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CAC */}
+                  <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>💸 CUSTOMER ACQUISITION COST (CAC)</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '12px' }}>Total monthly marketing spend ÷ new customers acquired. Hormozi's rule: your LTV must be 3x+ your CAC.</div>
+                    <input type="number" placeholder="$ cost per customer acquired"
+                      value={bizLeads?.cac || ''}
+                      onChange={e => setBizLeads(p => ({...p, cac: e.target.value}))}
+                      style={{...inputStyle, width: '100%'}} />
+                  </div>
+
+                  {/* LTV */}
+                  <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>💰 LIFETIME VALUE (LTV)</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '12px' }}>Enter directly or calculate below: Avg transaction × purchases per year × avg customer life in years.</div>
+                    <input type="number" placeholder="$ total value of one customer" value={bizLeads?.ltv || ''}
+                      onChange={e => setBizLeads(p => ({...p, ltv: e.target.value}))}
+                      style={{...inputStyle, width: '100%', marginBottom: '8px'}} />
+                    <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, marginBottom: '8px' }}>OR CALCULATE:</div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '3px' }}>Avg transaction $</div>
+                        <input type="number" placeholder="$" value={bizLeads?.avgTransactionValue || ''}
+                          onChange={e => setBizLeads(p => ({...p, avgTransactionValue: e.target.value}))}
+                          style={{...inputStyle, width: '100%'}} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '3px' }}>Purchases/year</div>
+                        <input type="number" placeholder="×" value={bizLeads?.purchasesPerYear || ''}
+                          onChange={e => setBizLeads(p => ({...p, purchasesPerYear: e.target.value}))}
+                          style={{...inputStyle, width: '100%'}} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: theme.textMuted, fontSize: '10px', marginBottom: '3px' }}>Years as customer</div>
+                        <input type="number" placeholder="×" value={bizLeads?.avgCustomerLifeYears || ''}
+                          onChange={e => setBizLeads(p => ({...p, avgCustomerLifeYears: e.target.value}))}
+                          style={{...inputStyle, width: '100%'}} />
+                      </div>
+                    </div>
+                    {bizLeads?.avgTransactionValue && bizLeads?.purchasesPerYear && bizLeads?.avgCustomerLifeYears && (
+                      <div style={{ marginTop: '10px', padding: '10px 14px', background: theme.success + '12', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: theme.textMuted, fontSize: '13px' }}>Calculated LTV</span>
+                        <span style={{ color: theme.success, fontWeight: 800, fontSize: '16px' }}>
+                          ${(parseFloat(bizLeads.avgTransactionValue) * parseFloat(bizLeads.purchasesPerYear) * parseFloat(bizLeads.avgCustomerLifeYears)).toFixed(0)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* LTV:CAC summary */}
+                  {ltv > 0 && cac > 0 && (
+                    <div style={{ padding: '16px 18px', background: ltvCacRatio >= 3 ? theme.success + '10' : theme.danger + '10', borderRadius: '12px', border: '1px solid ' + (ltvCacRatio >= 3 ? theme.success : theme.danger) + '40' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ color: theme.text, fontWeight: 700, fontSize: '14px' }}>LTV:CAC Ratio</span>
+                        <span style={{ color: ltvCacRatio >= 3 ? theme.success : ltvCacRatio >= 1 ? theme.accent : theme.danger, fontWeight: 900, fontSize: '24px' }}>{ltvCacRatio.toFixed(1)}x</span>
+                      </div>
+                      <div style={{ height: '8px', background: theme.border, borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                        <div style={{ width: Math.min(100, ltvCacRatio / 5 * 100) + '%', height: '100%', background: ltvCacRatio >= 3 ? 'linear-gradient(90deg, #27ae60, #2ecc71)' : 'linear-gradient(90deg, #D4AF37, #BC6A1F)', borderRadius: '4px' }} />
+                      </div>
+                      <div style={{ color: ltvCacRatio >= 3 ? theme.success : ltvCacRatio >= 1 ? theme.accent : theme.danger, fontSize: '12px', lineHeight: 1.5 }}>
+                        {ltvCacRatio >= 3
+                          ? `✅ Excellent. You make $${ltv.toFixed(0)} per customer and spend $${cac.toFixed(0)} to get them. Scale your ad spend.`
+                          : ltvCacRatio >= 1
+                          ? `⚠️ You're profitable but need to improve. Increase LTV or reduce CAC to hit 3:1.`
+                          : `🔴 Burning money. Either increase prices, get more repeat purchases, or cut acquisition costs.`}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ── GOALS ── */}
               {bizTab === 'goals' && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
                   <div style={{ padding: '14px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
                     <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>+ ADD BUSINESS GOAL</div>
                     <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                      <input placeholder="Goal name (e.g. Monthly revenue target, Emergency fund)" value={newBizGoal.name} onChange={e => setNewBizGoal(p => ({...p, name: e.target.value}))} style={{...inputStyle, width:'100%'}} />
+                      <input placeholder="Goal name (e.g. $10k/month revenue, 50 customers)" value={newBizGoal.name} onChange={e => setNewBizGoal(p => ({...p, name: e.target.value}))} style={{...inputStyle, width:'100%'}} />
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <input type="number" placeholder="Target $" value={newBizGoal.target} onChange={e => setNewBizGoal(p => ({...p, target: e.target.value}))} style={{...inputStyle, flex: 1}} />
                         <input type="number" placeholder="Current $" value={newBizGoal.current} onChange={e => setNewBizGoal(p => ({...p, current: e.target.value}))} style={{...inputStyle, flex: 1}} />
@@ -9128,10 +9519,16 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                     <div style={{ flex: 1, overflowY: 'auto' as const, display: 'flex', flexDirection: 'column' as const, gap: '12px', paddingBottom: '12px' }}>
                       {bizChatMessages.length === 0 && (
                         <div style={{ padding: '16px', background: theme.bg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
-                          <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>🏢 Business numbers assistant</div>
-                          <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, margin: '0 0 12px' }}>I can help you understand your business numbers, explain metrics, and point you to the right resources. I can't give business structure, tax, or legal advice.</p>
+                          <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>⚡ Business Growth Coach</div>
+                          <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, margin: '0 0 12px' }}>Ask me about your numbers, margins, offer strength, lead economics, and growth strategy. I use Alex Hormozi's frameworks to diagnose your business. I can't give tax or legal advice.</p>
                           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
-                            {['What is my profit margin?', 'What does break-even mean for my business?', 'Where do I register my business in Australia?', 'What is a BAS agent?'].map(q => (
+                            {[
+                              'What does my LTV:CAC ratio mean?',
+                              'How do I make my offer stronger?',
+                              'What is my biggest growth lever right now?',
+                              'What is a Grand Slam Offer?',
+                              'How do I increase my profit margin?',
+                            ].map(q => (
                               <button key={q} onClick={() => handleBizChat(q)}
                                 style={{ padding: '8px 12px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '12px', textAlign: 'left' as const }}>
                                 {q} →
@@ -9157,7 +9554,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                     <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '1px solid ' + theme.border }}>
                       <input value={bizChatInput} onChange={e => setBizChatInput(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter' && bizChatInput.trim() && !bizChatLoading) handleBizChat(bizChatInput) }}
-                        placeholder="Ask about your business numbers..."
+                        placeholder="Ask about growth, margins, offers, leads..."
                         style={{ ...inputStyle, flex: 1, fontSize: '14px' }} />
                       <button onClick={() => { if (bizChatInput.trim() && !bizChatLoading) handleBizChat(bizChatInput) }}
                         disabled={!bizChatInput.trim() || bizChatLoading}
