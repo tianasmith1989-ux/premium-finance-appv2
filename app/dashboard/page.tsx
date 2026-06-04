@@ -2434,12 +2434,36 @@ User: "${message}"`,
   // ── Load Calendly widget when booking tab is opened ──
   useEffect(() => {
     if (showSupport && supportTab === 'book') {
-      if (!document.getElementById('calendly-script')) {
-        const script = document.createElement('script')
-        script.id = 'calendly-script'
-        script.src = 'https://assets.calendly.com/assets/external/widget.js'
-        script.async = true
-        document.head.appendChild(script)
+      const initCalendly = () => {
+        const el = document.getElementById('calendly-inline')
+        if (el && (window as any).Calendly) {
+          el.innerHTML = ''
+          ;(window as any).Calendly.initInlineWidget({
+            url: 'https://calendly.com/tiana-aureusplutus/30min',
+            parentElement: el,
+            prefill: {},
+            utm: {}
+          })
+        }
+      }
+      if (!(window as any).Calendly) {
+        if (!document.getElementById('calendly-css')) {
+          const link = document.createElement('link')
+          link.id = 'calendly-css'
+          link.rel = 'stylesheet'
+          link.href = 'https://assets.calendly.com/assets/external/widget.css'
+          document.head.appendChild(link)
+        }
+        if (!document.getElementById('calendly-script')) {
+          const script = document.createElement('script')
+          script.id = 'calendly-script'
+          script.src = 'https://assets.calendly.com/assets/external/widget.js'
+          script.async = true
+          script.onload = () => setTimeout(initCalendly, 300)
+          document.head.appendChild(script)
+        }
+      } else {
+        setTimeout(initCalendly, 100)
       }
     }
   }, [showSupport, supportTab])
@@ -5335,7 +5359,9 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 <div style={{ padding: '16px 20px', color: theme.textMuted, fontSize: '13px', lineHeight: 1.6 }}>
                   Book a 30-minute call to get personal help setting up Aureus for your situation.
                 </div>
-                <div id="calendly-inline" style={{ flex: 1, minHeight: '500px' }}></div>
+                <div id="calendly-inline" style={{ flex: 1, minHeight: '600px', width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#666', fontSize: '13px' }}>Loading booking calendar...</div>
+                </div>
               </div>
             )}
             {/* Help guide link */}
