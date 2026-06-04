@@ -2272,6 +2272,24 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
     if (onboardingComplete && authUser) saveToCloud()
   }, [onboardingComplete])
 
+  // ── Logout — clears local data and signs out of Supabase ──
+  const handleLogout = async () => {
+    try {
+      // Save to cloud first so no data is lost
+      if (authUser) await saveToCloud()
+      // Sign out of Supabase
+      const sb = await getSb()
+      await sb.auth.signOut()
+    } catch {}
+    // Clear ALL local data so the next user starts fresh
+    localStorage.removeItem('aureus_data')
+    localStorage.removeItem('aureus_business')
+    localStorage.removeItem('aureus_user_token')
+    localStorage.removeItem('aureus_last_user_id')
+    // Reload the page for a completely clean state
+    window.location.reload()
+  }
+
   // ── Open Stripe Customer Portal ──
   const openCustomerPortal = async () => {
     setPortalLoading(true)
@@ -13565,6 +13583,12 @@ Tracking with Aureus 🏛️`
                 style={{ padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '15px', opacity: portalLoading ? 0.7 : 1 }}>
                 {portalLoading ? '⏳ Opening portal...' : 'Open Billing Portal →'}
               </button>
+              {authUser && (
+                <button onClick={handleLogout}
+                  style={{ padding: '12px', background: 'none', border: '1px solid ' + theme.danger + '40', color: theme.danger, borderRadius: '12px', cursor: 'pointer', fontSize: '14px' }}>
+                  🚪 Sign out of {authUser.email}
+                </button>
+              )}
               <button onClick={() => { setShowManageSub(false); setPortalError('') }}
                 style={{ padding: '12px', background: 'none', border: '1px solid ' + theme.border, color: theme.textMuted, borderRadius: '12px', cursor: 'pointer', fontSize: '14px' }}>
                 Cancel
@@ -13591,12 +13615,20 @@ Tracking with Aureus 🏛️`
             </a>
           ))}
         </div>
-        {(subStatus === 'active' || subStatus === 'trialing') && (
-          <button onClick={() => setShowManageSub(true)}
-            style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', padding: 0 }}>
-            Manage subscription / Cancel
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' as const }}>
+          {(subStatus === 'active' || subStatus === 'trialing') && (
+            <button onClick={() => setShowManageSub(true)}
+              style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', padding: 0 }}>
+              Manage subscription / Cancel
+            </button>
+          )}
+          {authUser && (
+            <button onClick={handleLogout}
+              style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', padding: 0 }}>
+              Sign out ({authUser.email})
+            </button>
+          )}
+        </div>
       </footer>
 
       <style>{`
