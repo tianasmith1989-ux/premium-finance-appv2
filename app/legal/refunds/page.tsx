@@ -37,6 +37,13 @@ export default function RefundsPage() {
           <li><strong>Major failure</strong> (for example, the Service has a problem that would have stopped you subscribing had you known about it, or it is substantially unfit for purpose and can't be easily fixed within a reasonable time): you can cancel and choose a <strong>refund</strong>, or keep the subscription and seek compensation for the drop in value.</li>
           <li><strong>Minor failure</strong> that can be fixed: we may choose to fix the problem within a reasonable time at no cost to you. If we don't, you can have it fixed elsewhere and recover reasonable costs, or cancel for a refund.</li>
         </ul>
+        <p><span className="clause-num">1.3</span> <strong>What "reasonable time" means for Aureus.</strong> We aim to resolve issues within the following timeframes, which we consider reasonable for a subscription service at this price point:</p>
+        <ul>
+          <li><strong>Critical issues</strong> (app completely inaccessible, inability to log in, data loss): <strong>48 hours</strong></li>
+          <li><strong>Major feature failures</strong> (core features not working, such as budgets not saving or AI coach not responding): <strong>3–5 business days</strong></li>
+          <li><strong>Minor issues</strong> (cosmetic bugs, minor feature misbehaviour): <strong>7–14 business days</strong></li>
+        </ul>
+        <p>If your issue is not resolved within the applicable timeframe, please contact us at <a href="mailto:support@aureusplutus.app">support@aureusplutus.app</a> and we will discuss your options, which may include a refund. These timeframes do not limit your rights under the ACL where a failure cannot be fixed within a reasonable time regardless of the above.</p>
         <div className="info-box"><strong>Nothing in this policy excludes, restricts or modifies your ACL rights.</strong> If anything in this policy is inconsistent with the ACL, the ACL prevails.</div>
 
         <h2>2. Change‑of‑mind cancellations</h2>
@@ -64,7 +71,7 @@ export default function RefundsPage() {
 
         <h2>6. How to request a refund</h2>
         <p><span className="clause-num">6.1</span> Contact us at <a href="mailto:support@aureusplutus.app">support@aureusplutus.app</a> with your account email, the charge date and amount, and a description of the issue. Where you are claiming a consumer‑guarantee failure, please tell us what went wrong so we can investigate.</p>
-        <p><span className="clause-num">6.2</span> We will respond within a reasonable time (we aim for <strong>5–10 business days</strong>). If a refund is due, we process it to your original payment method within a reasonable time after we approve it.</p>
+        <p><span className="clause-num">6.2</span> We will acknowledge your request within <strong>1–2 business days</strong> and aim to resolve it within <strong>5–10 business days</strong>. If a refund is due, we process it to your original payment method within a reasonable time after we approve it (typically 5–10 business days depending on your bank or payment provider).</p>
         <p><span className="clause-num">6.3</span> If you disagree with our decision, you may also seek assistance from the <strong>ACCC</strong> (<a href="https://www.accc.gov.au" target="_blank" rel="noopener noreferrer">www.accc.gov.au</a>) or your state or territory consumer protection agency.</p>
 
         <h2>7. Changes to this policy</h2>
