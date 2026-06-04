@@ -97,6 +97,7 @@ export default function Dashboard() {
   const [personalityAnswers, setPersonalityAnswers] = useState<{[key: number]: string}>({})
   const [userName, setUserName] = useState('')
   const [nameSubmitted, setNameSubmitted] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   // Identity Statements
   const [identityStatements, setIdentityStatements] = useState<string[]>([])
   const [showIdentityEditor, setShowIdentityEditor] = useState(false)
@@ -11921,9 +11922,18 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
                   <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', display: 'block', marginBottom: '4px' }}>
                     {showAuthModal === 'reset' ? 'NEW PASSWORD' : 'PASSWORD'}{showAuthModal === 'create' ? <span style={{ color: theme.textMuted, fontWeight: 400 }}> (min 8 characters)</span> : null}
                   </label>
-                  <input type="password" placeholder="••••••••" value={authPassword} onChange={e => setAuthPassword(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') showAuthModal === 'reset' ? handleResetPassword() : handleAuth(showAuthModal === 'create' ? 'signup' : 'login') }}
-                    style={{ ...inputStyle, width: '100%' }} autoFocus={showAuthModal === 'reset'} />
+                  <div style={{ position: 'relative' as const }}>
+                    <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={authPassword} onChange={e => setAuthPassword(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') showAuthModal === 'reset' ? handleResetPassword() : handleAuth(showAuthModal === 'create' ? 'signup' : 'login') }}
+                      style={{ ...inputStyle, width: '100%', paddingRight: '44px' }} autoFocus={showAuthModal === 'reset'} />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(p => !p)}
+                      style={{ position: 'absolute' as const, right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: theme.textMuted, fontSize: '16px', padding: '4px', lineHeight: 1 }}
+                      title={showPassword ? 'Hide password' : 'Show password'}>
+                      {showPassword ? '🙈' : '👁️'}
+                    </button>
+                  </div>
                 </div>
               )}
               {authError && (
@@ -13536,7 +13546,21 @@ Tracking with Aureus 🏛️`
 
       <footer style={{ padding: '16px 24px', background: theme.cardBg, borderTop: '1px solid ' + theme.border, textAlign: 'center' as const }}>
         <p style={{ margin: '0 0 4px 0', color: theme.textMuted, fontSize: '11px' }}>⚠️ Aureus is an AI assistant for general education only — not financial, tax, or legal advice. Always verify information and consult licensed professionals before making financial decisions.</p>
-        <p style={{ margin: '0 0 8px 0', color: theme.textMuted, fontSize: '10px' }}>© {new Date().getFullYear()} Aureus · Not affiliated with any financial institution · General information only</p>
+        <p style={{ margin: '0 0 6px 0', color: theme.textMuted, fontSize: '10px' }}>© {new Date().getFullYear()} Aureus Plutus ABN 32 306 872 259 · Not affiliated with any financial institution · General information only</p>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
+          {[
+            { label: 'Terms & Conditions', href: '/legal/terms' },
+            { label: 'Privacy Policy',     href: '/legal/privacy' },
+            { label: 'Subscription Terms', href: '/legal/subscription' },
+            { label: 'Refund Policy',      href: '/legal/refunds' },
+            { label: 'AI Disclaimer',      href: '/legal/ai-disclaimer' },
+          ].map(link => (
+            <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer"
+              style={{ color: theme.textMuted, fontSize: '10px', textDecoration: 'none', borderBottom: '1px solid ' + theme.border }}>
+              {link.label}
+            </a>
+          ))}
+        </div>
         {(subStatus === 'active' || subStatus === 'trialing') && (
           <button onClick={() => setShowManageSub(true)}
             style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', padding: 0 }}>
