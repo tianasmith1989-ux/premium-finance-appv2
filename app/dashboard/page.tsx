@@ -671,7 +671,18 @@ export default function Dashboard() {
     const saved = localStorage.getItem('aureus_data')
     if (saved) {
       const data = JSON.parse(saved)
-      // Safety check — if this data belongs to a different user, don't load it
+
+      // ── CRITICAL: Check if this data belongs to the current device user ──
+      // Store user ID inside the data object so we can detect device-sharing
+      const storedUserId = data._userId
+      const lastUserId = localStorage.getItem('aureus_last_user_id')
+      if (storedUserId && lastUserId && storedUserId !== lastUserId) {
+        // This data belongs to a different user — clear it and wait for cloud load
+        localStorage.removeItem('aureus_data')
+        localStorage.removeItem('aureus_business')
+        return
+      }
+
       if (data.incomeStreams) setIncomeStreams(data.incomeStreams)
       if (data.expenses) setExpenses(data.expenses)
       if (data.debts) setDebts(data.debts)
@@ -772,6 +783,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const data = {
+      _userId: localStorage.getItem('aureus_last_user_id') || '',
       incomeStreams, expenses, debts, goals, assets, liabilities,
       budgetMemory, paidOccurrences: Array.from(paidOccurrences), categoryBudgets, actualSpend,
       roadmapMilestones, budgetOnboarding, chatMessages, userCountry,
@@ -2272,13 +2284,15 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
         const { data } = await sb.auth.getSession()
         if (data.session?.user) {
           setAuthUser(data.session.user)
+          const currentUserId = data.session.user.id
           // If a different user was last logged in on this device, clear their local data
           const lastUserId = localStorage.getItem('aureus_last_user_id')
-          if (lastUserId && lastUserId !== data.session.user.id) {
+          if (lastUserId && lastUserId !== currentUserId) {
             localStorage.removeItem('aureus_data')
             localStorage.removeItem('aureus_business')
+            localStorage.removeItem('aureus_user_token')
           }
-          localStorage.setItem('aureus_last_user_id', data.session.user.id)
+          localStorage.setItem('aureus_last_user_id', currentUserId)
           const hasLocal = !!localStorage.getItem('aureus_data')
           if (!hasLocal) {
             const loaded = await loadFromCloud(data.session.user)
