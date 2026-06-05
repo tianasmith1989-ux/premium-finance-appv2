@@ -852,6 +852,55 @@ export default function Dashboard() {
     return () => clearTimeout(timer)
   }, [mortgageAccel.balance, mortgageAccel.rate, mortgageAccel.remainingYears, mortgageAccel.currentRepayment, mortgageAccel.extraRepayment, mortgageAccel.offsetBalance, mortgageAccel.repaymentFrequency])
 
+  // ── Dedicated onboarding progress save ──
+  // Fires immediately when any onboarding state changes so progress is never lost
+  useEffect(() => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('aureus_data') || '{}')
+      localStorage.setItem('aureus_data', JSON.stringify({
+        ...existing,
+        missionPhase, missionStep, missionComplete, missionNavLocked,
+        missionP2Step, missionP2Confirmed,
+        moneyPersonality, personalityAnswers,
+        deepWhyAnswers, deepWhyComplete,
+        fearAuditAnswers, fearAuditComplete,
+        onboardingComplete, userName,
+        houseStatus, fireGoal,
+        identityStatements, whyStatement,
+        coreValues, identityStatement, mustStatement, futureVision,
+      }))
+    } catch {}
+    // Also push to cloud after a short delay
+    const timer = setTimeout(() => { if (authUser) saveToCloud() }, 3000)
+    return () => clearTimeout(timer)
+  }, [
+    missionPhase, missionStep, missionComplete, missionNavLocked,
+    missionP2Step, missionP2Confirmed,
+    moneyPersonality, personalityAnswers,
+    deepWhyAnswers, deepWhyComplete,
+    fearAuditAnswers, fearAuditComplete,
+    onboardingComplete, userName,
+    houseStatus, fireGoal,
+    identityStatements, whyStatement,
+  ])
+
+  // ── Dedicated daily check-in save ──
+  useEffect(() => {
+    if (!lastDailyCheckIn) return
+    try {
+      const existing = JSON.parse(localStorage.getItem('aureus_data') || '{}')
+      localStorage.setItem('aureus_data', JSON.stringify({
+        ...existing,
+        lastDailyCheckIn,
+        dailyCheckInLog,
+        streak,
+        lastCheckIn,
+      }))
+    } catch {}
+    const timer = setTimeout(() => { if (authUser) saveToCloud() }, 2000)
+    return () => clearTimeout(timer)
+  }, [lastDailyCheckIn, dailyCheckInLog, streak, lastCheckIn])
+
   // Chat scroll
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
@@ -2194,10 +2243,26 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
       if (s.missionP2Confirmed?.length) setMissionP2Confirmed(s.missionP2Confirmed)
       if (s.wins?.length) setWins(s.wins)
       if (s.streak) setStreak(s.streak)
+      if (s.lastCheckIn) setLastCheckIn(s.lastCheckIn)
+      if (s.lastDailyCheckIn) setLastDailyCheckIn(s.lastDailyCheckIn)
+      if (s.dailyCheckInLog?.length) setDailyCheckInLog(s.dailyCheckInLog)
       if (s.coreValues?.length) setCoreValues(s.coreValues)
       if (s.identityStatement) setIdentityStatement(s.identityStatement)
       if (s.mustStatement) setMustStatement(s.mustStatement)
       if (s.futureVision) setFutureVision(s.futureVision)
+      if (s.whyStatement) setWhyStatement(s.whyStatement)
+      if (s.deepWhyAnswers) setDeepWhyAnswers(s.deepWhyAnswers)
+      if (s.deepWhyComplete !== undefined) setDeepWhyComplete(s.deepWhyComplete)
+      if (s.fearAuditAnswers) setFearAuditAnswers(s.fearAuditAnswers)
+      if (s.fearAuditComplete !== undefined) setFearAuditComplete(s.fearAuditComplete)
+      if (s.identityStatements?.length) setIdentityStatements(s.identityStatements)
+      if (s.missionNavLocked !== undefined) setMissionNavLocked(s.missionNavLocked)
+      if (s.missionP2Step) setMissionP2Step(s.missionP2Step)
+      if (s.missionP2Confirmed) setMissionP2Confirmed(s.missionP2Confirmed)
+      if (s.houseStatus) setHouseStatus(s.houseStatus)
+      if (s.fireGoal !== undefined) setFireGoal(s.fireGoal)
+      if (s.onboardingComplete) setOnboardingComplete(s.onboardingComplete)
+      if (s.userName) setUserName(s.userName)
       if (s.identityStatements?.length) setIdentityStatements(s.identityStatements)
       if (s.businessProfile) setBusinessProfile(s.businessProfile)
       if (s.businessRevenue?.length) setBusinessRevenue(s.businessRevenue)
