@@ -89,7 +89,7 @@ export default function Dashboard() {
   const [showModeSelector, setShowModeSelector] = useState(true)
 
   // ==================== MISSION SYSTEM ====================
-  const [missionPhase, setMissionPhase] = useState<1 | 2 | 3>(1)
+  const [missionPhase, setMissionPhase] = useState<0 | 1 | 2 | 3>(1)
   const [missionStep, setMissionStep] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8>(0)
   // 0 = not started, 1 = personality, 2 = income, 3 = expenses, 4 = debts, 5 = assets, 6 = mortgage, 7 = schedule, 8 = sinking funds
   const [missionComplete, setMissionComplete] = useState(false)
