@@ -123,6 +123,7 @@ export default function Dashboard() {
   const [userName, setUserName] = useState('')
   const [nameSubmitted, setNameSubmitted] = useState(false)
   const [editingName, setEditingName] = useState(false)
+  const [showActionPopup, setShowActionPopup] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   // Identity Statements
   const [identityStatements, setIdentityStatements] = useState<string[]>([])
@@ -5724,13 +5725,38 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             {/* Coach next action — compact header badge */}
             {coachNextAction && activeTab !== 'quickview' && (
               <button
-                onClick={() => setActiveTab('quickview')}
-                style={{ padding: '3px 10px', background: coachNextAction.urgency === 'high' ? theme.warning + '20' : theme.accent + '20', color: coachNextAction.urgency === 'high' ? theme.warning : theme.accent, border: '1px solid ' + (coachNextAction.urgency === 'high' ? theme.warning + '50' : theme.accent + '40'), borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}
-                title={coachNextAction.message}
+                onClick={() => setShowActionPopup(p => !p)}
+                style={{ padding: '4px 12px', background: coachNextAction.urgency === 'high' ? theme.warning + '20' : theme.accent + '20', color: coachNextAction.urgency === 'high' ? theme.warning : theme.accent, border: '1px solid ' + (coachNextAction.urgency === 'high' ? theme.warning + '50' : theme.accent + '40'), borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', maxWidth: '260px', position: 'relative' as const }}
               >
-                {coachNextAction.icon} {coachNextAction.urgency === 'high' ? 'Action needed' : 'Aureus recommends'}
+                {coachNextAction.icon} {coachNextAction.action?.length > 40 ? coachNextAction.action.slice(0, 38) + '…' : coachNextAction.action || 'Action needed'}
               </button>
             )}
+            {/* Action popup */}
+            {showActionPopup && coachNextAction && (
+              <div style={{ position: 'fixed' as const, top: '60px', left: '50%', transform: 'translateX(-50%)', zIndex: 2000, width: 'min(380px, 94vw)', background: theme.cardBg, border: '1px solid ' + (coachNextAction.urgency === 'high' ? theme.warning : theme.accent) + '60', borderRadius: '16px', boxShadow: '0 12px 40px rgba(0,0,0,0.7)', padding: '20px' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', marginBottom: '14px' }}>
+                  <span style={{ fontSize: '28px', flexShrink: 0 }}>{coachNextAction.icon}</span>
+                  <div>
+                    <div style={{ color: coachNextAction.urgency === 'high' ? theme.warning : theme.accent, fontWeight: 700, fontSize: '13px', letterSpacing: '1px', textTransform: 'uppercase' as const, marginBottom: '4px' }}>
+                      {coachNextAction.urgency === 'high' ? '⚡ Action needed' : '💡 Aureus recommends'}
+                    </div>
+                    <div style={{ color: theme.text, fontSize: '14px', fontWeight: 600, lineHeight: 1.5, marginBottom: '6px' }}>{coachNextAction.action}</div>
+                    <div style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6 }}>{coachNextAction.message}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => { setActiveTab(coachNextAction.tab as any); setShowActionPopup(false) }}
+                    style={{ flex: 1, padding: '10px', background: coachNextAction.urgency === 'high' ? theme.warning : theme.accent, color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
+                    Go there now →
+                  </button>
+                  <button onClick={() => setShowActionPopup(false)}
+                    style={{ padding: '10px 14px', background: 'transparent', border: '1px solid ' + theme.border, color: theme.textMuted, borderRadius: '10px', cursor: 'pointer', fontSize: '12px' }}>
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
+            {showActionPopup && <div style={{ position: 'fixed' as const, inset: 0, zIndex: 1999 }} onClick={() => setShowActionPopup(false)} />}
             {/* Due badges */}
             {isMoneyDateDue() && (
               <button onClick={() => { setShowMoneyDate(true); setMoneyDateStep(0); setMoneyDateAnswers({}) }} style={{ padding: '3px 10px', background: theme.success + '20', color: theme.success, border: '1px solid ' + theme.success + '50', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', animation: 'pulse 2s infinite' }}>
