@@ -2169,6 +2169,8 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
       localStorage.removeItem('aureus_data')
       localStorage.removeItem('aureus_business')
       if (data.aureus_token) localStorage.setItem('aureus_user_token', data.aureus_token)
+      // Return snapshot so callers can check missionComplete without relying on stale state
+      ;(loadFromCloud as any)._lastSnapshot = s
       if (s.userName) setUserName(s.userName)
       if (s.whyStatement) setWhyStatement(s.whyStatement)
       if (s.budgetMemory) setBudgetMemory(s.budgetMemory)
@@ -2218,6 +2220,8 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
       return true
     } catch { return false }
   }
+  // Helper to get last loaded snapshot (avoids stale closure issue)
+  const getLastSnapshot = () => (loadFromCloud as any)._lastSnapshot || null
 
   // ── Forgot password ──
   const handleForgotPassword = async () => {
@@ -2277,13 +2281,11 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
           setAuthUser(data.user)
           await saveToCloud(data.user)
           setShowAuthModal('none')
-          // New user — start onboarding mission if not already complete
-          if (!missionComplete) {
-            setMissionPhase(1)
-            setMissionStep(0)
-            setMissionNavLocked(true)
-            setActiveTab('home')
-          }
+          // Brand new signup — always start onboarding
+          setMissionPhase(1)
+          setMissionStep(0)
+          setMissionNavLocked(true)
+          setActiveTab('home')
         }
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword })
@@ -2296,7 +2298,9 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
           setSubStatus('active')
           setShowPaywall(false)
           setShowAuthModal('none')
-          if (!loaded || !missionComplete) {
+          // Use snapshot directly — missionComplete state is stale at this point
+          const snap = getLastSnapshot()
+          if (!loaded || !snap?.missionComplete) {
             setMissionPhase(1); setMissionStep(0); setMissionNavLocked(true)
           }
         }
@@ -2332,30 +2336,15 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
           }
           localStorage.setItem('aureus_last_user_id', currentUserId)
           const hasLocal = !!localStorage.getItem('aureus_data')
-          if (!hasLocal) {
-            const loaded = await loadFromCloud(data.session.user)
-            if (loaded) {
-              setSubStatus('active')
-              setShowPaywall(false)
-            } else {
-              // New user with no data — set active and trigger onboarding
-              setSubStatus('active')
-              setShowPaywall(false)
-              setMissionPhase(1)
-              setMissionStep(0)
-              setMissionNavLocked(true)
-            }
-          } else {
-            // Always load from cloud to ensure we have the latest data for this user
-            const loaded = await loadFromCloud(data.session.user)
-            if (loaded) {
-              setSubStatus('active')
-              setShowPaywall(false)
-            } else {
-              // Cloud empty but has local — still set active, check if onboarding needed
-              setSubStatus('active')
-              setShowPaywall(false)
-            }
+          const loaded = await loadFromCloud(data.session.user)
+          const snap = getLastSnapshot()
+          setSubStatus('active')
+          setShowPaywall(false)
+          if (!loaded || !snap?.missionComplete) {
+            // New user or incomplete onboarding — trigger setup
+            setMissionPhase(1)
+            setMissionStep(0)
+            setMissionNavLocked(true)
           }
         }
       } catch {}
