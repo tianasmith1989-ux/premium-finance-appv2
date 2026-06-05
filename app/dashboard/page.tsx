@@ -56,6 +56,31 @@ const getSb = async () => {
   return _sb
 }
 
+// Isolated name input — completely immune to parent re-renders
+const NameInput = React.memo(({ onSubmit }: { onSubmit: (name: string) => void }) => {
+  const [val, setVal] = React.useState('')
+  return (
+    <div style={{ width: '100%', maxWidth: '380px', marginBottom: '16px' }}>
+      <input
+        placeholder="Your first name"
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && val.trim()) onSubmit(val.trim()) }}
+        style={{ width: '100%', fontSize: '20px', padding: '16px 20px', textAlign: 'center', background: '#1a1a1a', border: '2px solid rgba(212,175,55,0.6)', borderRadius: '8px', color: '#f0ece0', outline: 'none', boxSizing: 'border-box' }}
+        autoFocus
+      />
+      <div style={{ color: '#7a7060', fontSize: '11px', marginTop: '8px' }}>Your data never leaves your device.</div>
+      <button
+        onClick={() => { if (val.trim()) onSubmit(val.trim()) }}
+        disabled={!val.trim()}
+        style={{ marginTop: '12px', width: '100%', padding: '16px', background: val.trim() ? 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)' : '#2a2a2a', color: val.trim() ? '#111111' : '#7a7060', border: 'none', borderRadius: '14px', cursor: val.trim() ? 'pointer' : 'default', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
+        {val.trim() ? `Continue →` : 'Enter your name to begin'}
+      </button>
+    </div>
+  )
+})
+NameInput.displayName = 'NameInput'
+
 export default function Dashboard() {
   const { user } = useUser()
 
@@ -4054,7 +4079,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
           MISSION OVERLAY — Phase 1 (setup) & Phase 2 (roadmap)
           Covers full screen, guides user step by step
       ═══════════════════════════════════════════════════ */}
-      {!missionComplete && missionPhase === 1 && !showPaywall && subStatus !== 'loading' && (subStatus === 'active' || subStatus === 'trialing') && (
+      {missionPhase === 1 && !missionComplete && !showPaywall && subStatus !== 'loading' && (subStatus === 'active' || subStatus === 'trialing') && (
         <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: theme.bg, zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
 
           {/* Mission header */}
@@ -4096,32 +4121,10 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                   <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 28px 0', maxWidth: '380px' }}>
                     Your personal budgeting assistant and money coach — built for Australians who want to pay off debt faster and build real wealth.
                   </p>
-                  <div style={{ width: '100%', maxWidth: '380px', marginBottom: '16px' }}>
-                    <label style={{ color: theme.accent, fontSize: '18px', fontWeight: 700, display: 'block', marginBottom: '14px' }}>
+                  <label style={{ color: theme.accent, fontSize: '18px', fontWeight: 700, display: 'block', marginBottom: '14px', textAlign: 'center' as const }}>
                       First — what's your name?
                     </label>
-                    <input
-                      ref={nameInputRef}
-                      placeholder="Your first name"
-                      defaultValue={userName}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          const val = nameInputRef.current?.value?.trim()
-                          if (val) { setUserName(val); setNameSubmitted(true); advanceMission(1) }
-                        }
-                      }}
-                      style={{ ...inputStyle, width: '100%', fontSize: '20px', padding: '16px 20px', textAlign: 'center' as const, borderColor: theme.accent + '60' }}
-                      autoFocus
-                    />
-                    <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px' }}>Your data never leaves your device.</div>
-                  </div>
-                  <button onClick={() => {
-                    const val = nameInputRef.current?.value?.trim()
-                    if (val) { setUserName(val); setNameSubmitted(true); advanceMission(1) }
-                  }}
-                    style={{ width: '100%', maxWidth: '380px', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #8C6A1F 100%)', color: '#111111', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif', transition: 'all 0.2s' }}>
-                    Continue →
-                  </button>
+                  <NameInput onSubmit={(val) => { setUserName(val); setNameSubmitted(true); advanceMission(1) }} />
                 </>
               ) : (
                 // ── Phase B: Name entered — show what's next ──
@@ -4152,7 +4155,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                   </button>
                 </>
               )}
-              <button onClick={() => { setMissionComplete(true); setMissionNavLocked(false); setOnboardingComplete(true); setActiveTab('home' as any) }}
+              <button onClick={() => { setMissionNavLocked(false); setMissionPhase(0); setOnboardingComplete(true); setActiveTab('home' as any) }}
                 style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', marginTop: '14px', fontSize: '12px', opacity: 0.5 }}>
                 I've used Aureus before — skip setup
               </button>
@@ -5847,6 +5850,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
                         <button
                           onClick={() => {
+                            setMissionComplete(false)
                             setMissionPhase(1)
                             setMissionNavLocked(true)
                             if (missionStep === 0) setMissionStep(0)
@@ -5855,7 +5859,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                           {missionStep > 0 ? `Resume setup — step ${missionStep} of 8 →` : 'Start setup →'}
                         </button>
                         <button
-                          onClick={() => { setMissionComplete(true); setOnboardingComplete(true); setMissionNavLocked(false) }}
+                          onClick={() => { setMissionNavLocked(false); setMissionPhase(0); setOnboardingComplete(true) }}
                           style={{ padding: '10px 14px', background: 'transparent', border: '1px solid ' + theme.border, color: theme.textMuted, borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>
                           Skip for now
                         </button>
