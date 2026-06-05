@@ -10669,18 +10669,80 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
         {activeTab === 'grow' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
 
+            {/* FIRE NUMBER HERO — shown at top so users can see it immediately */}
+            <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg, #1a0d2e, #111111)', borderRadius: '16px', border: '2px solid ' + theme.purple + '60' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' as const, gap: '12px' }}>
+                <div>
+                  <div style={{ color: theme.purple, fontSize: '11px', fontWeight: 700, letterSpacing: '2px', marginBottom: '4px' }}>🔥 YOUR FIRE NUMBER</div>
+                  <div style={{ color: theme.text, fontSize: '13px', marginBottom: '8px' }}>The portfolio needed to never work again — 4% rule, tax-adjusted</div>
+                  {totalOutgoing > 0 ? (
+                    <>
+                      <div style={{ color: theme.accent, fontSize: '40px', fontWeight: 900, lineHeight: 1, marginBottom: '4px' }}>
+                        ${fiPath.fireNumber.toLocaleString()}
+                      </div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>
+                        ${fiPath.monthlyNeed.toFixed(0)}/mo expenses → ${fiPath.annualNeedPreTax.toLocaleString(undefined,{maximumFractionDigits:0})}/yr pre-tax → ÷ 4% = FIRE number
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ color: theme.textMuted, fontSize: '14px', fontStyle: 'italic' }}>
+                      Add your expenses in Treasury to calculate your FIRE number
+                    </div>
+                  )}
+                </div>
+                {totalOutgoing > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px', minWidth: '160px' }}>
+                    <div style={{ padding: '12px 16px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.border, textAlign: 'center' as const }}>
+                      <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>PROGRESS</div>
+                      <div style={{ color: theme.purple, fontSize: '22px', fontWeight: 800 }}>
+                        {fiPath.fireNumber > 0 ? (fiPath.currentInvestments / fiPath.fireNumber * 100).toFixed(1) : 0}%
+                      </div>
+                      <div style={{ height: '4px', background: theme.border, borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>
+                        <div style={{ width: Math.min(100, fiPath.fireNumber > 0 ? fiPath.currentInvestments / fiPath.fireNumber * 100 : 0) + '%', height: '100%', background: 'linear-gradient(90deg, #8C6A1F, #D4AF37)', borderRadius: '2px' }} />
+                      </div>
+                    </div>
+                    <div style={{ padding: '12px 16px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.border, textAlign: 'center' as const }}>
+                      <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>YEARS TO FI</div>
+                      <div style={{ color: fiPath.yearsToFI >= 999 ? theme.danger : theme.success, fontSize: '22px', fontWeight: 800 }}>
+                        {fiPath.yearsToFI >= 999 ? '∞' : fiPath.yearsToFI}
+                      </div>
+                      <div style={{ color: theme.textMuted, fontSize: '10px', marginTop: '2px' }}>at current savings rate</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {totalOutgoing > 0 && (
+                <div style={{ marginTop: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                  <div style={{ padding: '6px 12px', background: theme.purple + '15', borderRadius: '6px', fontSize: '12px', color: theme.purple }}>
+                    📊 Invested: ${fiPath.currentInvestments.toLocaleString()} — add assets in Treasury
+                  </div>
+                  <div style={{ padding: '6px 12px', background: theme.success + '15', borderRadius: '6px', fontSize: '12px', color: theme.success }}>
+                    💰 Passive income: ${passiveIncome.toFixed(0)}/mo — {((passiveIncome / Math.max(fiPath.monthlyNeed, 1)) * 100).toFixed(0)}% covered
+                  </div>
+                  <button onClick={() => askAureusAbout(`My FIRE number is $${fiPath.fireNumber.toLocaleString()}. I need $${fiPath.monthlyNeed.toFixed(0)}/mo. I have $${fiPath.currentInvestments.toLocaleString()} invested and ${fiPath.yearsToFI >= 999 ? 'no clear path yet' : fiPath.yearsToFI + ' years to FI'}. What should I focus on?`)}
+                    style={{ padding: '6px 12px', background: theme.accent + '15', border: '1px solid ' + theme.accent + '40', borderRadius: '6px', fontSize: '12px', color: theme.accent, cursor: 'pointer', fontWeight: 600 }}>
+                    💬 Ask Aureus about your FIRE path →
+                  </button>
+                </div>
+              )}
+              <div style={{ marginTop: '10px', color: theme.textMuted, fontSize: '10px' }}>
+                ⚠️ Uses 32.5% AU marginal tax rate · Based on 4% safe withdrawal rule · General information only — not financial advice · Scroll down for full FIRE calculator
+              </div>
+            </div>
+
             {/* WEALTH SNAPSHOT */}
             <div style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                 <div>
                   <h3 style={{ margin: 0, color: theme.text, fontSize: '20px' }}>📈 Wealth Trajectory</h3>
-                  <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Your net worth — past and projected</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px', marginTop: '4px' }}>Your net worth — past and projected over 5 years</div>
                 </div>
                 <div style={{ textAlign: 'right' as const }}>
                   <div style={{ color: netWorth >= 0 ? theme.success : theme.danger, fontSize: '28px', fontWeight: 800 }}>${netWorth.toLocaleString()}</div>
                   <div style={{ color: theme.textMuted, fontSize: '11px' }}>Current net worth</div>
                 </div>
               </div>
+
               {/* SVG Chart */}
               {(() => {
                 const data = netWorthChartData
@@ -10690,63 +10752,128 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                     <div>Your wealth trajectory will appear here as you track progress over time. Do your first Annual Review to start the chart.</div>
                   </div>
                 )
-                const values = data.map(d => d.value)
-                const min = Math.min(...values)
-                const max = Math.max(...values)
-                const range = max - min || 1
-                const W = 600, H = 200, PAD = 40
-                const points = data.map((d, i) => {
-                  const x = PAD + (i / (data.length - 1)) * (W - PAD * 2)
-                  const y = H - PAD - ((d.value - min) / range) * (H - PAD * 2)
-                  return { x, y, ...d }
+
+                // ── Build optimistic line ──
+                // Adds: 4% compound growth on savings + debt payoff boost + super growth
+                const totalDebtMonthly = debts.reduce((s: number, d: any) => s + parseFloat(d.minimum || d.payment || '0'), 0)
+                const optimisticData = data.map((d: any, i: number) => {
+                  if (!d.projected) return { ...d, optimistic: d.value }
+                  const years = i
+                  // Base: surplus saved each year
+                  let nw = netWorth
+                  for (let y = 0; y < years; y++) {
+                    const surplusThisYear = monthlySurplus * 12
+                    // 4% compound return on accumulated positive net worth
+                    const compoundBoost = nw > 0 ? nw * 0.04 : 0
+                    // Debt payoff benefit: debts reducing means more surplus each year
+                    const debtPayoffBonus = totalDebtMonthly * 12 * (y * 0.15) // debts wind down ~15%/yr
+                    nw = nw + surplusThisYear + compoundBoost + debtPayoffBonus
+                  }
+                  return { ...d, optimistic: nw }
                 })
-                const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+
+                const allValues = [...data.map((d: any) => d.value), ...optimisticData.map((d: any) => d.optimistic || d.value)]
+                const min = Math.min(...allValues)
+                const max = Math.max(...allValues)
+                const range = max - min || 1
+                const W = 600, H = 220, PAD = 40
+
+                const toPoint = (val: number, i: number) => ({
+                  x: PAD + (i / (data.length - 1)) * (W - PAD * 2),
+                  y: H - PAD - ((val - min) / range) * (H - PAD * 2)
+                })
+
+                const conservPoints = data.map((d: any, i: number) => ({ ...toPoint(d.value, i), ...d }))
+                const optimistPoints = optimisticData.map((d: any, i: number) => ({ ...toPoint(d.optimistic ?? d.value, i), ...d }))
+
+                const conservPath = conservPoints.map((p: any, i: number) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+                const optimistPath = optimistPoints.map((p: any, i: number) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+
+                const lastOptimist = optimistPoints[optimistPoints.length - 1]
+                const lastConserv = conservPoints[conservPoints.length - 1]
+
                 return (
                   <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
                     <defs>
                       <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#B68B2E" stopOpacity="0.3"/>
+                        <stop offset="0%" stopColor="#B68B2E" stopOpacity="0.25"/>
                         <stop offset="100%" stopColor="#B68B2E" stopOpacity="0"/>
                       </linearGradient>
+                      <linearGradient id="optimistGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#2ecc71" stopOpacity="0.15"/>
+                        <stop offset="100%" stopColor="#2ecc71" stopOpacity="0"/>
+                      </linearGradient>
                     </defs>
-                    <path d={`${pathD} L${points[points.length-1].x},${H-PAD} L${points[0].x},${H-PAD} Z`} fill="url(#chartGrad)" />
-                    <path d={pathD} fill="none" stroke="#B68B2E" strokeWidth="2.5" strokeLinecap="round" />
-                    {points.map((p, i) => (
-                      <g key={i}>
-                        <circle cx={p.x} cy={p.y} r="5" fill={p.projected ? '#D4AF37' : '#B68B2E'} />
-                        <text x={p.x} y={H - 8} textAnchor="middle" fill="#64748b" fontSize="11">{p.date}</text>
-                        <text x={p.x} y={p.y - 10} textAnchor="middle" fill={p.projected ? '#D4AF37' : '#B68B2E'} fontSize="10">${Math.round(p.value / 1000)}k</text>
-                      </g>
-                    ))}
-                    {/* Milestone annotation markers */}
-                    {wins.filter((w: any) => w.date && w.amount > 0).slice(-5).map((w: any, i: number) => {
-                      // Find closest chart point by date
-                      const wDate = new Date(w.date).getTime()
-                      let closestIdx = 0
-                      let closestDiff = Infinity
-                      data.forEach((d: any, idx: number) => {
-                        const diff = Math.abs(new Date(d.date).getTime() - wDate)
-                        if (diff < closestDiff) { closestDiff = diff; closestIdx = idx }
-                      })
-                      if (closestDiff > 90 * 86400000) return null // >90 days away, skip
-                      const p = points[closestIdx]
-                      if (!p) return null
+
+                    {/* Optimistic fill */}
+                    <path d={`${optimistPath} L${lastOptimist.x},${H-PAD} L${optimistPoints[0].x},${H-PAD} Z`} fill="url(#optimistGrad)" />
+                    {/* Conservative fill */}
+                    <path d={`${conservPath} L${lastConserv.x},${H-PAD} L${conservPoints[0].x},${H-PAD} Z`} fill="url(#chartGrad)" />
+
+                    {/* Optimistic line — dashed green */}
+                    <path d={optimistPath} fill="none" stroke="#2ecc71" strokeWidth="2" strokeDasharray="6,3" strokeLinecap="round" opacity="0.8" />
+                    {/* Conservative line — solid gold */}
+                    <path d={conservPath} fill="none" stroke="#D4AF37" strokeWidth="2.5" strokeLinecap="round" />
+
+                    {/* Data points and labels */}
+                    {conservPoints.map((p: any, i: number) => {
+                      const op = optimistPoints[i]
                       return (
                         <g key={i}>
-                          <line x1={p.x} y1={p.y - 8} x2={p.x} y2={p.y - 28} stroke="#D4AF37" strokeWidth="1.5" strokeDasharray="3,2" />
-                          <circle cx={p.x} cy={p.y - 30} r="10" fill="#1a1208" stroke="#D4AF37" strokeWidth="1.5" />
-                          <text x={p.x} y={p.y - 26} textAnchor="middle" fontSize="10">🏆</text>
+                          {/* Year label */}
+                          <text x={p.x} y={H - 6} textAnchor="middle" fill="#64748b" fontSize="11">{p.date}</text>
+                          {/* Conservative dot + label */}
+                          <circle cx={p.x} cy={p.y} r="4" fill="#D4AF37" />
+                          <text x={p.x} y={p.y - 8} textAnchor="middle" fill="#D4AF37" fontSize="10" fontWeight="600">${Math.abs(Math.round(p.value / 1000))}k{p.value < 0 ? ' ▼' : ''}</text>
+                          {/* Optimistic dot + label — only show if different */}
+                          {op && Math.abs(op.y - p.y) > 8 && (
+                            <>
+                              <circle cx={op.x} cy={op.y} r="4" fill="#2ecc71" opacity="0.9" />
+                              <text x={op.x + 14} y={op.y + 4} textAnchor="start" fill="#2ecc71" fontSize="10">${Math.round((op.optimistic ?? op.value) / 1000)}k</text>
+                            </>
+                          )}
                         </g>
                       )
                     })}
+
+                    {/* Zero line */}
+                    {min < 0 && max > 0 && (
+                      <line x1={PAD} y1={H - PAD - ((0 - min) / range) * (H - PAD * 2)} x2={W - PAD} y2={H - PAD - ((0 - min) / range) * (H - PAD * 2)} stroke="#334155" strokeWidth="1" strokeDasharray="4,3" />
+                    )}
                     <line x1={PAD} y1={H-PAD} x2={W-PAD} y2={H-PAD} stroke="#334155" strokeWidth="1"/>
                   </svg>
                 )
               })()}
-              <div style={{ display: 'flex', gap: '16px', marginTop: '12px', justifyContent: 'center' as const, flexWrap: 'wrap' as const }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#B68B2E' }} /><span style={{ color: theme.textMuted, fontSize: '12px' }}>Actual</span></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', borderRadius: '50%', background: theme.warning }} /><span style={{ color: theme.textMuted, fontSize: '12px' }}>Projected</span></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ fontSize: '12px' }}>🏆</span><span style={{ color: theme.textMuted, fontSize: '12px' }}>Milestone win</span></div>
+
+              {/* Legend */}
+              <div style={{ display: 'flex', gap: '16px', marginTop: '10px', justifyContent: 'center' as const, flexWrap: 'wrap' as const }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="24" height="10"><line x1="0" y1="5" x2="24" y2="5" stroke="#D4AF37" strokeWidth="2.5"/></svg>
+                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>If you save your surplus</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="24" height="10"><line x1="0" y1="5" x2="24" y2="5" stroke="#2ecc71" strokeWidth="2" strokeDasharray="6,3"/></svg>
+                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>With investing + debt payoff</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '12px' }}>🏆</span>
+                  <span style={{ color: theme.textMuted, fontSize: '12px' }}>Milestone win</span>
+                </div>
+              </div>
+
+              {/* Assumptions explainer */}
+              <div style={{ marginTop: '14px', padding: '12px 16px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>HOW THESE ARE CALCULATED</div>
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                    <span style={{ color: '#D4AF37', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>— Gold line:</span>
+                    <span style={{ color: theme.textMuted, fontSize: '11px', lineHeight: 1.5 }}>Current net worth + your ${monthlySurplus > 0 ? monthlySurplus.toFixed(0) : '0'}/month surplus saved each year. No investment returns assumed. Conservative baseline.</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                    <span style={{ color: '#2ecc71', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>--- Green line:</span>
+                    <span style={{ color: theme.textMuted, fontSize: '11px', lineHeight: 1.5 }}>Same surplus + 4% annual compound growth on accumulated savings + debt repayments freeing up extra cash as debts are paid down. Not guaranteed — illustrative only.</span>
+                  </div>
+                </div>
               </div>
             </div>
 
