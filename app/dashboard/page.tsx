@@ -122,6 +122,7 @@ export default function Dashboard() {
   const [personalityAnswers, setPersonalityAnswers] = useState<{[key: number]: string}>({})
   const [userName, setUserName] = useState('')
   const [nameSubmitted, setNameSubmitted] = useState(false)
+  const [editingName, setEditingName] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   // Identity Statements
   const [identityStatements, setIdentityStatements] = useState<string[]>([])
@@ -5828,7 +5829,28 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap' as const, gap: '12px' }}>
                   <div>
                     <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, letterSpacing: '1px', marginBottom: '4px' }}>{dayName.toUpperCase()} · {today.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-                    <h2 style={{ color: theme.text, fontSize: '26px', fontWeight: 800, margin: '0 0 4px 0', fontFamily: 'Cinzel, serif' }}>{greetingWord}, <span style={{ color: theme.accent }}>{name}</span>.</h2>
+                    <h2 style={{ color: theme.text, fontSize: '26px', fontWeight: 800, margin: '0 0 4px 0', fontFamily: 'Cinzel, serif' }}>
+                      {greetingWord},{' '}
+                      {editingName ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <input
+                            defaultValue={userName}
+                            autoFocus
+                            onBlur={e => { const v = e.target.value.trim(); if (v) setUserName(v); setEditingName(false) }}
+                            onKeyDown={e => { if (e.key === 'Enter') { const v = (e.target as HTMLInputElement).value.trim(); if (v) setUserName(v); setEditingName(false) } if (e.key === 'Escape') setEditingName(false) }}
+                            style={{ fontSize: '24px', fontWeight: 800, fontFamily: 'Cinzel, serif', color: theme.accent, background: 'transparent', border: 'none', borderBottom: '2px solid ' + theme.accent, outline: 'none', width: '160px', padding: '0 2px' }}
+                          />
+                        </span>
+                      ) : (
+                        <span
+                          onClick={() => setEditingName(true)}
+                          title="Tap to edit your name"
+                          style={{ color: theme.accent, cursor: 'pointer', borderBottom: '1px dashed ' + theme.accent + '60' }}>
+                          {name}
+                        </span>
+                      )}
+                      .
+                    </h2>
                     <div style={{ color: theme.textMuted, fontSize: '14px', marginBottom: '4px' }}>{subGreeting}</div>
                     {currentQuote.quote && <div style={{ color: theme.textMuted, fontSize: '13px', fontStyle: 'italic' }}>"{currentQuote.quote}"</div>}
                     {whyStatement && <div style={{ marginTop: '10px', padding: '8px 12px', background: theme.accent + '15', borderRadius: '8px', border: '1px solid ' + theme.accent + '30', color: theme.accent, fontSize: '13px', fontStyle: 'italic' }}>🎯 {whyStatement}</div>}
@@ -7146,7 +7168,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 </div>
                 <div>
                   <div style={{ color: theme.text, fontWeight: 700, fontSize: '22px' }}>Aureus</div>
-                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Your budgeting assistant · {currentBabyStep.title}</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Your AI money coach · {currentBabyStep.step > 0 ? `Baby Step ${currentBabyStep.step}` : 'Getting started'}</div>
                 </div>
               </div>
               <div style={{ padding: '8px 12px', background: theme.warning + '15', borderRadius: '8px', marginBottom: '12px', border: '1px solid ' + theme.warning + '30' }}>
