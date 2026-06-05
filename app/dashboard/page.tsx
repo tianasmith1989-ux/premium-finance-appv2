@@ -816,6 +816,28 @@ export default function Dashboard() {
     return () => clearTimeout(timer)
   }, [userName])
 
+  // Dedicated roadmap milestones save
+  useEffect(() => {
+    if (!roadmapMilestones.length) return
+    try {
+      const existing = JSON.parse(localStorage.getItem('aureus_data') || '{}')
+      localStorage.setItem('aureus_data', JSON.stringify({ ...existing, roadmapMilestones }))
+    } catch {}
+    const timer = setTimeout(() => { if (authUser) saveToCloud() }, 2000)
+    return () => clearTimeout(timer)
+  }, [JSON.stringify(roadmapMilestones)])
+
+  // Dedicated money date log save
+  useEffect(() => {
+    if (!moneyDateLog.length) return
+    try {
+      const existing = JSON.parse(localStorage.getItem('aureus_data') || '{}')
+      localStorage.setItem('aureus_data', JSON.stringify({ ...existing, moneyDateLog }))
+    } catch {}
+    const timer = setTimeout(() => { if (authUser) saveToCloud() }, 2000)
+    return () => clearTimeout(timer)
+  }, [JSON.stringify(moneyDateLog)])
+
   // Dedicated mortgage save — saves immediately to localStorage and debounces cloud save
   // This prevents mortgage data from being lost due to stale closure in the 60s auto-save
   useEffect(() => {
@@ -5815,6 +5837,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', background: theme.accent + '20', borderRadius: '8px', border: '1px solid ' + theme.accent + '40', flexShrink: 0 }}>
               <span style={{ fontSize: '12px' }}>🔒</span>
               <span style={{ color: theme.accent, fontSize: '11px', fontWeight: 600 }}>Complete setup to unlock all tabs</span>
+              <button onClick={() => { setMissionComplete(false); setMissionPhase(1); setMissionStep(0); setMissionNavLocked(true) }} style={{ background: 'none', border: 'none', color: theme.accent, cursor: 'pointer', fontSize: '11px', fontWeight: 700, padding: 0 }}>Complete →</button>
               <button onClick={() => { setMissionComplete(true); setMissionNavLocked(false); setOnboardingComplete(true) }} style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '11px', textDecoration: 'underline', padding: 0 }}>skip</button>
             </div>
           )}
