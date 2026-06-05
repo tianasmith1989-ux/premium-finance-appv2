@@ -2389,25 +2389,30 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
           mode: 'question',
           question: `[AUREUS SUPPORT — APP HELP ONLY. Answer the support question below. You are a friendly app support agent, NOT a financial coach.]
 
-APP STRUCTURE users need to know:
-- TABS: Home, 💬 Aureus (chat), ⚡ Change, 🏛️ Treasury, 📈 Grow & FIRE, 🏆 Wins, 🧠 Insights
-- INCOME/EXPENSES/DEBTS/GOALS/ASSETS: all in Treasury tab
-- CHANGE WORK: ⚡ Change tab — Dickens Process, Values, Compelling Future, Money Mirror, Identity, Open Coaching
-- NOTIFICATIONS + PARTNER EMAIL + MEAL PLAN: Insights tab → scroll to notification section
-- NAME: Insights tab → Settings → Your Profile
-- COACH CHAT: 💬 Aureus tab
-- SUPPORT: tap the ? button (bottom of screen)
+APP STRUCTURE — be precise with these directions:
+- TABS (top nav): Home, Aureus (chat), Change, Treasury, Roadmap, Wins, Quick View. Everything else is in the Quick Access grid on the Home tab.
+- INCOME/EXPENSES/DEBTS/GOALS/ASSETS: Treasury tab
+- CHANGE WORK: Change tab — Dickens Process, Values, Compelling Future, Money Mirror, Identity
+- NOTIFICATIONS + DAILY EMAIL + PARTNER EMAIL + MEAL PLAN: Insights tab (in Quick Access on Home) → scroll down to the notification/email section
+- NAME: Two places — (1) Home tab → gold card "Your setup isn't complete" → Resume setup → first screen asks for name. OR (2) Insights tab → scroll down to "Your Profile" section → type name in the YOUR NAME field. The name updates immediately, no save button needed.
+- QUICK VIEW: Quick View tab (in top nav) — shows money left, bills due, budget vs actual
+- BUSINESS: Business tab (in Quick Access on Home)
+- COACH CHAT: Aureus tab
+- SUPPORT: tap the ? button top right
+- SIGN OUT: scroll to very bottom of any page → "Sign out (email)" link
+- LEGAL PAGES: scroll to very bottom → Terms, Privacy Policy etc links
+- SUBSCRIPTION/CANCEL: scroll to very bottom → "Manage subscription / Cancel"
 
 User question: "${message}"
 
-Answer in 2-4 sentences. Be specific about which tab and section. If technical error, suggest refresh then email hello@aureusplutus.app`,
+Answer in 2-4 sentences. Be specific about exactly which tab and where to scroll. If technical error, suggest refresh then email support@aureusplutus.app`,
           financialData: {}, memory: {}, countryConfig: currentCountryConfig
         })
       })
       const data = await res.json()
-      setSupportMessages(prev => [...prev, { role: 'agent', content: data.message || data.advice || 'Try refreshing the app. If the issue persists, email hello@aureusplutus.app and we\'ll sort it out.' }])
+      setSupportMessages(prev => [...prev, { role: 'agent', content: data.message || data.advice || 'Try refreshing the app. If the issue persists, email support@aureusplutus.app and we\'ll sort it out.' }])
     } catch {
-      setSupportMessages(prev => [...prev, { role: 'agent', content: "I'm having trouble connecting. Please email hello@aureusplutus.app and we'll help you directly." }])
+      setSupportMessages(prev => [...prev, { role: 'agent', content: "I'm having trouble connecting. Please email support@aureusplutus.app and we'll help you directly." }])
     }
     setSupportLoading(false)
     setTimeout(() => supportEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
