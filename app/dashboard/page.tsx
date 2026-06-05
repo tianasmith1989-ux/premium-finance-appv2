@@ -816,6 +816,20 @@ export default function Dashboard() {
     return () => clearTimeout(timer)
   }, [userName])
 
+  // Dedicated mortgage save — saves immediately to localStorage and debounces cloud save
+  // This prevents mortgage data from being lost due to stale closure in the 60s auto-save
+  useEffect(() => {
+    if (!mortgageAccel.balance && !mortgageAccel.rate) return // skip empty state
+    try {
+      const existing = JSON.parse(localStorage.getItem('aureus_data') || '{}')
+      localStorage.setItem('aureus_data', JSON.stringify({ ...existing, mortgageAccel }))
+    } catch {}
+    const timer = setTimeout(() => {
+      if (authUser) saveToCloud()
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [mortgageAccel.balance, mortgageAccel.rate, mortgageAccel.remainingYears, mortgageAccel.currentRepayment, mortgageAccel.extraRepayment, mortgageAccel.offsetBalance, mortgageAccel.repaymentFrequency])
+
   // Chat scroll
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
