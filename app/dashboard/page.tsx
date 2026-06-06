@@ -69,7 +69,7 @@ const NameInput = React.memo(({ onSubmit }: { onSubmit: (name: string) => void }
         style={{ width: '100%', fontSize: '20px', padding: '16px 20px', textAlign: 'center', background: '#1a1a1a', border: '2px solid rgba(212,175,55,0.6)', borderRadius: '8px', color: '#f0ece0', outline: 'none', boxSizing: 'border-box' }}
         autoFocus
       />
-      <div style={{ color: '#7a7060', fontSize: '11px', marginTop: '8px' }}>Your data never leaves your device.</div>
+      <div style={{ color: '#7a7060', fontSize: '11px', marginTop: '8px' }}>Your data is encrypted and stored securely.</div>
       <button
         onClick={() => { if (val.trim()) onSubmit(val.trim()) }}
         disabled={!val.trim()}
@@ -6486,7 +6486,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                         <div key={i} style={{ padding: '4px 10px', background: theme.bg, border: '1px solid ' + theme.border, borderRadius: '20px', color: theme.textMuted, fontSize: '12px' }}>{item}</div>
                       ))}
                     </div>
-                    <div style={{ marginTop: '8px', fontSize: '11px', color: theme.textMuted }}>All data stays on your device — Aureus never sees it.</div>
+                    <div style={{ marginTop: '8px', fontSize: '11px', color: theme.textMuted }}>Your data is encrypted and securely stored. <a href="/legal/privacy" target="_blank" style={{ color: theme.accent }}>Privacy Policy →</a></div>
                   </div>
                 )
               })()}
@@ -13073,9 +13073,14 @@ Tracking with Aureus 🏛️`
                 mealDietary: mealPlanPrefs?.dietaryNeeds || '',
                 moneyDateDay: checkInSchedule.moneyDateDay || 'Sunday',
                 moneyDateTime: checkInSchedule.moneyDateTime || '18:00',
-                savingRate: Math.round((monthlyGoalSavings / Math.max(1, monthlyIncome)) * 100),
+                monthlyIncome: Math.round(monthlyIncome),
+                monthlyExpenses: Math.round(monthlyExpenses),
+                monthlyDebtPayments: Math.round(debts.reduce((s: number, d: any) => s + parseFloat(d.minimum || d.payment || '0'), 0)),
+                monthlyGoalSavings: Math.round(monthlyGoalSavings),
                 monthlySurplus: Math.round(monthlySurplus),
-                topGoal: topGoal ? { name: topGoal.name, pct: Math.min(100, Math.round(parseFloat(topGoal.savedAmount||'0') / parseFloat(topGoal.targetAmount||'1') * 100)) } : null,
+                savingRate: Math.round(savingsRate),
+                topGoalName: topGoal?.name || null,
+                topGoalPct: topGoal ? Math.min(100, Math.round(parseFloat(topGoal.savedAmount||'0') / parseFloat(topGoal.targetAmount||'1') * 100)) : null,
                 topWin: topWin?.title || null,
                 nextAction: coachNextAction?.action || null,
                 streak, upcomingBills
@@ -13863,7 +13868,7 @@ Tracking with Aureus 🏛️`
               <button onClick={() => setShowDocUpload(false)} style={{ background: 'none', border: 'none', color: theme.textMuted, fontSize: '22px', cursor: 'pointer' }}>×</button>
             </div>
             <p style={{ color: theme.textMuted, fontSize: '13px', margin: '0 0 20px 0', lineHeight: 1.6 }}>
-              Upload payslips, bank statements, loan documents, insurance policies — anything you want to keep handy alongside your financial plan. Documents are stored locally in your browser.
+              Upload payslips, bank statements, loan documents, insurance policies — anything you want to keep handy alongside your financial plan. Documents are stored securely in your account.
             </p>
 
             {/* Upload area */}
