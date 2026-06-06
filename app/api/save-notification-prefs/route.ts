@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       monthlySurplus, savingRate,
       topGoalName, topGoalPct,
       topWin, nextAction, streak, upcomingBills,
-      debts, goals, mortgageAccel
+      debts, goals, sinkingFunds, mortgageAccel
     } = body
 
     if (!userToken || !email) {
@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
       upcoming_bills: upcomingBills || [],
       debts: debts || [],
       goals: goals || [],
+      sinking_funds: sinkingFunds || [],
       mortgage_accel: mortgageAccel || null,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_token' })
