@@ -7,7 +7,6 @@ import { createClient } from '@supabase/supabase-js'
 
 const FROM = 'Aureus <noreply@aureusplutus.app>'
 
-// Re-evaluated per cold start (fine for date values)
 const _today = new Date()
 const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][_today.getDay()]
 const dateFormatted = _today.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -25,21 +24,28 @@ function buildDailyBriefHtml(u: any): string {
   const bills: any[] = u.upcoming_bills || []
   const name = u.user_name || 'Builder'
 
-  // Categorise bills for this week (next 7 days)
+  // Categorise bills
   const thisWeekBills = bills.filter((b: any) => b.dayOffset >= 0 && b.dayOffset <= 7)
   const overdueBills = bills.filter((b: any) => b.dayOffset < 0)
   const nextWeekBills = bills.filter((b: any) => b.dayOffset > 7 && b.dayOffset <= 14)
 
-  // Total due this week
   const thisWeekTotal = thisWeekBills.reduce((s: number, b: any) => s + parseFloat(b.amount || '0'), 0)
   const overdueTotal = overdueBills.reduce((s: number, b: any) => s + parseFloat(b.amount || '0'), 0)
 
-  // Savings & fun money from surplus
-  const surplus = u.monthly_surplus || 0
-  const weeklySurplus = Math.round(surplus / 4.3)
+  // REAL financial numbers from user's actual data
+  const monthlySurplus = u.monthly_surplus || 0
+  const monthlyIncome = u.monthly_income || 0
+  const monthlyExpenses = u.monthly_expenses || 0
+  const monthlyDebtPayments = u.monthly_debt_payments || 0
+  const monthlyGoalSavings = u.monthly_goal_savings || 0
   const savingRate = u.saving_rate || 0
 
-  // Contextual greeting based on day
+  // Weekly equivalents (divide by 4.33 weeks/month)
+  const weeklyIncome = Math.round(monthlyIncome / 4.33)
+  const weeklyExpenses = Math.round((monthlyExpenses + monthlyDebtPayments) / 4.33)
+  const weeklyGoalSavings = Math.round(monthlyGoalSavings / 4.33)
+  const weeklyDiscretionary = Math.max(0, Math.round(monthlySurplus / 4.33) - weeklyGoalSavings)
+
   const dayGreeting: Record<string, string> = {
     Monday: `New week, new moves. Here's what's ahead, ${name}.`,
     Tuesday: `Tuesday — the real start of the week. Stay on track.`,
@@ -51,11 +57,9 @@ function buildDailyBriefHtml(u: any): string {
   }
   const greeting = dayGreeting[dayName] || `Good morning, ${name}.`
 
-  // Urgency colour for overdue
   const hasOverdue = overdueBills.length > 0
   const hasThisWeek = thisWeekBills.length > 0
 
-  // Build bill rows
   const buildBillRow = (b: any, highlight: string) => {
     const dueText = b.dayOffset === 0 ? 'DUE TODAY' : b.dayOffset < 0 ? `${Math.abs(b.dayOffset)} DAYS OVERDUE` : `Due in ${b.dayOffset} day${b.dayOffset !== 1 ? 's' : ''}`
     const isAutomatic = b.automatic
@@ -66,7 +70,7 @@ function buildDailyBriefHtml(u: any): string {
           <div>
             <div style="color:#F5F5F5;font-size:14px;font-weight:600;">${b.name}</div>
             <div style="color:${highlight};font-size:11px;font-weight:700;margin-top:2px;">${dueText}</div>
-            ${isAutomatic 
+            ${isAutomatic
               ? `<div style="color:#6b8f6b;font-size:10px;margin-top:2px;">✅ Auto-payment set up</div>`
               : `<div style="color:#bc6a1f;font-size:10px;margin-top:2px;">⚠️ Check payment is arranged</div>`
             }
@@ -95,7 +99,7 @@ function buildDailyBriefHtml(u: any): string {
     <p style="color:#F5F5F5;font-size:16px;margin:16px 0 0;line-height:1.5;">${greeting}</p>
   </div>
 
-  <!-- Overdue alert (only if overdue bills exist) -->
+  <!-- Overdue alert -->
   ${hasOverdue ? `
   <div style="background:rgba(192,57,43,0.12);border:1px solid rgba(192,57,43,0.4);border-radius:12px;padding:16px 20px;margin-bottom:12px;">
     <div style="color:#e74c3c;font-weight:800;font-size:13px;margin-bottom:10px;">🔴 ${overdueBills.length} OVERDUE PAYMENT${overdueBills.length > 1 ? 'S' : ''} — $${overdueTotal.toFixed(0)} total</div>
@@ -119,32 +123,42 @@ function buildDailyBriefHtml(u: any): string {
     <p style="color:#6b5e3e;font-size:13px;margin:0;">✅ No payments due this week. Clear run ahead.</p>`}
   </div>
 
-  <!-- Weekly money summary -->
+  <!-- Weekly money summary — REAL numbers from user data -->
+  ${monthlyIncome > 0 ? `
   <div style="background:#1a1810;border:1px solid #2e2618;border-radius:12px;padding:20px 24px;margin-bottom:12px;">
-    <div style="color:#9a8a6a;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:14px;">💰 THIS WEEK'S MONEY BREAKDOWN</div>
+    <div style="color:#9a8a6a;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:14px;">💰 THIS WEEK'S MONEY SNAPSHOT</div>
     <table style="width:100%;border-collapse:collapse;">
       <tr>
         <td style="padding:8px 0;border-bottom:1px solid #2e2618;">
-          <span style="color:#9a8a6a;font-size:13px;">Living expenses (bills, groceries, transport)</span>
+          <span style="color:#9a8a6a;font-size:13px;">Weekly income</span>
         </td>
         <td style="padding:8px 0;border-bottom:1px solid #2e2618;text-align:right;">
-          <span style="color:#F5F5F5;font-size:14px;font-weight:700;">~$${(thisWeekTotal + Math.round(weeklySurplus * 0.6)).toFixed(0)}</span>
+          <span style="color:#F5F5F5;font-size:14px;font-weight:700;">~$${weeklyIncome}</span>
         </td>
       </tr>
       <tr>
         <td style="padding:8px 0;border-bottom:1px solid #2e2618;">
-          <span style="color:#9a8a6a;font-size:13px;">Savings & goals this week</span>
+          <span style="color:#9a8a6a;font-size:13px;">Bills &amp; debt payments</span>
         </td>
         <td style="padding:8px 0;border-bottom:1px solid #2e2618;text-align:right;">
-          <span style="color:#D4AF37;font-size:14px;font-weight:700;">$${Math.round(weeklySurplus * 0.7)}</span>
+          <span style="color:#e74c3c;font-size:14px;font-weight:700;">-$${weeklyExpenses}</span>
         </td>
       </tr>
+      ${weeklyGoalSavings > 0 ? `
       <tr>
         <td style="padding:8px 0;border-bottom:1px solid #2e2618;">
-          <span style="color:#9a8a6a;font-size:13px;">Fun money (discretionary)</span>
+          <span style="color:#9a8a6a;font-size:13px;">Goal savings this week</span>
         </td>
         <td style="padding:8px 0;border-bottom:1px solid #2e2618;text-align:right;">
-          <span style="color:#6b8f6b;font-size:14px;font-weight:700;">$${Math.round(weeklySurplus * 0.3)}</span>
+          <span style="color:#D4AF37;font-size:14px;font-weight:700;">$${weeklyGoalSavings}</span>
+        </td>
+      </tr>` : ''}
+      <tr>
+        <td style="padding:8px 0;border-bottom:1px solid #2e2618;">
+          <span style="color:#9a8a6a;font-size:13px;">Discretionary (yours to spend)</span>
+        </td>
+        <td style="padding:8px 0;border-bottom:1px solid #2e2618;text-align:right;">
+          <span style="color:#6b8f6b;font-size:14px;font-weight:700;">$${weeklyDiscretionary}</span>
         </td>
       </tr>
       <tr>
@@ -156,7 +170,8 @@ function buildDailyBriefHtml(u: any): string {
         </td>
       </tr>
     </table>
-  </div>
+    <p style="color:#6b5e3e;font-size:11px;margin:10px 0 0;">Weekly figures are your monthly numbers ÷ 4.33 weeks</p>
+  </div>` : ''}
 
   <!-- Next week preview -->
   ${nextWeekBills.length > 0 ? `
@@ -196,7 +211,7 @@ function buildDailyBriefHtml(u: any): string {
     <span style="color:#9a8a6a;font-size:13px;margin-left:8px;">${u.streak}-day streak — discipline creates freedom.</span>
   </div>` : ''}
 
-  <!-- Weekly challenge / engagement hook -->
+  <!-- Weekly insight -->
   <div style="background:#1a1810;border:1px solid rgba(212,175,55,0.15);border-radius:12px;padding:16px 20px;margin-bottom:12px;">
     <div style="color:#9a8a6a;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:8px;">💡 AUREUS INSIGHT</div>
     <div style="color:#F5F5F5;font-size:13px;line-height:1.6;">
@@ -215,8 +230,9 @@ function buildDailyBriefHtml(u: any): string {
 
   <!-- Footer -->
   <div style="text-align:center;padding:8px 0 16px;">
-    <div style="color:#3a2e1e;font-size:11px;letter-spacing:1px;">WEALTH THROUGH DISCIPLINE · AUREUS</div>
+    <div style="color:#3a2e1e;font-size:11px;letter-spacing:1px;">WEALTH THROUGH DISCIPLINE · AUREUS PLUTUS</div>
     <div style="color:#3a2e1e;font-size:10px;margin-top:4px;">Open Aureus to update your numbers · Reply to unsubscribe</div>
+    <div style="color:#3a2e1e;font-size:10px;margin-top:2px;">Aureus Plutus ABN 32 306 872 259 · General information only, not financial advice</div>
   </div>
 
 </div>
@@ -225,33 +241,27 @@ function buildDailyBriefHtml(u: any): string {
 }
 
 export async function GET(request: NextRequest) {
-  // Verify cron secret
   const authHeader = request.headers.get('authorization')
   if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const RESEND_KEY = process.env.RESEND_API_KEY
-  if (!RESEND_KEY) return NextResponse.json({ error: 'RESEND_API_KEY not set', env_keys: Object.keys(process.env).filter(k => k.includes('RESEND') || k.includes('SUPABASE') || k.includes('CRON')) }, { status: 200 })
+  if (!RESEND_KEY) return NextResponse.json({ error: 'RESEND_API_KEY not set' }, { status: 500 })
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  if (!supabaseUrl || !supabaseKey) return NextResponse.json({ error: 'Supabase env vars not set', supabaseUrl: !!supabaseUrl, supabaseKey: !!supabaseKey }, { status: 200 })
+  if (!supabaseUrl || !supabaseKey) return NextResponse.json({ error: 'Supabase env vars not set' }, { status: 500 })
 
   const supabase = createClient(supabaseUrl, supabaseKey)
-
   const today = new Date()
   const todayStr = today.toISOString().split('T')[0]
   const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][today.getDay()]
-  const dateFormatted = today.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   const results = { sent: 0, skipped: 0, errors: 0, users: 0 }
 
   try {
-    const { data: users, error } = await supabase
-      .from('notification_prefs')
-      .select('*')
-
+    const { data: users, error } = await supabase.from('notification_prefs').select('*')
     if (error) throw new Error(error.message)
     if (!users?.length) return NextResponse.json({ ...results, message: 'No subscribers yet' })
 
@@ -259,14 +269,12 @@ export async function GET(request: NextRequest) {
 
     for (const u of users) {
       try {
-        // Skip if already sent today
         if (u.last_weekly_sent === todayStr) { results.skipped++; continue }
 
         const overdue = (u.upcoming_bills || []).filter((b: any) => b.dayOffset < 0)
         const thisWeek = (u.upcoming_bills || []).filter((b: any) => b.dayOffset >= 0 && b.dayOffset <= 7)
         const thisWeekTotal = thisWeek.reduce((s: number, b: any) => s + parseFloat(b.amount || '0'), 0)
 
-        // Varied subject lines that feel personal and create curiosity
         const subject = (() => {
           const name = u.user_name || 'Builder'
           if (overdue.length > 0) return `⚠️ ${name}, you have an overdue payment`
@@ -285,10 +293,7 @@ export async function GET(request: NextRequest) {
         const sent = await sendEmail(u.email, subject, html, RESEND_KEY)
 
         if (sent) {
-          await supabase
-            .from('notification_prefs')
-            .update({ last_weekly_sent: todayStr })
-            .eq('user_token', u.user_token)
+          await supabase.from('notification_prefs').update({ last_weekly_sent: todayStr }).eq('user_token', u.user_token)
           results.sent++
         } else {
           results.errors++
@@ -299,7 +304,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ── Monthly meal plan email (1st of each month) ──
+    // Monthly meal plan (1st of each month)
     if (new Date().getDate() === 1) {
       const mealPlanUsers = users.filter((u: any) => u.notify_monthly_meal_plan && u.email)
       for (const u of mealPlanUsers) {
@@ -308,18 +313,13 @@ export async function GET(request: NextRequest) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              email: u.email,
-              userName: u.user_name,
-              people: u.household_size || 4,
-              weeklyBudget: u.meal_budget || 150,
-              dislikes: u.meal_dislikes || '',
-              dietaryNeeds: u.meal_dietary || ''
+              email: u.email, userName: u.user_name,
+              people: u.household_size || 4, weeklyBudget: u.meal_budget || 150,
+              dislikes: u.meal_dislikes || '', dietaryNeeds: u.meal_dietary || ''
             })
           })
           results.sent++
-        } catch (e) {
-          results.errors++
-        }
+        } catch { results.errors++ }
       }
     }
 
