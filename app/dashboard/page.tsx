@@ -2452,21 +2452,64 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
           setMissionStep(0)
           setMissionNavLocked(true)
           setActiveTab('home')
-          // Send welcome email to user + notify owner
-          // Use await so errors are visible, run after state updates settle
+          // Send welcome email + auto-subscribe to daily brief
           setTimeout(async () => {
             try {
-              const res = await fetch('/api/send-welcome-email', {
+              // 1. Send welcome email + owner notification
+              const welcomeRes = await fetch('/api/send-welcome-email', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userName: signupName, email: signupEmail })
               })
-              const result = await res.json()
-              console.log('Welcome email result:', result)
+              console.log('Welcome email:', await welcomeRes.json())
+
+              // 2. Auto-subscribe to daily emails — user can opt out in Insights tab
+              const userToken = localStorage.getItem('aureus_user_token') || data.user.id
+              const notifRes = await fetch('/api/save-notification-prefs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userToken,
+                  email: signupEmail,
+                  userName: signupName,
+                  frequency: 'daily',
+                  notifyWeeklySnapshot: true,
+                  notifyOverdueBills: true,
+                  notifyMoneyDate: true,
+                  notifyMonthlyMealPlan: false,
+                  householdSize: 4,
+                  mealBudget: 150,
+                  mealDislikes: '',
+                  mealDietary: '',
+                  moneyDateDay: 'Sunday',
+                  moneyDateTime: '18:00',
+                  monthlyIncome: 0,
+                  monthlyExpenses: 0,
+                  monthlyDebtPayments: 0,
+                  monthlyGoalSavings: 0,
+                  monthlySurplus: 0,
+                  savingRate: 0,
+                  topGoalName: null,
+                  topGoalPct: 0,
+                  topWin: null,
+                  nextAction: null,
+                  streak: 0,
+                  upcomingBills: [],
+                  debts: [],
+                  goals: [],
+                  sinkingFunds: [],
+                  mortgageAccel: null
+                })
+              })
+              console.log('Auto-subscribed to daily emails:', await notifRes.json())
             } catch (e) {
-              console.error('Welcome email failed:', e)
+              console.error('Signup emails failed:', e)
             }
           }, 1000)
+
+          // Set emailNotifEnabled so the UI shows as subscribed
+          setEmailNotifEnabled(true)
+          setNotificationEmail(signupEmail)
         }
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword })
@@ -13326,17 +13369,26 @@ Tracking with Aureus 🏛️`
                   )}
                 </div>
 
+                {emailNotifEnabled && notificationEmail?.includes('@') && (
+                  <div style={{ padding: '12px 16px', background: 'rgba(107,143,107,0.12)', border: '1px solid rgba(107,143,107,0.3)', borderRadius: '10px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '18px', flexShrink: 0 }}>✅</span>
+                    <div>
+                      <div style={{ color: '#6b8f6b', fontWeight: 700, fontSize: '13px', marginBottom: '2px' }}>You're subscribed to daily emails</div>
+                      <div style={{ color: theme.textMuted, fontSize: '12px' }}>Sending to {notificationEmail} every morning at 8am AEST. You were automatically subscribed when you joined — update or unsubscribe below.</div>
+                    </div>
+                  </div>
+                )}
                 <button onClick={handleEnableEmail} disabled={!notificationEmail || !notificationEmail.includes('@')}
                   style={{ padding: '14px', background: notificationEmail?.includes('@') ? theme.accent : theme.border, color: notificationEmail?.includes('@') ? '#111111' : theme.textMuted, border: 'none', borderRadius: '10px', cursor: notificationEmail?.includes('@') ? 'pointer' : 'default', fontWeight: 800, fontSize: '15px' }}>
-                  {notificationEmail?.includes('@') ? '✅ Save & enable email notifications' : 'Enter your email above'}
+                  {emailNotifEnabled ? '💾 Update preferences' : notificationEmail?.includes('@') ? '✅ Enable daily emails' : 'Enter your email above'}
                 </button>
-                {notificationsEnabled && (
+                {(notificationsEnabled || emailNotifEnabled) && (
                   <button onClick={handleDisable} style={{ padding: '10px', background: 'transparent', border: '1px solid ' + theme.danger + '40', borderRadius: '8px', color: theme.danger, cursor: 'pointer', fontSize: '13px' }}>
-                    Turn off notifications
+                    🔕 Unsubscribe from daily emails
                   </button>
                 )}
                 <button onClick={() => setShowNotifSetup(false)} style={{ padding: '10px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>
-                  Not now
+                  Close
                 </button>
               </div>
             </div>
