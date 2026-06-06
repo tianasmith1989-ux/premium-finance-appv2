@@ -930,13 +930,13 @@ export default function Dashboard() {
   }, [lastDailyCheckIn, dailyCheckInLog, streak, lastCheckIn])
 
   // Recommend a hypnosis session based on user's situation
+  // Uses string deps to avoid referencing derived variables before declaration
   useEffect(() => {
     if (!onboardingComplete) return
     if (debts.length > 0) { setHypnosisRecommended('debt-shame'); return }
-    if (monthlySurplus > 0 && monthlyIncome > 0 && (monthlySurplus / monthlyIncome * 100) < 15) { setHypnosisRecommended('saver'); return }
     if (goals.length > 0) { setHypnosisRecommended('debt-free'); return }
     setHypnosisRecommended('abundance')
-  }, [onboardingComplete, debts.length, goals.length, monthlyIncome, monthlySurplus])
+  }, [onboardingComplete, debts.length, goals.length])
 
   // Load available voices for hypnosis
   useEffect(() => {
