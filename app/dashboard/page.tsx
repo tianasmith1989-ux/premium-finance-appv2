@@ -2360,6 +2360,14 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
           setMissionStep(0)
           setMissionNavLocked(true)
           setActiveTab('home')
+          // Send welcome email to user + notify owner
+          try {
+            fetch('/api/send-welcome-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userName: userName || '', email: authEmail.trim() })
+            })
+          } catch {}
         }
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword })
