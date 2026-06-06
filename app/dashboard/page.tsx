@@ -846,6 +846,16 @@ export default function Dashboard() {
     return () => clearTimeout(timer)
   }, [userName])
 
+  // Dedicated paidOccurrences save — fires immediately when user marks something paid
+  useEffect(() => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('aureus_data') || '{}')
+      localStorage.setItem('aureus_data', JSON.stringify({ ...existing, paidOccurrences: Array.from(paidOccurrences) }))
+    } catch {}
+    const timer = setTimeout(() => { if (authUser) saveToCloud() }, 1500)
+    return () => clearTimeout(timer)
+  }, [paidOccurrences.size])
+
   // Dedicated roadmap milestones save
   useEffect(() => {
     if (!roadmapMilestones.length) return
@@ -2318,6 +2328,9 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
       if (s.missionP2Proposals?.length) setMissionP2Proposals(s.missionP2Proposals)
       if (s.missionP2Confirmed?.length) setMissionP2Confirmed(s.missionP2Confirmed)
       if (s.wins?.length) setWins(s.wins)
+      if (s.paidOccurrences) setPaidOccurrences(new Set(s.paidOccurrences))
+      if (s.categoryBudgets) setCategoryBudgets(s.categoryBudgets)
+      if (s.actualSpend) setActualSpend(s.actualSpend)
       if (s.streak) setStreak(s.streak)
       if (s.lastCheckIn) setLastCheckIn(s.lastCheckIn)
       if (s.lastDailyCheckIn) setLastDailyCheckIn(s.lastDailyCheckIn)
