@@ -13083,7 +13083,11 @@ Tracking with Aureus 🏛️`
                 topGoalPct: topGoal ? Math.min(100, Math.round(parseFloat(topGoal.savedAmount||'0') / parseFloat(topGoal.targetAmount||'1') * 100)) : null,
                 topWin: topWin?.title || null,
                 nextAction: coachNextAction?.action || null,
-                streak, upcomingBills
+                streak, upcomingBills,
+                // For progress countdowns in email
+                debts: debts.map((d: any) => ({ name: d.name, balance: d.balance, minimum: d.minimum || d.payment || '0' })),
+                goals: goals.map((g: any) => ({ name: g.name, targetAmount: g.targetAmount, savedAmount: g.savedAmount || g.currentAmount || '0', paymentAmount: g.paymentAmount || '0' })),
+                mortgageAccel: mortgageAccel.balance ? { remaining_years: mortgageAccel.remainingYears } : null
               })
             })
           } catch { /* silent — still enables locally */ }
