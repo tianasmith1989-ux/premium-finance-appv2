@@ -846,15 +846,14 @@ export default function Dashboard() {
     return () => clearTimeout(timer)
   }, [userName])
 
-  // Dedicated paidOccurrences save — fires immediately when user marks something paid
+  // Dedicated paidOccurrences save — backup save via useEffect
   useEffect(() => {
+    if (paidOccurrences.size === 0) return
     try {
       const existing = JSON.parse(localStorage.getItem('aureus_data') || '{}')
       localStorage.setItem('aureus_data', JSON.stringify({ ...existing, paidOccurrences: Array.from(paidOccurrences) }))
     } catch {}
-    const timer = setTimeout(() => { if (authUser) saveToCloud() }, 1500)
-    return () => clearTimeout(timer)
-  }, [paidOccurrences.size])
+  }, [JSON.stringify(Array.from(paidOccurrences).sort())])
 
   // Dedicated roadmap milestones save
   useEffect(() => {
@@ -1707,6 +1706,16 @@ export default function Dashboard() {
       newPaid.add(itemId)
     }
     setPaidOccurrences(newPaid)
+
+    // Save immediately to localStorage and cloud — don't rely on useEffect timing
+    try {
+      const existing = JSON.parse(localStorage.getItem('aureus_data') || '{}')
+      localStorage.setItem('aureus_data', JSON.stringify({ ...existing, paidOccurrences: Array.from(newPaid) }))
+    } catch {}
+    if (authUser) {
+      // Small delay to let React state settle, then save to cloud
+      setTimeout(() => saveToCloud(), 500)
+    }
 
     // If this is a goal payment, update the goal's saved amount
     if (item?.itemType === 'goal' && item?.paymentAmount) {
