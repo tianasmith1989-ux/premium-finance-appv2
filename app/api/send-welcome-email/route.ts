@@ -191,8 +191,10 @@ function buildOwnerNotificationEmail(userName: string, email: string): string {
 export async function POST(request: NextRequest) {
   try {
     const { userName, email } = await request.json()
+    console.log('send-welcome-email called:', { userName, email })
 
     if (!email) {
+      console.error('send-welcome-email: missing email')
       return NextResponse.json({ error: 'Missing email' }, { status: 400 })
     }
 
