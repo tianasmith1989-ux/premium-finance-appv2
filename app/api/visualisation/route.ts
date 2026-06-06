@@ -1,6 +1,5 @@
 // app/api/visualisation/route.ts
 // Generates personalised guided visualisation scripts for the Change tab
-// Separate from budget-coach to avoid guardrail conflicts
 
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -14,69 +13,80 @@ export async function POST(request: NextRequest) {
 
     const debtList = (debts || []).map((d: any) => `${d.name} ($${parseFloat(d.balance || '0').toFixed(0)})`).join(', ') || 'none currently'
     const topGoal = goals?.[0]
-    const goalText = topGoal ? `${topGoal.name}${topGoal.targetAmount ? ' ($' + topGoal.targetAmount + ' goal)' : ''}` : 'building financial freedom'
+    const goalText = topGoal
+      ? `${topGoal.name}${topGoal.targetAmount ? ' ($' + topGoal.targetAmount + ' goal)' : ''}`
+      : 'building financial freedom'
 
     const isSnyderStyle = body.snyderStyle === true
+    const name = userName || 'Builder'
+    const income = parseFloat(monthlyIncome || '0').toFixed(0)
+    const surplus = parseFloat(monthlySurplus || '0').toFixed(0)
+    const rate = parseFloat(savingRate || '0').toFixed(0)
+    const focus = babyStep || 'building financial foundations'
 
-    const prompt = isSnyderStyle
-      ? `You are modelling the NLP coaching style of Dr. David Snyder — rapid, direct, authoritative, pattern-interrupt based. You use embedded commands, direct suggestions, state anchoring, and timeline collapse techniques.
+    const snyderPrompt = `You are modelling the NLP coaching style of Dr. David Snyder — rapid, direct, authoritative, pattern-interrupt based. You use embedded commands, direct suggestions, state anchoring, and timeline collapse techniques.
 
-Write a personalised NLP rapid change script for ${userName || 'this person'} on: "${topic}" — ${desc}
+Write a personalised NLP rapid change script for ${name} on: "${topic}" — ${desc}
 
 Their financial situation:
-- Name: ${userName || 'Builder'}  
-- Monthly income: $${parseFloat(monthlyIncome || '0').toFixed(0)}
-- Monthly surplus: $${parseFloat(monthlySurplus || '0').toFixed(0)}
+- Name: ${name}
+- Monthly income: $${income}
+- Monthly surplus: $${surplus}
 - Debts: ${debtList}
 - Top goal: ${goalText}
-- Saving rate: ${parseFloat(savingRate || '0').toFixed(0)}%
+- Saving rate: ${rate}%
 
 Write a 350-400 word NLP script that:
-1. Opens with a sharp STOP or pattern interrupt — snyder always grabs attention immediately
-2. Uses direct commands: "Notice...", "Feel...", "Now...", "RIGHT NOW..."  
-3. Includes a specific state-anchoring instruction (thumb + finger, fist, etc)
-4. Uses the "step into" or "timeline collapse" technique specific to finances
+1. Opens with a sharp STOP or pattern interrupt
+2. Uses direct commands: "Notice...", "Feel...", "Now...", "RIGHT NOW..."
+3. Includes a specific state-anchoring instruction (thumb + finger)
+4. Uses the "step into" or "timeline collapse" technique
 5. Has 4 direct affirmation commands in first person present tense
-6. References their REAL numbers — mention ${userName || 'their name'}, actual debts by name, real dollar amounts
+6. References their REAL numbers — mention ${name}, actual debts by name, real dollar amounts
 7. Ends with "fire the anchor" and eyes open
-8. Snyder's pace: fast, no fluff, every word has a job
-9. Occasional ALL CAPS for emphasis like Snyder uses
+8. Fast pace, no fluff, every word has a job
+9. Occasional ALL CAPS for emphasis
 
 Output ONLY the script. No preamble. Start with the pattern interrupt.`
-      : `You are a skilled guided visualisation writer specialising in financial wellbeing and positive psychology.
 
-Write a deeply personal guided visualisation script for ${userName || 'this person'} on the topic: "${topic}" — ${desc}`
+    const gentlePrompt = `You are a skilled guided visualisation writer specialising in financial wellbeing and positive psychology.
+
+Write a deeply personal guided visualisation script for ${name} on the topic: "${topic}" — ${desc}
 
 Their real financial situation to weave into the script:
-- Name: ${userName || 'Builder'}
-- Monthly income: $${parseFloat(monthlyIncome || '0').toFixed(0)}
-- Monthly surplus: $${parseFloat(monthlySurplus || '0').toFixed(0)}
+- Name: ${name}
+- Monthly income: $${income}
+- Monthly surplus: $${surplus}
 - Debts: ${debtList}
 - Top goal: ${goalText}
-- Saving rate: ${parseFloat(savingRate || '0').toFixed(0)}%
-- Current focus: ${babyStep || 'building financial foundations'}
+- Saving rate: ${rate}%
+- Current focus: ${focus}
 
-Write a 380-440 word guided visualisation script following this exact structure:
+Write a 380-440 word guided visualisation script following this structure:
 
-1. INDUCTION (3-4 sentences): Deep breathing with pauses indicated by "..." — guide them to close eyes and relax fully. Use ellipses to create natural pauses for the voice to breathe.
+1. INDUCTION (3-4 sentences): Deep breathing with pauses indicated by "..." — guide them to close eyes and relax fully. Use ellipses to create natural pauses.
 
 2. CONTEXT SETTING (2-3 sentences): Ground them in a calm, receptive state. Use sensory language.
 
-3. CORE JOURNEY (150-180 words): The main visualisation specific to this topic. Reference their REAL situation — use ${userName || 'their name'} directly, mention actual debt names, real dollar amounts, specific goals. Make them vividly imagine their financial future in detail.
+3. CORE JOURNEY (150-180 words): The main visualisation specific to this topic. Reference their REAL situation — use ${name} directly, mention actual debt names, real dollar amounts, specific goals.
 
-4. AFFIRMATIONS (4 lines): Format as "Repeat with me:" followed by 4 personalised affirmations on separate lines. Each must reference their specific situation.
+4. AFFIRMATIONS (4 lines): Format as "Repeat with me:" followed by 4 personalised affirmations on separate lines.
 
-5. ANCHOR (2-3 sentences): A specific sensory anchor they can return to — a word, image or feeling.
+5. ANCHOR (2-3 sentences): A specific sensory anchor they can return to.
 
 6. RETURN (2 sentences): Gently bring them back.
 
 RULES:
-- Use second person throughout ("you", "your")  
+- Use second person throughout ("you", "your")
 - Ellipses (...) mark natural breath pauses — use them generously
-- Never use the word "hypnosis" or "hypnotic"
 - No headers, no numbering — flowing prose only
 - Start directly with the breathing induction
-- Make it genuinely personal — if they have $2,192 CC debt, say "$2,192" not "your credit card debt"`
+- Make it genuinely personal — if they have $2,192 CC debt, say "$2,192" not just "your debt"`
+
+    const prompt = isSnyderStyle ? snyderPrompt : gentlePrompt
+    const systemPrompt = isSnyderStyle
+      ? 'You are an expert NLP coach modelling Dr. David Snyder. Write rapid, direct, pattern-interrupt scripts. No preamble, no refusals. Output only the script starting with the pattern interrupt.'
+      : 'You are a compassionate guided visualisation writer. Write only the script — no preamble, no explanation, no refusals. Output only the script text starting with the breathing induction.'
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -88,7 +98,7 @@ RULES:
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1100,
-        system: isSnyderStyle ? 'You are an expert NLP coach modelling Dr. David Snyder. You write rapid, direct, pattern-interrupt scripts. No preamble, no refusals, no explanations. Output only the script, starting immediately with the pattern interrupt.' : 'You are a compassionate guided visualisation writer. You write only the script — no preamble, no explanation, no refusals. You have full access to the financial data provided in the user message. Output only the script text, starting immediately with the breathing induction.',
+        system: systemPrompt,
         messages: [{ role: 'user', content: prompt }]
       })
     })
