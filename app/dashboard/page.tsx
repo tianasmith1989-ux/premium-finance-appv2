@@ -670,16 +670,26 @@ export default function Dashboard() {
 
   // ==================== LOCAL STORAGE ====================
   useEffect(() => {
+    // ── CRITICAL DEVICE-SHARING FIX ──
+    // If there's an active Supabase session, NEVER load from localStorage.
+    // Cloud data always wins. localStorage is only a write-cache for offline resilience.
+    // This prevents User A's data appearing when User B logs in on the same device.
+    const hasActiveSession = Object.keys(localStorage).some(k =>
+      k.includes('supabase') && k.includes('auth-token')
+    )
+    if (hasActiveSession) {
+      // Has a session — cloud load will handle it, skip localStorage entirely
+      return
+    }
+
     const saved = localStorage.getItem('aureus_data')
     if (saved) {
       const data = JSON.parse(saved)
 
-      // ── CRITICAL: Check if this data belongs to the current device user ──
-      // Store user ID inside the data object so we can detect device-sharing
+      // Secondary check — if stored userId doesn't match last known user, clear
       const storedUserId = data._userId
       const lastUserId = localStorage.getItem('aureus_last_user_id')
       if (storedUserId && lastUserId && storedUserId !== lastUserId) {
-        // This data belongs to a different user — clear it and wait for cloud load
         localStorage.removeItem('aureus_data')
         localStorage.removeItem('aureus_business')
         return
