@@ -14269,12 +14269,12 @@ Tracking with Aureus 🏛️`
           if (!window.speechSynthesis) { alert('Text-to-speech is not supported in your browser. Try Chrome or Safari.'); return }
           window.speechSynthesis.cancel()
           const utterance = new SpeechSynthesisUtterance(script)
-          utterance.rate = hypnosisStyle === 'snyder' ? 0.88 : 0.72
-          utterance.pitch = hypnosisStyle === 'snyder' ? 0.9 : 0.85
+          utterance.rate = hypnosisStyle === 'power' ? 0.88 : 0.72
+          utterance.pitch = hypnosisStyle === 'power' ? 0.9 : 0.85
           utterance.volume = 0.95
           if (hypnosisVoices.length > 0) utterance.voice = hypnosisVoices[hypnosisVoiceIndex] || hypnosisVoices[0]
           hypnosisSpeechRef.current = utterance
-          const estimatedMs = (script.length / 14) * (1 / (hypnosisStyle === 'snyder' ? 0.88 : 0.72)) * 1000
+          const estimatedMs = (script.length / 14) * (1 / (hypnosisStyle === 'power' ? 0.88 : 0.72)) * 1000
           const interval = 200
           const steps = estimatedMs / interval
           let step = 0
@@ -14346,8 +14346,8 @@ Tracking with Aureus 🏛️`
                         <div style={{ color: '#6b5e3e', fontSize: '11px' }}>Soft, meditative, compassionate</div>
                       </button>
                       <button onClick={() => setHypnosisStyle('snyder')}
-                        style={{ flex: 1, padding: '10px 14px', background: hypnosisStyle === 'snyder' ? 'rgba(231,76,60,0.1)' : '#0d0d0d', border: '1px solid ' + (hypnosisStyle === 'snyder' ? '#e74c3c' : '#2a2218'), borderRadius: '10px', cursor: 'pointer', textAlign: 'left' as const }}>
-                        <div style={{ color: hypnosisStyle === 'snyder' ? '#e74c3c' : '#9a8a6a', fontSize: '13px', fontWeight: 700, marginBottom: '2px' }}>⚡ Power NLP</div>
+                        style={{ flex: 1, padding: '10px 14px', background: hypnosisStyle === 'power' ? 'rgba(231,76,60,0.1)' : '#0d0d0d', border: '1px solid ' + (hypnosisStyle === 'power' ? '#e74c3c' : '#2a2218'), borderRadius: '10px', cursor: 'pointer', textAlign: 'left' as const }}>
+                        <div style={{ color: hypnosisStyle === 'power' ? '#e74c3c' : '#9a8a6a', fontSize: '13px', fontWeight: 700, marginBottom: '2px' }}>⚡ Power NLP</div>
                         <div style={{ color: '#6b5e3e', fontSize: '11px' }}>Rapid, direct, pattern-interrupt</div>
                       </button>
                     </div>
@@ -14590,7 +14590,7 @@ Tracking with Aureus 🏛️`
                     <span style={{ fontSize: '36px' }}>{hypnosisSession.icon}</span>
                     <div>
                       <div style={{ color: hypnosisSession.colour, fontWeight: 800, fontSize: '20px' }}>{hypnosisSession.title}</div>
-                      <div style={{ color: '#9a8a6a', fontSize: '12px' }}>{hypnosisSession.duration} min · {hypnosisStyle === 'snyder' ? '⚡ Power NLP style' : '🕊 Gentle guided visualisation'}</div>
+                      <div style={{ color: '#9a8a6a', fontSize: '12px' }}>{hypnosisSession.duration} min · {hypnosisStyle === 'power' ? '⚡ Power NLP style' : '🕊 Gentle guided visualisation'}</div>
                     </div>
                   </div>
 
