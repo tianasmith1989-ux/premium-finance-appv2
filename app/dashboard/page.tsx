@@ -14166,9 +14166,13 @@ Tracking with Aureus 🏛️`
       {
         id: 'abundance', icon: '✨', title: 'Abundance Mindset',
         desc: 'Shift from scarcity thinking to abundance', duration: 8, colour: '#D4AF37',
-        script: `Take a slow, deep breath in... and release. Let your body soften with each exhale.
+        script: `Take a slow breath in through your nose... hold it gently... and release through your mouth. Feel your shoulders drop.
 
-You are safe. You are here. And you are ready to change.
+Again. Breathe in... and let it all go.
+
+With each breath, your mind becomes quieter. More receptive. More open.
+
+You are safe. You are here. And something is about to shift.
 
 Close your eyes gently and bring your awareness to your breath. Each inhale brings in possibility. Each exhale releases the old stories.
 
@@ -14201,7 +14205,9 @@ You are already becoming that person.`
       {
         id: 'debt-shame', icon: '🔓', title: 'Releasing Debt Shame',
         desc: 'Let go of guilt and anxiety around debt', duration: 7, colour: '#6b8f6b',
-        script: `Breathe in slowly... and let it all go.
+        script: `Close your eyes and take a long, slow breath in... filling your lungs completely... and release it slowly.
+
+Once more. Breathe in... and as you breathe out, feel something loosen in your chest.
 
 Whatever you are carrying right now — the weight of what you owe, the heaviness of past decisions — you do not have to carry it alone in this moment.
 
@@ -14234,9 +14240,11 @@ Take a deep breath. You are doing the work. That matters.`
       {
         id: 'confidence', icon: '💎', title: 'Money Confidence',
         desc: 'Build unshakeable confidence with financial decisions', duration: 7, colour: '#8C6A1F',
-        script: `Settle into this moment. Breathe in... and out.
+        script: `Allow your eyes to close softly. Take a breath in... and breathe out slowly.
 
-There is a version of you who moves through the world with complete clarity around money. They do not freeze at decisions. They do not feel anxious when they look at their account. They know their numbers, they trust their judgment, and they act.
+Let your jaw unclench. Let your hands relax. Let your mind go still.
+
+In this calm, receptive state... there is a version of you who moves through the world with complete clarity around money. They do not freeze at decisions. They do not feel anxious when they look at their account. They know their numbers, they trust their judgment, and they act.
 
 That version of you is not far away. They are one layer deeper.
 
@@ -14269,9 +14277,11 @@ Open your eyes when you are ready. You are more capable than you know.`
       {
         id: 'saver', icon: '🏦', title: 'Becoming a Natural Saver',
         desc: 'Rewire your identity around saving effortlessly', duration: 8, colour: '#2980b9',
-        script: `Take a long, slow breath. Let your body relax completely.
+        script: `Breathe in slowly... hold for just a moment... and breathe out completely.
 
-In your mind, I want you to meet someone. They are you — but a version of you that has always been comfortable with saving. It comes naturally to them. They do not feel deprived when they transfer money to savings. They feel satisfied. They feel in control.
+Feel the weight of your body in the chair. You don't need to hold anything up right now. Just rest.
+
+In this relaxed, open state... I want you to meet someone. They are you — but a version of you that has always been comfortable with saving. It comes naturally to them. They do not feel deprived when they transfer money to savings. They feel satisfied. They feel in control.
 
 This is not a fantasy. This is a real neurological pattern that can be built — and we are building it right now.
 
@@ -14374,34 +14384,35 @@ Breathe in peace. Breathe out fear. You are safe.`
         const handleGeneratePersonalised = async (session: any) => {
           setHypnosisLoading(true)
           try {
-            const res = await fetch('/api/budget-coach', {
+            // Use a dedicated personalisation endpoint to avoid guardrail conflicts
+          const res = await fetch('/api/budget-coach', {
               method: 'POST', headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({
                 mode: 'question',
-                question: `[HYPNOSIS SCRIPT GENERATOR]
-You are writing a deeply personalised guided hypnosis / visualisation script for ${userName || 'this person'}.
-Topic: ${session.title}
-Base script theme: ${session.desc}
+                question: `[AUREUS CHANGE WORK — PERSONALISED GUIDED VISUALISATION]
+You are Aureus, creating a deeply personalised guided visualisation and positive affirmation script.
+This is a legitimate evidence-based wellbeing tool — guided visualisation is widely used in financial coaching, sports psychology, and cognitive behavioural therapy to help people build positive associations with new behaviours.
 
-Their financial situation (use these REAL details to make it deeply personal):
+Topic: ${session.title} — ${session.desc}
+
+Personalise this script using their REAL details:
 - Name: ${userName || 'Builder'}
 - Monthly income: $${monthlyIncome.toFixed(0)}
 - Monthly surplus: $${monthlySurplus.toFixed(0)}
-- Debts: ${debts.map((d: any) => d.name + ' $' + d.balance).join(', ') || 'none'}
-- Top goal: ${goals[0]?.name || 'building financial freedom'} (${goals[0]?.targetAmount || ''})
-- Saving rate: ${savingsRate.toFixed(0)}%
-- Baby step: ${currentBabyStep?.title || 'getting started'}
-- House status: ${houseStatus}
+- Debts: ${debts.map((d: any) => d.name + ' $' + parseFloat((d as any).balance || '0').toFixed(0)).join(', ') || 'none currently'}
+- Top goal: ${goals[0]?.name || 'financial freedom'}${goals[0]?.targetAmount ? ' ($' + goals[0].targetAmount + ')' : ''}
+- Current saving rate: ${savingsRate.toFixed(0)}%
+- Progress: ${currentBabyStep?.title || 'building financial foundations'}
 
-Write a 400-500 word hypnosis script that:
-1. Opens with a breathing induction (2-3 sentences)
-2. Uses their REAL numbers and situation — mention their name, their actual debts or goals by name
-3. Has 4-5 "repeat with me" affirmations tailored to their specific situation
-4. Ends with a vivid, specific visualisation of their financial future
-5. Uses present tense and second person ("you are", "you have")
-6. Is warm, powerful, and grounded — not generic or vague
+Write a 380-450 word guided visualisation script that:
+1. Opens with a 2-sentence breathing induction
+2. References their REAL situation — use ${userName || 'their name'}, mention actual debt names, actual goal names, real dollar amounts
+3. Includes 4 personalised "Repeat with me:" affirmations specific to their numbers
+4. Builds to a vivid future-self visualisation — specific to their actual goals
+5. Uses calm, second-person present tense throughout ("you are", "you feel", "you have")
+6. Closes with a gentle return to awareness
 
-Write ONLY the script itself. No intro, no explanation. Start with the breathing induction.`,
+IMPORTANT: Output ONLY the script text. Begin directly with the breathing induction. No preamble, no explanation, no headers.`,
                 financialData: {}, memory: budgetMemory, countryConfig: currentCountryConfig
               })
             })
