@@ -406,6 +406,11 @@ export default function Dashboard() {
   const [hypnosisSpeaking, setHypnosisSpeaking] = useState(false)
   const [hypnosisVoices, setHypnosisVoices] = useState<SpeechSynthesisVoice[]>([])
   const [hypnosisVoiceIndex, setHypnosisVoiceIndex] = useState(0)
+  const [hypnosisHistory, setHypnosisHistory] = useState<{id: string, title: string, icon: string, date: string, personalised: boolean}[]>([])
+  const [hypnosisSaved, setHypnosisSaved] = useState<{id: string, title: string, icon: string, script: string, colour: string}[]>([])
+  const [hypnosisTab, setHypnosisTab] = useState<'sessions'|'history'|'saved'>('sessions')
+  const [hypnosisStyle, setHypnosisStyle] = useState<'gentle'|'snyder'>('gentle')
+  const [hypnosisRecommended, setHypnosisRecommended] = useState<string | null>(null)
 
   // Values elicitation
   const [showValuesElicitation, setShowValuesElicitation] = useState(false)
@@ -923,6 +928,15 @@ export default function Dashboard() {
     const timer = setTimeout(() => { if (authUser) saveToCloud() }, 2000)
     return () => clearTimeout(timer)
   }, [lastDailyCheckIn, dailyCheckInLog, streak, lastCheckIn])
+
+  // Recommend a hypnosis session based on user's situation
+  useEffect(() => {
+    if (!onboardingComplete) return
+    if (debts.length > 0) { setHypnosisRecommended('debt-shame'); return }
+    if (monthlySurplus > 0 && savingsRate < 15) { setHypnosisRecommended('saver'); return }
+    if (goals.length > 0) { setHypnosisRecommended('debt-free'); return }
+    setHypnosisRecommended('abundance')
+  }, [onboardingComplete, debts.length, savingsRate, goals.length])
 
   // Load available voices for hypnosis
   useEffect(() => {
@@ -14162,234 +14176,45 @@ Tracking with Aureus 🏛️`
 
       {/* ── HYPNOSIS & GUIDED VISUALISATION MODAL ── */}
       {showHypnosis && (() => {
-        const sessions = [
-      {
-        id: 'abundance', icon: '✨', title: 'Abundance Mindset',
-        desc: 'Shift from scarcity thinking to abundance', duration: 8, colour: '#D4AF37',
-        script: `Take a slow breath in through your nose... hold it gently... and release through your mouth. Feel your shoulders drop.
-
-Again. Breathe in... and let it all go.
-
-With each breath, your mind becomes quieter. More receptive. More open.
-
-You are safe. You are here. And something is about to shift.
-
-Close your eyes gently and bring your awareness to your breath. Each inhale brings in possibility. Each exhale releases the old stories.
-
-You have spent years believing there is never enough. Never enough money. Never enough time. Never enough security. But today, right now, we begin to rewrite that story.
-
-Imagine standing at the edge of a vast, golden field at sunrise. The light is warm on your face. This field represents everything that is available to you — opportunity, abundance, growth. It stretches further than you can see.
-
-In this state, your mind is open. Your nervous system is calm. You are ready to receive new beliefs.
-
-Repeat silently with me:
-
-I am worthy of financial abundance.
-
-Money flows to me because I create real value.
-
-I manage money with confidence and clarity.
-
-Every decision I make builds my future.
-
-I am not defined by my past with money. I am defined by who I choose to become today.
-
-Feel these words settle into your body. Not as wishes — as facts. As the truth of who you are becoming.
-
-Now picture your future self — one year from now. They are calm. They are clear. They have built something real. They look back at this moment and smile — because this was when everything changed.
-
-Take one more deep breath. And when you're ready, gently open your eyes.
-
-You are already becoming that person.`
-      },
-      {
-        id: 'debt-shame', icon: '🔓', title: 'Releasing Debt Shame',
-        desc: 'Let go of guilt and anxiety around debt', duration: 7, colour: '#6b8f6b',
-        script: `Close your eyes and take a long, slow breath in... filling your lungs completely... and release it slowly.
-
-Once more. Breathe in... and as you breathe out, feel something loosen in your chest.
-
-Whatever you are carrying right now — the weight of what you owe, the heaviness of past decisions — you do not have to carry it alone in this moment.
-
-Debt is not a character flaw. It is not proof that you are broken or bad or incapable. It is a number on a page. And numbers can change.
-
-Imagine setting down a heavy backpack you have been carrying for years. You can still see it — the debt is still there — but you are no longer crushed under its weight. You are standing tall. You can breathe.
-
-You made the best decisions you could with what you knew and what you had. That is true. That has always been true.
-
-And now — now you know more. Now you have a plan. Now you have a system.
-
-Repeat with me:
-
-I release shame about my financial past.
-
-I am not my debt. My debt is not my identity.
-
-Every payment I make is proof of my commitment.
-
-I am building a new story, one decision at a time.
-
-I forgive myself. I free myself. I move forward.
-
-Picture the day your debt reaches zero. The number disappears. The burden lifts completely. How does your body feel in that moment? That feeling is real. That day is coming. Hold it in your chest like a warm light.
-
-Let shame be replaced by purpose. Let anxiety be replaced by action.
-
-Take a deep breath. You are doing the work. That matters.`
-      },
-      {
-        id: 'confidence', icon: '💎', title: 'Money Confidence',
-        desc: 'Build unshakeable confidence with financial decisions', duration: 7, colour: '#8C6A1F',
-        script: `Allow your eyes to close softly. Take a breath in... and breathe out slowly.
-
-Let your jaw unclench. Let your hands relax. Let your mind go still.
-
-In this calm, receptive state... there is a version of you who moves through the world with complete clarity around money. They do not freeze at decisions. They do not feel anxious when they look at their account. They know their numbers, they trust their judgment, and they act.
-
-That version of you is not far away. They are one layer deeper.
-
-Let your breath slow. Let your shoulders drop. Feel the chair or ground beneath you — solid, supportive.
-
-Now imagine walking into any financial conversation — with your bank, your partner, a shop, a negotiation — and feeling completely grounded. You know what you want. You know what you're worth. You know your numbers.
-
-This is not arrogance. This is clarity.
-
-Repeat with me:
-
-I make financial decisions from a place of calm, not fear.
-
-I trust myself to figure things out.
-
-I am capable of understanding my own money.
-
-I ask for what I want. I negotiate. I advocate for myself.
-
-My past does not predict my financial future. I decide my future.
-
-Feel that confidence as a physical sensation — maybe a warmth in your chest, a steadiness in your spine, a quietness in your mind.
-
-You do not need to have it all figured out. You just need to take the next step with intention.
-
-Breathe in strength. Breathe out doubt.
-
-Open your eyes when you are ready. You are more capable than you know.`
-      },
-      {
-        id: 'saver', icon: '🏦', title: 'Becoming a Natural Saver',
-        desc: 'Rewire your identity around saving effortlessly', duration: 8, colour: '#2980b9',
-        script: `Breathe in slowly... hold for just a moment... and breathe out completely.
-
-Feel the weight of your body in the chair. You don't need to hold anything up right now. Just rest.
-
-In this relaxed, open state... I want you to meet someone. They are you — but a version of you that has always been comfortable with saving. It comes naturally to them. They do not feel deprived when they transfer money to savings. They feel satisfied. They feel in control.
-
-This is not a fantasy. This is a real neurological pattern that can be built — and we are building it right now.
-
-Your brain learns by repetition and emotion. So we are going to give it both.
-
-Imagine the feeling — not just the thought, the feeling — of watching your savings grow. The number goes up. You did that. Nobody gave it to you. You chose it, over and over.
-
-That feeling is pride. That feeling is power.
-
-Repeat with me:
-
-I am someone who saves consistently.
-
-Saving first is how I honour my future self.
-
-Every dollar saved is a vote for the person I am becoming.
-
-I do not save what is left. I spend what is left after saving.
-
-Saving is not sacrifice. It is investment in myself.
-
-See yourself on an ordinary Tuesday — you get paid, and before you do anything else, a portion goes straight to savings. Automatically. Effortlessly. It feels normal. It feels right. It feels like you.
-
-Because it is you. This is who you are now.
-
-Take a deep breath. Let this new identity settle in. Let it feel real — because it is becoming real with every breath you take.`
-      },
-      {
-        id: 'debt-free', icon: '🏁', title: 'Your Debt-Free Future',
-        desc: 'Vividly experience life without debt', duration: 9, colour: '#27ae60',
-        script: `Close your eyes. Take three slow breaths. Let everything else fall away.
-
-I want to take you somewhere. It is the day your last debt is paid.
-
-Picture it clearly. What device are you on when you make that final payment? What time of day is it? Is anyone with you?
-
-You press the button. The balance reads zero. 
-
-Zero.
-
-Let that land. After months — maybe years — of payments, of budgeting, of choosing your future over your present moment again and again — it is done.
-
-How does your body feel? Notice the lightness. Notice the breathing. Notice the space that has opened up where that weight used to be.
-
-This is not a fantasy. This is a preview of your actual life. Your brain does not fully distinguish between a vivid imagination and reality — which means the emotional pathway to that moment begins right now.
-
-Repeat with me:
-
-I am on my way to being completely debt-free.
-
-Every payment brings me closer. Every payment matters.
-
-I choose my future self over momentary comfort.
-
-I will reach zero. It is inevitable. I have decided.
-
-My life after debt is already being built.
-
-Now imagine one thing you will do the month after your debt is cleared. One thing that your previous payment was blocking. Feel the joy of that. Let it be vivid and specific.
-
-That is what you are working towards. Keep that image. Carry it with you.
-
-Breathe deeply. You are on your way.`
-      },
-      {
-        id: 'emergency', icon: '🛡️', title: 'Emergency Fund Peace',
-        desc: 'Feel the safety of a fully-funded emergency fund', duration: 6, colour: '#9b59b6',
-        script: `Breathe slowly. Feel yourself soften.
-
-There is a feeling I want to give you today. It is one of the most underrated feelings in personal finance. It is the feeling of being okay — no matter what happens.
-
-Imagine your emergency fund is fully funded. It sits there, untouched, doing nothing except existing. And because it exists, you are free.
-
-Your car can break down. You can have a medical expense. Your hours can be cut. And instead of panic — there is calm. Because you planned for this. Because you built this. Because you are someone who takes care of yourself.
-
-This is not just a financial concept. This is nervous system regulation. When your brain knows you are safe, it stops running on fear.
-
-Repeat with me:
-
-I am building my safety net, one payment at a time.
-
-Financial security is not just possible for other people. It is for me.
-
-I deserve to feel financially safe.
-
-Every contribution to my emergency fund is an act of self-care.
-
-I am protected. I am prepared. I am at peace.
-
-Picture that fund growing. See the number rising. Feel the tension in your shoulders releasing with every deposit.
-
-One day — soon — you will reach it. And on that day, something will shift. Not just in your finances. In your nervous system. In how you move through the world.
-
-You are building that day right now.
-
-Breathe in peace. Breathe out fear. You are safe.`
-      },
-    ]
+        const GENTLE_SESSIONS = [
+          { id: 'abundance', icon: '✨', title: 'Abundance Mindset', desc: 'Shift from scarcity to abundance', duration: 8, colour: '#D4AF37',
+            script: `Take a slow breath in through your nose... hold it gently... and release through your mouth. Feel your shoulders drop.\n\nAgain. Breathe in... and let it all go.\n\nWith each breath, your mind becomes quieter. More receptive. More open.\n\nYou are safe. You are here. And something is about to shift.\n\nYou have spent years believing there is never enough. Never enough money. Never enough time. Never enough security. But today, right now, we begin to rewrite that story.\n\nImagine standing at the edge of a vast, golden field at sunrise. The light is warm on your face. This field represents everything that is available to you — opportunity, abundance, growth. It stretches further than you can see.\n\nIn this state, your mind is open. Your nervous system is calm. You are ready to receive new beliefs.\n\nRepeat with me:\n\nI am worthy of financial abundance.\n\nMoney flows to me because I create real value.\n\nI manage money with confidence and clarity.\n\nEvery decision I make builds my future.\n\nFeel these words settle into your body. Not as wishes — as facts. As the truth of who you are becoming.\n\nNow picture your future self — one year from now. They are calm. They are clear. They have built something real. They look back at this moment and smile — because this was when everything changed.\n\nTake one more deep breath. And when you are ready, gently open your eyes.\n\nYou are already becoming that person.` },
+          { id: 'debt-shame', icon: '🔓', title: 'Releasing Debt Shame', desc: 'Let go of guilt and anxiety around debt', duration: 7, colour: '#6b8f6b',
+            script: `Close your eyes and take a long, slow breath in... filling your lungs completely... and release it slowly.\n\nOnce more. Breathe in... and as you breathe out, feel something loosen in your chest.\n\nWhatever you are carrying right now — the weight of what you owe, the heaviness of past decisions — you do not have to carry it alone in this moment.\n\nDebt is not a character flaw. It is not proof that you are broken or bad or incapable. It is a number on a page. And numbers can change.\n\nImagine setting down a heavy backpack you have been carrying for years. You can still see it — the debt is still there — but you are no longer crushed under its weight. You are standing tall. You can breathe.\n\nYou made the best decisions you could with what you knew and what you had. That is true. That has always been true.\n\nRepeat with me:\n\nI release shame about my financial past.\n\nI am not my debt. My debt is not my identity.\n\nEvery payment I make is proof of my commitment.\n\nI forgive myself. I free myself. I move forward.\n\nPicture the day your debt reaches zero. The number disappears. The burden lifts completely. Hold that feeling in your chest like a warm light.\n\nLet shame be replaced by purpose. Let anxiety be replaced by action.\n\nTake a deep breath. You are doing the work. That matters.` },
+          { id: 'confidence', icon: '💎', title: 'Money Confidence', desc: 'Build unshakeable confidence with financial decisions', duration: 7, colour: '#8C6A1F',
+            script: `Allow your eyes to close softly. Take a breath in... and breathe out slowly.\n\nLet your jaw unclench. Let your hands relax. Let your mind go still.\n\nIn this calm, receptive state... there is a version of you who moves through the world with complete clarity around money. They do not freeze at decisions. They do not feel anxious when they look at their account. They know their numbers, they trust their judgment, and they act.\n\nThat version of you is not far away. They are one layer deeper.\n\nNow imagine walking into any financial conversation — with your bank, your partner, a negotiation — and feeling completely grounded. You know what you want. You know what you are worth. You know your numbers.\n\nThis is not arrogance. This is clarity.\n\nRepeat with me:\n\nI make financial decisions from a place of calm, not fear.\n\nI trust myself to figure things out.\n\nI am capable of understanding my own money.\n\nMy past does not predict my financial future. I decide my future.\n\nFeel that confidence as a physical sensation — a warmth in your chest, a steadiness in your spine, a quietness in your mind.\n\nBreathe in strength. Breathe out doubt.\n\nOpen your eyes when you are ready. You are more capable than you know.` },
+          { id: 'saver', icon: '🏦', title: 'Becoming a Natural Saver', desc: 'Rewire your identity around saving effortlessly', duration: 8, colour: '#2980b9',
+            script: `Breathe in slowly... hold for just a moment... and breathe out completely.\n\nFeel the weight of your body in the chair. You do not need to hold anything up right now. Just rest.\n\nIn this relaxed, open state... I want you to meet someone. They are you — but a version of you that has always been comfortable with saving. It comes naturally to them. They do not feel deprived when they transfer money to savings. They feel satisfied. They feel in control.\n\nThis is not a fantasy. This is a real neurological pattern that can be built — and we are building it right now.\n\nImagine the feeling — not just the thought, the feeling — of watching your savings grow. The number goes up. You did that. Nobody gave it to you. You chose it, over and over.\n\nThat feeling is pride. That feeling is power.\n\nRepeat with me:\n\nI am someone who saves consistently.\n\nSaving first is how I honour my future self.\n\nEvery dollar saved is a vote for the person I am becoming.\n\nSaving is not sacrifice. It is investment in myself.\n\nSee yourself on an ordinary Tuesday — you get paid, and before you do anything else, a portion goes straight to savings. Automatically. Effortlessly. It feels normal. It feels right. It feels like you.\n\nBecause it is you. This is who you are now.\n\nTake a deep breath. Let this new identity settle in.` },
+          { id: 'debt-free', icon: '🏁', title: 'Your Debt-Free Future', desc: 'Vividly experience life without debt', duration: 9, colour: '#27ae60',
+            script: `Close your eyes. Take three slow breaths. Let everything else fall away.\n\nI want to take you somewhere. It is the day your last debt is paid.\n\nPicture it clearly. What device are you on when you make that final payment? What time of day is it? Is anyone with you?\n\nYou press the button. The balance reads zero.\n\nZero.\n\nLet that land. After months — maybe years — of payments, of budgeting, of choosing your future over your present moment again and again — it is done.\n\nHow does your body feel? Notice the lightness. Notice the breathing. Notice the space that has opened up where that weight used to be.\n\nRepeat with me:\n\nI am on my way to being completely debt-free.\n\nEvery payment brings me closer. Every payment matters.\n\nI choose my future self over momentary comfort.\n\nMy life after debt is already being built.\n\nNow imagine one thing you will do the month after your debt is cleared. Feel the joy of that. Let it be vivid and specific.\n\nThat is what you are working towards. Keep that image. Carry it with you.\n\nBreathe deeply. You are on your way.` },
+          { id: 'emergency', icon: '🛡️', title: 'Emergency Fund Peace', desc: 'Feel the safety of a fully-funded emergency fund', duration: 6, colour: '#9b59b6',
+            script: `Breathe slowly. Feel yourself soften.\n\nThere is a feeling I want to give you today. It is one of the most underrated feelings in personal finance. It is the feeling of being okay — no matter what happens.\n\nImagine your emergency fund is fully funded. It sits there, untouched, doing nothing except existing. And because it exists, you are free.\n\nYour car can break down. You can have a medical expense. Your hours can be cut. And instead of panic — there is calm. Because you planned for this. Because you built this. Because you are someone who takes care of yourself.\n\nRepeat with me:\n\nI am building my safety net, one payment at a time.\n\nFinancial security is not just possible for other people. It is for me.\n\nI deserve to feel financially safe.\n\nEvery contribution to my emergency fund is an act of self-care.\n\nPicture that fund growing. See the number rising. Feel the tension in your shoulders releasing with every deposit.\n\nOne day — soon — you will reach it. And on that day, something will shift. Not just in your finances. In how you move through the world.\n\nBreathe in peace. Breathe out fear. You are safe.` },
+        ]
+
+        const SNYDER_SESSIONS = [
+          { id: 'snyder-wealth', icon: '⚡', title: 'Wealth Identity Install', desc: 'NLP rapid wealth identity programming', duration: 7, colour: '#D4AF37',
+            script: `STOP. Right now. Take a breath.\n\nNotice how your mind just responded to that command. That is your unconscious mind — and it has been running financial programs that do not serve you. Today we rewrite them. Fast.\n\nSit up straight. Eyes closed. Breathe normally.\n\nNow I want you to think of the person you know — or have seen — who is most naturally, effortlessly comfortable with money. Someone whose relationship with wealth is just... easy. Automatic. Like breathing.\n\nSee them clearly. Notice how they stand. How they speak. How they make decisions. There is no hesitation. No apology. No guilt. Just clarity.\n\nNow — and this is important — step into that person. Not alongside them. INTO them. Feel their posture become your posture. Feel their certainty become your certainty. Their relationship with money is now running through your neurology.\n\nRepeat these commands to your unconscious mind — say them like you mean them:\n\nMy unconscious mind now runs wealth-building programs automatically.\n\nI make money decisions from certainty, not scarcity.\n\nWealth creation is a skill I am installing now.\n\nI am the kind of person who builds financial freedom.\n\nAnchor this feeling. Press your thumb and index finger together RIGHT NOW while you feel this certainty. This is your wealth anchor. Any time you need this state — press those fingers together.\n\nTake a breath. Open your eyes. That install is complete.` },
+          { id: 'snyder-debt', icon: '🧠', title: 'Debt Pattern Interrupt', desc: 'Break the anxiety loop around debt with NLP', duration: 6, colour: '#e74c3c',
+            script: `Ready? Good. Pay attention — this is going to move fast.\n\nClose your eyes. Think about your debt. Feel the anxiety that comes up. Notice where you feel it in your body — chest, stomach, shoulders. Good. That is the pattern we are interrupting.\n\nNow — here is something your unconscious mind needs to hear:\n\nAnxiety about debt is not useful information. It is a program. And programs can be updated.\n\nImagine that anxiety as a picture in your mind. Give it a colour, a shape. Now — shrink it. Make it smaller. Push it further away. Drain the colour out of it until it is grey and distant and small.\n\nReplace it with a different picture. A clear spreadsheet. A plan. A number going down month by month. Make THAT image big, bright, and close.\n\nYour brain responds to what you give it attention and emotion. We are redirecting both.\n\nRepeat these pattern-breaking commands:\n\nI see debt as a problem to solve, not a sentence to serve.\n\nEvery time I think about debt, I think about the plan.\n\nMy nervous system is calm when I look at my numbers.\n\nI act from clarity. Not fear.\n\nFire that anchor — press thumb and index finger — lock in this calm, problem-solving state.\n\nOpen your eyes. Pattern interrupted. New program running.` },
+          { id: 'snyder-future', icon: '🔮', title: 'Future Self Collapse', desc: 'Collapse the timeline — become your wealthy future self now', duration: 8, colour: '#8e44ad',
+            script: `Close your eyes. Breathe once.\n\nI want you to project yourself forward in time. Five years. Your debts are gone. Your savings are real. You wake up without financial anxiety. This is not a fantasy — your brain cannot tell the difference between a vividly imagined future and a real memory.\n\nSee that version of you clearly. What do they look like? How do they carry themselves? What does their morning feel like? Notice every detail.\n\nNow — your future self is going to walk towards you. They are coming back through time to meet you right now, in this moment. They stop in front of you.\n\nThey have a message for you. Listen carefully.\n\n[Pause and listen to whatever comes up.]\n\nNow your future self reaches out and places their hand on your shoulder. And as they do, everything they know about money, everything they feel about wealth, every habit and belief that got them to where they are — transfers to you. Right now. Completely.\n\nYou are not becoming them. You ARE them. The timeline has collapsed.\n\nRepeat these truths from your future self:\n\nI already know how to do this. I have done it.\n\nThe wealth I want already exists in my future. I am walking towards it.\n\nEvery good decision I make today is a memory my future self already has.\n\nI am not working towards my best financial life. I am living it now.\n\nFire your anchor. Lock this in.\n\nTake a breath. Open your eyes. You just collapsed a timeline.` },
+          { id: 'snyder-confidence', icon: '🦁', title: 'Absolute Money Certainty', desc: 'Install unshakeable certainty in financial decisions', duration: 7, colour: '#e67e22',
+            script: `Sit up. Eyes closed. Right now.\n\nI want you to remember a time — any time — when you were completely certain about something. Maybe a skill you have, something you know deeply, a moment where there was zero doubt. Find it.\n\nFeel that certainty in your body. Where is it? Chest? Spine? Just notice.\n\nGood. That feeling — that neurological state — is certainty. And certainty is a state, not a fact. Which means you can run it deliberately.\n\nNow take that feeling and move it — deliberately — into how you relate to money. Your ability to track it. Your ability to make decisions. Your ability to build wealth.\n\nYou do not need permission. You do not need more information. You need to make a decision and take action. That is all wealth ever was.\n\nRepeat these certainty installations:\n\nI am certain in my ability to manage and grow money.\n\nI make decisions quickly and adjust as I go.\n\nI do not wait to feel ready. I act and readiness follows.\n\nFinancial mastery is my natural state.\n\nNow — double that certainty. Triple it. Fill your entire body with it.\n\nFire your anchor. Press those fingers. Lock it in.\n\nOpen your eyes. That is your default state now.` },
+        ]
+
+        const sessions = hypnosisStyle === 'gentle' ? GENTLE_SESSIONS : SNYDER_SESSIONS
+        const allSessions = [...GENTLE_SESSIONS, ...SNYDER_SESSIONS]
 
         const handleGeneratePersonalised = async (session: any) => {
           setHypnosisLoading(true)
           try {
-            // Call dedicated visualisation route — no guardrails conflict
-          const res = await fetch('/api/visualisation', {
+            const res = await fetch('/api/visualisation', {
               method: 'POST', headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({
                 topic: session.title,
                 desc: session.desc,
+                style: hypnosisStyle,
+                snyderStyle: hypnosisStyle === 'snyder',
                 userName: userName || '',
                 monthlyIncome: monthlyIncome.toFixed(0),
                 monthlySurplus: monthlySurplus.toFixed(0),
@@ -14400,12 +14225,26 @@ Breathe in peace. Breathe out fear. You are safe.`
               })
             })
             const data = await res.json()
-            const text = data.script || ''
-            setHypnosisPersonalised(text)
+            setHypnosisPersonalised(data.script || '')
           } catch (e) {
-            setHypnosisPersonalised('Unable to generate personalised session. Please try again.')
+            setHypnosisPersonalised('Unable to generate. Please try again.')
           }
           setHypnosisLoading(false)
+        }
+
+        const saveSession = (session: any) => {
+          const script = hypnosisPersonalised || session.script
+          const existing = hypnosisSaved.find((s: any) => s.id === session.id)
+          if (existing) {
+            setHypnosisSaved(prev => prev.filter((s: any) => s.id !== session.id))
+          } else {
+            setHypnosisSaved(prev => [...prev, { id: session.id, title: session.title, icon: session.icon, script, colour: session.colour }])
+          }
+        }
+
+        const logSessionHistory = (session: any, personalised: boolean) => {
+          const entry = { id: session.id, title: session.title, icon: session.icon, date: new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }), personalised }
+          setHypnosisHistory(prev => [entry, ...prev].slice(0, 20))
         }
 
         const stopSpeech = () => {
@@ -14417,22 +14256,15 @@ Breathe in peace. Breathe out fear. You are safe.`
         }
 
         const speakSession = (script: string) => {
-          if (!window.speechSynthesis) {
-            alert('Text-to-speech is not supported in your browser. Try Chrome or Safari.')
-            return
-          }
+          if (!window.speechSynthesis) { alert('Text-to-speech is not supported in your browser. Try Chrome or Safari.'); return }
           window.speechSynthesis.cancel()
           const utterance = new SpeechSynthesisUtterance(script)
-          // Hypnotic voice settings — slow, low, calm
-          utterance.rate = 0.72   // slow and deliberate
-          utterance.pitch = 0.85  // slightly lower than normal
+          utterance.rate = hypnosisStyle === 'snyder' ? 0.88 : 0.72
+          utterance.pitch = hypnosisStyle === 'snyder' ? 0.9 : 0.85
           utterance.volume = 0.95
-          if (hypnosisVoices.length > 0) {
-            utterance.voice = hypnosisVoices[hypnosisVoiceIndex] || hypnosisVoices[0]
-          }
+          if (hypnosisVoices.length > 0) utterance.voice = hypnosisVoices[hypnosisVoiceIndex] || hypnosisVoices[0]
           hypnosisSpeechRef.current = utterance
-          // Progress timer based on estimated speaking duration
-          const estimatedMs = (script.length / 14) * (1 / 0.72) * 1000
+          const estimatedMs = (script.length / 14) * (1 / (hypnosisStyle === 'snyder' ? 0.88 : 0.72)) * 1000
           const interval = 200
           const steps = estimatedMs / interval
           let step = 0
@@ -14444,117 +14276,224 @@ Breathe in peace. Breathe out fear. You are safe.`
             step++
             setHypnosisProgress(Math.min(99, (step / steps) * 100))
           }, interval)
-          utterance.onend = () => {
-            clearInterval(hypnosisTimerRef.current)
-            setHypnosisProgress(100)
-            setHypnosisSpeaking(false)
-            setHypnosisPlaying(false)
-          }
-          utterance.onerror = () => {
-            clearInterval(hypnosisTimerRef.current)
-            setHypnosisSpeaking(false)
-            setHypnosisPlaying(false)
-          }
+          utterance.onend = () => { clearInterval(hypnosisTimerRef.current); setHypnosisProgress(100); setHypnosisSpeaking(false); setHypnosisPlaying(false) }
+          utterance.onerror = () => { clearInterval(hypnosisTimerRef.current); setHypnosisSpeaking(false); setHypnosisPlaying(false) }
           window.speechSynthesis.speak(utterance)
         }
 
-        const startSession = (script: string) => {
+        const startRead = (script: string) => {
           setHypnosisPlaying(true)
           setHypnosisProgress(0)
           const duration = (hypnosisSession?.duration || 7) * 60 * 1000
-          const interval = 100
-          const steps = duration / interval
+          const steps = duration / 200
           let step = 0
           if (hypnosisTimerRef.current) clearInterval(hypnosisTimerRef.current)
           hypnosisTimerRef.current = setInterval(() => {
             step++
             setHypnosisProgress(Math.min(100, (step / steps) * 100))
-            if (step >= steps) {
-              clearInterval(hypnosisTimerRef.current)
-              setHypnosisPlaying(false)
-            }
-          }, interval)
+            if (step >= steps) { clearInterval(hypnosisTimerRef.current); setHypnosisPlaying(false) }
+          }, 200)
         }
 
+        const recommendedSession = allSessions.find((s: any) => s.id === hypnosisRecommended)
+
         return (
-          <div style={{ position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.97)', zIndex: 9500, display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' }}>
+          <div style={{ position: 'fixed' as const, inset: 0, background: '#080808', zIndex: 9500, display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' }}>
+
             {/* Header */}
-            <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(212,175,55,0.15)' }}>
-              <div>
-                <div style={{ color: '#D4AF37', fontSize: '11px', fontWeight: 700, letterSpacing: '2px' }}>🌀 HYPNOSIS & GUIDED VISUALISATION</div>
-                <div style={{ color: '#9a8a6a', fontSize: '12px', marginTop: '2px' }}>Rewire your relationship with money</div>
+            <div style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(212,175,55,0.12)', background: '#0d0d0d' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '20px' }}>🌀</span>
+                <div>
+                  <div style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 700, letterSpacing: '1px' }}>MIND REPROGRAMMING</div>
+                  <div style={{ color: '#6b5e3e', fontSize: '11px' }}>Guided visualisation & NLP for financial freedom</div>
+                </div>
               </div>
               <button onClick={() => { setShowHypnosis(false); setHypnosisPlaying(false); setHypnosisSpeaking(false); if (window.speechSynthesis) window.speechSynthesis.cancel(); setHypnosisSession(null); setHypnosisPersonalised(null); if (hypnosisTimerRef.current) clearInterval(hypnosisTimerRef.current) }}
                 style={{ background: 'none', border: 'none', color: '#9a8a6a', cursor: 'pointer', fontSize: '24px', lineHeight: 1 }}>×</button>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto' as const, padding: '20px' }}>
-              {!hypnosisSession ? (
-                /* Session picker */
-                <div>
-                  <p style={{ color: '#9a8a6a', fontSize: '14px', lineHeight: 1.7, marginBottom: '20px', maxWidth: '520px' }}>
-                    Find a quiet place. Put on headphones if you can. Read slowly, or let the words wash over you.
-                    These sessions use guided visualisation and affirmation to rewire deeply held beliefs about money.
-                  </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-                    {sessions.map((s: any) => (
-                      <button key={s.id} onClick={() => { setHypnosisSession(s); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisProgress(0) }}
-                        style={{ padding: '18px', background: '#0d0d0d', border: '1px solid ' + s.colour + '40', borderRadius: '14px', cursor: 'pointer', textAlign: 'left' as const, transition: 'border-color 0.2s' }}>
-                        <div style={{ fontSize: '28px', marginBottom: '8px' }}>{s.icon}</div>
-                        <div style={{ color: s.colour, fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>{s.title}</div>
-                        <div style={{ color: '#9a8a6a', fontSize: '12px', marginBottom: '8px' }}>{s.desc}</div>
-                        <div style={{ color: '#6b5e3e', fontSize: '11px' }}>⏱ {s.duration} min</div>
+            {!hypnosisSession ? (
+              <div style={{ flex: 1, overflowY: 'auto' as const, padding: '16px 20px' }}>
+
+                {/* Tabs */}
+                <div style={{ display: 'flex', gap: '4px', background: '#0d0d0d', padding: '4px', borderRadius: '10px', marginBottom: '16px' }}>
+                  {([['sessions','🌀 Sessions'],['history','📅 History'],['saved','⭐ Saved']] as const).map(([id, label]) => (
+                    <button key={id} onClick={() => setHypnosisTab(id)}
+                      style={{ flex: 1, padding: '8px', background: hypnosisTab === id ? '#1a1810' : 'transparent', border: hypnosisTab === id ? '1px solid rgba(212,175,55,0.2)' : 'none', borderRadius: '8px', color: hypnosisTab === id ? '#D4AF37' : '#6b5e3e', cursor: 'pointer', fontSize: '12px', fontWeight: hypnosisTab === id ? 700 : 400 }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {hypnosisTab === 'sessions' && (
+                  <div>
+                    {/* Style toggle */}
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                      <button onClick={() => setHypnosisStyle('gentle')}
+                        style={{ flex: 1, padding: '10px 14px', background: hypnosisStyle === 'gentle' ? 'rgba(212,175,55,0.12)' : '#0d0d0d', border: '1px solid ' + (hypnosisStyle === 'gentle' ? '#D4AF37' : '#2a2218'), borderRadius: '10px', cursor: 'pointer', textAlign: 'left' as const }}>
+                        <div style={{ color: hypnosisStyle === 'gentle' ? '#D4AF37' : '#9a8a6a', fontSize: '13px', fontWeight: 700, marginBottom: '2px' }}>🕊 Gentle</div>
+                        <div style={{ color: '#6b5e3e', fontSize: '11px' }}>Soft, meditative, compassionate</div>
                       </button>
+                      <button onClick={() => setHypnosisStyle('snyder')}
+                        style={{ flex: 1, padding: '10px 14px', background: hypnosisStyle === 'snyder' ? 'rgba(231,76,60,0.1)' : '#0d0d0d', border: '1px solid ' + (hypnosisStyle === 'snyder' ? '#e74c3c' : '#2a2218'), borderRadius: '10px', cursor: 'pointer', textAlign: 'left' as const }}>
+                        <div style={{ color: hypnosisStyle === 'snyder' ? '#e74c3c' : '#9a8a6a', fontSize: '13px', fontWeight: 700, marginBottom: '2px' }}>⚡ Dr. Snyder NLP</div>
+                        <div style={{ color: '#6b5e3e', fontSize: '11px' }}>Rapid, direct, pattern-interrupt</div>
+                      </button>
+                    </div>
+
+                    {/* Recommended */}
+                    {recommendedSession && hypnosisStyle === 'gentle' && (
+                      <div style={{ marginBottom: '14px', padding: '12px 16px', background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                        <div>
+                          <div style={{ color: '#D4AF37', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '3px' }}>✨ RECOMMENDED FOR YOU</div>
+                          <div style={{ color: '#F5F5F5', fontSize: '13px', fontWeight: 600 }}>{recommendedSession.icon} {recommendedSession.title}</div>
+                          <div style={{ color: '#9a8a6a', fontSize: '11px' }}>Based on your current situation</div>
+                        </div>
+                        <button onClick={() => { setHypnosisSession(recommendedSession); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisProgress(0) }}
+                          style={{ padding: '8px 16px', background: '#D4AF37', color: '#111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
+                          Start →
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Session grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '10px' }}>
+                      {sessions.map((s: any) => {
+                        const isSaved = hypnosisSaved.some((saved: any) => saved.id === s.id)
+                        const historyEntry = hypnosisHistory.find((h: any) => h.id === s.id)
+                        return (
+                          <button key={s.id} onClick={() => { setHypnosisSession(s); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisProgress(0) }}
+                            style={{ padding: '16px', background: '#0d0d0d', border: '1px solid ' + s.colour + '30', borderRadius: '12px', cursor: 'pointer', textAlign: 'left' as const, position: 'relative' as const }}>
+                            {isSaved && <span style={{ position: 'absolute' as const, top: '10px', right: '10px', fontSize: '12px' }}>⭐</span>}
+                            <div style={{ fontSize: '26px', marginBottom: '6px' }}>{s.icon}</div>
+                            <div style={{ color: s.colour, fontWeight: 700, fontSize: '13px', marginBottom: '3px' }}>{s.title}</div>
+                            <div style={{ color: '#9a8a6a', fontSize: '11px', marginBottom: '6px' }}>{s.desc}</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ color: '#6b5e3e', fontSize: '11px' }}>⏱ {s.duration} min</span>
+                              {historyEntry && <span style={{ color: '#6b5e3e', fontSize: '10px' }}>Last: {historyEntry.date}</span>}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {hypnosisTab === 'history' && (
+                  <div>
+                    {hypnosisHistory.length === 0 ? (
+                      <div style={{ textAlign: 'center' as const, padding: '40px', color: '#6b5e3e' }}>
+                        <div style={{ fontSize: '32px', marginBottom: '8px' }}>🌀</div>
+                        <div>Complete your first session to start your history</div>
+                      </div>
+                    ) : hypnosisHistory.map((h: any, i: number) => {
+                      const session = allSessions.find((s: any) => s.id === h.id)
+                      return (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #1a1810' }}>
+                          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                            <span style={{ fontSize: '22px' }}>{h.icon}</span>
+                            <div>
+                              <div style={{ color: '#F5F5F5', fontSize: '13px', fontWeight: 600 }}>{h.title}</div>
+                              <div style={{ color: '#6b5e3e', fontSize: '11px' }}>{h.personalised ? '✨ Personalised' : '📖 Pre-written'} · {h.date}</div>
+                            </div>
+                          </div>
+                          {session && (
+                            <button onClick={() => { setHypnosisSession(session); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisProgress(0); setHypnosisTab('sessions') }}
+                              style={{ padding: '6px 12px', background: 'transparent', border: '1px solid #2a2218', borderRadius: '6px', color: '#9a8a6a', cursor: 'pointer', fontSize: '11px' }}>
+                              Redo →
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {hypnosisTab === 'saved' && (
+                  <div>
+                    {hypnosisSaved.length === 0 ? (
+                      <div style={{ textAlign: 'center' as const, padding: '40px', color: '#6b5e3e' }}>
+                        <div style={{ fontSize: '32px', marginBottom: '8px' }}>⭐</div>
+                        <div>Tap the star in any session to save it here</div>
+                      </div>
+                    ) : hypnosisSaved.map((s: any, i: number) => (
+                      <div key={i} style={{ padding: '14px', background: '#0d0d0d', border: '1px solid ' + s.colour + '30', borderRadius: '12px', marginBottom: '10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <span style={{ fontSize: '20px' }}>{s.icon}</span>
+                            <span style={{ color: s.colour, fontWeight: 700, fontSize: '13px' }}>{s.title}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button onClick={() => speakSession(s.script)}
+                              style={{ padding: '5px 10px', background: s.colour, color: '#111', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}>🔊</button>
+                            <button onClick={() => setHypnosisSaved(prev => prev.filter((_: any, idx: number) => idx !== i))}
+                              style={{ padding: '5px 10px', background: 'transparent', border: '1px solid #2a2218', borderRadius: '6px', color: '#9a8a6a', cursor: 'pointer', fontSize: '11px' }}>Remove</button>
+                          </div>
+                        </div>
+                        <div style={{ color: '#6b5e3e', fontSize: '12px', lineHeight: 1.5, maxHeight: '60px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {s.script.slice(0, 150)}...
+                        </div>
+                      </div>
                     ))}
                   </div>
-                </div>
-              ) : (
-                /* Session view */
-                <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-                  <button onClick={() => { setHypnosisSession(null); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisSpeaking(false); setHypnosisProgress(0); if (window.speechSynthesis) window.speechSynthesis.cancel(); if (hypnosisTimerRef.current) clearInterval(hypnosisTimerRef.current) }}
-                    style={{ background: 'none', border: 'none', color: '#9a8a6a', cursor: 'pointer', fontSize: '13px', marginBottom: '20px', padding: 0 }}>← Back to sessions</button>
+                )}
+              </div>
+            ) : (
+              /* Session view */
+              <div style={{ flex: 1, overflowY: 'auto' as const, padding: '16px 20px' }}>
+                <div style={{ maxWidth: '620px', margin: '0 auto' }}>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                    <button onClick={() => { setHypnosisSession(null); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisSpeaking(false); setHypnosisProgress(0); if (window.speechSynthesis) window.speechSynthesis.cancel(); if (hypnosisTimerRef.current) clearInterval(hypnosisTimerRef.current) }}
+                      style={{ background: 'none', border: 'none', color: '#9a8a6a', cursor: 'pointer', fontSize: '13px', padding: 0 }}>← Back</button>
+                    <button onClick={() => saveSession(hypnosisSession)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', padding: 0 }}
+                      title={hypnosisSaved.some((s: any) => s.id === hypnosisSession.id) ? 'Remove from saved' : 'Save this session'}>
+                      {hypnosisSaved.some((s: any) => s.id === hypnosisSession.id) ? '⭐' : '☆'}
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                     <span style={{ fontSize: '36px' }}>{hypnosisSession.icon}</span>
                     <div>
                       <div style={{ color: hypnosisSession.colour, fontWeight: 800, fontSize: '20px' }}>{hypnosisSession.title}</div>
-                      <div style={{ color: '#9a8a6a', fontSize: '13px' }}>{hypnosisSession.duration} min · {hypnosisSession.desc}</div>
+                      <div style={{ color: '#9a8a6a', fontSize: '12px' }}>{hypnosisSession.duration} min · {hypnosisStyle === 'snyder' ? '⚡ Dr. Snyder NLP style' : '🕊 Gentle guided visualisation'}</div>
                     </div>
                   </div>
 
                   {/* Breathing animation */}
                   {hypnosisPlaying && (
-                    <div style={{ textAlign: 'center' as const, marginBottom: '24px' }}>
-                      <div style={{ width: '60px', height: '60px', borderRadius: '50%', border: '2px solid ' + hypnosisSession.colour, margin: '0 auto', animation: 'breathe 4s ease-in-out infinite', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div style={{ color: hypnosisSession.colour, fontSize: '11px', fontWeight: 700 }}>breathe</div>
+                    <div style={{ textAlign: 'center' as const, marginBottom: '20px' }}>
+                      <div style={{ width: '64px', height: '64px', borderRadius: '50%', border: '2px solid ' + hypnosisSession.colour, margin: '0 auto', animation: 'breathe 4s ease-in-out infinite', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ color: hypnosisSession.colour, fontSize: '10px', fontWeight: 700, textAlign: 'center' as const, lineHeight: 1.2 }}>{hypnosisSpeaking ? 'listen' : 'breathe'}</div>
                       </div>
-                      <style>{`@keyframes breathe { 0%, 100% { transform: scale(1); opacity: 0.5 } 50% { transform: scale(1.4); opacity: 1 } }`}</style>
+                      <style>{`@keyframes breathe { 0%, 100% { transform: scale(1); opacity: 0.4 } 50% { transform: scale(1.5); opacity: 1 } }`}</style>
                     </div>
                   )}
 
-                  {/* Progress bar */}
+                  {/* Progress */}
                   {hypnosisPlaying && (
-                    <div style={{ marginBottom: '20px' }}>
-                      <div style={{ height: '3px', background: '#2a2218', borderRadius: '2px', overflow: 'hidden' }}>
-                        <div style={{ width: hypnosisProgress + '%', height: '100%', background: hypnosisSession.colour, transition: 'width 0.1s linear', borderRadius: '2px' }} />
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{ height: '2px', background: '#1a1810', borderRadius: '1px', overflow: 'hidden' }}>
+                        <div style={{ width: hypnosisProgress + '%', height: '100%', background: hypnosisSession.colour, transition: 'width 0.2s linear' }} />
                       </div>
-                      <div style={{ color: '#6b5e3e', fontSize: '11px', marginTop: '4px', textAlign: 'right' as const }}>{Math.round(hypnosisProgress)}%</div>
                     </div>
                   )}
 
                   {/* Script */}
-                  <div style={{ background: '#0a0a0a', border: '1px solid rgba(212,175,55,0.1)', borderRadius: '14px', padding: '28px', marginBottom: '16px', whiteSpace: 'pre-line' as const, color: '#d4cdb8', fontSize: '15px', lineHeight: 2, letterSpacing: '0.3px' }}>
+                  <div style={{ background: '#050505', border: '1px solid rgba(212,175,55,0.08)', borderRadius: '14px', padding: '28px', marginBottom: '14px', whiteSpace: 'pre-line' as const, color: '#c8c0a8', fontSize: '15px', lineHeight: 2.1, letterSpacing: '0.2px', fontFamily: 'Georgia, serif' }}>
                     {hypnosisPersonalised || hypnosisSession.script}
                   </div>
 
                   {/* Voice selector */}
                   {hypnosisVoices.length > 1 && (
                     <div style={{ marginBottom: '12px' }}>
-                      <div style={{ color: '#9a8a6a', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '6px' }}>🎙 VOICE</div>
+                      <div style={{ color: '#6b5e3e', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '6px' }}>🎙 VOICE</div>
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-                        {hypnosisVoices.slice(0, 6).map((v, i) => (
+                        {hypnosisVoices.slice(0, 6).map((v: any, i: number) => (
                           <button key={i} onClick={() => setHypnosisVoiceIndex(i)}
-                            style={{ padding: '5px 10px', background: hypnosisVoiceIndex === i ? 'rgba(212,175,55,0.15)' : '#0d0d0d', border: '1px solid ' + (hypnosisVoiceIndex === i ? '#D4AF37' : '#2a2218'), borderRadius: '6px', cursor: 'pointer', color: hypnosisVoiceIndex === i ? '#D4AF37' : '#9a8a6a', fontSize: '11px' }}>
+                            style={{ padding: '5px 10px', background: hypnosisVoiceIndex === i ? 'rgba(212,175,55,0.12)' : '#0d0d0d', border: '1px solid ' + (hypnosisVoiceIndex === i ? '#D4AF37' : '#2a2218'), borderRadius: '6px', cursor: 'pointer', color: hypnosisVoiceIndex === i ? '#D4AF37' : '#6b5e3e', fontSize: '11px' }}>
                             {v.name.replace('Google ', '').replace(' (Enhanced)', '').split(' ').slice(0, 2).join(' ')}
                           </button>
                         ))}
@@ -14563,42 +14502,42 @@ Breathe in peace. Breathe out fear. You are safe.`
                   )}
 
                   {/* Controls */}
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '10px' }}>
                     {!hypnosisPlaying ? (
-                      <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
-                        <button onClick={() => speakSession(hypnosisPersonalised || hypnosisSession.script)}
-                          style={{ flex: 1, padding: '14px', background: 'linear-gradient(135deg, ' + hypnosisSession.colour + ', #8C6A1F)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>
+                      <>
+                        <button onClick={() => { speakSession(hypnosisPersonalised || hypnosisSession.script); logSessionHistory(hypnosisSession, !!hypnosisPersonalised) }}
+                          style={{ flex: 1, padding: '14px', background: 'linear-gradient(135deg, ' + hypnosisSession.colour + ', #5a4010)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>
                           🔊 Listen
                         </button>
-                        <button onClick={() => startSession(hypnosisPersonalised || hypnosisSession.script)}
+                        <button onClick={() => { startRead(hypnosisPersonalised || hypnosisSession.script); logSessionHistory(hypnosisSession, !!hypnosisPersonalised) }}
                           style={{ flex: 1, padding: '14px', background: '#0d0d0d', border: '1px solid ' + hypnosisSession.colour + '40', color: hypnosisSession.colour, borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' }}>
                           👁 Read
                         </button>
-                      </div>
+                      </>
                     ) : (
                       <button onClick={stopSpeech}
-                        style={{ flex: 1, padding: '14px', background: '#1a1810', border: '1px solid ' + hypnosisSession.colour + '40', color: hypnosisSession.colour, borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' }}>
+                        style={{ flex: 1, padding: '14px', background: '#1a1810', border: '1px solid #e74c3c40', color: '#e74c3c', borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' }}>
                         ⏹ Stop
                       </button>
                     )}
-                    <button
-                      onClick={() => handleGeneratePersonalised(hypnosisSession)}
-                      disabled={hypnosisLoading}
-                      style={{ flex: 1, padding: '14px', background: '#0d0d0d', border: '1px solid rgba(212,175,55,0.3)', color: '#D4AF37', borderRadius: '12px', cursor: hypnosisLoading ? 'default' : 'pointer', fontWeight: 700, fontSize: '13px', opacity: hypnosisLoading ? 0.7 : 1 }}>
-                      {hypnosisLoading ? '✨ Personalising...' : hypnosisPersonalised ? '🔄 Regenerate for me' : '✨ Personalise for ' + (userName || 'me')}
+                    <button onClick={() => handleGeneratePersonalised(hypnosisSession)} disabled={hypnosisLoading}
+                      style={{ flex: 1, padding: '14px', background: '#0d0d0d', border: '1px solid rgba(212,175,55,0.25)', color: '#D4AF37', borderRadius: '12px', cursor: hypnosisLoading ? 'default' : 'pointer', fontWeight: 700, fontSize: '12px', opacity: hypnosisLoading ? 0.7 : 1 }}>
+                      {hypnosisLoading ? '✨ Creating...' : hypnosisPersonalised ? '🔄 Regenerate' : '✨ Personalise for ' + (userName || 'me')}
                     </button>
                   </div>
+
                   {hypnosisPersonalised && (
-                    <div style={{ marginTop: '10px', padding: '10px 14px', background: 'rgba(212,175,55,0.06)', borderRadius: '8px', color: '#9a8a6a', fontSize: '12px' }}>
-                      ✨ This session has been personalised using your name, debts, goals and financial situation.
+                    <div style={{ marginBottom: '10px', padding: '10px 14px', background: 'rgba(212,175,55,0.05)', borderRadius: '8px', color: '#9a8a6a', fontSize: '12px' }}>
+                      ✨ Personalised using your name, debts, goals and financial situation.
                     </div>
                   )}
-                  <div style={{ marginTop: '14px', padding: '10px 14px', background: '#0d0d0d', borderRadius: '8px', color: '#6b5e3e', fontSize: '11px', lineHeight: 1.6 }}>
-                    ⚠️ Guided visualisation is for personal development and wellbeing purposes only. It is not a substitute for professional mental health support. If you are experiencing severe anxiety or distress, please seek appropriate professional help.
+
+                  <div style={{ padding: '10px 14px', background: '#060606', borderRadius: '8px', color: '#3a2e1e', fontSize: '11px', lineHeight: 1.6 }}>
+                    ⚠️ Guided visualisation is for personal development only. Not a substitute for professional mental health support.
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )
       })()}
