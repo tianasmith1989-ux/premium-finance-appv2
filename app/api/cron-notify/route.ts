@@ -40,11 +40,68 @@ function buildDailyBriefHtml(u: any): string {
   const monthlyGoalSavings = u.monthly_goal_savings || 0
   const savingRate = u.saving_rate || 0
 
-  // Weekly equivalents (divide by 4.33 weeks/month)
-  const weeklyIncome = Math.round(monthlyIncome / 4.33)
-  const weeklyExpenses = Math.round((monthlyExpenses + monthlyDebtPayments) / 4.33)
-  const weeklyGoalSavings = Math.round(monthlyGoalSavings / 4.33)
-  const weeklyDiscretionary = Math.max(0, Math.round(monthlySurplus / 4.33) - weeklyGoalSavings)
+  // Weekly equivalents — using 4 weeks (conservative baseline)
+  // This is intentionally understated: some months have 5 weeks, so budgeting
+  // on 4 weeks means users always have a buffer rather than overspending
+  const weeklyIncome = Math.round(monthlyIncome / 4)
+  const weeklyExpenses = Math.round((monthlyExpenses + monthlyDebtPayments) / 4)
+  const weeklyGoalSavings = Math.round(monthlyGoalSavings / 4)
+  const weeklyDiscretionary = Math.max(0, Math.round(monthlySurplus / 4) - weeklyGoalSavings)
+
+  // Progress countdowns from user data
+  const debts: any[] = u.debts || []
+  const goals: any[] = u.goals || []
+  const mortgage = u.mortgage_accel || null
+
+  // Debt payoff countdowns
+  const debtCountdowns = debts
+    .filter((d: any) => parseFloat(d.balance || '0') > 0 && parseFloat(d.minimum || d.payment || '0') > 0)
+    .map((d: any) => {
+      const balance = parseFloat(d.balance || '0')
+      const monthly = parseFloat(d.minimum || d.payment || '0')
+      const months = monthly > 0 ? Math.ceil(balance / monthly) : null
+      return { name: d.name, balance, months }
+    })
+    .filter((d: any) => d.months !== null && d.months < 360)
+    .sort((a: any, b: any) => a.months - b.months)
+    .slice(0, 2)
+
+  // Goal countdowns
+  const goalCountdowns = goals
+    .filter((g: any) => {
+      const target = parseFloat(g.targetAmount || '0')
+      const saved = parseFloat(g.savedAmount || g.currentAmount || '0')
+      const payment = parseFloat(g.paymentAmount || '0')
+      return target > 0 && saved < target && payment > 0
+    })
+    .map((g: any) => {
+      const target = parseFloat(g.targetAmount || '0')
+      const saved = parseFloat(g.savedAmount || g.currentAmount || '0')
+      const remaining = target - saved
+      const monthly = parseFloat(g.paymentAmount || '0')
+      const months = monthly > 0 ? Math.ceil(remaining / monthly) : null
+      return { name: g.name, remaining, months, pct: Math.round(saved / target * 100) }
+    })
+    .filter((g: any) => g.months !== null && g.months < 600)
+    .sort((a: any, b: any) => a.months - b.months)
+    .slice(0, 2)
+
+  // Mortgage countdown
+  let mortgageMonthsLeft: number | null = null
+  let mortgageYearsLeft: number | null = null
+  if (mortgage?.remaining_years) {
+    mortgageYearsLeft = parseFloat(mortgage.remaining_years)
+    mortgageMonthsLeft = Math.round(mortgageYearsLeft * 12)
+  }
+
+  const formatCountdown = (months: number): string => {
+    if (months <= 1) return '1 month'
+    if (months < 12) return `${months} months`
+    const years = Math.floor(months / 12)
+    const rem = months % 12
+    if (rem === 0) return `${years} year${years !== 1 ? 's' : ''}`
+    return `${years}yr ${rem}mo`
+  }
 
   const dayGreeting: Record<string, string> = {
     Monday: `New week, new moves. Here's what's ahead, ${name}.`,
@@ -170,7 +227,46 @@ function buildDailyBriefHtml(u: any): string {
         </td>
       </tr>
     </table>
-    <p style="color:#6b5e3e;font-size:11px;margin:10px 0 0;">Weekly figures are your monthly numbers ÷ 4.33 weeks</p>
+    <p style="color:#6b5e3e;font-size:11px;margin:10px 0 0;">Based on 4 weeks/month — intentionally conservative so you always have a buffer</p>
+  </div>` : ''}
+
+  <!-- Progress countdowns — goal/debt/mortgage -->
+  ${(debtCountdowns.length > 0 || goalCountdowns.length > 0 || mortgageYearsLeft) ? `
+  <div style="background:#1a1810;border:1px solid #2e2618;border-radius:12px;padding:16px 20px;margin-bottom:12px;">
+    <div style="color:#9a8a6a;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:12px;">🏁 YOUR PROGRESS COUNTDOWNS</div>
+    ${debtCountdowns.map((d: any) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2e2618;">
+      <div>
+        <div style="color:#F5F5F5;font-size:13px;font-weight:600;">💳 ${d.name}</div>
+        <div style="color:#9a8a6a;font-size:11px;margin-top:1px;">$${Math.round(d.balance).toLocaleString()} remaining</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="color:#e74c3c;font-size:14px;font-weight:800;">${formatCountdown(d.months)}</div>
+        <div style="color:#9a8a6a;font-size:10px;">to debt free</div>
+      </div>
+    </div>`).join('')}
+    ${goalCountdowns.map((g: any) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2e2618;">
+      <div>
+        <div style="color:#F5F5F5;font-size:13px;font-weight:600;">🎯 ${g.name}</div>
+        <div style="color:#9a8a6a;font-size:11px;margin-top:1px;">${g.pct}% there · $${Math.round(g.remaining).toLocaleString()} to go</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="color:#D4AF37;font-size:14px;font-weight:800;">${formatCountdown(g.months)}</div>
+        <div style="color:#9a8a6a;font-size:10px;">to goal</div>
+      </div>
+    </div>`).join('')}
+    ${mortgageYearsLeft ? `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;">
+      <div>
+        <div style="color:#F5F5F5;font-size:13px;font-weight:600;">🏠 Mortgage</div>
+        <div style="color:#9a8a6a;font-size:11px;margin-top:1px;">At standard repayments</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="color:#6b8f6b;font-size:14px;font-weight:800;">${mortgageYearsLeft.toFixed(1)} years</div>
+        <div style="color:#9a8a6a;font-size:10px;">till mortgage free</div>
+      </div>
+    </div>` : ''}
   </div>` : ''}
 
   <!-- Next week preview -->
