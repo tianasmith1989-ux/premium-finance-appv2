@@ -14196,6 +14196,66 @@ Tracking with Aureus 🏛️`
 
       {/* ── GUIDED VISUALISATION MODAL ── */}
       {showHypnosis && (() => {
+        const GENTLE_INDUCTION = `Close your eyes.
+
+Take a slow breath in through your nose... hold it for just a moment... and release it slowly through your mouth.
+
+Again. Breathe in... and let it go.
+
+With each breath you take, you find yourself becoming more relaxed. More at ease. More comfortable.
+
+I want you to notice the weight of your body right now. Feel how the chair, or the floor, or whatever you're resting on, is completely supporting you. You don't need to hold anything up. You can simply... let go.
+
+Take another breath in... and as you breathe out, feel your shoulders drop. Feel any tension in your jaw release. Feel your hands become heavy and soft.
+
+Good.
+
+Now I want you to imagine a warm, golden light at the top of your head. With each breath, this light moves slowly downward... through your forehead... relaxing every muscle... through your eyes... your cheeks... your jaw...
+
+Down through your neck and shoulders... your chest... your stomach... all the way down through your legs... to the soles of your feet.
+
+You are completely relaxed. Completely safe. Completely receptive.
+
+In this state, your conscious mind can rest... and your deeper mind — the part that runs your habits, your beliefs, your automatic responses — is wide open. Ready to receive new instructions.
+
+You are in the perfect state to make lasting change.
+
+Now... let's begin.
+
+---
+
+`
+
+        const POWER_INDUCTION = `Stop what you're doing. Right now.
+
+Take a breath. In through your nose... and out.
+
+I want your full attention — not your distracted attention, your FULL attention. Because what we're about to do requires you to be completely present.
+
+Close your eyes.
+
+Now notice your body. Where are you holding tension? Your shoulders? Your jaw? Your chest? Good — notice it. You don't need to fix it. Just notice it.
+
+Take a breath in... and as you breathe out, drop your shoulders. Unclench your jaw. Relax your hands.
+
+Do it now.
+
+Good.
+
+Here's what you need to understand before we begin: your brain is a pattern-recognition machine. It runs programs. And right now, some of your financial programs are running on old code — code you didn't choose, code you inherited, code that was installed before you had any say in the matter.
+
+Today we're updating that code. Fast. Directly. Permanently.
+
+Your unconscious mind is listening. It responds to commands. It responds to repetition. It responds to emotion. And right now, with your eyes closed, your breathing slow, and your body relaxed — it is fully available.
+
+Are you ready?
+
+Let's begin.
+
+---
+
+`
+
         const GENTLE_SESSIONS = [
           { id: 'abundance', icon: '✨', title: 'Abundance Mindset', desc: 'Shift from scarcity to abundance', duration: 8, colour: '#D4AF37',
             script: `Take a slow breath in through your nose... hold it gently... and release through your mouth. Feel your shoulders drop.\n\nAgain. Breathe in... and let it all go.\n\nWith each breath, your mind becomes quieter. More receptive. More open.\n\nYou are safe. You are here. And something is about to shift.\n\nYou have spent years believing there is never enough. Never enough money. Never enough time. Never enough security. But today, right now, we begin to rewrite that story.\n\nImagine standing at the edge of a vast, golden field at sunrise. The light is warm on your face. This field represents everything that is available to you — opportunity, abundance, growth. It stretches further than you can see.\n\nIn this state, your mind is open. Your nervous system is calm. You are ready to receive new beliefs.\n\nRepeat with me:\n\nI am worthy of financial abundance.\n\nMoney flows to me because I create real value.\n\nI manage money with confidence and clarity.\n\nEvery decision I make builds my future.\n\nFeel these words settle into your body. Not as wishes — as facts. As the truth of who you are becoming.\n\nNow picture your future self — one year from now. They are calm. They are clear. They have built something real. They look back at this moment and smile — because this was when everything changed.\n\nTake one more deep breath. And when you are ready, gently open your eyes.\n\nYou are already becoming that person.` },
@@ -14278,16 +14338,22 @@ Tracking with Aureus 🏛️`
           if (hypnosisTimerRef.current) clearInterval(hypnosisTimerRef.current)
         }
 
+        const getFullScript = (script: string) => {
+          const induction = hypnosisStyle === 'power' ? POWER_INDUCTION : GENTLE_INDUCTION
+          return induction + script
+        }
+
         const speakSession = (script: string) => {
           if (!window.speechSynthesis) { alert('Text-to-speech is not supported in your browser. Try Chrome or Safari.'); return }
           window.speechSynthesis.cancel()
-          const utterance = new SpeechSynthesisUtterance(script)
+          const fullScript = getFullScript(script)
+          const utterance = new SpeechSynthesisUtterance(fullScript)
           utterance.rate = hypnosisStyle === 'power' ? 0.88 : 0.72
           utterance.pitch = hypnosisStyle === 'power' ? 0.9 : 0.85
           utterance.volume = 0.95
           if (hypnosisVoices.length > 0) utterance.voice = hypnosisVoices[hypnosisVoiceIndex] || hypnosisVoices[0]
           hypnosisSpeechRef.current = utterance
-          const estimatedMs = (script.length / 14) * (1 / (hypnosisStyle === 'power' ? 0.88 : 0.72)) * 1000
+          const estimatedMs = (fullScript.length / 14) * (1 / (hypnosisStyle === 'power' ? 0.88 : 0.72)) * 1000
           const interval = 200
           const steps = estimatedMs / interval
           let step = 0
@@ -14626,8 +14692,16 @@ Tracking with Aureus 🏛️`
                     </div>
                   )}
 
-                  {/* Script */}
+                  {/* Script — with induction prepended */}
                   <div style={{ background: '#050505', border: '1px solid rgba(212,175,55,0.08)', borderRadius: '14px', padding: '28px', marginBottom: '14px', whiteSpace: 'pre-line' as const, color: '#c8c0a8', fontSize: '15px', lineHeight: 2.1, letterSpacing: '0.2px', fontFamily: 'Georgia, serif' }}>
+                    <div style={{ color: '#6b5e3e', fontSize: '12px', fontWeight: 700, letterSpacing: '1.5px', marginBottom: '16px' }}>
+                      {hypnosisStyle === 'power' ? '⚡ POWER INDUCTION' : '🕊 INDUCTION'}
+                    </div>
+                    {hypnosisStyle === 'power' ? POWER_INDUCTION : GENTLE_INDUCTION}
+                    <div style={{ borderTop: '1px solid #2a2218', margin: '20px 0', opacity: 0.5 }} />
+                    <div style={{ color: '#9a8a6a', fontSize: '11px', fontWeight: 700, letterSpacing: '1.5px', marginBottom: '16px' }}>
+                      {hypnosisSession.title.toUpperCase()}
+                    </div>
                     {hypnosisPersonalised || hypnosisSession.script}
                   </div>
 
@@ -14654,7 +14728,7 @@ Tracking with Aureus 🏛️`
                           style={{ flex: 1, padding: '14px', background: 'linear-gradient(135deg, ' + hypnosisSession.colour + ', #5a4010)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>
                           🔊 Listen
                         </button>
-                        <button onClick={() => { startRead(hypnosisPersonalised || hypnosisSession.script); logSessionHistory(hypnosisSession, !!hypnosisPersonalised) }}
+                        <button onClick={() => { startRead(getFullScript(hypnosisPersonalised || hypnosisSession.script)); logSessionHistory(hypnosisSession, !!hypnosisPersonalised) }}
                           style={{ flex: 1, padding: '14px', background: '#0d0d0d', border: '1px solid ' + hypnosisSession.colour + '40', color: hypnosisSession.colour, borderRadius: '12px', cursor: 'pointer', fontWeight: 700, fontSize: '14px' }}>
                           👁 Read
                         </button>
