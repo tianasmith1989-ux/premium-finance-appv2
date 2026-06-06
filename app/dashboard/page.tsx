@@ -2167,26 +2167,35 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
   }
 
   // ── Build snapshot of all user data ──
+  // Use a ref to always have fresh state values — avoids stale closure in saveToCloud
+  const stateRef = useRef<any>({})
+  useEffect(() => {
+    stateRef.current = {
+      userName, whyStatement, budgetMemory, userCountry,
+      incomeStreams, expenses, debts, goals, assets, liabilities,
+      sinkingFunds, categoryBudgets, actualSpend,
+      superData, mealPlanPrefs, mealPlanHistory,
+      missionComplete, missionPhase, missionStep,
+      missionP2Proposals, missionP2Confirmed, missionP2Step,
+      missionNavLocked, onboardingComplete, houseStatus, fireGoal, moneyPersonality,
+      wins, streak, lastCheckIn, lastDailyCheckIn, dailyCheckInLog,
+      coreValues, identityStatement, mustStatement, futureVision,
+      identityStatements, proactiveInsights, insightsGeneratedAt,
+      businessProfile, businessRevenue, businessExpenses, businessGoals,
+      notificationEmail, emailNotifEnabled, emailNotifFrequency,
+      monthlyMealPlanOptIn, accountabilityEmail, accountabilityName,
+      mortgageAccel, investmentProperties, lastMirrorMonth,
+      roadmapMilestones, latteItems, moneyDateLog, annualReviews,
+      coachNextAction, dismissedTriggers, lastAppOpen,
+      personalityAnswers, deepWhyAnswers, deepWhyComplete,
+      fearAuditAnswers, fearAuditComplete,
+      wealthMilestones, netWorthHistory,
+    }
+  })
+
   const buildSnapshot = () => ({
     aureus_token: localStorage.getItem('aureus_user_token') || '',
-    userName, whyStatement, budgetMemory, userCountry,
-    incomeStreams, expenses, debts, goals, assets, liabilities,
-    sinkingFunds, categoryBudgets, actualSpend,
-    superData, mealPlanPrefs, mealPlanHistory,
-    missionComplete, missionPhase, missionStep,
-    missionP2Proposals, missionP2Confirmed, missionP2Step,
-    onboardingComplete, houseStatus, fireGoal, moneyPersonality,
-    wins, streak, lastCheckIn,
-    coreValues, identityStatement, mustStatement, futureVision,
-    identityStatements, proactiveInsights, insightsGeneratedAt,
-    businessProfile, businessRevenue, businessExpenses, businessGoals,
-    notificationEmail, emailNotifEnabled, emailNotifFrequency,
-    monthlyMealPlanOptIn, accountabilityEmail, accountabilityName,
-    mortgageAccel, investmentProperties, lastMirrorMonth,
-    roadmapMilestones,
-    latteItems, dailyCheckInLog, moneyDateLog, annualReviews,
-    coachNextAction, dismissedTriggers, lastAppOpen,
-    personalityAnswers, deepWhyAnswers, deepWhyComplete,
+    ...stateRef.current,
     saved_at: new Date().toISOString()
   })
 
