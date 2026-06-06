@@ -14345,7 +14345,7 @@ Tracking with Aureus 🏛️`
                         <div style={{ color: hypnosisStyle === 'gentle' ? '#D4AF37' : '#9a8a6a', fontSize: '13px', fontWeight: 700, marginBottom: '2px' }}>🕊 Gentle</div>
                         <div style={{ color: '#6b5e3e', fontSize: '11px' }}>Soft, meditative, compassionate</div>
                       </button>
-                      <button onClick={() => setHypnosisStyle('snyder')}
+                      <button onClick={() => setHypnosisStyle('power')}
                         style={{ flex: 1, padding: '10px 14px', background: hypnosisStyle === 'power' ? 'rgba(231,76,60,0.1)' : '#0d0d0d', border: '1px solid ' + (hypnosisStyle === 'power' ? '#e74c3c' : '#2a2218'), borderRadius: '10px', cursor: 'pointer', textAlign: 'left' as const }}>
                         <div style={{ color: hypnosisStyle === 'power' ? '#e74c3c' : '#9a8a6a', fontSize: '13px', fontWeight: 700, marginBottom: '2px' }}>⚡ Power NLP</div>
                         <div style={{ color: '#6b5e3e', fontSize: '11px' }}>Rapid, direct, pattern-interrupt</div>
