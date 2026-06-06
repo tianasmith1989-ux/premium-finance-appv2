@@ -13049,14 +13049,48 @@ Tracking with Aureus 🏛️`
           if (!userToken) { userToken = 'aureus_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('aureus_user_token', userToken) }
           const topGoal = goals[0]
           const topWin = wins.slice(-1)[0]
-          const upcomingBills = expenses
-            .filter((e: any) => e.dueDate || e.frequency)
-            .map((e: any) => {
-              const due = e.dueDate ? new Date(e.dueDate + 'T12:00:00') : null
-              const dayOffset = due ? Math.round((due.getTime() - Date.now()) / 86400000) : 999
-              return { name: e.name, amount: e.amount, dayOffset, automatic: hasAutomatedPayments, itemType: 'expense' }
-            })
-            .filter((u: any) => u.dayOffset < 30)
+          const upcomingBills = [
+            // Regular expenses
+            ...expenses
+              .filter((e: any) => e.dueDate || e.frequency)
+              .map((e: any) => {
+                const due = e.dueDate ? new Date(e.dueDate + 'T12:00:00') : null
+                const dayOffset = due ? Math.round((due.getTime() - Date.now()) / 86400000) : 999
+                // Use the actual per-occurrence amount (already correct — e.amount IS the per-occurrence amount)
+                return { name: e.name, amount: e.amount, frequency: e.frequency || 'monthly', dayOffset, automatic: hasAutomatedPayments, itemType: 'expense' }
+              }),
+            // Debt payments — use minPayment per occurrence, not monthly total
+            ...debts
+              .filter((d: any) => d.paymentDate)
+              .map((d: any) => {
+                const due = new Date(d.paymentDate + 'T12:00:00')
+                const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
+                const payAmt = d.minPayment || d.payment || d.minimum || '0'
+                return { name: d.name + ' (debt)', amount: payAmt, frequency: d.frequency || 'monthly', dayOffset, automatic: hasAutomatedPayments, itemType: 'debt' }
+              }),
+            // Goal savings
+            ...goals
+              .filter((g: any) => g.addedToCalendar && g.startDate && g.paymentAmount)
+              .map((g: any) => {
+                const due = new Date(g.startDate + 'T12:00:00')
+                const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
+                return { name: g.name + ' (goal)', amount: g.paymentAmount, frequency: g.savingsFrequency || 'monthly', dayOffset, automatic: true, itemType: 'goal' }
+              }),
+            // Sinking funds — weekly contributions
+            ...sinkingFunds
+              .filter((f: any) => parseFloat(f.savedAmount || '0') < parseFloat(f.targetAmount || '0') && parseFloat(f.weeklyAmount || '0') > 0)
+              .map((f: any) => {
+                // Next Monday as the next weekly contribution date
+                const nextMonday = new Date()
+                nextMonday.setHours(0,0,0,0)
+                let diff = 1 - nextMonday.getDay()
+                if (diff <= 0) diff += 7
+                nextMonday.setDate(nextMonday.getDate() + diff)
+                const dayOffset = Math.round((nextMonday.getTime() - Date.now()) / 86400000)
+                return { name: f.name + ' (sinking fund)', amount: f.weeklyAmount, frequency: 'weekly', dayOffset, automatic: true, itemType: 'sinking' }
+              }),
+          ]
+            .filter((u: any) => u.dayOffset >= -7 && u.dayOffset < 30)
             .sort((a: any, b: any) => a.dayOffset - b.dayOffset)
             .slice(0, 14)
           try {
@@ -13087,6 +13121,7 @@ Tracking with Aureus 🏛️`
                 // For progress countdowns in email
                 debts: debts.map((d: any) => ({ name: d.name, balance: d.balance, minimum: d.minimum || d.payment || '0' })),
                 goals: goals.map((g: any) => ({ name: g.name, targetAmount: g.targetAmount, savedAmount: g.savedAmount || g.currentAmount || '0', paymentAmount: g.paymentAmount || '0' })),
+                sinkingFunds: sinkingFunds.map((f: any) => ({ name: f.name, targetAmount: f.targetAmount, savedAmount: f.savedAmount || '0', weeklyAmount: f.weeklyAmount || '0', targetDate: f.targetDate || '' })),
                 mortgageAccel: mortgageAccel.balance ? { remaining_years: mortgageAccel.remainingYears } : null
               })
             })
