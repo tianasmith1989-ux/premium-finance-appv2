@@ -44,6 +44,7 @@ function buildWelcomeEmail(userName: string, email: string): string {
       ['📅', 'Reminds you what\'s due', 'Never get caught off guard by a bill again. Aureus shows what\'s coming up each week.'],
       ['📈', 'Shows you the path forward', 'Baby Steps, FIRE number, mortgage payoff, net worth trajectory — Aureus maps your whole financial future.'],
       ['🏆', 'Celebrates your wins', 'Every debt paid, every goal hit, every milestone — logged and remembered.'],
+      ['🌀', 'Guided Visualisation', 'Six mindset sessions in the Change tab — abundance, debt release, confidence, and more. With AI personalisation using your real numbers. No experience needed.'],
       ['📧', 'Briefs you every morning', 'Enable your daily email brief in the Insights tab for a personalised morning snapshot.'],
     ].map(([icon, title, desc]) => `
     <div style="display:flex;gap:14px;margin-bottom:14px;align-items:flex-start;">
@@ -64,6 +65,7 @@ function buildWelcomeEmail(userName: string, email: string): string {
       ['3', 'Add your bills and debts', 'Even just the big ones. The more detail, the better the coaching.'],
       ['4', 'Set a goal', 'Emergency fund, holiday, paying off a debt — whatever matters most.'],
       ['5', 'Ask Aureus a question', 'Go to the Aureus tab and ask anything. "What should I focus on?" is a great start.'],
+      ['6', 'Try a Guided Visualisation', 'Go to the Change tab → Guided Visualisation. Pick a session, do the 2-minute pre-flight, and let the session work on your money mindset.'],
     ].map(([num, title, desc]) => `
     <div style="display:flex;gap:14px;margin-bottom:14px;align-items:flex-start;">
       <div style="background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.4);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#D4AF37;font-size:13px;font-weight:800;">${num}</div>
@@ -81,7 +83,7 @@ function buildWelcomeEmail(userName: string, email: string): string {
       ${[
         ['🏠 Home', 'Your daily dashboard — streak, next action, quick access to everything'],
         ['💬 Aureus', 'Your AI money coach — ask anything, anytime'],
-        ['⚡ Change', 'Mindset work — your Why, values, identity, Dickens Process'],
+        ['⚡ Change', 'Mindset work — Dickens Process, Values, Compelling Future, Money Mirror, Guided Visualisation'],
         ['🏛️ Treasury', 'Income, expenses, debts, goals, budget tracker'],
         ['🛤️ Roadmap', 'Baby Steps progress and financial milestones'],
         ['🏆 Wins', 'Your financial victories — logged and celebrated'],
