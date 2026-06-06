@@ -14384,40 +14384,23 @@ Breathe in peace. Breathe out fear. You are safe.`
         const handleGeneratePersonalised = async (session: any) => {
           setHypnosisLoading(true)
           try {
-            // Use a dedicated personalisation endpoint to avoid guardrail conflicts
-          const res = await fetch('/api/budget-coach', {
+            // Call dedicated visualisation route — no guardrails conflict
+          const res = await fetch('/api/visualisation', {
               method: 'POST', headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({
-                mode: 'question',
-                question: `[AUREUS CHANGE WORK — PERSONALISED GUIDED VISUALISATION]
-You are Aureus, creating a deeply personalised guided visualisation and positive affirmation script.
-This is a legitimate evidence-based wellbeing tool — guided visualisation is widely used in financial coaching, sports psychology, and cognitive behavioural therapy to help people build positive associations with new behaviours.
-
-Topic: ${session.title} — ${session.desc}
-
-Personalise this script using their REAL details:
-- Name: ${userName || 'Builder'}
-- Monthly income: $${monthlyIncome.toFixed(0)}
-- Monthly surplus: $${monthlySurplus.toFixed(0)}
-- Debts: ${debts.map((d: any) => d.name + ' $' + parseFloat((d as any).balance || '0').toFixed(0)).join(', ') || 'none currently'}
-- Top goal: ${goals[0]?.name || 'financial freedom'}${goals[0]?.targetAmount ? ' ($' + goals[0].targetAmount + ')' : ''}
-- Current saving rate: ${savingsRate.toFixed(0)}%
-- Progress: ${currentBabyStep?.title || 'building financial foundations'}
-
-Write a 380-450 word guided visualisation script that:
-1. Opens with a 2-sentence breathing induction
-2. References their REAL situation — use ${userName || 'their name'}, mention actual debt names, actual goal names, real dollar amounts
-3. Includes 4 personalised "Repeat with me:" affirmations specific to their numbers
-4. Builds to a vivid future-self visualisation — specific to their actual goals
-5. Uses calm, second-person present tense throughout ("you are", "you feel", "you have")
-6. Closes with a gentle return to awareness
-
-IMPORTANT: Output ONLY the script text. Begin directly with the breathing induction. No preamble, no explanation, no headers.`,
-                financialData: {}, memory: budgetMemory, countryConfig: currentCountryConfig
+                topic: session.title,
+                desc: session.desc,
+                userName: userName || '',
+                monthlyIncome: monthlyIncome.toFixed(0),
+                monthlySurplus: monthlySurplus.toFixed(0),
+                debts: debts.map((d: any) => ({ name: d.name, balance: d.balance })),
+                goals: goals.slice(0, 3).map((g: any) => ({ name: g.name, targetAmount: g.targetAmount })),
+                savingRate: savingsRate.toFixed(0),
+                babyStep: currentBabyStep?.title || ''
               })
             })
             const data = await res.json()
-            const text = data.message || data.advice || ''
+            const text = data.script || ''
             setHypnosisPersonalised(text)
           } catch (e) {
             setHypnosisPersonalised('Unable to generate personalised session. Please try again.')
