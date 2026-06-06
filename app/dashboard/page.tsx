@@ -14337,7 +14337,7 @@ Tracking with Aureus 🏛️`
                       </button>
                       <button onClick={() => setHypnosisStyle('snyder')}
                         style={{ flex: 1, padding: '10px 14px', background: hypnosisStyle === 'snyder' ? 'rgba(231,76,60,0.1)' : '#0d0d0d', border: '1px solid ' + (hypnosisStyle === 'snyder' ? '#e74c3c' : '#2a2218'), borderRadius: '10px', cursor: 'pointer', textAlign: 'left' as const }}>
-                        <div style={{ color: hypnosisStyle === 'snyder' ? '#e74c3c' : '#9a8a6a', fontSize: '13px', fontWeight: 700, marginBottom: '2px' }}>⚡ Dr. Snyder NLP</div>
+                        <div style={{ color: hypnosisStyle === 'snyder' ? '#e74c3c' : '#9a8a6a', fontSize: '13px', fontWeight: 700, marginBottom: '2px' }}>⚡ Power NLP</div>
                         <div style={{ color: '#6b5e3e', fontSize: '11px' }}>Rapid, direct, pattern-interrupt</div>
                       </button>
                     </div>
@@ -14458,7 +14458,7 @@ Tracking with Aureus 🏛️`
                     <span style={{ fontSize: '36px' }}>{hypnosisSession.icon}</span>
                     <div>
                       <div style={{ color: hypnosisSession.colour, fontWeight: 800, fontSize: '20px' }}>{hypnosisSession.title}</div>
-                      <div style={{ color: '#9a8a6a', fontSize: '12px' }}>{hypnosisSession.duration} min · {hypnosisStyle === 'snyder' ? '⚡ Dr. Snyder NLP style' : '🕊 Gentle guided visualisation'}</div>
+                      <div style={{ color: '#9a8a6a', fontSize: '12px' }}>{hypnosisSession.duration} min · {hypnosisStyle === 'snyder' ? '⚡ Power NLP style' : '🕊 Gentle guided visualisation'}</div>
                     </div>
                   </div>
 
