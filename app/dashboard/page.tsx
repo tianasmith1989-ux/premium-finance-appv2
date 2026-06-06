@@ -394,7 +394,7 @@ export default function Dashboard() {
   const [dickensResponse, setDickensResponse] = useState<string | null>(null)
   const [dickensLoading, setDickensLoading] = useState(false)
 
-  // ── Hypnosis / Guided Visualisation ──
+  // ── Guided Visualisation ──
   const [showHypnosis, setShowHypnosis] = useState(false)
   const [hypnosisSession, setHypnosisSession] = useState<any>(null)
   const [hypnosisPersonalised, setHypnosisPersonalised] = useState<string | null>(null)
@@ -409,7 +409,9 @@ export default function Dashboard() {
   const [hypnosisHistory, setHypnosisHistory] = useState<{id: string, title: string, icon: string, date: string, personalised: boolean}[]>([])
   const [hypnosisSaved, setHypnosisSaved] = useState<{id: string, title: string, icon: string, script: string, colour: string}[]>([])
   const [hypnosisTab, setHypnosisTab] = useState<'sessions'|'history'|'saved'>('sessions')
-  const [hypnosisStyle, setHypnosisStyle] = useState<'gentle'|'snyder'>('gentle')
+  const [hypnosisStyle, setHypnosisStyle] = useState<'gentle'|'power'>('gentle')
+  const [hypnosisPrePhase, setHypnosisPrePhase] = useState<'idle'|'consult'|'pretalk'|'ready'>('idle')
+  const [hypnosisConsultAnswers, setHypnosisConsultAnswers] = useState<{goal: string, concerns: string, experience: string}>({goal: '', concerns: '', experience: ''})
   const [hypnosisRecommended, setHypnosisRecommended] = useState<string | null>(null)
 
   // Values elicitation
@@ -5506,6 +5508,11 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             highlight: 'Auto-wins · Manual wins · Streak tracking'
           },
           {
+            tab: 'change', icon: '⚡', title: 'Change — Mindset & Guided Visualisation',
+            desc: 'Where the deep work happens. Use the Dickens Process to feel the real cost of inaction, Find Your Values to turn "should" into "must", and access Guided Visualisation sessions to rewire your money mindset. Six sessions including abundance, debt release, confidence, and more — with AI personalisation that uses your real numbers.',
+            highlight: 'Dickens Process · Values · Compelling Future · Money Mirror · Guided Visualisation · AI Personalised'
+          },
+          {
             tab: 'learn', icon: '🎓', title: 'Learn — Financial Education',
             desc: 'Core financial concepts explained clearly. Baby Steps, the avalanche vs snowball method, how compound interest works, Australian-specific content (super, offset accounts, negative gearing). Learn as you go.',
             highlight: 'Baby Steps · Debt methods · Compound interest · Australian concepts'
@@ -6584,7 +6591,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                       { icon: '🧭', title: 'Find Your Values', desc: 'Turn "should" into "must"', action: () => { setValuesStep(0); setValuesAnswers({}); setValuesInput(''); setShowValuesElicitation(true) } },
                       { icon: '🌅', title: 'Compelling Future', desc: 'Make your vision visceral', action: () => { setFutureVision(''); setFutureResponse(null); setShowCompellingFuture(true) } },
                       { icon: '🪞', title: 'Money Mirror', desc: 'Rewrite your money story', action: () => { setMirrorStory(''); setMirrorResponse(null); setShowMoneyMirror(true) } },
-                      { icon: '🌀', title: 'Hypnosis & Visualisation', desc: 'Rewire your money mindset', action: () => { setHypnosisSession(null); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisProgress(0); setShowHypnosis(true) } },
+                      { icon: '🌀', title: 'Guided Visualisation', desc: 'Rewire your money mindset', action: () => { setHypnosisSession(null); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisProgress(0); setShowHypnosis(true) } },
                     ].map((item, i) => (
                       <button key={i} onClick={item.action}
                         style={{ padding: '14px 12px', background: theme.bg, border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', textAlign: 'left' as const, transition: 'border-color 0.2s' }}>
@@ -14174,7 +14181,7 @@ Tracking with Aureus 🏛️`
         </div>
       )}
 
-      {/* ── HYPNOSIS & GUIDED VISUALISATION MODAL ── */}
+      {/* ── GUIDED VISUALISATION MODAL ── */}
       {showHypnosis && (() => {
         const GENTLE_SESSIONS = [
           { id: 'abundance', icon: '✨', title: 'Abundance Mindset', desc: 'Shift from scarcity to abundance', duration: 8, colour: '#D4AF37',
@@ -14214,7 +14221,10 @@ Tracking with Aureus 🏛️`
                 topic: session.title,
                 desc: session.desc,
                 style: hypnosisStyle,
-                snyderStyle: hypnosisStyle === 'snyder',
+                snyderStyle: hypnosisStyle === 'power',
+                userGoal: hypnosisConsultAnswers.goal,
+                userConcerns: hypnosisConsultAnswers.concerns,
+                userExperience: hypnosisConsultAnswers.experience,
                 userName: userName || '',
                 monthlyIncome: monthlyIncome.toFixed(0),
                 monthlySurplus: monthlySurplus.toFixed(0),
@@ -14305,8 +14315,8 @@ Tracking with Aureus 🏛️`
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '20px' }}>🌀</span>
                 <div>
-                  <div style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 700, letterSpacing: '1px' }}>MIND REPROGRAMMING</div>
-                  <div style={{ color: '#6b5e3e', fontSize: '11px' }}>Guided visualisation & NLP for financial freedom</div>
+                  <div style={{ color: '#D4AF37', fontSize: '13px', fontWeight: 700, letterSpacing: '1px' }}>GUIDED VISUALISATION</div>
+                  <div style={{ color: '#6b5e3e', fontSize: '11px' }}>Mindset sessions for financial freedom</div>
                 </div>
               </div>
               <button onClick={() => { setShowHypnosis(false); setHypnosisPlaying(false); setHypnosisSpeaking(false); if (window.speechSynthesis) window.speechSynthesis.cancel(); setHypnosisSession(null); setHypnosisPersonalised(null); if (hypnosisTimerRef.current) clearInterval(hypnosisTimerRef.current) }}
@@ -14350,7 +14360,7 @@ Tracking with Aureus 🏛️`
                           <div style={{ color: '#F5F5F5', fontSize: '13px', fontWeight: 600 }}>{recommendedSession.icon} {recommendedSession.title}</div>
                           <div style={{ color: '#9a8a6a', fontSize: '11px' }}>Based on your current situation</div>
                         </div>
-                        <button onClick={() => { setHypnosisSession(recommendedSession); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisProgress(0) }}
+                        <button onClick={() => { setHypnosisSession(recommendedSession); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisProgress(0); setHypnosisPrePhase('consult'); setHypnosisConsultAnswers({goal:'',concerns:'',experience:''}) }}
                           style={{ padding: '8px 16px', background: '#D4AF37', color: '#111', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
                           Start →
                         </button>
@@ -14363,7 +14373,7 @@ Tracking with Aureus 🏛️`
                         const isSaved = hypnosisSaved.some((saved: any) => saved.id === s.id)
                         const historyEntry = hypnosisHistory.find((h: any) => h.id === s.id)
                         return (
-                          <button key={s.id} onClick={() => { setHypnosisSession(s); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisProgress(0) }}
+                          <button key={s.id} onClick={() => { setHypnosisSession(s); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisProgress(0); setHypnosisPrePhase('consult'); setHypnosisConsultAnswers({goal:'',concerns:'',experience:''}) }}
                             style={{ padding: '16px', background: '#0d0d0d', border: '1px solid ' + s.colour + '30', borderRadius: '12px', cursor: 'pointer', textAlign: 'left' as const, position: 'relative' as const }}>
                             {isSaved && <span style={{ position: 'absolute' as const, top: '10px', right: '10px', fontSize: '12px' }}>⭐</span>}
                             <div style={{ fontSize: '26px', marginBottom: '6px' }}>{s.icon}</div>
@@ -14399,7 +14409,7 @@ Tracking with Aureus 🏛️`
                             </div>
                           </div>
                           {session && (
-                            <button onClick={() => { setHypnosisSession(session); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisProgress(0); setHypnosisTab('sessions') }}
+                            <button onClick={() => { setHypnosisSession(session); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisProgress(0); setHypnosisTab('sessions'); setHypnosisPrePhase('consult'); setHypnosisConsultAnswers({goal:'',concerns:'',experience:''}) }}
                               style={{ padding: '6px 12px', background: 'transparent', border: '1px solid #2a2218', borderRadius: '6px', color: '#9a8a6a', cursor: 'pointer', fontSize: '11px' }}>
                               Redo →
                             </button>
@@ -14440,10 +14450,132 @@ Tracking with Aureus 🏛️`
                 )}
               </div>
             ) : (
-              /* Session view */
+              /* Pre-flight + Session view */
               <div style={{ flex: 1, overflowY: 'auto' as const, padding: '16px 20px' }}>
                 <div style={{ maxWidth: '620px', margin: '0 auto' }}>
 
+                  {/* ── PRE-FLIGHT PHASES ── */}
+                  {hypnosisPrePhase !== 'idle' && (
+                    <div>
+                      <button onClick={() => { setHypnosisPrePhase('idle'); setHypnosisSession(null) }}
+                        style={{ background: 'none', border: 'none', color: '#9a8a6a', cursor: 'pointer', fontSize: '13px', padding: '0 0 16px 0' }}>← Back to sessions</button>
+
+                      {/* Progress steps */}
+                      <div style={{ display: 'flex', gap: '4px', marginBottom: '24px' }}>
+                        {['consult', 'pretalk', 'ready'].map((phase, i) => (
+                          <div key={phase} style={{ flex: 1, height: '3px', borderRadius: '2px', background: hypnosisPrePhase === 'consult' && i === 0 ? '#D4AF37' : hypnosisPrePhase === 'pretalk' && i <= 1 ? '#D4AF37' : hypnosisPrePhase === 'ready' ? '#D4AF37' : '#2a2218' }} />
+                        ))}
+                      </div>
+
+                      {/* Step 1 — Initial Consultation */}
+                      {hypnosisPrePhase === 'consult' && (
+                        <div>
+                          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', marginBottom: '20px' }}>
+                            <span style={{ fontSize: '32px' }}>{hypnosisSession.icon}</span>
+                            <div>
+                              <div style={{ color: '#9a8a6a', fontSize: '11px', fontWeight: 700, letterSpacing: '1.5px', marginBottom: '4px' }}>STEP 1 OF 3 — CONSULTATION</div>
+                              <div style={{ color: '#F5F5F5', fontSize: '18px', fontWeight: 700 }}>{hypnosisSession.title}</div>
+                              <div style={{ color: '#9a8a6a', fontSize: '13px', marginTop: '2px' }}>Let's understand what you want from this session</div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px', marginBottom: '20px' }}>
+                            <div>
+                              <label style={{ color: '#9a8a6a', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>WHAT'S YOUR MAIN GOAL FOR THIS SESSION?</label>
+                              <textarea
+                                value={hypnosisConsultAnswers.goal}
+                                onChange={e => setHypnosisConsultAnswers(prev => ({...prev, goal: e.target.value}))}
+                                placeholder={`e.g. I want to release the shame I feel about my ${debts[0]?.name || 'debt'} and start feeling more in control`}
+                                style={{ width: '100%', minHeight: '80px', padding: '12px 14px', background: '#0d0d0d', border: '1px solid #2a2218', borderRadius: '10px', color: '#F5F5F5', fontSize: '14px', resize: 'vertical' as const, fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' as const }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ color: '#9a8a6a', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>ANY CONCERNS OR THINGS YOU WANT TO AVOID?</label>
+                              <textarea
+                                value={hypnosisConsultAnswers.concerns}
+                                onChange={e => setHypnosisConsultAnswers(prev => ({...prev, concerns: e.target.value}))}
+                                placeholder="e.g. I don't want to feel judged about past financial decisions. I struggle to visualise clearly."
+                                style={{ width: '100%', minHeight: '70px', padding: '12px 14px', background: '#0d0d0d', border: '1px solid #2a2218', borderRadius: '10px', color: '#F5F5F5', fontSize: '14px', resize: 'vertical' as const, fontFamily: 'inherit', lineHeight: 1.6, boxSizing: 'border-box' as const }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ color: '#9a8a6a', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>HAVE YOU DONE GUIDED VISUALISATION OR MEDITATION BEFORE?</label>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                {['Never', 'A few times', 'Regularly'].map(opt => (
+                                  <button key={opt} onClick={() => setHypnosisConsultAnswers(prev => ({...prev, experience: opt}))}
+                                    style={{ flex: 1, padding: '10px 8px', background: hypnosisConsultAnswers.experience === opt ? 'rgba(212,175,55,0.12)' : '#0d0d0d', border: '1px solid ' + (hypnosisConsultAnswers.experience === opt ? '#D4AF37' : '#2a2218'), borderRadius: '8px', color: hypnosisConsultAnswers.experience === opt ? '#D4AF37' : '#9a8a6a', cursor: 'pointer', fontSize: '12px', fontWeight: hypnosisConsultAnswers.experience === opt ? 700 : 400 }}>
+                                    {opt}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          <button onClick={() => setHypnosisPrePhase('pretalk')}
+                            disabled={!hypnosisConsultAnswers.goal.trim() || !hypnosisConsultAnswers.experience}
+                            style={{ width: '100%', padding: '14px', background: hypnosisConsultAnswers.goal.trim() && hypnosisConsultAnswers.experience ? 'linear-gradient(135deg, #D4AF37, #8C6A1F)' : '#1a1810', color: hypnosisConsultAnswers.goal.trim() && hypnosisConsultAnswers.experience ? '#111' : '#6b5e3e', border: 'none', borderRadius: '12px', cursor: hypnosisConsultAnswers.goal.trim() && hypnosisConsultAnswers.experience ? 'pointer' : 'default', fontWeight: 800, fontSize: '15px' }}>
+                            Continue →
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Step 2 — Pre-Talk & Education */}
+                      {hypnosisPrePhase === 'pretalk' && (
+                        <div>
+                          <div style={{ marginBottom: '20px' }}>
+                            <div style={{ color: '#9a8a6a', fontSize: '11px', fontWeight: 700, letterSpacing: '1.5px', marginBottom: '8px' }}>STEP 2 OF 3 — PRE-TALK</div>
+                            <div style={{ color: '#F5F5F5', fontSize: '18px', fontWeight: 700, marginBottom: '4px' }}>Before we begin</div>
+                            <div style={{ color: '#9a8a6a', fontSize: '13px' }}>A few things to know that will make this more effective</div>
+                          </div>
+
+                          {[
+                            { icon: '🧠', title: 'You are always in control', body: 'Guided visualisation works gently with your mind — you cannot be made to do anything against your will. You can open your eyes and stop at any time.' },
+                            { icon: '👁', title: `You don't need to "go under"`, body: `Most people remain aware of their surroundings. The depth of relaxation varies — even light relaxation is effective. If you've struggled with meditation before, that's okay. Just read slowly.` },
+                            { icon: '🔁', title: 'Repetition creates change', body: 'A single session plants a seed. The real rewiring happens with repetition over time. Consider returning to this session — especially the personalised version — several times over the coming weeks.' },
+                            { icon: '💰', title: 'Your goal for today', body: `You said: "${hypnosisConsultAnswers.goal}" — this session is designed to help with exactly that. Stay focused on that intention throughout.` },
+                            hypnosisConsultAnswers.experience === 'Never'
+                              ? { icon: '🌱', title: "First time? That's perfect", body: 'Your mind is completely open to new suggestions. There is no right or wrong way to experience this. Just breathe, read slowly, and let the words land.' }
+                              : { icon: '✨', title: 'Build on what you know', body: 'Your experience with meditation or visualisation is an advantage. You already know how to settle into that receptive state. Use that familiarity here.' },
+                          ].map((item, i) => (
+                            <div key={i} style={{ display: 'flex', gap: '14px', padding: '14px 0', borderBottom: '1px solid #1a1810' }}>
+                              <span style={{ fontSize: '22px', flexShrink: 0, marginTop: '2px' }}>{item.icon}</span>
+                              <div>
+                                <div style={{ color: '#F5F5F5', fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>{item.title}</div>
+                                <div style={{ color: '#9a8a6a', fontSize: '13px', lineHeight: 1.65 }}>{item.body}</div>
+                              </div>
+                            </div>
+                          ))}
+
+                          {hypnosisConsultAnswers.concerns.trim() && (
+                            <div style={{ marginTop: '14px', padding: '14px', background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.15)', borderRadius: '10px' }}>
+                              <div style={{ color: '#D4AF37', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '6px' }}>YOUR CONCERN</div>
+                              <div style={{ color: '#9a8a6a', fontSize: '13px', lineHeight: 1.6 }}>You mentioned: "{hypnosisConsultAnswers.concerns}" — that's completely valid. There's no pressure here. Go at your own pace and skip anything that doesn't feel right.</div>
+                            </div>
+                          )}
+
+                          <div style={{ marginTop: '20px', padding: '16px', background: '#0d0d0d', border: '1px solid rgba(212,175,55,0.1)', borderRadius: '12px', marginBottom: '16px' }}>
+                            <div style={{ color: '#D4AF37', fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>🎧 PREPARE YOUR ENVIRONMENT</div>
+                            <div style={{ color: '#9a8a6a', fontSize: '13px', lineHeight: 1.7 }}>
+                              • Find a quiet place where you won't be disturbed<br/>
+                              • Put on headphones if you can — it deepens the experience<br/>
+                              • Sit comfortably with your back supported, hands relaxed<br/>
+                              • Silence notifications on your device<br/>
+                              • Give yourself {hypnosisSession.duration} minutes of uninterrupted time
+                            </div>
+                          </div>
+
+                          <button onClick={() => setHypnosisPrePhase('idle')}
+                            style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #D4AF37, #8C6A1F)', color: '#111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '16px', letterSpacing: '0.5px' }}>
+                            I'm ready — begin the session →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── MAIN SESSION (shown when pre-flight done) ── */}
+                  {hypnosisPrePhase === 'idle' && (
+                  <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                     <button onClick={() => { setHypnosisSession(null); setHypnosisPersonalised(null); setHypnosisPlaying(false); setHypnosisSpeaking(false); setHypnosisProgress(0); if (window.speechSynthesis) window.speechSynthesis.cancel(); if (hypnosisTimerRef.current) clearInterval(hypnosisTimerRef.current) }}
                       style={{ background: 'none', border: 'none', color: '#9a8a6a', cursor: 'pointer', fontSize: '13px', padding: 0 }}>← Back</button>
@@ -14533,8 +14665,10 @@ Tracking with Aureus 🏛️`
                   )}
 
                   <div style={{ padding: '10px 14px', background: '#060606', borderRadius: '8px', color: '#3a2e1e', fontSize: '11px', lineHeight: 1.6 }}>
-                    ⚠️ Guided visualisation is for personal development only. Not a substitute for professional mental health support.
+                    ⚠️ Guided visualisation is for personal development and wellbeing only. Not a substitute for professional mental health support.
                   </div>
+                  </div>
+                  )}
                 </div>
               </div>
             )}
