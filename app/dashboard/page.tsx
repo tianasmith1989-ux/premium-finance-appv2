@@ -2353,6 +2353,9 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
         if (error) throw error
         if (data.user) {
           setAuthUser(data.user)
+          // Capture values before any state changes clear them
+          const signupEmail = authEmail.trim()
+          const signupName = userName || ''
           await saveToCloud(data.user)
           setShowAuthModal('none')
           // Brand new signup — always start onboarding
@@ -2361,13 +2364,20 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
           setMissionNavLocked(true)
           setActiveTab('home')
           // Send welcome email to user + notify owner
-          try {
-            fetch('/api/send-welcome-email', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userName: userName || '', email: authEmail.trim() })
-            })
-          } catch {}
+          // Use await so errors are visible, run after state updates settle
+          setTimeout(async () => {
+            try {
+              const res = await fetch('/api/send-welcome-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userName: signupName, email: signupEmail })
+              })
+              const result = await res.json()
+              console.log('Welcome email result:', result)
+            } catch (e) {
+              console.error('Welcome email failed:', e)
+            }
+          }, 1000)
         }
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword })
