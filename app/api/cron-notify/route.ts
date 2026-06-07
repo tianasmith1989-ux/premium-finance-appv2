@@ -7,10 +7,6 @@ import { createClient } from '@supabase/supabase-js'
 
 const FROM = 'Aureus <noreply@aureusplutus.app>'
 
-const _today = new Date()
-const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][_today.getDay()]
-const dateFormatted = _today.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-
 async function sendEmail(to: string, subject: string, html: string, resendKey: string) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -20,7 +16,7 @@ async function sendEmail(to: string, subject: string, html: string, resendKey: s
   return res.ok
 }
 
-function buildDailyBriefHtml(u: any): string {
+function buildDailyBriefHtml(u: any, dayName: string, dateFormatted: string): string {
   const bills: any[] = u.upcoming_bills || []
   const name = u.user_name || 'Builder'
 
@@ -86,6 +82,37 @@ function buildDailyBriefHtml(u: any): string {
     .sort((a: any, b: any) => a.months - b.months)
     .slice(0, 2)
 
+  // Sinking fund countdowns
+  const sinkingFunds: any[] = u.sinking_funds || []
+  const sinkingCountdowns = sinkingFunds
+    .filter((f: any) => {
+      const target = parseFloat(f.targetAmount || '0')
+      const saved = parseFloat(f.savedAmount || '0')
+      const weekly = parseFloat(f.weeklyAmount || '0')
+      return target > 0 && saved < target && weekly > 0
+    })
+    .map((f: any) => {
+      const target = parseFloat(f.targetAmount || '0')
+      const saved = parseFloat(f.savedAmount || '0')
+      const weekly = parseFloat(f.weeklyAmount || '0')
+      const remaining = target - saved
+      const weeks = weekly > 0 ? Math.ceil(remaining / weekly) : null
+      const months = weeks ? Math.ceil(weeks / 4.33) : null
+      // Use targetDate if set, otherwise calculate
+      let completionDate = ''
+      if (f.targetDate) {
+        completionDate = new Date(f.targetDate).toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })
+      } else if (weeks) {
+        const d = new Date()
+        d.setDate(d.getDate() + weeks * 7)
+        completionDate = d.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })
+      }
+      const pct = Math.round(saved / target * 100)
+      return { name: f.name, remaining, weeks, months, pct, completionDate, target, saved, weekly }
+    })
+    .filter((f: any) => f.months !== null)
+    .slice(0, 3)
+
   // Mortgage countdown
   let mortgageMonthsLeft: number | null = null
   let mortgageYearsLeft: number | null = null
@@ -119,6 +146,7 @@ function buildDailyBriefHtml(u: any): string {
 
   const buildBillRow = (b: any, highlight: string) => {
     const dueText = b.dayOffset === 0 ? 'DUE TODAY' : b.dayOffset < 0 ? `${Math.abs(b.dayOffset)} DAYS OVERDUE` : `Due in ${b.dayOffset} day${b.dayOffset !== 1 ? 's' : ''}`
+    const freqLabel = b.frequency && b.frequency !== 'monthly' ? ` · ${b.frequency}` : ''
     const isAutomatic = b.automatic
     return `
     <tr>
@@ -126,7 +154,7 @@ function buildDailyBriefHtml(u: any): string {
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div>
             <div style="color:#F5F5F5;font-size:14px;font-weight:600;">${b.name}</div>
-            <div style="color:${highlight};font-size:11px;font-weight:700;margin-top:2px;">${dueText}</div>
+            <div style="color:${highlight};font-size:11px;font-weight:700;margin-top:2px;">${dueText}${freqLabel}</div>
             ${isAutomatic
               ? `<div style="color:#6b8f6b;font-size:10px;margin-top:2px;">✅ Auto-payment set up</div>`
               : `<div style="color:#bc6a1f;font-size:10px;margin-top:2px;">⚠️ Check payment is arranged</div>`
@@ -231,7 +259,7 @@ function buildDailyBriefHtml(u: any): string {
   </div>` : ''}
 
   <!-- Progress countdowns — goal/debt/mortgage -->
-  ${(debtCountdowns.length > 0 || goalCountdowns.length > 0 || mortgageYearsLeft) ? `
+  ${(debtCountdowns.length > 0 || goalCountdowns.length > 0 || sinkingCountdowns.length > 0 || mortgageYearsLeft) ? `
   <div style="background:#1a1810;border:1px solid #2e2618;border-radius:12px;padding:16px 20px;margin-bottom:12px;">
     <div style="color:#9a8a6a;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:12px;">🏁 YOUR PROGRESS COUNTDOWNS</div>
     ${debtCountdowns.map((d: any) => `
@@ -254,6 +282,22 @@ function buildDailyBriefHtml(u: any): string {
       <div style="text-align:right;">
         <div style="color:#D4AF37;font-size:14px;font-weight:800;">${formatCountdown(g.months)}</div>
         <div style="color:#9a8a6a;font-size:10px;">to goal</div>
+      </div>
+    </div>`).join('')}
+    ${sinkingCountdowns.map((f: any) => `
+    <div style="padding:8px 0;border-bottom:1px solid #2e2618;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+        <div>
+          <div style="color:#F5F5F5;font-size:13px;font-weight:600;">🪣 ${f.name}</div>
+          <div style="color:#9a8a6a;font-size:11px;margin-top:1px;">$${Math.round(f.saved).toLocaleString()} of $${Math.round(f.target).toLocaleString()} · $${f.weekly}/wk${f.completionDate ? ' · ready ' + f.completionDate : ''}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="color:#8C6A1F;font-size:14px;font-weight:800;">${f.months ? formatCountdown(f.months) : '—'}</div>
+          <div style="color:#9a8a6a;font-size:10px;">to target</div>
+        </div>
+      </div>
+      <div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;">
+        <div style="width:${Math.min(100, f.pct)}%;height:100%;background:#8C6A1F;border-radius:2px;"></div>
       </div>
     </div>`).join('')}
     ${mortgageYearsLeft ? `
@@ -350,9 +394,13 @@ export async function GET(request: NextRequest) {
   if (!supabaseUrl || !supabaseKey) return NextResponse.json({ error: 'Supabase env vars not set' }, { status: 500 })
 
   const supabase = createClient(supabaseUrl, supabaseKey)
-  const today = new Date()
-  const todayStr = today.toISOString().split('T')[0]
-  const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][today.getDay()]
+  // Always use AEST (UTC+10) for date — cron fires at 8am AEST = 10pm UTC previous day
+  const now = new Date()
+  const aestOffset = 10 * 60 // AEST is UTC+10 (no DST adjustment needed for Brisbane)
+  const aestNow = new Date(now.getTime() + aestOffset * 60 * 1000)
+  const todayStr = aestNow.toISOString().split('T')[0]
+  const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][aestNow.getUTCDay()]
+  const dateFormatted = aestNow.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Brisbane' })
 
   const results = { sent: 0, skipped: 0, errors: 0, users: 0 }
 
@@ -365,7 +413,9 @@ export async function GET(request: NextRequest) {
 
     for (const u of users) {
       try {
-        if (u.last_weekly_sent === todayStr) { results.skipped++; continue }
+        // Skip if already sent today (AEST) — prevents double-sending
+        const lastSent = u.last_weekly_sent || ''
+        if (lastSent === todayStr) { results.skipped++; continue }
 
         const overdue = (u.upcoming_bills || []).filter((b: any) => b.dayOffset < 0)
         const thisWeek = (u.upcoming_bills || []).filter((b: any) => b.dayOffset >= 0 && b.dayOffset <= 7)
@@ -385,7 +435,7 @@ export async function GET(request: NextRequest) {
           return `🏛️ Your Aureus brief, ${name} — ${dayName}`
         })()
 
-        const html = buildDailyBriefHtml(u)
+        const html = buildDailyBriefHtml(u, dayName, dateFormatted)
         const sent = await sendEmail(u.email, subject, html, RESEND_KEY)
 
         if (sent) {
