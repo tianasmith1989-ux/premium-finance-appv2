@@ -2588,6 +2588,74 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
     if (onboardingComplete && authUser) saveToCloud()
   }, [onboardingComplete])
 
+  // ── Auto-sync notification prefs whenever financial data changes ──
+  // Runs with a 5-second debounce so it doesn't hammer the API on every keystroke
+  useEffect(() => {
+    if (!emailNotifEnabled && !notificationsEnabled) return
+    if (!notificationEmail?.includes('@')) return
+    if (!onboardingComplete) return
+    const timer = setTimeout(async () => {
+      try {
+        const userToken = localStorage.getItem('aureus_user_token') || authUser?.id || ''
+        if (!userToken) return
+        const topGoal = goals[0]
+        const upcomingBills = [
+          ...expenses.filter((e: any) => e.dueDate).map((e: any) => {
+            const due = new Date(e.dueDate + 'T12:00:00')
+            const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
+            return { name: e.name, amount: e.amount, frequency: e.frequency || 'monthly', dayOffset, automatic: hasAutomatedPayments, itemType: 'expense', dueDate: e.dueDate }
+          }),
+          ...debts.filter((d: any) => d.paymentDate).map((d: any) => {
+            const due = new Date(d.paymentDate + 'T12:00:00')
+            const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
+            return { name: d.name + ' (debt payment)', amount: d.minPayment || d.payment || d.minimum || '0', frequency: d.frequency || 'fortnightly', dayOffset, automatic: hasAutomatedPayments, itemType: 'debt', dueDate: d.paymentDate }
+          }),
+          ...goals.filter((g: any) => g.startDate && g.paymentAmount).map((g: any) => {
+            const due = new Date(g.startDate + 'T12:00:00')
+            const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
+            return { name: g.name + ' (goal)', amount: g.paymentAmount, frequency: g.savingsFrequency || 'fortnightly', dayOffset, automatic: true, itemType: 'goal', dueDate: g.startDate }
+          }),
+        ].filter((u: any) => u.dayOffset >= -7 && u.dayOffset < 30).sort((a: any, b: any) => a.dayOffset - b.dayOffset).slice(0, 20)
+
+        await fetch('/api/save-notification-prefs', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userToken, email: notificationEmail, userName,
+            frequency: 'daily',
+            notifyWeeklySnapshot: true, notifyOverdueBills: true, notifyMoneyDate: true,
+            notifyMonthlyMealPlan: monthlyMealPlanOptIn,
+            householdSize: parseInt(mealPlanPrefs?.people || '4'),
+            mealBudget: parseInt(mealPlanPrefs?.budget || '150'),
+            mealDislikes: mealPlanPrefs?.dislikes || '',
+            mealDietary: mealPlanPrefs?.dietaryNeeds || '',
+            moneyDateDay: checkInSchedule.moneyDateDay || 'Sunday',
+            moneyDateTime: checkInSchedule.moneyDateTime || '18:00',
+            monthlyIncome: Math.round(monthlyIncome),
+            monthlyExpenses: Math.round(monthlyExpenses),
+            monthlyDebtPayments: Math.round(debts.reduce((s: number, d: any) => s + parseFloat(d.minimum || d.payment || '0'), 0)),
+            monthlyGoalSavings: Math.round(monthlyGoalSavings),
+            monthlySurplus: Math.round(monthlySurplus),
+            savingRate: Math.round(savingsRate),
+            topGoalName: topGoal?.name || null,
+            topGoalPct: topGoal ? Math.min(100, Math.round(parseFloat(topGoal.savedAmount||'0') / parseFloat(topGoal.targetAmount||'1') * 100)) : null,
+            nextAction: coachNextAction?.action || null,
+            streak, upcomingBills,
+            debts: debts.map((d: any) => ({ name: d.name, balance: d.balance, minimum: d.minimum || d.payment || '0' })),
+            goals: goals.map((g: any) => ({ name: g.name, targetAmount: g.targetAmount, savedAmount: g.savedAmount || g.currentAmount || '0', paymentAmount: g.paymentAmount || '0' })),
+            sinkingFunds: sinkingFunds.map((f: any) => ({ name: f.name, targetAmount: f.targetAmount, savedAmount: f.savedAmount || '0', weeklyAmount: f.weeklyAmount || '0', targetDate: f.targetDate || '' })),
+            mortgageAccel: mortgageAccel.balance ? { remaining_years: mortgageAccel.remainingYears } : null
+          })
+        })
+      } catch {}
+    }, 5000)
+    return () => clearTimeout(timer)
+  }, [
+    JSON.stringify(expenses.map((e: any) => e.dueDate + e.amount)),
+    JSON.stringify(debts.map((d: any) => d.paymentDate + d.balance)),
+    JSON.stringify(goals.map((g: any) => g.startDate + g.savedAmount)),
+    monthlyIncome, monthlySurplus, streak, notificationEmail, emailNotifEnabled
+  ])
+
   // ── Logout — clears local data and signs out of Supabase ──
   const handleLogout = async () => {
     try {
@@ -13197,46 +13265,38 @@ Tracking with Aureus 🏛️`
 
       {/* ==================== NOTIFICATION SETUP MODAL ==================== */}
       {showNotifSetup && (() => {
-        const handleEnableEmail = async () => {
-          if (!notificationEmail || !notificationEmail.includes('@')) { alert('Please enter a valid email address.'); return }
-          setNotificationsEnabled(true)
-          // Generate a stable anonymous token for this user
-          let userToken = localStorage.getItem('aureus_user_token')
-          if (!userToken) { userToken = 'aureus_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('aureus_user_token', userToken) }
+        // ── Reusable notification prefs sync — called on save and auto-sync ──
+        const buildNotifPayload = () => {
+          const userToken = localStorage.getItem('aureus_user_token') || (authUser?.id || '')
+          if (!userToken || !notificationEmail?.includes('@')) return null
           const topGoal = goals[0]
           const topWin = wins.slice(-1)[0]
           const upcomingBills = [
-            // Regular expenses
             ...expenses
-              .filter((e: any) => e.dueDate || e.frequency)
+              .filter((e: any) => e.dueDate)
               .map((e: any) => {
-                const due = e.dueDate ? new Date(e.dueDate + 'T12:00:00') : null
-                const dayOffset = due ? Math.round((due.getTime() - Date.now()) / 86400000) : 999
-                // Use the actual per-occurrence amount (already correct — e.amount IS the per-occurrence amount)
-                return { name: e.name, amount: e.amount, frequency: e.frequency || 'monthly', dayOffset, automatic: hasAutomatedPayments, itemType: 'expense' }
+                const due = new Date(e.dueDate + 'T12:00:00')
+                const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
+                return { name: e.name, amount: e.amount, frequency: e.frequency || 'monthly', dayOffset, automatic: hasAutomatedPayments, itemType: 'expense', dueDate: e.dueDate }
               }),
-            // Debt payments — use minPayment per occurrence, not monthly total
             ...debts
               .filter((d: any) => d.paymentDate)
               .map((d: any) => {
                 const due = new Date(d.paymentDate + 'T12:00:00')
                 const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
                 const payAmt = d.minPayment || d.payment || d.minimum || '0'
-                return { name: d.name + ' (debt)', amount: payAmt, frequency: d.frequency || 'monthly', dayOffset, automatic: hasAutomatedPayments, itemType: 'debt' }
+                return { name: d.name + ' (debt payment)', amount: payAmt, frequency: d.frequency || 'fortnightly', dayOffset, automatic: hasAutomatedPayments, itemType: 'debt', dueDate: d.paymentDate }
               }),
-            // Goal savings
             ...goals
-              .filter((g: any) => g.addedToCalendar && g.startDate && g.paymentAmount)
+              .filter((g: any) => g.startDate && g.paymentAmount)
               .map((g: any) => {
                 const due = new Date(g.startDate + 'T12:00:00')
                 const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
-                return { name: g.name + ' (goal)', amount: g.paymentAmount, frequency: g.savingsFrequency || 'monthly', dayOffset, automatic: true, itemType: 'goal' }
+                return { name: g.name + ' (goal)', amount: g.paymentAmount, frequency: g.savingsFrequency || 'fortnightly', dayOffset, automatic: true, itemType: 'goal', dueDate: g.startDate }
               }),
-            // Sinking funds — weekly contributions
             ...sinkingFunds
               .filter((f: any) => parseFloat(f.savedAmount || '0') < parseFloat(f.targetAmount || '0') && parseFloat(f.weeklyAmount || '0') > 0)
               .map((f: any) => {
-                // Next Monday as the next weekly contribution date
                 const nextMonday = new Date()
                 nextMonday.setHours(0,0,0,0)
                 let diff = 1 - nextMonday.getDay()
@@ -13248,40 +13308,56 @@ Tracking with Aureus 🏛️`
           ]
             .filter((u: any) => u.dayOffset >= -7 && u.dayOffset < 30)
             .sort((a: any, b: any) => a.dayOffset - b.dayOffset)
-            .slice(0, 14)
+            .slice(0, 20)
+
+          return {
+            userToken, email: notificationEmail, userName,
+            frequency: 'daily',
+            notifyWeeklySnapshot: true, notifyOverdueBills: true, notifyMoneyDate: true,
+            notifyMonthlyMealPlan: monthlyMealPlanOptIn,
+            householdSize: parseInt(mealPlanPrefs?.people || '4'),
+            mealBudget: parseInt(mealPlanPrefs?.budget || '150'),
+            mealDislikes: mealPlanPrefs?.dislikes || '',
+            mealDietary: mealPlanPrefs?.dietaryNeeds || '',
+            moneyDateDay: checkInSchedule.moneyDateDay || 'Sunday',
+            moneyDateTime: checkInSchedule.moneyDateTime || '18:00',
+            monthlyIncome: Math.round(monthlyIncome),
+            monthlyExpenses: Math.round(monthlyExpenses),
+            monthlyDebtPayments: Math.round(debts.reduce((s: number, d: any) => s + parseFloat(d.minimum || d.payment || '0'), 0)),
+            monthlyGoalSavings: Math.round(monthlyGoalSavings),
+            monthlySurplus: Math.round(monthlySurplus),
+            savingRate: Math.round(savingsRate),
+            topGoalName: topGoal?.name || null,
+            topGoalPct: topGoal ? Math.min(100, Math.round(parseFloat(topGoal.savedAmount||'0') / parseFloat(topGoal.targetAmount||'1') * 100)) : null,
+            topWin: topWin?.title || null,
+            nextAction: coachNextAction?.action || null,
+            streak, upcomingBills,
+            debts: debts.map((d: any) => ({ name: d.name, balance: d.balance, minimum: d.minimum || d.payment || '0' })),
+            goals: goals.map((g: any) => ({ name: g.name, targetAmount: g.targetAmount, savedAmount: g.savedAmount || g.currentAmount || '0', paymentAmount: g.paymentAmount || '0' })),
+            sinkingFunds: sinkingFunds.map((f: any) => ({ name: f.name, targetAmount: f.targetAmount, savedAmount: f.savedAmount || '0', weeklyAmount: f.weeklyAmount || '0', targetDate: f.targetDate || '' })),
+            mortgageAccel: mortgageAccel.balance ? { remaining_years: mortgageAccel.remainingYears } : null
+          }
+        }
+
+        const syncNotificationPrefs = async () => {
+          if (!emailNotifEnabled && !notificationsEnabled) return
+          const payload = buildNotifPayload()
+          if (!payload) return
           try {
             await fetch('/api/save-notification-prefs', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userToken, email: notificationEmail, userName,
-                frequency: emailNotifFrequency,
-                notifyWeeklySnapshot: true, notifyOverdueBills: true, notifyMoneyDate: true,
-                notifyMonthlyMealPlan: monthlyMealPlanOptIn,
-                householdSize: parseInt(mealPlanPrefs?.people || '4'),
-                mealBudget: parseInt(mealPlanPrefs?.budget || '150'),
-                mealDislikes: mealPlanPrefs?.dislikes || '',
-                mealDietary: mealPlanPrefs?.dietaryNeeds || '',
-                moneyDateDay: checkInSchedule.moneyDateDay || 'Sunday',
-                moneyDateTime: checkInSchedule.moneyDateTime || '18:00',
-                monthlyIncome: Math.round(monthlyIncome),
-                monthlyExpenses: Math.round(monthlyExpenses),
-                monthlyDebtPayments: Math.round(debts.reduce((s: number, d: any) => s + parseFloat(d.minimum || d.payment || '0'), 0)),
-                monthlyGoalSavings: Math.round(monthlyGoalSavings),
-                monthlySurplus: Math.round(monthlySurplus),
-                savingRate: Math.round(savingsRate),
-                topGoalName: topGoal?.name || null,
-                topGoalPct: topGoal ? Math.min(100, Math.round(parseFloat(topGoal.savedAmount||'0') / parseFloat(topGoal.targetAmount||'1') * 100)) : null,
-                topWin: topWin?.title || null,
-                nextAction: coachNextAction?.action || null,
-                streak, upcomingBills,
-                // For progress countdowns in email
-                debts: debts.map((d: any) => ({ name: d.name, balance: d.balance, minimum: d.minimum || d.payment || '0' })),
-                goals: goals.map((g: any) => ({ name: g.name, targetAmount: g.targetAmount, savedAmount: g.savedAmount || g.currentAmount || '0', paymentAmount: g.paymentAmount || '0' })),
-                sinkingFunds: sinkingFunds.map((f: any) => ({ name: f.name, targetAmount: f.targetAmount, savedAmount: f.savedAmount || '0', weeklyAmount: f.weeklyAmount || '0', targetDate: f.targetDate || '' })),
-                mortgageAccel: mortgageAccel.balance ? { remaining_years: mortgageAccel.remainingYears } : null
-              })
+              body: JSON.stringify(payload)
             })
-          } catch { /* silent — still enables locally */ }
+          } catch {}
+        }
+
+        const handleEnableEmail = async () => {
+          if (!notificationEmail || !notificationEmail.includes('@')) { alert('Please enter a valid email address.'); return }
+          setNotificationsEnabled(true)
+          setEmailNotifEnabled(true)
+          let userToken = localStorage.getItem('aureus_user_token')
+          if (!userToken) { userToken = 'aureus_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('aureus_user_token', userToken) }
+          await syncNotificationPrefs()
           setShowNotifSetup(false)
         }
 
