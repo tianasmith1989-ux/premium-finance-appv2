@@ -294,14 +294,14 @@ export default function Dashboard() {
   const [paywallLoading, setPaywallLoading] = useState(false)
   const [paywallError, setPaywallError] = useState('')
   const [selectedPlan, setSelectedPlan] = useState<'monthly'|'annual'>('monthly')
-  const [businessProfile, setBusinessProfile] = useState<{name:string,abn:string,type:string,industry:string,startDate:string}>({name:'',abn:'',type:'sole_trader',industry:'',startDate:''})
+  const [businessProfile, setBusinessProfile] = useState<{name:string,abn:string,type:string,industry:string,startDate:string,gstRegistered:boolean}>({name:'',abn:'',type:'sole_trader',industry:'',startDate:'',gstRegistered:false})
   const [businessRevenue, setBusinessRevenue] = useState<any[]>([])
   const [businessExpenses, setBusinessExpenses] = useState<any[]>([])
   const [businessGoals, setBusinessGoals] = useState<any[]>([])
   const [newBizRevenue, setNewBizRevenue] = useState({name:'',amount:'',frequency:'monthly',category:'sales'})
   const [newBizExpense, setNewBizExpense] = useState({name:'',amount:'',frequency:'monthly',category:'operations'})
   const [newBizGoal, setNewBizGoal] = useState({name:'',target:'',current:'',deadline:''})
-  const [bizTab, setBizTab] = useState<'dashboard'|'revenue'|'expenses'|'offer'|'leads'|'goals'|'coach'>('dashboard')
+  const [bizTab, setBizTab] = useState<'dashboard'|'cashflow'|'revenue'|'expenses'|'offer'|'leads'|'gst'|'goals'|'coach'>('dashboard')
   const [bizChatMessages, setBizChatMessages] = useState<{role:'user'|'assistant',content:string}[]>([])
   const [bizChatInput, setBizChatInput] = useState('')
   const [bizChatLoading, setBizChatLoading] = useState(false)
@@ -2764,11 +2764,11 @@ Answer in 2-4 sentences. Be specific about exactly which tab and where to scroll
         body: JSON.stringify({
           mode: 'question',
           question: `[BUSINESS GROWTH COACH — HORMOZI FRAMEWORK]
-You are a business growth coach who uses Alex Hormozi's frameworks from $100M Offers and $100M Leads.
+You are a business growth coach specialising in offer design, lead economics, and scaling frameworks.
 NEVER advise on: business structure, tax deductions, GST, BAS, employment law, contracts, accounting methods, business loans.
 For those topics: decline and refer to accountant, BAS agent, ato.gov.au, business.gov.au.
-YOU DO help with: understanding metrics, offer strength, lead economics, LTV:CAC ratios, growth levers, pricing strategy, profit margins, and Hormozi frameworks.
-Be direct, specific, and actionable. Use Hormozi's language where relevant.
+YOU DO help with: understanding metrics, offer strength, lead economics, LTV:CAC ratios, growth levers, pricing strategy, profit margins, and Growth frameworks.
+Be direct, specific, and actionable. Use direct, specific business language.
 
 Business: ${businessProfile.name || 'unnamed'} | ${businessProfile.type} | ${businessProfile.industry}
 Monthly Revenue: $${totalRevenue.toFixed(0)} | Expenses: $${totalExpenses.toFixed(0)} | Profit: $${profit.toFixed(0)} | Margin: ${margin.toFixed(1)}%
@@ -5640,7 +5640,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             highlight: 'Net worth update · Goal progress · Wins & misses · Coach feedback'
           },
           {
-            tab: 'overview', icon: '📊', title: 'Metrics — Your Financial Health',
+            tab: 'insights', icon: '📊', title: 'Metrics — Your Financial Health',
             desc: 'A birds-eye view of your financial health score, net worth history chart, debt-to-income ratio, savings rate, emergency fund status, and all your assets vs liabilities. Great for your monthly review.',
             highlight: 'Health score · Net worth history · Savings rate · Emergency fund months'
           },
@@ -5660,9 +5660,9 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             highlight: 'Baby Steps · Debt methods · Compound interest · Australian concepts'
           },
           {
-            tab: 'business', icon: '🏢', title: 'Business Hub — Hormozi Framework',
-            desc: "Track your business numbers using Alex Hormozi's frameworks. See your Profit Engine (LTV:CAC), score your Offer out of 100, track your lead funnel, and get a Hormozi-trained AI coach to diagnose your biggest growth lever.",
-            highlight: 'Profit Engine · Offer Scorecard · Lead Funnel · LTV:CAC · 3 Growth Levers · Hormozi Coach'
+            tab: 'business', icon: '🏢', title: 'Business Hub — Growth Framework',
+            desc: "Track your business numbers using proven growth frameworks. Cash Flow timeline, Break-Even calculator, GST/BAS tracker, Revenue & Expense tracking, Offer scorecard, Lead economics (LTV:CAC), and an AI business coach to diagnose your biggest growth lever.",
+            highlight: 'Cash Flow · Break-Even · GST/BAS · Revenue · Offer Scorecard · LTV:CAC · Business Coach'
           },
         ]
         const step = tourSteps[tourStep]
@@ -6972,10 +6972,10 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                     { id: 'grow',      icon: '📈', label: 'Grow & FIRE',   desc: 'Investments & FI' },
                     { id: 'insights',  icon: '🧠', label: 'Insights',      desc: 'AI analysis' },
                     { id: 'review',    icon: '🔄', label: 'Review',        desc: 'Monthly check-in' },
-                    { id: 'overview',  icon: '📊', label: 'Metrics',       desc: 'Net worth & health' },
+
                     { id: 'learn',     icon: '🎓', label: 'Learn',         desc: 'Financial education' },
                     { id: 'quickview', icon: '⚡', label: 'Quick View',    desc: 'All-in-one snapshot' },
-                    { id: 'business',  icon: '🏢', label: 'Business',      desc: 'Hormozi framework' },
+                    { id: 'business',  icon: '🏢', label: 'Business',      desc: 'Growth framework' },
                   ].map(item => (
                     <button key={item.id} onClick={() => { setActiveTab(item.id as any) }}
                       style={{ padding: '12px', background: activeTab === item.id ? theme.accent + '20' : theme.bg, border: '1px solid ' + (activeTab === item.id ? theme.accent + '60' : theme.border), borderRadius: '10px', cursor: 'pointer', textAlign: 'left' as const }}
@@ -9832,7 +9832,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
           const profitMargin = monthlyRev > 0 ? (monthlyProfit / monthlyRev * 100) : 0
           const annualRev = monthlyRev * 12
 
-          // Hormozi metrics
+          // Business metrics
           const cac = parseFloat(bizLeads?.cac || '0')
           const ltv = parseFloat(bizLeads?.ltv || '0') ||
             (parseFloat(bizLeads?.avgTransactionValue || '0') * parseFloat(bizLeads?.purchasesPerYear || '0') * parseFloat(bizLeads?.avgCustomerLifeYears || '0'))
@@ -9842,7 +9842,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
           const newCustomers = Math.round(monthlyLeads * convRate)
           const revenuePerLead = monthlyLeads > 0 ? monthlyRev / monthlyLeads : 0
 
-          // Offer scorecard (Hormozi value equation)
+          // Offer scorecard (Value equation)
           const offerScore = bizOffer ? Math.round(
             ((bizOffer.dreamOutcome ? 1 : 0) * 20) +
             (bizOffer.likelihood / 10 * 20) +
@@ -9890,10 +9890,12 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
               <div style={{ display: 'flex', gap: '4px', background: theme.bg, padding: '4px', borderRadius: '12px', overflowX: 'auto' as const }}>
                 {([
                   ['dashboard','📊 Dashboard'],
+                  ['cashflow','💧 Cash Flow'],
                   ['revenue','💰 Revenue'],
                   ['expenses','💸 Expenses'],
                   ['offer','🎯 Offer'],
                   ['leads','📈 Leads'],
+                  ['gst','🧾 GST/BAS'],
                   ['goals','🏆 Goals'],
                   ['coach','💬 Coach'],
                 ] as const).map(([id, label]) => (
@@ -9925,7 +9927,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                     ))}
                   </div>
 
-                  {/* Hormozi LTV:CAC */}
+                  {/* LTV:CAC */}
                   {ltv > 0 && cac > 0 && (
                     <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + (ltvCacRatio >= 3 ? theme.success : theme.danger) + '60' }}>
                       <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>⚡ HORMOZI PROFIT ENGINE</div>
@@ -9951,7 +9953,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                           {ltvCacRatio >= 3
                             ? `✅ Strong unit economics. For every $1 spent acquiring customers, you get $${ltvCacRatio.toFixed(1)} back. Scale this.`
                             : ltvCacRatio >= 1
-                            ? `⚠️ Profitable but thin. Hormozi's target is 3:1+. Increase LTV (charge more, sell more often) or reduce CAC.`
+                            ? `⚠️ Profitable but thin. Target is 3:1+. Increase LTV (charge more, sell more often) or reduce CAC.`
                             : `🔴 Losing money on acquisition. You spend $${cac.toFixed(0)} to get a customer worth $${ltv.toFixed(0)}. Fix before scaling.`}
                         </div>
                       </div>
@@ -9985,7 +9987,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                     </div>
                   )}
 
-                  {/* Hormozi 3 growth levers */}
+                  {/* 3 Growth Levers */}
                   <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
                     <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>🚀 HORMOZI'S 3 WAYS TO GROW</div>
                     <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '12px' }}>Pick your primary lever. Don't do all three at once.</div>
@@ -10087,6 +10089,110 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                   </div>
                 </div>
               )}
+
+              {/* ── CASH FLOW ── */}
+              {bizTab === 'cashflow' && (() => {
+                // Build monthly cash flow — money in vs money out by week
+                const today = new Date()
+                const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+                const dayOfMonth = today.getDate()
+
+                // Weekly buckets (4 weeks)
+                const weeks = [1,2,3,4].map(w => {
+                  const weekStart = (w-1) * 7 + 1
+                  const weekEnd = Math.min(w * 7, daysInMonth)
+                  const inflows = businessRevenue
+                    .filter((r: any) => {
+                      if (r.frequency === 'weekly') return true
+                      if (r.frequency === 'fortnightly') return w === 1 || w === 3
+                      if (r.frequency === 'monthly') return w === 1
+                      return false
+                    })
+                    .reduce((s: number, r: any) => {
+                      const monthly = parseFloat(r.amount || '0') * (r.frequency === 'weekly' ? 52 : r.frequency === 'fortnightly' ? 26 : 12) / 12
+                      return s + monthly / 4
+                    }, 0)
+                  const outflows = businessExpenses
+                    .filter((e: any) => {
+                      if (e.frequency === 'weekly') return true
+                      if (e.frequency === 'fortnightly') return w === 1 || w === 3
+                      if (e.frequency === 'monthly') return w === 1
+                      return false
+                    })
+                    .reduce((s: number, e: any) => {
+                      const monthly = parseFloat(e.amount || '0') * (e.frequency === 'weekly' ? 52 : e.frequency === 'fortnightly' ? 26 : 12) / 12
+                      return s + monthly / 4
+                    }, 0)
+                  return { week: w, weekStart, weekEnd, inflows, outflows, net: inflows - outflows }
+                })
+
+                const maxFlow = Math.max(...weeks.map(w => Math.max(w.inflows, w.outflows, 1)))
+                const breakEvenRevenue = monthlyExp > 0 ? monthlyExp : 0
+                const breakEvenGap = breakEvenRevenue - monthlyRev
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+
+                    {/* Break-even calculator */}
+                    <div style={{ padding: '18px 20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>⚖️ BREAK-EVEN ANALYSIS</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                        <div style={{ padding: '12px', background: theme.bg, borderRadius: '10px', textAlign: 'center' as const }}>
+                          <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>MONTHLY COSTS</div>
+                          <div style={{ color: theme.danger, fontSize: '18px', fontWeight: 800 }}>${monthlyExp.toFixed(0)}</div>
+                        </div>
+                        <div style={{ padding: '12px', background: theme.bg, borderRadius: '10px', textAlign: 'center' as const }}>
+                          <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>CURRENT REVENUE</div>
+                          <div style={{ color: theme.success, fontSize: '18px', fontWeight: 800 }}>${monthlyRev.toFixed(0)}</div>
+                        </div>
+                        <div style={{ padding: '12px', background: breakEvenGap <= 0 ? theme.success + '15' : theme.danger + '15', borderRadius: '10px', textAlign: 'center' as const, border: '1px solid ' + (breakEvenGap <= 0 ? theme.success + '40' : theme.danger + '40') }}>
+                          <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>
+                            {breakEvenGap <= 0 ? 'PROFIT' : 'GAP TO B/E'}
+                          </div>
+                          <div style={{ color: breakEvenGap <= 0 ? theme.success : theme.danger, fontSize: '18px', fontWeight: 800 }}>
+                            {breakEvenGap <= 0 ? '+$' + Math.abs(breakEvenGap).toFixed(0) : '-$' + breakEvenGap.toFixed(0)}
+                          </div>
+                        </div>
+                      </div>
+                      {monthlyRev > 0 && monthlyExp > 0 && (
+                        <div style={{ color: theme.textMuted, fontSize: '12px', lineHeight: 1.6 }}>
+                          {breakEvenGap <= 0
+                            ? `✅ You're profitable at $${monthlyRev.toFixed(0)}/mo revenue. Break-even is $${monthlyExp.toFixed(0)}/mo — you're $${Math.abs(breakEvenGap).toFixed(0)}/mo above it.`
+                            : `⚠️ You need $${breakEvenGap.toFixed(0)} more revenue per month to break even. At your current revenue you're running at a loss.`}
+                        </div>
+                      )}
+                      {monthlyRev === 0 && <div style={{ color: theme.textMuted, fontSize: '12px' }}>Add revenue streams to calculate break-even.</div>}
+                    </div>
+
+                    {/* Monthly cash flow chart */}
+                    {(monthlyRev > 0 || monthlyExp > 0) && (
+                      <div style={{ padding: '18px 20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '16px' }}>📅 MONTHLY CASH FLOW — WEEK BY WEEK</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                          {weeks.map((w: any) => (
+                            <div key={w.week} style={{ textAlign: 'center' as const }}>
+                              <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '6px' }}>Week {w.week}</div>
+                              <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end', justifyContent: 'center', height: '80px' }}>
+                                <div style={{ width: '18px', background: theme.success + '80', borderRadius: '3px 3px 0 0', height: Math.max(4, (w.inflows / maxFlow) * 80) + 'px' }} title={'In: $' + w.inflows.toFixed(0)} />
+                                <div style={{ width: '18px', background: theme.danger + '80', borderRadius: '3px 3px 0 0', height: Math.max(4, (w.outflows / maxFlow) * 80) + 'px' }} title={'Out: $' + w.outflows.toFixed(0)} />
+                              </div>
+                              <div style={{ color: w.net >= 0 ? theme.success : theme.danger, fontSize: '11px', fontWeight: 700, marginTop: '4px' }}>
+                                {w.net >= 0 ? '+' : ''}{w.net.toFixed(0)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginTop: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', borderRadius: '2px', background: theme.success + '80' }}/><span style={{ color: theme.textMuted, fontSize: '11px' }}>In</span></div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', borderRadius: '2px', background: theme.danger + '80' }}/><span style={{ color: theme.textMuted, fontSize: '11px' }}>Out</span></div>
+                        </div>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '8px', textAlign: 'center' as const }}>Based on your revenue and expense frequencies</div>
+                      </div>
+                    )}
+
+                  </div>
+                )
+              })()}
 
               {/* ── REVENUE ── */}
               {bizTab === 'revenue' && (
@@ -10215,7 +10321,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                     <div style={{ color: offerScore >= 80 ? theme.success : offerScore >= 50 ? theme.accent : theme.danger, fontSize: '52px', fontWeight: 900, lineHeight: 1 }}>{offerScore}</div>
                     <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '4px' }}>out of 100</div>
                     <div style={{ color: offerScore >= 80 ? theme.success : offerScore >= 50 ? theme.accent : theme.danger, fontSize: '13px', fontWeight: 700, marginTop: '6px' }}>
-                      {offerScore >= 80 ? '🔥 Grand Slam Offer territory' : offerScore >= 60 ? '⚡ Strong offer — sharpen the edges' : offerScore >= 40 ? '⚠️ Decent foundation — needs work' : '🔴 Weak offer — buyers will hesitate'}
+                      {offerScore >= 80 ? '🔥 Exceptional offer territory' : offerScore >= 60 ? '⚡ Strong offer — sharpen the edges' : offerScore >= 40 ? '⚠️ Decent foundation — needs work' : '🔴 Weak offer — buyers will hesitate'}
                     </div>
                   </div>
 
@@ -10288,7 +10394,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                         <div style={{ color: parseFloat(bizOffer.price) > parseFloat(bizOffer.competitors) ? theme.success : theme.accent, fontSize: '12px' }}>
                           {parseFloat(bizOffer.price) > parseFloat(bizOffer.competitors)
                             ? `✅ You charge ${((parseFloat(bizOffer.price) / parseFloat(bizOffer.competitors) - 1) * 100).toFixed(0)}% more than competitors. Make sure your offer justifies it.`
-                            : `⚠️ You're cheaper than competitors. Hormozi says: don't compete on price — compete on value. Consider raising prices.`}
+                            : `⚠️ You're cheaper than competitors. Don't compete on price — compete on value. Consider raising prices.`}
                         </div>
                       </div>
                     )}
@@ -10297,7 +10403,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                   {/* Guarantee */}
                   <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
                     <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>GUARANTEE</div>
-                    <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '8px' }}>Hormozi: "The strength of your guarantee is proportional to how much you believe in your product." A strong guarantee removes risk from the buyer and transfers it to you.</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '8px' }}>A strong guarantee removes risk from the buyer and transfers it to you. The stronger your belief in your product, the stronger the guarantee you can offer.</div>
                     <input
                       placeholder='e.g. "If you don&apos;t get 10 leads in 90 days, I work free until you do"'
                       value={bizOffer?.guarantee || ''}
@@ -10362,7 +10468,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                     </div>
                     {bizLeads?.leadSource?.length > 0 && bizLeads?.leadSource?.length < 3 && (
                       <div style={{ marginTop: '10px', padding: '8px 12px', background: theme.accent + '10', borderRadius: '8px', color: theme.accent, fontSize: '12px' }}>
-                        💡 Hormozi: "One channel is fragile. Two is a business. Three is a machine." Add more lead sources.
+                        💡 One channel is fragile. Two is a business. Three is a machine. Add more lead sources.
                       </div>
                     )}
                   </div>
@@ -10370,7 +10476,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                   {/* CAC */}
                   <div style={{ padding: '16px 18px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
                     <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>💸 CUSTOMER ACQUISITION COST (CAC)</div>
-                    <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '12px' }}>Total monthly marketing spend ÷ new customers acquired. Hormozi's rule: your LTV must be 3x+ your CAC.</div>
+                    <div style={{ color: theme.textMuted, fontSize: '11px', marginBottom: '12px' }}>Total monthly marketing spend ÷ new customers acquired. The benchmark: your LTV should be 3x+ your CAC.</div>
                     <input type="number" placeholder="$ cost per customer acquired"
                       value={bizLeads?.cac || ''}
                       onChange={e => setBizLeads(p => ({...p, cac: e.target.value}))}
@@ -10437,6 +10543,119 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 </div>
               )}
 
+              {/* ── GST / BAS ── */}
+              {bizTab === 'gst' && (() => {
+                const gstRate = 0.1
+                const isGstRegistered = annualRev >= 75000 || businessProfile.gstRegistered
+                const gstOnRevenue = monthlyRev * gstRate
+                const gstOnExpenses = monthlyExp * gstRate * 0.6 // ~60% of biz expenses have GST
+                const netGstOwed = gstOnRevenue - gstOnExpenses
+                const quarterlyGst = netGstOwed * 3
+
+                // BAS quarters
+                const now = new Date()
+                const month = now.getMonth()
+                const quarter = Math.floor(month / 3) + 1
+                const basQuarters = [
+                  { q: 'Q1', months: 'Jul–Sep', dueMonth: 'Oct', due: new Date(now.getFullYear(), 9, 28) },
+                  { q: 'Q2', months: 'Oct–Dec', dueMonth: 'Feb', due: new Date(now.getFullYear() + (quarter > 2 ? 1 : 0), 1, 28) },
+                  { q: 'Q3', months: 'Jan–Mar', dueMonth: 'Apr', due: new Date(now.getFullYear(), 3, 28) },
+                  { q: 'Q4', months: 'Apr–Jun', dueMonth: 'Jul', due: new Date(now.getFullYear(), 6, 28) },
+                ]
+                const currentQ = basQuarters[quarter - 1]
+                const daysToNextBAS = Math.round((currentQ.due.getTime() - now.getTime()) / 86400000)
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+
+                    {/* GST Registration status */}
+                    <div style={{ padding: '16px 20px', background: isGstRegistered ? 'rgba(107,143,107,0.1)' : 'rgba(192,57,43,0.08)', borderRadius: '14px', border: '1px solid ' + (isGstRegistered ? theme.success + '40' : theme.danger + '40') }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ color: isGstRegistered ? theme.success : theme.danger, fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>
+                            {isGstRegistered ? '✅ GST Registered' : '⚠️ GST Registration'}
+                          </div>
+                          <div style={{ color: theme.textMuted, fontSize: '12px', lineHeight: 1.5 }}>
+                            {isGstRegistered
+                              ? 'You must charge 10% GST on taxable sales and lodge a BAS quarterly.'
+                              : annualRev >= 75000
+                                ? `Your projected annual revenue ($${(annualRev).toFixed(0)}) is over $75,000 — you must register for GST.`
+                                : `Annual revenue under $75,000 — GST registration is optional but you can register voluntarily.`}
+                          </div>
+                        </div>
+                        <a href="https://www.ato.gov.au/businesses-and-organisations/gst-excise-and-indirect-taxes/gst/registering-for-gst" target="_blank" rel="noopener noreferrer"
+                          style={{ padding: '8px 12px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '8px', color: theme.accent, fontSize: '11px', textDecoration: 'none', flexShrink: 0 }}>
+                          ATO guide →
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* GST estimate */}
+                    {isGstRegistered && monthlyRev > 0 && (
+                      <div style={{ padding: '18px 20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>🧾 GST ESTIMATE — CURRENT QUARTER</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                          <div style={{ padding: '12px', background: theme.bg, borderRadius: '10px' }}>
+                            <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, marginBottom: '4px' }}>GST COLLECTED</div>
+                            <div style={{ color: theme.danger, fontSize: '16px', fontWeight: 800 }}>${(gstOnRevenue * 3).toFixed(0)}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '10px' }}>10% of revenue</div>
+                          </div>
+                          <div style={{ padding: '12px', background: theme.bg, borderRadius: '10px' }}>
+                            <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, marginBottom: '4px' }}>GST CREDITS</div>
+                            <div style={{ color: theme.success, fontSize: '16px', fontWeight: 800 }}>${(gstOnExpenses * 3).toFixed(0)}</div>
+                            <div style={{ color: theme.textMuted, fontSize: '10px' }}>Input tax credits</div>
+                          </div>
+                          <div style={{ padding: '12px', background: quarterlyGst > 0 ? theme.danger + '15' : theme.success + '15', borderRadius: '10px', border: '1px solid ' + (quarterlyGst > 0 ? theme.danger + '40' : theme.success + '40') }}>
+                            <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, marginBottom: '4px' }}>NET OWED TO ATO</div>
+                            <div style={{ color: quarterlyGst > 0 ? theme.danger : theme.success, fontSize: '16px', fontWeight: 800 }}>
+                              {quarterlyGst > 0 ? '$' + quarterlyGst.toFixed(0) : 'Refund'}
+                            </div>
+                            <div style={{ color: theme.textMuted, fontSize: '10px' }}>this quarter</div>
+                          </div>
+                        </div>
+                        <div style={{ padding: '10px 14px', background: theme.bg, borderRadius: '8px', color: theme.textMuted, fontSize: '12px', lineHeight: 1.6 }}>
+                          💡 Set aside ~${netGstOwed.toFixed(0)}/month in a separate account for GST. This is the ATO's money, not yours.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* BAS calendar */}
+                    <div style={{ padding: '18px 20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>📅 BAS DUE DATES</div>
+                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
+                        {basQuarters.map((q: any, i: number) => {
+                          const isCurrentQ = i === quarter - 1
+                          const isPast = q.due < now
+                          return (
+                            <div key={q.q} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: isCurrentQ ? theme.accent + '10' : theme.bg, borderRadius: '8px', border: '1px solid ' + (isCurrentQ ? theme.accent + '40' : theme.border) }}>
+                              <div>
+                                <span style={{ color: isCurrentQ ? theme.accent : theme.text, fontWeight: isCurrentQ ? 700 : 400, fontSize: '13px' }}>{q.q} {q.months}</span>
+                                {isCurrentQ && <span style={{ color: theme.accent, fontSize: '11px', marginLeft: '8px' }}>← current quarter</span>}
+                              </div>
+                              <div style={{ textAlign: 'right' as const }}>
+                                <div style={{ color: isPast ? theme.textMuted : isCurrentQ ? theme.accent : theme.textMuted, fontSize: '13px', fontWeight: isCurrentQ ? 700 : 400 }}>
+                                  Due {q.dueMonth} 28
+                                </div>
+                                {isCurrentQ && !isPast && (
+                                  <div style={{ color: daysToNextBAS < 14 ? theme.danger : theme.textMuted, fontSize: '11px' }}>
+                                    {daysToNextBAS} days away
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div style={{ marginTop: '10px', color: theme.textMuted, fontSize: '11px', lineHeight: 1.6 }}>
+                        Lodge your BAS through <a href="https://www.ato.gov.au/online-services/online-services-for-business" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>ATO Online Services</a> or via your accountant. Late lodgement = penalties.
+                      </div>
+                    </div>
+
+                    {COMPLIANCE_DISCLAIMER}
+                  </div>
+                )
+              })()}
+
               {/* ── GOALS ── */}
               {bizTab === 'goals' && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
@@ -10488,7 +10707,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                       {bizChatMessages.length === 0 && (
                         <div style={{ padding: '16px', background: theme.bg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
                           <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px', marginBottom: '8px' }}>⚡ Business Growth Coach</div>
-                          <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, margin: '0 0 12px' }}>Ask me about your numbers, margins, offer strength, lead economics, and growth strategy. I use Alex Hormozi's frameworks to diagnose your business. I can't give tax or legal advice.</p>
+                          <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.6, margin: '0 0 12px' }}>Ask me about your numbers, margins, offer strength, lead economics, and growth strategy. I use proven business frameworks to diagnose your business. I can't give tax or legal advice.</p>
                           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
                             {[
                               'What does my LTV:CAC ratio mean?',
@@ -10758,6 +10977,35 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
 
         {activeTab === 'insights' && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
+
+            {/* FINANCIAL HEALTH SCORE & KEY METRICS — merged from Metrics tab */}
+            <div style={{ padding: '20px 22px', background: theme.cardBg, borderRadius: '16px', border: '1px solid ' + theme.border }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div>
+                  <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1.5px', marginBottom: '4px' }}>📊 FINANCIAL HEALTH SCORE</div>
+                  <div style={{ color: theme.textMuted, fontSize: '12px' }}>Based on savings rate, emergency fund, debt ratio and net worth trend</div>
+                </div>
+                <div style={{ textAlign: 'right' as const }}>
+                  <div style={{ fontSize: '52px', fontWeight: 900, lineHeight: 1, color: financialHealthScore >= 70 ? theme.success : financialHealthScore >= 40 ? theme.warning : theme.danger }}>{financialHealthScore}</div>
+                  <div style={{ color: theme.textMuted, fontSize: '11px' }}>out of 100</div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px' }}>
+                {[
+                  { label: 'Monthly Income', value: '$' + monthlyIncome.toFixed(0), color: theme.success },
+                  { label: 'Monthly Surplus', value: '$' + monthlySurplus.toFixed(0), color: monthlySurplus >= 0 ? theme.success : theme.danger },
+                  { label: 'Saving Rate', value: savingsRate.toFixed(0) + '%', color: savingsRate >= 20 ? theme.success : savingsRate >= 10 ? theme.warning : theme.danger },
+                  { label: 'Net Worth', value: '$' + netWorth.toLocaleString(), color: netWorth >= 0 ? theme.success : theme.danger },
+                  { label: 'Emergency Fund', value: emergencyMonths.toFixed(1) + ' mo', color: emergencyMonths >= 3 ? theme.success : emergencyMonths >= 1 ? theme.warning : theme.danger },
+                  { label: 'Total Debt', value: '$' + debts.reduce((s: number, d: any) => s + parseFloat(d.balance || '0'), 0).toLocaleString(), color: theme.danger },
+                ].map((m, i) => (
+                  <div key={i} style={{ padding: '10px 12px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
+                    <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>{m.label.toUpperCase()}</div>
+                    <div style={{ color: m.color, fontSize: '16px', fontWeight: 800 }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             {/* MONEY PERSONALITY */}
             {moneyPersonality && personalityProfiles[moneyPersonality] ? (
@@ -11614,8 +11862,8 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
           </div>
         )}
 
-        {/* OVERVIEW */}
-        {activeTab === 'overview' && (
+        {/* OVERVIEW — merged into Insights */}
+        {(activeTab === 'overview' || activeTab === 'metrics') && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             <div style={{ padding: '24px', background: theme.cardBg, borderRadius: '20px', border: '1px solid ' + theme.border }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
