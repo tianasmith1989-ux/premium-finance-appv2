@@ -877,17 +877,29 @@ export default function Dashboard() {
     return () => clearTimeout(timer)
   }, [JSON.stringify(moneyDateLog)])
 
-  // Dedicated mortgage save — saves immediately to localStorage and debounces cloud save
-  // This prevents mortgage data from being lost due to stale closure in the 60s auto-save
+  // Dedicated mortgage save — saves immediately to localStorage AND directly patches Supabase
+  // Uses direct Supabase patch to avoid stale closure issue in saveToCloud
   useEffect(() => {
-    if (!mortgageAccel.balance && !mortgageAccel.rate) return // skip empty state
+    if (!mortgageAccel.balance && !mortgageAccel.rate) return
+    // 1. Save to localStorage immediately
     try {
       const existing = JSON.parse(localStorage.getItem('aureus_data') || '{}')
       localStorage.setItem('aureus_data', JSON.stringify({ ...existing, mortgageAccel }))
     } catch {}
-    const timer = setTimeout(() => {
-      if (authUser) saveToCloud()
-    }, 2000)
+    // 2. Patch Supabase directly with the current mortgageAccel value
+    // This bypasses the stale closure issue in saveToCloud()
+    const currentMortgage = { ...mortgageAccel }
+    const timer = setTimeout(async () => {
+      if (!authUser) return
+      try {
+        const sb = await getSb()
+        const { data: existing } = await sb.from('user_data').select('snapshot').eq('user_id', authUser.id).single()
+        if (existing?.snapshot) {
+          const updated = { ...existing.snapshot, mortgageAccel: currentMortgage }
+          await sb.from('user_data').update({ snapshot: updated, updated_at: new Date().toISOString() }).eq('user_id', authUser.id)
+        }
+      } catch {}
+    }, 1500)
     return () => clearTimeout(timer)
   }, [mortgageAccel.balance, mortgageAccel.rate, mortgageAccel.remainingYears, mortgageAccel.currentRepayment, mortgageAccel.extraRepayment, mortgageAccel.offsetBalance, mortgageAccel.repaymentFrequency])
 
@@ -3123,7 +3135,7 @@ FINANCIAL DATA:
 • Debts: ${debts.length > 0 ? debts.map((d: any) => `${d.name} $${d.balance} @ ${d.interestRate}%`).join(', ') : 'none'}
 • Goals: ${goals.length > 0 ? goals.map((g: any) => `${g.name}: $${g.saved}/$${g.target}`).join(', ') : 'none'}
 • Net worth: $${netWorth.toLocaleString()} | Baby Step: ${currentBabyStep.step} — ${currentBabyStep.title}
-• House: ${houseStatus || 'not specified'}${mortgageAccel.balance ? ` | Mortgage: $${mortgageAccel.balance} at ${mortgageAccel.rate}%` : ''}${moneyPersonality ? ` | Personality: ${personalityProfiles[moneyPersonality]?.label}` : ''}
+• House: ${houseStatus || 'not specified'} | Mortgage: ${mortgageAccel.balance ? `$${mortgageAccel.balance} balance, ${mortgageAccel.rate}% rate, ${mortgageAccel.remainingYears} years remaining, $${mortgageAccel.currentRepayment}/${mortgageAccel.repaymentFrequency || 'weekly'} repayment${mortgageAccel.extraRepayment ? `, $${mortgageAccel.extraRepayment}/wk extra` : ''}${mortgageAccel.offsetBalance ? `, $${mortgageAccel.offsetBalance} offset` : ''}` : 'not tracked in Aureus yet — user may have entered it in the mortgage calculator tab'} ${moneyPersonality ? `| Personality: ${personalityProfiles[moneyPersonality]?.label}` : ''}
 
 Be specific, warm, direct. Use their actual numbers. Australia-specific advice. Remember earlier parts of this conversation.${getPersonalityCoachingContext()}`
 
@@ -3137,7 +3149,7 @@ Be specific, warm, direct. Use their actual numbers. Australia-specific advice. 
           systemContext,
           conversationHistory,
           useWebSearch: useSearch,
-          financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones },
+          financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities, roadmapMilestones, mortgageAccel },
           memory: { ...budgetMemory, userName: userName || '', coachingNote: `This user's name is ${userName || 'unknown'}. Use their name naturally.` },
           countryConfig: currentCountryConfig
         })
