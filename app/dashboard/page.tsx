@@ -11863,7 +11863,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
         )}
 
         {/* OVERVIEW — merged into Insights */}
-        {(activeTab === 'overview' || activeTab === 'metrics') && (
+        {(activeTab === 'overview') && (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '24px' }}>
             <div style={{ padding: '24px', background: theme.cardBg, borderRadius: '20px', border: '1px solid ' + theme.border }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
