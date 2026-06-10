@@ -312,9 +312,14 @@ export default function Dashboard() {
     title: string,
     label: string,
     defaultValue: string,
-    onConfirm: (val: string) => void
+    showFrequency?: boolean,
+    defaultFrequency?: string,
+    showDueDate?: boolean,
+    onConfirm: (val: string, frequency?: string, dueDate?: string) => void
   } | null>(null)
   const [promptValue, setPromptValue] = useState('')
+  const [promptFrequency, setPromptFrequency] = useState('monthly')
+  const [promptDueDate, setPromptDueDate] = useState('')
   const promptInputRef = useRef<HTMLInputElement>(null)
   const [bizOffer, setBizOffer] = useState({ dreamOutcome:'', likelihood:5, timeDelay:5, effort:5, price:'', competitors:'', guarantee:'', conversionRate:'' })
   const [bizLeads, setBizLeads] = useState({ monthlyLeads:'', leadSource:[] as string[], cac:'', ltv:'', avgTransactionValue:'', purchasesPerYear:'', avgCustomerLifeYears:'' })
@@ -877,29 +882,19 @@ export default function Dashboard() {
     return () => clearTimeout(timer)
   }, [JSON.stringify(moneyDateLog)])
 
-  // Dedicated mortgage save — saves immediately to localStorage AND directly patches Supabase
-  // Uses direct Supabase patch to avoid stale closure issue in saveToCloud
+  // Dedicated mortgage save — saves to localStorage immediately
+  // stateRef always has current mortgageAccel so saveToCloud() gets fresh data
   useEffect(() => {
     if (!mortgageAccel.balance && !mortgageAccel.rate) return
-    // 1. Save to localStorage immediately
     try {
       const existing = JSON.parse(localStorage.getItem('aureus_data') || '{}')
       localStorage.setItem('aureus_data', JSON.stringify({ ...existing, mortgageAccel }))
     } catch {}
-    // 2. Patch Supabase directly with the current mortgageAccel value
-    // This bypasses the stale closure issue in saveToCloud()
-    const currentMortgage = { ...mortgageAccel }
-    const timer = setTimeout(async () => {
-      if (!authUser) return
-      try {
-        const sb = await getSb()
-        const { data: existing } = await sb.from('user_data').select('snapshot').eq('user_id', authUser.id).single()
-        if (existing?.snapshot) {
-          const updated = { ...existing.snapshot, mortgageAccel: currentMortgage }
-          await sb.from('user_data').update({ snapshot: updated, updated_at: new Date().toISOString() }).eq('user_id', authUser.id)
-        }
-      } catch {}
-    }, 1500)
+    // stateRef.current is updated on every render, so by the time this fires
+    // it will contain the latest mortgageAccel values
+    const timer = setTimeout(() => {
+      if (authUser) saveToCloud()
+    }, 2000)
     return () => clearTimeout(timer)
   }, [mortgageAccel.balance, mortgageAccel.rate, mortgageAccel.remainingYears, mortgageAccel.currentRepayment, mortgageAccel.extraRepayment, mortgageAccel.offsetBalance, mortgageAccel.repaymentFrequency])
 
@@ -4718,22 +4713,24 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                   {presetBills.map(p => (
                     <button key={p.name} onClick={() => {
                       setPromptValue((p as any).amount || '')
+                      setPromptFrequency(p.frequency)
+                      setPromptDueDate('')
                       setPromptModal({
                         title: p.name,
-                        label: 'How much is this per ' + p.frequency + '?',
+                        label: 'How much per payment?',
                         defaultValue: (p as any).amount || '',
-                        onConfirm: (amt) => {
+                        showFrequency: true,
+                        defaultFrequency: p.frequency,
+                        showDueDate: true,
+                        onConfirm: (amt, freq, due) => {
                           if (!amt || isNaN(parseFloat(amt))) return
-                          setExpenses(prev => [...prev, { id: Date.now(), name: p.name, amount: amt, frequency: p.frequency, category: p.category, dueDate: (p.frequency === 'weekly' || p.frequency === 'fortnightly' ? (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })() : (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })()) }])
+                          const usedFreq = freq || p.frequency
+                          const dueDate = due || (usedFreq === 'weekly' || usedFreq === 'fortnightly'
+                            ? (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })()
+                            : (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })())
+                          setExpenses(prev => [...prev, { id: Date.now(), name: p.name, amount: amt, frequency: usedFreq, category: p.category, dueDate }])
                         }
                       })
-                      const amt = null // handled by modal
-                      if (amt) {
-                        const dueDate = (p.frequency === 'weekly' || p.frequency === 'fortnightly')
-                          ? (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })()
-                          : (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })()
-                        setExpenses(prev => [...prev, { id: Date.now(), name: p.name, amount: amt, frequency: p.frequency, category: p.category, dueDate }])
-                      }
                     }} style={{ padding: '5px 12px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '12px', color: theme.textMuted }}>
                       + {p.name}
                     </button>
@@ -8125,13 +8122,22 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '12px', padding: '10px', background: theme.bg, borderRadius: '8px' }}>
                     {presetBills.map(p => <button key={p.name} onClick={() => {
   setPromptValue((p as any).amount || '')
+  setPromptFrequency(p.frequency)
+  setPromptDueDate('')
   setPromptModal({
     title: p.name,
-    label: 'Amount per ' + p.frequency + ' ($)',
+    label: 'How much per payment?',
     defaultValue: (p as any).amount || '',
-    onConfirm: (amt) => {
+    showFrequency: true,
+    defaultFrequency: p.frequency,
+    showDueDate: true,
+    onConfirm: (amt, freq, due) => {
       if (!amt || isNaN(parseFloat(amt))) return
-      setExpenses(prev => [...prev, { id: Date.now(), name: p.name, amount: amt, frequency: p.frequency, category: p.category, dueDate: (p.frequency === 'weekly' || p.frequency === 'fortnightly' ? (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })() : (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })()) }])
+      const usedFreq = freq || p.frequency
+      const dueDate = due || (usedFreq === 'weekly' || usedFreq === 'fortnightly'
+        ? (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })()
+        : (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })())
+      setExpenses(prev => [...prev, { id: Date.now(), name: p.name, amount: amt, frequency: usedFreq, category: p.category, dueDate }])
     }
   })
 }} style={{ padding: '4px 10px', background: theme.purple + '20', color: theme.purple, border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>{p.name}</button>)}
@@ -14299,9 +14305,11 @@ Tracking with Aureus 🏛️`
           <div style={{ background: theme.cardBg, borderRadius: '20px 20px 0 0', border: '1px solid ' + theme.border, width: '100%', maxWidth: '480px', padding: '24px' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ color: theme.text, fontWeight: 800, fontSize: '16px', marginBottom: '4px', fontFamily: 'Cinzel, serif' }}>{promptModal.title}</div>
-            <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '16px' }}>{promptModal.label}</div>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              <span style={{ position: 'absolute' as const, marginLeft: '12px', marginTop: '10px', color: theme.textMuted, fontSize: '16px', fontWeight: 700, zIndex: 1 }}>$</span>
+            <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '14px' }}>{promptModal.label}</div>
+
+            {/* Amount */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', position: 'relative' as const }}>
+              <span style={{ position: 'absolute' as const, left: '12px', top: '50%', transform: 'translateY(-50%)', color: theme.textMuted, fontSize: '16px', fontWeight: 700, zIndex: 1 }}>$</span>
               <input
                 ref={promptInputRef}
                 type="number"
@@ -14311,7 +14319,7 @@ Tracking with Aureus 🏛️`
                 onChange={e => setPromptValue(e.target.value)}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && promptValue) {
-                    promptModal.onConfirm(promptValue)
+                    promptModal.onConfirm(promptValue, promptFrequency, promptDueDate)
                     setPromptModal(null)
                     setPromptValue('')
                   }
@@ -14320,13 +14328,43 @@ Tracking with Aureus 🏛️`
                 style={{ ...inputStyle, flex: 1, fontSize: '22px', fontWeight: 700, paddingLeft: '28px', paddingTop: '12px', paddingBottom: '12px' }}
               />
             </div>
+
+            {/* Frequency selector */}
+            {promptModal.showFrequency && (
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>FREQUENCY</label>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
+                  {['weekly', 'fortnightly', 'monthly', 'quarterly', 'annual'].map(f => (
+                    <button key={f} onClick={() => setPromptFrequency(f)}
+                      style={{ padding: '7px 14px', background: promptFrequency === f ? theme.accent : theme.bg, border: '1px solid ' + (promptFrequency === f ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', color: promptFrequency === f ? '#111' : theme.textMuted, fontSize: '12px', fontWeight: promptFrequency === f ? 700 : 400, textTransform: 'capitalize' as const }}>
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Due date */}
+            {promptModal.showDueDate && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', display: 'block', marginBottom: '6px' }}>NEXT DUE DATE <span style={{ color: theme.textMuted, fontWeight: 400 }}>(optional — helps with bill reminders)</span></label>
+                <input
+                  type="date"
+                  value={promptDueDate}
+                  onChange={e => setPromptDueDate(e.target.value)}
+                  style={{ ...inputStyle, width: '100%', fontSize: '14px' }}
+                />
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 onClick={() => {
                   if (promptValue) {
-                    promptModal.onConfirm(promptValue)
+                    promptModal.onConfirm(promptValue, promptFrequency, promptDueDate)
                     setPromptModal(null)
                     setPromptValue('')
+                    setPromptDueDate('')
                   }
                 }}
                 disabled={!promptValue}
@@ -14334,7 +14372,7 @@ Tracking with Aureus 🏛️`
                 Add →
               </button>
               <button
-                onClick={() => { setPromptModal(null); setPromptValue('') }}
+                onClick={() => { setPromptModal(null); setPromptValue(''); setPromptDueDate('') }}
                 style={{ padding: '14px 20px', background: 'transparent', border: '1px solid ' + theme.border, color: theme.textMuted, borderRadius: '12px', cursor: 'pointer', fontSize: '14px' }}>
                 Cancel
               </button>
