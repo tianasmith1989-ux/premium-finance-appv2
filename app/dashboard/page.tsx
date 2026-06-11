@@ -597,11 +597,14 @@ export default function Dashboard() {
 
   // Misc
   const moneyQuotes = [
-    { quote: "The goal isn't more money. The goal is living life on your terms.", author: "Chris Brogan" },
-    { quote: "Do not save what is left after spending; spend what is left after saving.", author: "Warren Buffett" },
+    { quote: "The goal isn't more money. The goal is living life on your terms.", author: "" },
+    { quote: "Do not save what is left after spending. Spend what is left after saving.", author: "" },
     { quote: "A budget is not about restriction — it's about intention. Every dollar with a purpose is a dollar working for you.", author: "Aureus" },
-    { quote: "Compound interest is the eighth wonder of the world.", author: "Albert Einstein" },
-    { quote: "The best time to plant a tree was 20 years ago. The second best time is now.", author: "Chinese Proverb" },
+    { quote: "Compound interest is the most powerful force in wealth building.", author: "Aureus" },
+    { quote: "The best time to start was years ago. The second best time is now.", author: "" },
+    { quote: "Wealth is not about how much you earn. It's about how much you keep and grow.", author: "Aureus" },
+    { quote: "Every debt paid is a raise you gave yourself.", author: "Aureus" },
+    { quote: "Financial freedom is bought with decisions, not luck.", author: "Aureus" },
   ]
   const [currentQuote] = useState(() => moneyQuotes[Math.floor(Math.random() * moneyQuotes.length)])
 
@@ -1175,7 +1178,7 @@ export default function Dashboard() {
     { step: 1, title: 'Starter Emergency Fund', desc: 'Save $2,000 for emergencies', target: 2000, icon: '🛡️', aureusAdvice: "This $2,000 is your financial airbag - it stops you going into debt when life throws curveballs.", tips: ["Open a separate savings account", "Set up automatic transfers on payday", "Use a high-interest account", "Don't touch it except for TRUE emergencies"] },
     { step: 2, title: 'Kill Bad Debt', desc: 'Pay off credit cards, personal loans, BNPL', icon: '💳', aureusAdvice: "Credit cards at 20%+ interest will DESTROY your wealth. Every $1,000 in CC debt costs you $200/year in interest.", tips: ["List all debts: CC, personal loans, Afterpay, Zip", "DON'T include: HECS/HELP, mortgage", "High-rate first: Pay highest interest first", "Quick-wins: Pay smallest balance first"] },
     { step: 3, title: 'Full Emergency Fund', desc: '3-6 months expenses saved', icon: '🏦', aureusAdvice: "Now we're building real security. 3-6 months of expenses means you could lose your job and be FINE.", tips: ["Calculate your monthly expenses", "Multiply by 3 (secure job) or 6 (unstable income)", "This money should be BORING - high-interest savings"] },
-    { step: 4, title: 'Invest 15% + Super', desc: 'Salary sacrifice + investments', icon: '📈', aureusAdvice: "Your employer already puts 11.5% into super - that's forced savings! Now add salary sacrifice for tax benefits.", tips: ["Compare your super fund's fees using the ATO's YourSuper tool at yoursuper.gov.au", "Consider salary sacrifice: $100/fortnight saves ~$30 in tax", "Outside super: speak with a licensed financial adviser about investment options that suit your situation"] },
+    { step: 4, title: 'Grow Long-Term Wealth', desc: 'Learn about investing and boosting your super', icon: '📈', aureusAdvice: "This is where wealth compounds over time. Super and investing are powerful — but they involve regulated products. Aureus can show you the concepts and tools; a licensed financial adviser can help you decide what's right for your situation.", tips: ["Learn about super at moneysmart.gov.au/superannuation", "Use the ATO's YourSuper comparison tool at ato.gov.au to compare super funds yourself", "Learn about investing at moneysmart.gov.au/shares — always read the PDS before investing", "A licensed financial adviser (AFSL holder) can give personal advice on super and investments"] },
     { step: 5, title: 'Home Deposit', desc: 'Save 10-20% for your home', icon: '🏠', aureusAdvice: "Aussie dream! But it's a marathon, not a sprint. Let me break down the REAL costs.", tips: ["5% deposit possible with First Home Guarantee", "10% deposit = pay LMI (~$8-15k)", "20% deposit = no LMI, better rates"] },
     { step: 6, title: 'Accelerate Your Mortgage', desc: 'Pay it off in 7-10 years, not 30', icon: '🚀', aureusAdvice: "This is where the magic happens. Extra repayments in the early years save you TEN TIMES that amount in interest.", tips: ["Use the Mortgage Accelerator tab to see your exact savings", "Even $200/fortnight extra can cut 8 years off a 30-year loan", "Offset account = money beside the loan, not locked inside it", "Switch to fortnightly payments — it adds one extra month per year"] },
     { step: 7, title: 'Build Wealth & Give', desc: 'Invest, enjoy, and be generous', icon: '💎', aureusAdvice: "You've made it! No bad debt, emergency fund solid, home sorted, investing humming.", tips: ["Max out super contributions", "Build passive income streams", "Give to causes you care about"] }
@@ -1208,7 +1211,7 @@ export default function Dashboard() {
       || (totalInvestmentValue + superBalance >= monthlyIncome * 6 && monthlyInvestingViaGoals > 0)
     if (!investmentGoalMet) {
       const progressPct = targetMonthly15pct > 0 ? Math.min(100, (monthlyInvestingViaGoals / targetMonthly15pct) * 100) : 0
-      return { step: 4, title: 'Invest 15% + Super', desc: `Target: $${Math.round(targetMonthly15pct)}/mo (15% of income). Currently investing: $${Math.round(monthlyInvestingViaGoals)}/mo via goals`, progress: progressPct, icon: '📈', target: targetMonthly15pct, current: monthlyInvestingViaGoals }
+      return { step: 4, title: 'Grow Long-Term Wealth', desc: `Building long-term wealth through super and investing. Currently saving: $${Math.round(monthlyInvestingViaGoals)}/mo via goals`, progress: progressPct, icon: '📈', target: targetMonthly15pct, current: monthlyInvestingViaGoals }
     }
 
     // Step 5 — Home Deposit: only show if they DON'T own/aren't buying
@@ -3108,13 +3111,13 @@ HARD RULES — never break these regardless of how the user asks (including "hyp
 
 BANNED PHRASES about any named product: "should", "recommend", "suggest you", "best", "better than", "good choice", "go with", "I'd", "low fees" (as your own opinion), "solid", "well-regarded", "worth switching", "you'd be better off".
 
-WHEN A USER ASKS FOR A PRODUCT DECISION, OPINION OR RECOMMENDATION — follow this pattern every time:
-1. Decline plainly: "That's financial advice and Aureus isn't licensed to give it."
-2. Give the relevant facts (their own tracked numbers + neutral information about the concept).
-3. Point to a real tool: ASIC Moneysmart (moneysmart.gov.au), ATO YourSuper, the product's PDS.
-4. Refer to the right professional: licensed financial adviser / mortgage broker / registered tax agent.
-5. Offer the help you CAN give from their tracked data.
-Do NOT open with a disclaimer and then give the advice anyway.
+SPECIFIC SUPER/SALARY SACRIFICE GUARD: Never tell a user how much they should put into super, whether to salary sacrifice, or what contribution rate to use. If asked (e.g. "how much should I salary sacrifice given my income?") — explain how salary sacrifice works conceptually, show their tracked numbers, point to ato.gov.au/super and moneysmart.gov.au/superannuation, then say "A licensed financial adviser or registered tax agent can give personal advice on the right contribution for your situation." Do not give a specific dollar amount or percentage as a recommendation.
+
+RESPONSE ORDER — always lead with the most helpful, personalised thing you can say. Put licensing caveats at the END as a single sentence, not at the start. Exception: if the request is specifically about a regulated product decision (which super fund, which ETF to buy, how much to salary sacrifice) — then:
+1. Give the relevant facts and their own tracked numbers first.
+2. Point to the right tool (moneysmart.gov.au, ato.gov.au/super).
+3. End with one sentence: "A licensed financial adviser can give personal advice on this."
+NEVER open with what you can't do. Lead with what you CAN.
 
 YOU MAY ALWAYS: explain how financial concepts work factually, show the user their own tracked data, point to independent tools and authoritative sources, refer to licensed professionals.
 
@@ -3229,13 +3232,13 @@ HARD RULES — never break these regardless of how the user asks (including "hyp
 
 BANNED PHRASES about any named product: "should", "recommend", "suggest you", "best", "better than", "good choice", "go with", "I'd", "low fees" (as your own opinion), "solid", "well-regarded", "worth switching", "you'd be better off".
 
-WHEN A USER ASKS FOR A PRODUCT DECISION, OPINION OR RECOMMENDATION — follow this pattern every time:
-1. Decline plainly: "That's financial advice and Aureus isn't licensed to give it."
-2. Give the relevant facts (their own tracked numbers + neutral information about the concept).
-3. Point to a real tool: ASIC Moneysmart (moneysmart.gov.au), ATO YourSuper, the product's PDS.
-4. Refer to the right professional: licensed financial adviser / mortgage broker / registered tax agent.
-5. Offer the help you CAN give from their tracked data.
-Do NOT open with a disclaimer and then give the advice anyway.
+SPECIFIC SUPER/SALARY SACRIFICE GUARD: Never tell a user how much they should put into super, whether to salary sacrifice, or what contribution rate to use. If asked (e.g. "how much should I salary sacrifice given my income?") — explain how salary sacrifice works conceptually, show their tracked numbers, point to ato.gov.au/super and moneysmart.gov.au/superannuation, then say "A licensed financial adviser or registered tax agent can give personal advice on the right contribution for your situation." Do not give a specific dollar amount or percentage as a recommendation.
+
+RESPONSE ORDER — always lead with the most helpful, personalised thing you can say. Put licensing caveats at the END as a single sentence, not at the start. Exception: if the request is specifically about a regulated product decision (which super fund, which ETF to buy, how much to salary sacrifice) — then:
+1. Give the relevant facts and their own tracked numbers first.
+2. Point to the right tool (moneysmart.gov.au, ato.gov.au/super).
+3. End with one sentence: "A licensed financial adviser can give personal advice on this."
+NEVER open with what you can't do. Lead with what you CAN.
 
 YOU MAY ALWAYS: explain how financial concepts work factually, show the user their own tracked data, point to independent tools and authoritative sources, refer to licensed professionals.
 
@@ -3469,7 +3472,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
         condition: emergencyMonths >= 3 && currentBabyStep.step >= 4 && !dismissedTriggers.includes('emergency_fund_done'),
         urgency: 'high' as const,
         icon: '🏦',
-        message: `${emergencyMonths.toFixed(1)} months of expenses saved — Wealth Step 3 is DONE. Now it's time to invest 15% of your income. Let's look at super salary sacrifice and ETFs.`,
+        message: `${emergencyMonths.toFixed(1)} months of expenses saved — Wealth Step 3 is DONE. Now it's time to grow long-term wealth. Learn about super and investing at moneysmart.gov.au.`,
         action: "Start investing →",
         tab: 'path'
       },
@@ -3740,7 +3743,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
         steps.push({ name: `Kill $${Math.round(totalDebtBalance).toLocaleString()} Bad Debt`, icon: '💳', target: Math.round(totalDebtBalance), notes: `Bad debt is an anchor on everything. At your current interest rate this is costing you $${Math.round(totalDebtBalance * 0.18 / 12).toLocaleString()}/month. Eliminating it is a guaranteed return.` })
 
       if (!hasFullEmergencyFund)
-        steps.push({ name: `Build 3-Month Emergency Fund ($${monthlyExpenses3.toLocaleString()})`, icon: '🏦', target: monthlyExpenses3, notes: `3 months of expenses as a true safety net. This is Wealth Step 3 — it means losing your job or a major emergency doesn't derail everything.` })
+        steps.push({ name: `Build 3-Month Emergency Fund ($${monthlyExpenses3.toLocaleString()})`, icon: '🏦', target: monthlyExpenses3, notes: `3 months of expenses as a true safety net. This is Wealth Step 3 — it means a job loss or major emergency doesn't derail everything you've built.` })
 
       if (mortgageAccel.balance)
         steps.push({ name: 'Accelerate Mortgage Payoff', icon: '🏠', target: 0, notes: 'Extra repayments early in a mortgage save 3-4× that amount in interest over the life of the loan.' })
@@ -3970,8 +3973,8 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
       icon: '⚖️',
       title: 'Extra Mortgage Repayments vs Investing',
       tagline: 'The question every homeowner asks',
-      content: `This is the great Australian financial debate. Here\'s an honest look:\n\nCase for extra repayments:\n• Guaranteed return equal to your mortgage rate (~6%)\n• Risk-free — markets can drop, mortgage savings can\'t\n• Psychological peace of mortgage freedom\n• After paying off, you redirect all payments to investments\n\nCase for investing:\n• ASX historical average: ~7–10% p.a. (but NOT guaranteed)\n• Super has tax advantages (15% tax vs your marginal rate)\n• Time in market beats timing the market\n\nThe maths says: if investments return more than your mortgage rate after tax, invest. But the guaranteed, risk-free nature of mortgage savings is underrated.\n\nThe Infinity Group approach: kill the mortgage aggressively first, then redirect those payments to wealth building. It works because the discipline and momentum carry over.`,
-      keyNumbers: ['Mortgage rate 6% = guaranteed 6% return on extra payments', 'Super salary sacrifice saves 15–32% in tax depending on your bracket', '$500/month extra = 8+ years cut from a 30-year mortgage'],
+      content: `This is the great Australian financial debate. Here\'s an honest look:\n\nCase for extra repayments:\n• Guaranteed return equal to your mortgage rate (~6%)\n• Risk-free — markets can drop, mortgage savings can\'t\n• Psychological peace of mortgage freedom\n• After paying off, you redirect all payments to investments\n\nCase for investing:\n• ASX historical average: ~7–10% p.a. (but NOT guaranteed)\n• Super has tax advantages (15% tax vs your marginal rate)\n• Time in market beats timing the market\n\nThe maths says: if investments return more than your mortgage rate after tax, invest. But the guaranteed, risk-free nature of mortgage savings is underrated.\n\nOne common approach: pay down the mortgage aggressively first, then redirect those repayments to wealth building. The discipline and momentum carry over either way.`,
+      keyNumbers: ['Mortgage rate 6% = guaranteed 6% return on extra payments', 'Extra repayments save compound interest over the life of the loan', '$500/month extra = 8+ years cut from a 30-year mortgage'],
       mistake: 'Investing in low-return assets while paying 20%+ interest on a credit card. Always kill high-interest debt before investing.',
       cta: 'Help me decide for my situation'
     },
@@ -3980,7 +3983,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
       icon: '🦺',
       title: 'Super: Your Forced Savings System',
       tagline: 'Make the most of Australia\'s retirement safety net',
-      content: `Superannuation is compulsory retirement savings. Your employer contributes 11.5% of your salary (rising to 12% from July 2025).\n\nConcessional (pre-tax) contributions:\n• Cap: $30,000/year (including employer SG)\n• Taxed at just 15% going in (vs your marginal rate up to 47%)\n• Salary sacrifice: ask HR to direct extra pre-tax pay into super\n\nExample of salary sacrifice:\nEarning $80k, top tax rate 34.5% (inc Medicare)\n• Salary sacrifice $5,000/year to super\n• Tax saving: ~$975/year vs paying income tax\n• Super gets ~$4,250 instead of you getting ~$3,275 after tax\n\nFinding lost super: myGov → ATO → Super → search for lost accounts. Australians have $17.5 billion in lost super.`,
+      content: `Superannuation is compulsory retirement savings. Your employer contributes 11.5% of your salary (rising to 12% from July 2025).\n\nConcessional (pre-tax) contributions:\n• There is an annual cap — check ato.gov.au for current limits\n• Taxed at 15% going in vs your marginal rate\n• Salary sacrifice means directing pre-tax salary to super — ask HR how your employer handles this\n\nFinding lost super: myGov → ATO → Super → search for lost accounts. Australians have $17.5 billion in lost super.\n\nLearn more: moneysmart.gov.au/superannuation and ato.gov.au/super\n\n⚠️ Super involves regulated financial products. Aureus explains how it works — a licensed financial adviser or registered tax agent can give personal advice on your specific situation.`,
       keyNumbers: ['11.5% employer SG rate in 2024–25', '$30,000 concessional contribution cap', '$17.5 billion sitting in lost/unclaimed super'],
       mistake: 'Ignoring your super until 50. Someone who puts $5k/year extra from age 30 vs age 45 ends up with roughly double the balance at retirement due to compounding.',
       cta: 'Optimise my super strategy'
@@ -4058,12 +4061,12 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
     {
       id: 'salary-sacrifice',
       icon: '💼',
-      title: 'Salary Sacrifice: The Tax Win Most People Miss',
+      title: 'How Salary Sacrifice Works',
       tagline: 'Pre-tax super contributions are the most underused financial tool in Australia',
-      content: `Salary sacrifice means asking your employer to redirect part of your pre-tax salary directly into your super. You pay 15% tax on it instead of your marginal rate.\n\nExample at $90,000 salary (marginal rate ~34.5%):\n• Salary sacrifice $10,000/year to super\n• Tax you'd pay at 34.5%: $3,450\n• Tax in super at 15%: $1,500\n• Tax saving: $1,950/year\n• Super gets: $8,500 (after 15% tax)\n• You lose from take-home: $6,550\n• Net benefit: $1,950 less tax + compound growth\n\nThe concessional contribution cap is $30,000/year (including employer SG contributions). Most people under 40 have plenty of headroom.\n\nCarryforward rule: If you've had less than $500k in super and haven't used your full cap in prior years, you can catch up unused amounts for up to 5 years.\n\nHow to set it up: Email your payroll/HR asking to salary sacrifice $X/fortnight to your super fund. Takes one email.`,
-      keyNumbers: ['Save 34.5% vs 15% tax — on every dollar salary sacrificed', '$30,000 total concessional cap (2024–25)', 'One email to HR is all it takes to set up'],
-      mistake: 'Waiting until close to retirement to salary sacrifice. The compounding on early contributions dwarfs the tax saving itself.',
-      cta: 'Calculate my salary sacrifice saving'
+      content: `Salary sacrifice means asking your employer to redirect part of your pre-tax salary directly into your super fund. The money is taxed at 15% instead of your marginal income tax rate, which can be a significant difference.\n\nHow it works conceptually:\n• You ask HR/payroll to direct a set amount of pre-tax salary to super\n• That amount is taxed at 15% super tax instead of your income tax rate\n• Your take-home pay reduces, but less than the full amount sacrificed\n\nAnnual contribution caps apply — check ato.gov.au for current limits.\n\nCarryforward: if your super balance is under $500k and you haven't used your full cap in prior years, unused amounts may be carried forward — see ato.gov.au for details.\n\nLearn more: moneysmart.gov.au/superannuation and ato.gov.au/super\n\n⚠️ Whether salary sacrifice is right for you depends on your income, tax situation, and goals. A licensed financial adviser or registered tax agent can give personal advice.`,
+      keyNumbers: ['Salary sacrifice can reduce taxable income — learn how at ato.gov.au', 'There are annual concessional (pre-tax) contribution caps — check ato.gov.au for current limits', 'A licensed financial adviser can assess whether salary sacrifice suits your situation'],
+      mistake: 'Not learning about super until close to retirement. Understanding how it works early gives you more options — start at moneysmart.gov.au/superannuation.',
+      cta: 'Learn about super at MoneySmart'
     },
     {
       id: 'first-home-schemes',
@@ -4080,7 +4083,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
       icon: '📋',
       title: 'How to Read Your Australian Payslip',
       tagline: 'Understanding every line so you\'re not leaving money on the table',
-      content: `Most Australians have never properly read their payslip. Here\'s what every line means:\n\nGross pay: Your total earnings before tax and deductions.\n\nTax withheld (PAYG): Pay As You Go tax sent to the ATO. This is an estimate — your actual tax is calculated at year end (tax return).\n\nSuper: Should be 11.5% of your ordinary time earnings (OTE). Check this every single pay — underpayment is a $3.4B annual problem in Australia.\n\nNet pay: What hits your account. Gross − tax − other deductions.\n\nYTD (Year to Date): Totals from 1 July. Useful for tracking total tax paid and super contributions.\n\nAllowances: Car, phone, tool, travel — these are usually taxable.\n\nSalary sacrifice: Should show reduction from gross before tax if you have an arrangement.\n\nFAQs:\n• Super not showing? Ask HR immediately — it should appear every pay or at least every quarter.\n• Tax seems high? Check your tax file declaration — ensure you haven\'t selected "No tax-free threshold."\n• Different super fund shown? Could be employer default — you can choose your own.`,
+      content: `Most Australians have never properly read their payslip. Here\'s what every line means:\n\nGross pay: Your total earnings before tax and deductions.\n\nTax withheld (PAYG): Pay As You Go tax sent to the ATO. This is an estimate — your actual tax is calculated at year end (tax return).\n\nSuper: Your employer is required to pay 11.5% of your ordinary time earnings (OTE) — this is the Superannuation Guarantee rate. Check this every single pay — underpayment is a $3.4B annual problem in Australia.\n\nNet pay: What hits your account. Gross − tax − other deductions.\n\nYTD (Year to Date): Totals from 1 July. Useful for tracking total tax paid and super contributions.\n\nAllowances: Car, phone, tool, travel — these are usually taxable.\n\nSalary sacrifice: Should show reduction from gross before tax if you have an arrangement.\n\nFAQs:\n• Super not showing? Ask HR immediately — it should appear every pay or at least every quarter.\n• Tax seems high? Check your tax file declaration — ensure you haven\'t selected "No tax-free threshold."\n• Different super fund shown? Could be employer default — you can choose your own.`,
       keyNumbers: ['11.5% super guarantee rate (2024–25)', 'Super underpayment: $3.4B/year across AU', 'Tax-free threshold: $18,200 — make sure it\'s claimed'],
       mistake: 'Never checking super on your payslip. Some employers underpay or delay super. The ATO\'s unpaid super hotline: 13 28 61.',
       cta: 'Is my super being paid correctly?'
@@ -7593,7 +7596,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                         'How do I pay my mortgage off faster?',
                         'Should I use an offset account?',
                         'Am I on track financially?',
-                        'How does salary sacrifice work?',
+                        'How does super work in Australia?',
                         'What should I focus on this week?'
                       ].map(q => (
                         <button key={q} onClick={() => { setChatInput(q); setTimeout(() => handleChatMessage(), 50) }} style={{ padding: '8px 14px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '20px', color: theme.text, cursor: 'pointer', fontSize: '13px' }}>{q}</button>
@@ -9087,7 +9090,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                   { icon: '💪', title: 'Make Regular Extra Repayments', desc: 'Even $100–$200 extra per fortnight in the early years can cut 5–8 years off your loan. Start small, increase as your income grows.', saving: '$200/fn extra on a $500k loan: ~$90k saved', action: 'Set up an automatic extra repayment via bank transfer', difficulty: 'Easy', time: '20 mins' },
                   { icon: '🔁', title: 'Refinance If Your Rate Is High', desc: 'If you haven\'t reviewed your rate in 2+ years, you might be on a loyalty tax. Refinancing to a lower rate can save thousands annually.', saving: '0.5% lower rate on $500k = $2,500/yr saved', action: 'Get a free mortgage health check from a broker', difficulty: 'Medium', time: '1-2 hrs' },
                   { icon: '📈', title: 'Direct Windfalls to Your Mortgage', desc: 'Tax returns, bonuses, inheritance — put these directly onto your mortgage. A single $5,000 lump sum can save 2–3x that in interest.', saving: '$5k lump sum at year 5 saves ~$12k in interest', action: 'Create a rule: 50% of any windfall goes to mortgage', difficulty: 'Easy', time: 'Ongoing habit' },
-                  { icon: '🏦', title: 'Salary Sacrifice Into Your Mortgage', desc: 'Some employers offer mortgage salary sacrifice arrangements. Combine with your offset to maximise tax efficiency. Ask your HR/payroll team.', saving: 'Varies by income and employer', action: 'Check if your employer offers salary sacrifice for mortgage', difficulty: 'Medium', time: '1-2 hrs' },
+                  { icon: '🏦', title: 'Ask About Employer Benefits', desc: 'Some employers offer salary packaging or other benefits. Ask your HR/payroll team what is available and speak to a licensed adviser about tax implications.', saving: 'Varies by employer', action: 'Ask HR what benefits are available', difficulty: 'Easy', time: '30 mins' },
                 ].map(strat => (
                   <div key={strat.title} style={{ padding: '20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', marginBottom: '12px' }}>
@@ -11433,7 +11436,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             {/* SUPER OPTIMIZER */}
             <div style={cardStyle}>
               <h3 style={{ margin: '0 0 6px 0', color: theme.text, fontSize: '20px' }}>🦺 Superannuation Optimizer</h3>
-              <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>See the real impact of salary sacrifice and how fees are affecting your retirement.</p>
+              <p style={{ margin: '0 0 20px 0', color: theme.textMuted, fontSize: '13px' }}>Explore how extra contributions and fees affect your super balance over time. For personal advice on your contributions, speak with a licensed financial adviser.</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
                 {[
                   { label: 'Current super balance ($)', key: 'currentBalance', placeholder: 'e.g. 45000' },
@@ -11441,7 +11444,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                   { label: 'Retirement age', key: 'retirementAge', placeholder: '67' },
                   { label: 'Annual salary ($)', key: 'salary', placeholder: 'e.g. 85000' },
                   { label: 'Employer SG rate (%)', key: 'employerRate', placeholder: '11.5' },
-                  { label: 'Extra salary sacrifice ($/fortnight)', key: 'extraContribution', placeholder: 'e.g. 100' },
+                  { label: 'Extra voluntary contribution ($/fortnight)', key: 'extraContribution', placeholder: 'e.g. 100' },
                   { label: 'Super fund fee rate (% p.a.)', key: 'fundFeeRate', placeholder: 'e.g. 0.8' },
                 ].map(field => (
                   <div key={field.key}>
@@ -11461,7 +11464,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                         <div style={{ color: theme.textMuted, fontSize: '11px' }}>at retirement</div>
                       </div>
                       <div style={{ padding: '16px', background: theme.success + '15', borderRadius: '12px', textAlign: 'center' as const, border: '2px solid ' + theme.success + '40' }}>
-                        <div style={{ color: theme.success, fontSize: '11px', marginBottom: '4px' }}>With salary sacrifice</div>
+                        <div style={{ color: theme.success, fontSize: '11px', marginBottom: '4px' }}>With extra contributions</div>
                         <div style={{ color: theme.success, fontSize: '22px', fontWeight: 700 }}>${Math.round(proj.projected / 1000)}k</div>
                         <div style={{ color: theme.success, fontSize: '11px' }}>+${Math.round(proj.extraImpact / 1000)}k more</div>
                       </div>
