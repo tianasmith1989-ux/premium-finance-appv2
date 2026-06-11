@@ -42,7 +42,7 @@ function buildWelcomeEmail(userName: string, email: string): string {
       ['🏛️', 'Tracks your money', 'Income, bills, debts and goals — all in one place. No spreadsheets.'],
       ['💬', 'Coaches you daily', 'Ask Aureus anything about your money. It knows your numbers and gives real, personalised answers.'],
       ['📅', 'Reminds you what\'s due', 'Never get caught off guard by a bill again. Aureus shows what\'s coming up each week.'],
-      ['📈', 'Shows you the path forward', 'Baby Steps, FIRE number, mortgage payoff, net worth trajectory — Aureus maps your whole financial future.'],
+      ['📈', 'Shows you the path forward', 'Wealth Steps, FIRE number, mortgage payoff, net worth trajectory — Aureus maps your whole financial future.'],
       ['🏆', 'Celebrates your wins', 'Every debt paid, every goal hit, every milestone — logged and remembered.'],
       ['🌀', 'Guided Visualisation', 'Six mindset sessions in the Change tab — abundance, debt release, confidence, and more. With AI personalisation using your real numbers. No experience needed.'],
       ['📧', 'Briefs you every morning', 'Enable your daily email brief in the Insights tab for a personalised morning snapshot.'],
@@ -85,11 +85,11 @@ function buildWelcomeEmail(userName: string, email: string): string {
         ['💬 Aureus', 'Your AI money coach — ask anything, anytime'],
         ['⚡ Change', 'Mindset work — Dickens Process, Values, Compelling Future, Money Mirror, Guided Visualisation'],
         ['🏛️ Treasury', 'Income, expenses, debts, goals, budget tracker'],
-        ['🛤️ Roadmap', 'Baby Steps progress and financial milestones'],
+        ['🛤️ Roadmap', 'Wealth Steps progress and financial milestones'],
         ['🏆 Wins', 'Your financial victories — logged and celebrated'],
         ['⚡ Quick View', 'Mobile-friendly snapshot — money left, bills due, goals'],
         ['📈 Grow & FIRE', 'Net worth, FIRE number, investments, wealth trajectory'],
-        ['🏢 Business', 'For business owners — Hormozi framework, profit engine'],
+        ['🏢 Business', 'For business owners — growth framework, profit engine'],
         ['🧠 Insights', 'AI analysis, spending patterns, daily email setup'],
       ].map(([tab, desc]) => `
       <tr>
