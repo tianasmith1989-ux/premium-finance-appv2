@@ -17,8 +17,19 @@ async function sendEmail(to: string, subject: string, html: string, resendKey: s
 }
 
 function buildDailyBriefHtml(u: any, dayName: string, dateFormatted: string): string {
-  const bills: any[] = u.upcoming_bills || []
   const name = u.user_name || 'Builder'
+
+  // Recalculate dayOffset from stored dueDate at send time — prevents stale offsets crashing the template
+  const nowMs = Date.now()
+  const rawBills: any[] = u.upcoming_bills || []
+  const bills = rawBills.map((b: any) => {
+    if (b.dueDate) {
+      const due = new Date(b.dueDate + 'T12:00:00')
+      const dayOffset = Math.round((due.getTime() - nowMs) / 86400000)
+      return { ...b, dayOffset }
+    }
+    return b // keep stored dayOffset if no dueDate
+  }).filter((b: any) => b.dayOffset >= -30 && b.dayOffset <= 30)
 
   // Categorise bills
   const thisWeekBills = bills.filter((b: any) => b.dayOffset >= 0 && b.dayOffset <= 7)
@@ -445,7 +456,7 @@ export async function GET(request: NextRequest) {
           results.errors++
         }
       } catch (userErr: any) {
-        console.error(`Error processing ${u.user_token}:`, userErr?.message)
+        console.error(`Error processing ${u.email || u.user_token}:`, userErr?.message, userErr?.stack?.split('\n')[1])
         results.errors++
       }
     }
