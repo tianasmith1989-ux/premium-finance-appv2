@@ -351,7 +351,7 @@ export default function Dashboard() {
     }
     setChangeLoading(true)
     try {
-      const financialContext = `Financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, baby step ${currentBabyStep.step}, ${debts.length} debts totalling $${debts.reduce((s: any, d: any) => s + parseFloat(d.balance || '0'), 0).toLocaleString()}, net worth $${netWorth.toLocaleString()}, ${goals.length} active goals`
+      const financialContext = `Financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, wealth step ${currentBabyStep.step}, ${debts.length} debts totalling $${debts.reduce((s: any, d: any) => s + parseFloat(d.balance || '0'), 0).toLocaleString()}, net worth $${netWorth.toLocaleString()}, ${goals.length} active goals`
       const res = await fetch('/api/change-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -571,7 +571,7 @@ export default function Dashboard() {
   const [userCountry, setUserCountry] = useState<'AU' | 'US' | 'UK' | 'NZ' | 'CA'>('AU')
 
   // AI State
-  const [budgetMemory, setBudgetMemory] = useState<any>({ name: '', onboardingComplete: false, financialPath: '', bigGoals: {}, lifeEvents: [], patterns: [], preferences: { communicationStyle: 'direct', checkInFrequency: 'when-needed', motivators: [] }, currentStep: 'Baby Step 1', notes: [] })
+  const [budgetMemory, setBudgetMemory] = useState<any>({ name: '', onboardingComplete: false, financialPath: '', bigGoals: {}, lifeEvents: [], patterns: [], preferences: { communicationStyle: 'direct', checkInFrequency: 'when-needed', motivators: [] }, currentStep: 'Wealth Step 1', notes: [] })
   const [budgetOnboarding, setBudgetOnboarding] = useState({ isActive: false, step: 'greeting' })
   const [chatInput, setChatInput] = useState('')
   const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string, usedWebSearch?: boolean}>>([])
@@ -599,7 +599,7 @@ export default function Dashboard() {
   const moneyQuotes = [
     { quote: "The goal isn't more money. The goal is living life on your terms.", author: "Chris Brogan" },
     { quote: "Do not save what is left after spending; spend what is left after saving.", author: "Warren Buffett" },
-    { quote: "A budget is telling your money where to go instead of wondering where it went.", author: "Dave Ramsey" },
+    { quote: "A budget is not about restriction — it's about intention. Every dollar with a purpose is a dollar working for you.", author: "Aureus" },
     { quote: "Compound interest is the eighth wonder of the world.", author: "Albert Einstein" },
     { quote: "The best time to plant a tree was 20 years ago. The second best time is now.", author: "Chinese Proverb" },
   ]
@@ -1170,10 +1170,10 @@ export default function Dashboard() {
     ((100 - debtToIncomeRatio * 100) * 0.15)
   )
 
-  // Baby Steps
+  // Wealth Steps
   const australianBabySteps = [
     { step: 1, title: 'Starter Emergency Fund', desc: 'Save $2,000 for emergencies', target: 2000, icon: '🛡️', aureusAdvice: "This $2,000 is your financial airbag - it stops you going into debt when life throws curveballs.", tips: ["Open a separate savings account", "Set up automatic transfers on payday", "Use a high-interest account", "Don't touch it except for TRUE emergencies"] },
-    { step: 2, title: 'Kill Bad Debt', desc: 'Pay off credit cards, personal loans, BNPL', icon: '💳', aureusAdvice: "Credit cards at 20%+ interest will DESTROY your wealth. Every $1,000 in CC debt costs you $200/year in interest.", tips: ["List all debts: CC, personal loans, Afterpay, Zip", "DON'T include: HECS/HELP, mortgage", "Avalanche: Pay highest interest first", "Snowball: Pay smallest balance first"] },
+    { step: 2, title: 'Kill Bad Debt', desc: 'Pay off credit cards, personal loans, BNPL', icon: '💳', aureusAdvice: "Credit cards at 20%+ interest will DESTROY your wealth. Every $1,000 in CC debt costs you $200/year in interest.", tips: ["List all debts: CC, personal loans, Afterpay, Zip", "DON'T include: HECS/HELP, mortgage", "High-rate first: Pay highest interest first", "Quick-wins: Pay smallest balance first"] },
     { step: 3, title: 'Full Emergency Fund', desc: '3-6 months expenses saved', icon: '🏦', aureusAdvice: "Now we're building real security. 3-6 months of expenses means you could lose your job and be FINE.", tips: ["Calculate your monthly expenses", "Multiply by 3 (secure job) or 6 (unstable income)", "This money should be BORING - high-interest savings"] },
     { step: 4, title: 'Invest 15% + Super', desc: 'Salary sacrifice + investments', icon: '📈', aureusAdvice: "Your employer already puts 11.5% into super - that's forced savings! Now add salary sacrifice for tax benefits.", tips: ["Compare your super fund's fees using the ATO's YourSuper tool at yoursuper.gov.au", "Consider salary sacrifice: $100/fortnight saves ~$30 in tax", "Outside super: speak with a licensed financial adviser about investment options that suit your situation"] },
     { step: 5, title: 'Home Deposit', desc: 'Save 10-20% for your home', icon: '🏠', aureusAdvice: "Aussie dream! But it's a marathon, not a sprint. Let me break down the REAL costs.", tips: ["5% deposit possible with First Home Guarantee", "10% deposit = pay LMI (~$8-15k)", "20% deposit = no LMI, better rates"] },
@@ -1316,7 +1316,7 @@ export default function Dashboard() {
         '',
         'NUMBERS (use these exactly — do not invent or estimate differently):',
         `- Monthly surplus available: $${monthlySurplus.toFixed(0)}/month`,
-        `- Current baby step: ${currentBabyStep.title}`,
+        `- Current wealth step: ${currentBabyStep.title}`,
         `- Baby step target: $${babyStepTarget.toLocaleString()} | Already saved: $${babyStepSaved.toFixed(0)} | Still needed: $${babyStepRemaining.toFixed(0)}`,
         `- Months to complete at current surplus: ${monthsToComplete > 0 ? monthsToComplete + ' month' + (monthsToComplete !== 1 ? 's' : '') : 'already done'}`,
         `- Debts: ${debts.length > 0 ? debts.map((d: any) => d.name + ' $' + d.balance).join(', ') : 'none'}`,
@@ -1397,7 +1397,7 @@ export default function Dashboard() {
             max_tokens: 150,
             messages: [{
               role: 'user',
-              content: `The user just advanced from Baby Step ${prevBabyStep} to Baby Step ${currentBabyStep.step} (${currentBabyStep.title}). Write 2 things: 1. A 1-sentence celebration of what they just achieved (specific, genuine, not generic) 2. A 1-sentence description of what Baby Step ${currentBabyStep.step} means for their life specifically Their data: income $${monthlyIncome.toFixed(0)}/mo, surplus $${monthlySurplus.toFixed(0)}/mo, ${debts.length} debts, emergency fund $${emergencyFund.toFixed(0)} Respond as JSON: {"celebration": "...", "nextFocus": "..."}`
+              content: `The user just advanced from Wealth Step ${prevBabyStep} to Wealth Step ${currentBabyStep.step} (${currentBabyStep.title}). Write 2 things: 1. A 1-sentence celebration of what they just achieved (specific, genuine, not generic) 2. A 1-sentence description of what Wealth Step ${currentBabyStep.step} means for their life specifically Their data: income $${monthlyIncome.toFixed(0)}/mo, surplus $${monthlySurplus.toFixed(0)}/mo, ${debts.length} debts, emergency fund $${emergencyFund.toFixed(0)} Respond as JSON: {"celebration": "...", "nextFocus": "..."}`
             }]
           })
         })
@@ -1408,7 +1408,7 @@ export default function Dashboard() {
         setStepReaction({ step: currentBabyStep.step, message: parsed.celebration, nextSuggestion: parsed.nextFocus })
         // Auto-fire a win
         setWins((prev: any[]) => [...prev, {
-          id: Date.now(), title: `Baby Step ${prevBabyStep} Complete!`,
+          id: Date.now(), title: `Wealth Step ${prevBabyStep} Complete!`,
           desc: parsed.celebration, icon: '🏆', auto: true, date: new Date().toISOString()
         }])
       } catch {}
@@ -1623,9 +1623,9 @@ export default function Dashboard() {
       setCelebrationWin(newWinsList[0].title)
       setTimeout(() => setCelebrationWin(null), 4000)
       // Full-screen celebration for major milestones
-      const majorWin = newWinsList.find(w => w.title.includes('Baby Step') || w.title.includes('Emergency Fund') || w.title.includes('debt') || w.title.includes('savings rate'))
+      const majorWin = newWinsList.find(w => w.title.includes('Wealth Step') || w.title.includes('Emergency Fund') || w.title.includes('debt') || w.title.includes('savings rate'))
       if (majorWin) {
-        triggerCelebration(majorWin.title, majorWin.desc, majorWin.icon || '🏆', majorWin.title.includes('debt') ? 'debt_free' : majorWin.title.includes('Baby Step') ? 'baby_step' : 'win')
+        triggerCelebration(majorWin.title, majorWin.desc, majorWin.icon || '🏆', majorWin.title.includes('debt') ? 'debt_free' : majorWin.title.includes('Wealth Step') ? 'baby_step' : 'win')
       }
     }
   }, [incomeStreams, monthlySurplus, savingsRate, intentionalSavingsRate, emergencyFund, emergencyMonths, netWorth, goals, debts, assets, roadmapMilestones, wins])
@@ -2067,7 +2067,7 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'question',
-          question: `You are Aureus, an AI financial coach built into a budgeting app called Aureus. The user is already using Aureus to track their budget, income, expenses, debts, and goals — so NEVER suggest they download a budgeting app, spreadsheet, or any other tracking tool. They already have one.  Important financial context for Australian users: - The $2,000 Starter Emergency Fund (Baby Step 1) is a buffer for UNEXPECTED emergencies like car breakdowns, medical bills, vet bills, or appliance failures — it is NOT meant to cover a month of living expenses. Do not describe it that way. - Baby Step 3 (3-6 months of expenses) is the full emergency fund — different goal.  Create a 7-step action plan for this goal: "${milestone.name}"${milestone.targetAmount ? ` (target: $${milestone.targetAmount})` : ''}${milestone.notes ? `. Context: ${milestone.notes}` : ''}. Rules: - Output ONLY the 7 steps, nothing else. No intro sentence, no summary, no preamble. - Format each line as: Step 1: [action] - Each action must be specific, concrete, and doable — no fixed day requirement, user does them at their own pace - One sentence per step - Never suggest downloading another app or creating a spreadsheet — the user is already in Aureus - MILESTONE TYPE: This is ${isDebtMilestone ? 'a DEBT PAYOFF milestone. Step 5 MUST be EXACTLY this word for word: "Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically." Do NOT change a single word.' : 'a SAVINGS GOAL milestone — NOT a debt. Do NOT use the word "debt" anywhere in your plan. Step 5 MUST be EXACTLY this word for word: "Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders." Do NOT change a single word.'} - Start directly with "Step 1:"${getPersonalityCoachingContext()}`,
+          question: `You are Aureus, an AI financial coach built into a budgeting app called Aureus. The user is already using Aureus to track their budget, income, expenses, debts, and goals — so NEVER suggest they download a budgeting app, spreadsheet, or any other tracking tool. They already have one.  Important financial context for Australian users: - The $2,000 Starter Emergency Fund (Wealth Step 1) is a buffer for UNEXPECTED emergencies like car breakdowns, medical bills, vet bills, or appliance failures — it is NOT meant to cover a month of living expenses. Do not describe it that way. - Wealth Step 3 (3-6 months of expenses) is the full emergency fund — different goal.  Create a 7-step action plan for this goal: "${milestone.name}"${milestone.targetAmount ? ` (target: $${milestone.targetAmount})` : ''}${milestone.notes ? `. Context: ${milestone.notes}` : ''}. Rules: - Output ONLY the 7 steps, nothing else. No intro sentence, no summary, no preamble. - Format each line as: Step 1: [action] - Each action must be specific, concrete, and doable — no fixed day requirement, user does them at their own pace - One sentence per step - Never suggest downloading another app or creating a spreadsheet — the user is already in Aureus - MILESTONE TYPE: This is ${isDebtMilestone ? 'a DEBT PAYOFF milestone. Step 5 MUST be EXACTLY this word for word: "Add this debt to the Debts section in Aureus with the balance, interest rate, and minimum payment so it tracks your payoff progress automatically." Do NOT change a single word.' : 'a SAVINGS GOAL milestone — NOT a debt. Do NOT use the word "debt" anywhere in your plan. Step 5 MUST be EXACTLY this word for word: "Add this goal to your Aureus savings goals with your target amount and a weekly payment amount, then enable it on the calendar for visual tracking and reminders." Do NOT change a single word.'} - Start directly with "Step 1:"${getPersonalityCoachingContext()}`,
           financialData: { income: incomeStreams, expenses, debts, goals, assets, liabilities },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
@@ -3009,7 +3009,7 @@ User: "${message}"`,
           max_tokens: 150,
           messages: [{
             role: 'user',
-            content: `You are Aureus. This user's data: income $${monthlyIncome.toFixed(0)}/mo, surplus $${monthlySurplus.toFixed(0)}/mo, debts: ${debts.map((d: any) => `${d.name} $${d.balance} @ ${d.interestRate}%`).join(', ') || 'none'}, emergency fund $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months), baby step ${currentBabyStep.step}, house: ${houseStatus || 'unknown'}. Give them ONE specific financial action to take THIS MONTH. Not a list. One thing. It must be: - Specific and actionable (with a phone number, website, or exact step if relevant) - High-leverage for their specific situation - Achievable in under 2 hours - Australian-specific if relevant Examples of good ones: - "Call your bank on 13 22 43 and ask for a mortgage rate review — rates have dropped and most people who ask get 0.1–0.3% off their rate without refinancing" - "Log into MyGov and check your super balance and employer contributions match your payslips — $3.4B goes unpaid each year" - "Set up a $50/fortnight automatic transfer to a sinking fund account specifically for Christmas — start now and you'll have $600 by December" Respond with ONE sentence only. Be specific. Include the actual step.`
+            content: `You are Aureus. This user's data: income $${monthlyIncome.toFixed(0)}/mo, surplus $${monthlySurplus.toFixed(0)}/mo, debts: ${debts.map((d: any) => `${d.name} $${d.balance} @ ${d.interestRate}%`).join(', ') || 'none'}, emergency fund $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months), wealth step ${currentBabyStep.step}, house: ${houseStatus || 'unknown'}. Give them ONE specific financial action to take THIS MONTH. Not a list. One thing. It must be: - Specific and actionable (with a phone number, website, or exact step if relevant) - High-leverage for their specific situation - Achievable in under 2 hours - Australian-specific if relevant Examples of good ones: - "Call your bank on 13 22 43 and ask for a mortgage rate review — rates have dropped and most people who ask get 0.1–0.3% off their rate without refinancing" - "Log into MyGov and check your super balance and employer contributions match your payslips — $3.4B goes unpaid each year" - "Set up a $50/fortnight automatic transfer to a sinking fund account specifically for Christmas — start now and you'll have $600 by December" Respond with ONE sentence only. Be specific. Include the actual step.`
           }]
         })
       })
@@ -3129,7 +3129,7 @@ FINANCIAL DATA:
 • Emergency fund: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months)
 • Debts: ${debts.length > 0 ? debts.map((d: any) => `${d.name} $${d.balance} @ ${d.interestRate}%`).join(', ') : 'none'}
 • Goals: ${goals.length > 0 ? goals.map((g: any) => `${g.name}: $${g.saved}/$${g.target}`).join(', ') : 'none'}
-• Net worth: $${netWorth.toLocaleString()} | Baby Step: ${currentBabyStep.step} — ${currentBabyStep.title}
+• Net worth: $${netWorth.toLocaleString()} | Wealth Step: ${currentBabyStep.step} — ${currentBabyStep.title}
 • House: ${houseStatus || 'not specified'} | Mortgage: ${mortgageAccel.balance ? `$${mortgageAccel.balance} balance, ${mortgageAccel.rate}% rate, ${mortgageAccel.remainingYears} years remaining, $${mortgageAccel.currentRepayment}/${mortgageAccel.repaymentFrequency || 'weekly'} repayment${mortgageAccel.extraRepayment ? `, $${mortgageAccel.extraRepayment}/wk extra` : ''}${mortgageAccel.offsetBalance ? `, $${mortgageAccel.offsetBalance} offset` : ''}` : 'not tracked in Aureus yet — user may have entered it in the mortgage calculator tab'} ${moneyPersonality ? `| Personality: ${personalityProfiles[moneyPersonality]?.label}` : ''}
 
 Be specific, warm, direct. Use their actual numbers. Australia-specific advice. Remember earlier parts of this conversation.${getPersonalityCoachingContext()}`
@@ -3250,7 +3250,7 @@ Debts: ${debts.length > 0 ? debts.map(d => `${d.name} $${d.balance} at ${d.inter
 Goals: ${goals.length > 0 ? goals.map(g => `${g.name} $${g.saved}/$${g.target}`).join(', ') : 'none'}
 Assets: ${assets.length > 0 ? assets.map(a => `${a.name} $${a.value}`).join(', ') : 'none'}
 Net worth: $${netWorth.toLocaleString()}
-Baby Step: ${currentBabyStep.step} — ${currentBabyStep.title}
+Wealth Step: ${currentBabyStep.step} — ${currentBabyStep.title}
 House status: ${houseStatus || 'not specified'}
 ${moneyPersonality ? `Money personality: ${personalityProfiles[moneyPersonality]?.label}` : ''}
 ${mortgageAccel.balance ? (() => {
@@ -3451,8 +3451,8 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
         condition: emergencyFund >= 2000 && !dismissedTriggers.includes('baby_step_1_done') && currentBabyStep.step >= 2,
         urgency: 'high' as const,
         icon: '🛡️',
-        message: `Your $2,000 emergency fund is in place — Baby Step 1 is DONE. 🎉 You're now on Baby Step 2: kill bad debt. List every credit card, personal loan, and BNPL balance in the Debts section.`,
-        action: "Start Baby Step 2 →",
+        message: `Your $2,000 emergency fund is in place — Wealth Step 1 is DONE. 🎉 You're now on Wealth Step 2: kill bad debt. List every credit card, personal loan, and BNPL balance in the Debts section.`,
+        action: "Start Wealth Step 2 →",
         tab: 'dashboard'
       },
       {
@@ -3460,7 +3460,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
         condition: debts.filter(d => parseFloat(d.interestRate || '0') > 5 && !d.name?.toLowerCase().includes('mortgage')).length === 0 && debts.length > 0 && currentBabyStep.step >= 3,
         urgency: 'high' as const,
         icon: '💳',
-        message: "All bad debt cleared! That's Baby Step 2 done. Now build your full 3-6 month emergency fund — that's the buffer that makes everything else possible.",
+        message: "All bad debt cleared! That's Wealth Step 2 done. Now build your full 3-6 month emergency fund — that's the buffer that makes everything else possible.",
         action: "Set up emergency fund goal →",
         tab: 'path'
       },
@@ -3469,7 +3469,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
         condition: emergencyMonths >= 3 && currentBabyStep.step >= 4 && !dismissedTriggers.includes('emergency_fund_done'),
         urgency: 'high' as const,
         icon: '🏦',
-        message: `${emergencyMonths.toFixed(1)} months of expenses saved — Baby Step 3 is DONE. Now it's time to invest 15% of your income. Let's look at super salary sacrifice and ETFs.`,
+        message: `${emergencyMonths.toFixed(1)} months of expenses saved — Wealth Step 3 is DONE. Now it's time to invest 15% of your income. Let's look at super salary sacrifice and ETFs.`,
         action: "Start investing →",
         tab: 'path'
       },
@@ -3704,7 +3704,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'question',
-          question: `You are Aureus. A new user has just set up their financial profile. Based on their data, propose exactly 3 roadmap milestones that will have the biggest impact on their financial life. Be specific with numbers.  Their data: - Monthly income: $${monthlyIncome.toFixed(0)} - Monthly expenses: $${monthlyExpenses.toFixed(0)} - Monthly surplus: $${monthlySurplus.toFixed(0)} - Existing savings: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months of expenses covered) - Total bad debt: $${totalDebtBalance.toFixed(0)} - Mortgage: ${mortgageAccel.balance ? `$${mortgageAccel.balance} at ${mortgageAccel.rate}%` : 'not entered'} - Baby Step: ${currentBabyStep.step} — ${currentBabyStep.title} - Money personality: ${moneyPersonality ? personalityProfiles[moneyPersonality]?.label : 'not assessed'} - House status: ${houseStatus || 'not specified'} - FIRE goal: ${fireGoal ? 'Yes' : 'No'} CRITICAL RULES — FOLLOW EXACTLY: - Baby Steps order: 1) $2,000 emergency fund → 2) Kill ALL bad debt → 3) 3-month expenses saved → 4) Invest/mortgage - savings < $2,000: milestone 1 MUST be Build $2,000 Emergency Fund - savings >= $2,000 AND bad debt > 0: one milestone MUST be killing that bad debt - savings < 3 months expenses: one milestone MUST be Build 3-Month Emergency Fund - NEVER propose investing milestones if bad debt exists - NEVER skip debt if totalDebt > 0 — it must appear - Each milestone must be something they have NOT already achieved - Use "Kill" not "Pay off" for debt milestones Respond in this EXACT JSON format, no other text: [ {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 1}, {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 2}, {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 3} ]`,
+          question: `You are Aureus. A new user has just set up their financial profile. Based on their data, propose exactly 3 roadmap milestones that will have the biggest impact on their financial life. Be specific with numbers.  Their data: - Monthly income: $${monthlyIncome.toFixed(0)} - Monthly expenses: $${monthlyExpenses.toFixed(0)} - Monthly surplus: $${monthlySurplus.toFixed(0)} - Existing savings: $${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)} months of expenses covered) - Total bad debt: $${totalDebtBalance.toFixed(0)} - Mortgage: ${mortgageAccel.balance ? `$${mortgageAccel.balance} at ${mortgageAccel.rate}%` : 'not entered'} - Wealth Step: ${currentBabyStep.step} — ${currentBabyStep.title} - Money personality: ${moneyPersonality ? personalityProfiles[moneyPersonality]?.label : 'not assessed'} - House status: ${houseStatus || 'not specified'} - FIRE goal: ${fireGoal ? 'Yes' : 'No'} CRITICAL RULES — FOLLOW EXACTLY: - Wealth Steps order: 1) $2,000 emergency fund → 2) Kill ALL bad debt → 3) 3-month expenses saved → 4) Invest/mortgage - savings < $2,000: milestone 1 MUST be Build $2,000 Emergency Fund - savings >= $2,000 AND bad debt > 0: one milestone MUST be killing that bad debt - savings < 3 months expenses: one milestone MUST be Build 3-Month Emergency Fund - NEVER propose investing milestones if bad debt exists - NEVER skip debt if totalDebt > 0 — it must appear - Each milestone must be something they have NOT already achieved - Use "Kill" not "Pay off" for debt milestones Respond in this EXACT JSON format, no other text: [ {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 1}, {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 2}, {"name": "milestone name", "icon": "emoji", "target": number_or_0, "notes": "why this matters for them specifically", "priority": 3} ]`,
           financialData: { income: incomeStreams, expenses, debts, goals, assets },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
@@ -3722,7 +3722,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
         throw new Error('No JSON in response')
       }
     } catch {
-      // Fallback proposals — strictly follow baby steps order based on actual data
+      // Fallback proposals — strictly follow wealth steps order based on actual data
       const hasStarterFund = emergencyFund >= 2000
       const hasFullEmergencyFund = emergencyMonths >= 3
       const hasSixMonthFund = emergencyMonths >= 6
@@ -3740,7 +3740,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
         steps.push({ name: `Kill $${Math.round(totalDebtBalance).toLocaleString()} Bad Debt`, icon: '💳', target: Math.round(totalDebtBalance), notes: `Bad debt is an anchor on everything. At your current interest rate this is costing you $${Math.round(totalDebtBalance * 0.18 / 12).toLocaleString()}/month. Eliminating it is a guaranteed return.` })
 
       if (!hasFullEmergencyFund)
-        steps.push({ name: `Build 3-Month Emergency Fund ($${monthlyExpenses3.toLocaleString()})`, icon: '🏦', target: monthlyExpenses3, notes: `3 months of expenses as a true safety net. This is Baby Step 3 — it means losing your job or a major emergency doesn't derail everything.` })
+        steps.push({ name: `Build 3-Month Emergency Fund ($${monthlyExpenses3.toLocaleString()})`, icon: '🏦', target: monthlyExpenses3, notes: `3 months of expenses as a true safety net. This is Wealth Step 3 — it means losing your job or a major emergency doesn't derail everything.` })
 
       if (mortgageAccel.balance)
         steps.push({ name: 'Accelerate Mortgage Payoff', icon: '🏠', target: 0, notes: 'Extra repayments early in a mortgage save 3-4× that amount in interest over the life of the loan.' })
@@ -4008,10 +4008,10 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
     {
       id: 'debt-snowball-avalanche',
       icon: '❄️',
-      title: 'Snowball vs Avalanche: Which Debt Method Wins?',
+      title: 'High-Rate-First vs Quick-Wins: Which Debt Strategy Works?',
       tagline: 'Two strategies — very different outcomes',
-      content: `Both methods work. The question is whether you optimise for maths or psychology.\n\nAvalanche (highest interest first):\n• Pay minimums on everything\n• Throw every extra dollar at the highest-rate debt\n• Mathematically optimal — saves the most money\n• Takes longer to see a debt disappear\n\nSnowball (smallest balance first):\n• Pay minimums on everything\n• Attack the smallest balance first, regardless of rate\n• Psychologically powerful — quick wins keep you motivated\n• Costs more in interest but many people actually finish it\n\nReal example with 3 debts:\n• $800 Afterpay at 0%\n• $3,000 car loan at 9%\n• $6,000 credit card at 20%\n\nAvalanche: Target credit card first → saves ~$800 more in interest\nSnowball: Clear Afterpay first → eliminates a debt in weeks, builds momentum\n\nAureus uses Avalanche by default — but you can switch to Snowball in the Debt Payoff Accelerator if you need motivation wins.`,
-      keyNumbers: ['Avalanche saves more money — typically $500–2,000 on a typical debt load', 'Snowball wins for completion rates — people actually finish it', 'The best method is the one you stick to'],
+      content: `Both methods work. The question is whether you optimise for maths or psychology.\n\nHigh-rate-first (highest interest first):\n• Pay minimums on everything\n• Throw every extra dollar at the highest-rate debt\n• Mathematically optimal — saves the most money\n• Takes longer to see a debt disappear\n\nQuick-wins (smallest balance first):\n• Pay minimums on everything\n• Attack the smallest balance first, regardless of rate\n• Psychologically powerful — quick wins keep you motivated\n• Costs more in interest but many people actually finish it\n\nReal example with 3 debts:\n• $800 Afterpay at 0%\n• $3,000 car loan at 9%\n• $6,000 credit card at 20%\n\nHigh-rate-first: Target credit card first → saves ~$800 more in interest\nQuick-wins: Clear Afterpay first → eliminates a debt in weeks, builds momentum\n\nAureus uses high-rate-first by default — but you can switch to quick-wins in the Debt Payoff Accelerator if you need motivation wins.`,
+      keyNumbers: ['High-rate-first saves more money — typically $500–2,000 on a typical debt load', 'Quick-wins strategy wins for completion rates — people actually finish it', 'The best method is the one you stick to'],
       mistake: 'Making minimum payments on everything while carrying a 20% credit card. Every month you delay is ~$60 in interest on a $3,600 card — straight to the bank.',
       cta: 'Show me my best debt payoff order'
     },
@@ -4165,7 +4165,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'question',
-          question: 'You are Aureus. Identify THE SINGLE highest-leverage financial action this user could take this week. One specific action with a number. Start with an action verb. Include estimated impact in brackets. Max 2 sentences. Income: $' + monthlyIncome.toFixed(0) + '/mo | Surplus: $' + monthlySurplus.toFixed(0) + '/mo | Debt: $' + totalDebtBalance.toFixed(0) + ' | Baby Step: ' + currentBabyStep.step + ' | Mortgage: ' + (mortgageAccel.balance ? '$' + mortgageAccel.balance + ' @ ' + mortgageAccel.rate + '%' : 'not entered') + ' | Emergency: ' + emergencyMonths.toFixed(1) + ' months' + getPersonalityCoachingContext(),
+          question: 'You are Aureus. Identify THE SINGLE highest-leverage financial action this user could take this week. One specific action with a number. Start with an action verb. Include estimated impact in brackets. Max 2 sentences. Income: $' + monthlyIncome.toFixed(0) + '/mo | Surplus: $' + monthlySurplus.toFixed(0) + '/mo | Debt: $' + totalDebtBalance.toFixed(0) + ' | Wealth Step: ' + currentBabyStep.step + ' | Mortgage: ' + (mortgageAccel.balance ? '$' + mortgageAccel.balance + ' @ ' + mortgageAccel.rate + '%' : 'not entered') + ' | Emergency: ' + emergencyMonths.toFixed(1) + ' months' + getPersonalityCoachingContext(),
           financialData: { income: incomeStreams, expenses, debts, goals, assets },
           memory: budgetMemory,
           countryConfig: currentCountryConfig
@@ -4899,7 +4899,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
               <div style={{ fontSize: '56px', marginBottom: '16px' }}>🏦</div>
               <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>What savings do you already have?</h2>
               <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 8px 0' }}>
-                This helps Aureus see if you've already hit Baby Step 1 ($2,000 emergency fund) and build your plan from the right starting point.
+                This helps Aureus see if you've already hit Wealth Step 1 ($2,000 emergency fund) and build your plan from the right starting point.
               </p>
               <p style={{ color: theme.textMuted, fontSize: '12px', textAlign: 'center' as const, margin: '0 0 24px 0' }}>
                 Include savings accounts, term deposits, offset accounts. Not super — that's tracked separately.
@@ -4927,7 +4927,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
                       <div style={{ padding: '12px 16px', background: hasEmergencyFund ? theme.success + '20' : theme.warning + '15', borderRadius: '10px', border: '1px solid ' + (hasEmergencyFund ? theme.success + '40' : theme.warning + '40'), marginTop: '4px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ color: hasEmergencyFund ? theme.success : theme.warning, fontWeight: 700, fontSize: '13px' }}>
-                            {hasEmergencyFund ? '✅ Emergency fund covered!' : `⚡ $${(2000 - totalSavings).toFixed(0)} away from Baby Step 1`}
+                            {hasEmergencyFund ? '✅ Emergency fund covered!' : `⚡ $${(2000 - totalSavings).toFixed(0)} away from Wealth Step 1`}
                           </span>
                           <span style={{ color: theme.success, fontWeight: 700 }}>${totalSavings.toLocaleString()}</span>
                         </div>
@@ -5465,7 +5465,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                           { label: 'Monthly expenses', value: `$${monthlyExpenses.toFixed(0)}`, color: theme.danger },
                           { label: 'Monthly surplus', value: `$${monthlySurplus.toFixed(0)}`, color: monthlySurplus > 0 ? theme.success : theme.danger },
                           { label: 'Savings / Emergency fund', value: `$${emergencyFund.toFixed(0)} (${emergencyMonths.toFixed(1)}mo)`, color: emergencyFund >= 2000 ? theme.success : theme.warning },
-                          { label: 'Baby Step', value: `Step ${currentBabyStep.step}`, color: theme.accent },
+                          { label: 'Wealth Step', value: `Step ${currentBabyStep.step}`, color: theme.accent },
                           ...(mortgageAccel.balance ? [{ label: 'Mortgage balance', value: `$${parseInt(mortgageAccel.balance).toLocaleString()}`, color: theme.warning }] : []),
                           ...(totalDebtBalance > 0 ? [{ label: 'Total debt', value: `$${totalDebtBalance.toFixed(0)}`, color: theme.danger }] : []),
                         ].map(item => (
@@ -5612,7 +5612,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
           {
             tab: 'path', icon: '🛤️', title: 'Roadmap — Your Financial Path',
             desc: 'Your personalised milestones — built by Aureus from your data. Each milestone gets a 7-step action plan. Tick off steps as you complete them. When you finish, Aureus generates a new plan. Add milestones from the roadmap or let Aureus propose them.',
-            highlight: 'Baby Steps · Milestones · 7-step plans · Ask Aureus about any milestone'
+            highlight: 'Aureus Wealth Steps · Milestones · 7-step plans · Ask Aureus about any milestone'
           },
           {
             tab: 'mortgage', icon: '🚀', title: 'Mortgage Accelerator',
@@ -5656,8 +5656,8 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
           },
           {
             tab: 'learn', icon: '🎓', title: 'Learn — Financial Education',
-            desc: 'Core financial concepts explained clearly. Baby Steps, the avalanche vs snowball method, how compound interest works, Australian-specific content (super, offset accounts, negative gearing). Learn as you go.',
-            highlight: 'Baby Steps · Debt methods · Compound interest · Australian concepts'
+            desc: 'Core financial concepts explained clearly. The Aureus Wealth Steps, debt payoff strategies, how compound interest works, Australian-specific content (super, offset accounts, negative gearing). Learn as you go.',
+            highlight: 'Aureus Wealth Steps · Debt methods · Compound interest · Australian concepts'
           },
           {
             tab: 'business', icon: '🏢', title: 'Business Hub — Growth Framework',
@@ -5894,8 +5894,8 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                   icon: '💳', title: 'Debt Payoff',
                   items: [
                     'Add all debts in Budget → Debts with balance, rate, and minimum payment',
-                    'Aureus uses Avalanche method by default (highest rate first = most interest saved)',
-                    'Switch to Snowball (smallest balance first) if you need quick wins for motivation',
+                    'Aureus uses the highest-rate-first strategy by default (most interest saved)',
+                    'Switch to Quick-Wins (smallest balance first) if you need motivation wins',
                     'Use the Payoff Accelerator to see how much extra payments save you',
                     '"Use 50% surplus" auto-fills a smart extra payment from your monthly surplus',
                   ]
@@ -6620,7 +6620,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                   <div style={{ color: theme.text, fontSize: '15px', fontWeight: 600, lineHeight: 1.6, marginBottom: '8px' }}>{stepReaction.message}</div>
                   <div style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>{stepReaction.nextSuggestion}</div>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => askAureusAbout(`I just completed Baby Step ${stepReaction.step - 1} and I'm now on Baby Step ${stepReaction.step} (${currentBabyStep.title}). What should my focus be now?`)}
+                    <button onClick={() => askAureusAbout(`I just completed Wealth Step ${stepReaction.step - 1} and I'm now on Wealth Step ${stepReaction.step} (${currentBabyStep.title}). What should my focus be now?`)}
                       style={{ padding: '8px 14px', background: theme.success, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '12px' }}>
                       What's next for me? →
                     </button>
@@ -7527,7 +7527,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                 </div>
                 <div>
                   <div style={{ color: theme.text, fontWeight: 700, fontSize: '22px' }}>Aureus</div>
-                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Your AI money coach · {currentBabyStep.step > 0 ? `Baby Step ${currentBabyStep.step}` : 'Getting started'}</div>
+                  <div style={{ color: theme.textMuted, fontSize: '13px' }}>Your AI money coach · {currentBabyStep.step > 0 ? `Wealth Step ${currentBabyStep.step}` : 'Getting started'}</div>
                 </div>
               </div>
               <div style={{ padding: '8px 12px', background: theme.warning + '15', borderRadius: '8px', marginBottom: '12px', border: '1px solid ' + theme.warning + '30' }}>
@@ -8421,7 +8421,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                             </div>
                           </div>
                           <div style={{ marginTop: '10px', color: theme.textMuted, fontSize: '11px', textAlign: 'center' as const, lineHeight: 1.5 }}>
-                            Adding ${extra}/mo using <strong style={{ color: theme.accent }}>{payoffMethod}</strong> method — highest {payoffMethod === 'avalanche' ? 'interest rate' : 'momentum'} debt first
+                            Adding ${extra}/mo using <strong style={{ color: theme.accent }}>{payoffMethod === 'avalanche' ? 'High-Rate-First' : 'Quick-Wins'}</strong> strategy — highest {payoffMethod === 'avalanche' ? 'interest rate' : 'smallest balance'} debt first
                           </div>
                         </div>
                       )}
@@ -9138,7 +9138,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
               </div>
 
               {[
-                { id: 'phase1', num: '1', icon: '💰', title: 'Get Financially Ready', color: theme.warning, items: ['Complete Baby Steps 1–3 first (emergency fund + kill bad debt)', 'Save your deposit: 5% minimum, 20% avoids LMI', 'Check your credit score free via Credit Savvy or Finder', 'Stop applying for new credit 6+ months before applying', 'Consistent income for 12+ months strengthens your application', 'Reduce existing debt and BNPL balances to boost borrowing power'] },
+                { id: 'phase1', num: '1', icon: '💰', title: 'Get Financially Ready', color: theme.warning, items: ['Complete Wealth Steps 1–3 first (emergency fund + kill bad debt)', 'Save your deposit: 5% minimum, 20% avoids LMI', 'Check your credit score free via Credit Savvy or Finder', 'Stop applying for new credit 6+ months before applying', 'Consistent income for 12+ months strengthens your application', 'Reduce existing debt and BNPL balances to boost borrowing power'] },
                 { id: 'phase2', num: '2', icon: '🧾', title: 'Understand the True Costs', color: theme.purple, items: ['Stamp duty: 0% (first home QLD new builds) to 5.5% (investors)', 'LMI: $8k–$30k if deposit under 20% — often added to your loan', 'Conveyancer / solicitor: ~$1,500–$2,500', 'Building & pest inspection: ~$500–$800', 'Lender fees (application, valuation): ~$500–$1,500', "Moving costs + immediate repairs: budget $3k–$10k", "Budget 3–5% of purchase price in extra costs on top of deposit"] },
                 { id: 'phase3', num: '3', icon: '🏛️', title: 'Government Schemes & Grants', color: theme.accent, items: ['First Home Guarantee: 5% deposit, no LMI — 35,000 places/yr', 'Regional First Home Guarantee: same for regional areas', 'Family Home Guarantee: single parents — 2% deposit', 'QLD FHOG: $30,000 grant for new builds', 'NSW FHOG: $10,000 for new builds under $600k', 'First Home Super Saver Scheme: up to $50k from super for deposit', 'Check your state revenue office for current stamp duty concessions'] },
                 { id: 'phase4', num: '4', icon: '🏦', title: 'Get Pre-Approved', color: theme.success, items: ['Pre-approval shows sellers you\'re serious — valid ~90 days', 'Use a mortgage broker: access 40+ lenders, free to you (paid by bank)', 'Bring: 3 months payslips, 3 months bank statements, tax returns, ID', 'Understand variable (flexible) vs fixed rate (certainty)', 'Ask about offset accounts — critical for accelerating payoff', 'Compare comparison rates, not just advertised rates', 'Get pre-approval BEFORE falling in love with a property'] },
@@ -9621,9 +9621,9 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
               )}
             </div>
 
-            {/* Baby Steps */}
+            {/* Wealth Steps */}
             <div style={cardStyle}>
-              <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>👶 Australian Baby Steps</h2>
+              <h2 style={{ margin: '0 0 20px 0', color: theme.text, fontSize: '22px' }}>🏛️ The Aureus Wealth Steps</h2>
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
                 {australianBabySteps.map(item => {
                   const alreadyOwnsHome = ['own', 'paid_off', 'buying'].includes(houseStatus || '')
@@ -10713,7 +10713,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                               'What does my LTV:CAC ratio mean?',
                               'How do I make my offer stronger?',
                               'What is my biggest growth lever right now?',
-                              'What is a Grand Slam Offer?',
+                              'What makes an irresistible offer?',
                               'How do I increase my profit margin?',
                             ].map(q => (
                               <button key={q} onClick={() => handleBizChat(q)}
@@ -11202,7 +11202,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
               <h3 style={{ margin: '0 0 16px 0', color: theme.text, fontSize: '18px' }}>🌏 You're Not Alone</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
                 {[
-                  { stat: '847', label: 'users on Baby Step 2 right now', sub: 'Average completion: 14 months' },
+                  { stat: '847', label: 'users on Wealth Step 2 right now', sub: 'Average completion: 14 months' },
                   { stat: '$2.4M', label: 'in interest savings identified this week', sub: 'Across all Aureus users' },
                   { stat: '4.2×', label: 'faster debt payoff with weekly check-ins', sub: 'vs. users who skip them' },
                   { stat: '91%', label: 'of users feel less stressed after 30 days', sub: 'Based on check-in data' },
@@ -12365,7 +12365,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
 The user has just completed a deep reflection exercise based on the cost of inaction vs the reward of change.
 
 Their name: ${userName || 'Builder'}
-Their financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, baby step ${currentBabyStep.step}, ${debts.length > 0 ? 'has debt' : 'debt free'}
+Their financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, wealth step ${currentBabyStep.step}, ${debts.length > 0 ? 'has debt' : 'debt free'}
 
 Their 5 answers:
 1. What has this pattern already cost them: "${newAnswers[0]}"
@@ -12477,7 +12477,7 @@ Their core value: "${newAnswers.topValue}"
 What money enables for them: "${newAnswers.moneyMeaning}"
 Current alignment score: "${newAnswers.currentGap}"
 Their "must" reason: "${newAnswers.mustReason}"
-Financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, baby step ${currentBabyStep.step}
+Financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, wealth step ${currentBabyStep.step}
 
 Your job — three things:
 1. Reflect their values back powerfully — show them you heard what actually matters to them
@@ -12596,7 +12596,7 @@ Raw and personal. No generic motivation. Use their actual words back at them.`,
                         question: `[COMPELLING FUTURE VISUALISATION]
 User: ${userName || 'Builder'}
 Their 5-year vision: "${futureVision}"
-Current situation: surplus $${monthlySurplus.toFixed(0)}/mo, baby step ${currentBabyStep.step}, net worth $${netWorth.toLocaleString()}
+Current situation: surplus $${monthlySurplus.toFixed(0)}/mo, wealth step ${currentBabyStep.step}, net worth $${netWorth.toLocaleString()}
 Core values: ${coreValues.join(', ') || 'not yet elicited'}
 
 Your job:
@@ -12740,7 +12740,7 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
                       method:'POST', headers:{'Content-Type':'application/json'},
                       body: JSON.stringify({
                         mode: 'question',
-                        question: `[DAILY MONEY DEBRIEF] The user has completed their daily money check-in. Respond with warmth and zero judgment. Acknowledge the emotion first. If they mentioned why they spent (e.g. exhaustion, stress), address THAT not just the money. Give one insight or one action — not both. Keep it under 4 sentences. Context: ${context}. Their financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, baby step ${currentBabyStep.step}.`,
+                        question: `[DAILY MONEY DEBRIEF] The user has completed their daily money check-in. Respond with warmth and zero judgment. Acknowledge the emotion first. If they mentioned why they spent (e.g. exhaustion, stress), address THAT not just the money. Give one insight or one action — not both. Keep it under 4 sentences. Context: ${context}. Their financial situation: surplus $${monthlySurplus.toFixed(0)}/mo, wealth step ${currentBabyStep.step}.`,
                         financialData: { income: incomeStreams, expenses },
                         memory: budgetMemory, countryConfig: currentCountryConfig
                       })
