@@ -1704,6 +1704,48 @@ export default function Dashboard() {
     return false
   }
 
+  // Returns the next occurrence date (as YYYY-MM-DD) from a start date + frequency
+  // Used for email upcomingBills to show the actual next due date, not a stale stored one
+  const getNextOccurrence = (startDateStr: string, frequency: string): string | null => {
+    if (!startDateStr) return null
+    const parts = startDateStr.split('-')
+    if (parts.length !== 3) return null
+    const start = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    if (frequency === 'once') {
+      return start >= today ? startDateStr : null
+    }
+    if (frequency === 'monthly') {
+      const next = new Date(today.getFullYear(), today.getMonth(), start.getDate())
+      if (next < today) next.setMonth(next.getMonth() + 1)
+      return next.toISOString().split('T')[0]
+    }
+    if (frequency === 'quarterly') {
+      const next = new Date(start)
+      while (next < today) next.setMonth(next.getMonth() + 3)
+      return next.toISOString().split('T')[0]
+    }
+    if (frequency === 'yearly' || frequency === 'annual') {
+      const next = new Date(start)
+      while (next < today) next.setFullYear(next.getFullYear() + 1)
+      return next.toISOString().split('T')[0]
+    }
+    // Weekly or fortnightly — step forward from start by interval
+    const intervalDays = frequency === 'weekly' ? 7 : 14
+    const startMs = start.getTime()
+    const todayMs = today.getTime()
+    if (startMs >= todayMs) return startDateStr
+    const daysSinceStart = Math.floor((todayMs - startMs) / 86400000)
+    const periodsElapsed = Math.floor(daysSinceStart / intervalDays)
+    const next = new Date(start)
+    next.setDate(start.getDate() + (periodsElapsed + 1) * intervalDays)
+    // If today IS an occurrence day, show today
+    if (daysSinceStart % intervalDays === 0) next.setDate(start.getDate() + periodsElapsed * intervalDays)
+    return next.toISOString().split('T')[0]
+  }
+
   const getCalendarItemsForDay = (day: number) => {
     const { month, year } = getDaysInMonth()
     const items: any[] = []
@@ -2625,19 +2667,31 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
         const topGoal = goals[0]
         const upcomingBills = [
           ...expenses.filter((e: any) => e.dueDate).map((e: any) => {
-            const due = new Date(e.dueDate + 'T12:00:00')
+            const nextDate = getNextOccurrence(e.dueDate, e.frequency || 'monthly') || e.dueDate
+            const due = new Date(nextDate + 'T12:00:00')
             const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
-            return { name: e.name, amount: e.amount, frequency: e.frequency || 'monthly', dayOffset, automatic: hasAutomatedPayments, itemType: 'expense', dueDate: e.dueDate }
+            return { name: e.name, amount: e.amount, frequency: e.frequency || 'monthly', dayOffset, automatic: hasAutomatedPayments, itemType: 'expense', dueDate: nextDate }
           }),
           ...debts.filter((d: any) => d.paymentDate).map((d: any) => {
-            const due = new Date(d.paymentDate + 'T12:00:00')
+            const nextDate = getNextOccurrence(d.paymentDate, d.frequency || 'fortnightly') || d.paymentDate
+            const due = new Date(nextDate + 'T12:00:00')
             const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
-            return { name: d.name + ' (debt payment)', amount: d.minPayment || d.payment || d.minimum || '0', frequency: d.frequency || 'fortnightly', dayOffset, automatic: hasAutomatedPayments, itemType: 'debt', dueDate: d.paymentDate }
+            return { name: d.name + ' (debt payment)', amount: d.minPayment || d.payment || d.minimum || '0', frequency: d.frequency || 'fortnightly', dayOffset, automatic: hasAutomatedPayments, itemType: 'debt', dueDate: nextDate }
           }),
           ...goals.filter((g: any) => g.startDate && g.paymentAmount).map((g: any) => {
-            const due = new Date(g.startDate + 'T12:00:00')
+            const nextDate = getNextOccurrence(g.startDate, g.savingsFrequency || 'fortnightly') || g.startDate
+            const due = new Date(nextDate + 'T12:00:00')
             const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
-            return { name: g.name + ' (goal)', amount: g.paymentAmount, frequency: g.savingsFrequency || 'fortnightly', dayOffset, automatic: true, itemType: 'goal', dueDate: g.startDate }
+            return { name: g.name + ' (goal)', amount: g.paymentAmount, frequency: g.savingsFrequency || 'fortnightly', dayOffset, automatic: true, itemType: 'goal', dueDate: nextDate }
+          }),
+          ...sinkingFunds.filter((f: any) => parseFloat(f.savedAmount || '0') < parseFloat(f.targetAmount || '0')).map((f: any) => {
+            // Next Monday for weekly sinking fund contribution
+            const nextMonday = new Date()
+            nextMonday.setHours(0,0,0,0)
+            let diff = 1 - nextMonday.getDay(); if (diff <= 0) diff += 7
+            nextMonday.setDate(nextMonday.getDate() + diff)
+            const dayOffset = Math.round((nextMonday.getTime() - Date.now()) / 86400000)
+            return { name: f.name + ' (sinking fund)', amount: f.weeklyAmount, frequency: 'weekly', dayOffset, automatic: true, itemType: 'sinking', dueDate: nextMonday.toISOString().split('T')[0] }
           }),
         ].filter((u: any) => u.dayOffset >= -7 && u.dayOffset < 30).sort((a: any, b: any) => a.dayOffset - b.dayOffset).slice(0, 20)
 
@@ -12985,24 +13039,27 @@ Tracking with Aureus 🏛️`
             ...expenses
               .filter((e: any) => e.dueDate)
               .map((e: any) => {
-                const due = new Date(e.dueDate + 'T12:00:00')
+                const nextDate = getNextOccurrence(e.dueDate, e.frequency || 'monthly') || e.dueDate
+                const due = new Date(nextDate + 'T12:00:00')
                 const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
-                return { name: e.name, amount: e.amount, frequency: e.frequency || 'monthly', dayOffset, automatic: hasAutomatedPayments, itemType: 'expense', dueDate: e.dueDate }
+                return { name: e.name, amount: e.amount, frequency: e.frequency || 'monthly', dayOffset, automatic: hasAutomatedPayments, itemType: 'expense', dueDate: nextDate }
               }),
             ...debts
               .filter((d: any) => d.paymentDate)
               .map((d: any) => {
-                const due = new Date(d.paymentDate + 'T12:00:00')
+                const nextDate = getNextOccurrence(d.paymentDate, d.frequency || 'fortnightly') || d.paymentDate
+                const due = new Date(nextDate + 'T12:00:00')
                 const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
                 const payAmt = d.minPayment || d.payment || d.minimum || '0'
-                return { name: d.name + ' (debt payment)', amount: payAmt, frequency: d.frequency || 'fortnightly', dayOffset, automatic: hasAutomatedPayments, itemType: 'debt', dueDate: d.paymentDate }
+                return { name: d.name + ' (debt payment)', amount: payAmt, frequency: d.frequency || 'fortnightly', dayOffset, automatic: hasAutomatedPayments, itemType: 'debt', dueDate: nextDate }
               }),
             ...goals
               .filter((g: any) => g.startDate && g.paymentAmount)
               .map((g: any) => {
-                const due = new Date(g.startDate + 'T12:00:00')
+                const nextDate = getNextOccurrence(g.startDate, g.savingsFrequency || 'fortnightly') || g.startDate
+                const due = new Date(nextDate + 'T12:00:00')
                 const dayOffset = Math.round((due.getTime() - Date.now()) / 86400000)
-                return { name: g.name + ' (goal)', amount: g.paymentAmount, frequency: g.savingsFrequency || 'fortnightly', dayOffset, automatic: true, itemType: 'goal', dueDate: g.startDate }
+                return { name: g.name + ' (goal)', amount: g.paymentAmount, frequency: g.savingsFrequency || 'fortnightly', dayOffset, automatic: true, itemType: 'goal', dueDate: nextDate }
               }),
             ...sinkingFunds
               .filter((f: any) => parseFloat(f.savedAmount || '0') < parseFloat(f.targetAmount || '0') && parseFloat(f.weeklyAmount || '0') > 0)
@@ -13013,7 +13070,7 @@ Tracking with Aureus 🏛️`
                 if (diff <= 0) diff += 7
                 nextMonday.setDate(nextMonday.getDate() + diff)
                 const dayOffset = Math.round((nextMonday.getTime() - Date.now()) / 86400000)
-                return { name: f.name + ' (sinking fund)', amount: f.weeklyAmount, frequency: 'weekly', dayOffset, automatic: true, itemType: 'sinking' }
+                return { name: f.name + ' (sinking fund)', amount: f.weeklyAmount, frequency: 'weekly', dayOffset, automatic: true, itemType: 'sinking', dueDate: nextMonday.toISOString().split('T')[0] }
               }),
           ]
             .filter((u: any) => u.dayOffset >= -7 && u.dayOffset < 30)
