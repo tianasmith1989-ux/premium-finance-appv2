@@ -97,7 +97,21 @@ export default function Dashboard() {
   const [missionP2Loading, setMissionP2Loading] = useState(false)
   const [missionP2Proposals, setMissionP2Proposals] = useState<any[]>([])
   const [missionP2Confirmed, setMissionP2Confirmed] = useState<boolean[]>([])
-  const [missionNavLocked, setMissionNavLocked] = useState(true) // locks nav during phase 1
+  const [missionNavLocked, setMissionNavLocked] = useState(true)
+
+  // ── New conversational onboarding state ──
+  const [ob5Q, setOb5Q] = useState({
+    name: '',
+    incomeAmount: '', incomeFrequency: 'fortnightly',
+    housingAmount: '', housingFrequency: 'fortnightly', housingType: 'rent',
+    debtAmount: '', debtType: 'credit_card', hasDebt: true,
+    emergencyAmount: '',
+    goal: '',
+  })
+  const [obStep, setObStep] = useState(0) // 0=name, 1=income, 2=housing, 3=debt, 4=emergency, 5=goal, 6=reveal, 7=action
+  const [obReveal, setObReveal] = useState<string | null>(null)
+  const [obRevealLoading, setObRevealLoading] = useState(false)
+  const [obActionDone, setObActionDone] = useState(false) // locks nav during phase 1
   const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'quickview' | 'dashboard' | 'overview' | 'path' | 'learn' | 'wins' | 'mortgage' | 'insights' | 'grow' | 'review' | 'property' | 'meals' | 'change' | 'business'>('home')
   const [darkMode, setDarkMode] = useState(true)
 
@@ -4424,997 +4438,424 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
     <div style={{ minHeight: '100vh', background: theme.bg }}>
 
       {/* ═══════════════════════════════════════════════════
-          MISSION OVERLAY — Phase 1 (setup) & Phase 2 (roadmap)
-          Covers full screen, guides user step by step
+          ONBOARDING v2 — Conversational 5-question flow
+          Name → 5 Qs → Reveal → One Action → Done
       ═══════════════════════════════════════════════════ */}
-      {missionPhase === 1 && !missionComplete && !showPaywall && subStatus !== 'loading' && (subStatus === 'active' || subStatus === 'trialing') && (
-        <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: theme.bg, zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
+      {missionPhase === 1 && !missionComplete && !showPaywall && subStatus !== 'loading' && (subStatus === 'active' || subStatus === 'trialing') && (() => {
 
-          {/* Mission header */}
-          <div style={{ padding: '16px 24px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}><img src="/logo.svg" alt="Aureus" style={{ width: '32px', height: '32px', objectFit: 'contain' }}/></div>
-              <div>
-                <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Aureus Setup</div>
-                <div style={{ color: theme.textMuted, fontSize: '11px' }}>{missionStep === 0 ? 'Welcome' : `Step ${missionStep} of 8`}</div>
-              </div>
-            </div>
-            {/* Progress bar — only show after step 0 */}
-            {missionStep > 0 && (() => {
-              const stepNames = ['', 'Your name', 'Income', 'Expenses', 'Debts', 'Savings', 'Goals', 'Super', 'Sinking funds']
-              const pct = Math.round((missionStep / 8) * 100)
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'flex-end', gap: '4px', minWidth: '120px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                    <span style={{ color: theme.textMuted, fontSize: '10px' }}>{stepNames[missionStep] || `Step ${missionStep}`}</span>
-                    <span style={{ color: theme.accent, fontSize: '10px', fontWeight: 700 }}>{pct}%</span>
-                  </div>
-                  <div style={{ width: '120px', height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{ width: pct + '%', height: '100%', background: 'linear-gradient(90deg, #D4AF37, #B68B2E)', borderRadius: '3px', transition: 'width 0.4s ease' }} />
-                  </div>
+        // ── Calculate surplus & wealth step from 5Q answers ──
+        const obIncomeMonthly = (() => {
+          const a = parseFloat(ob5Q.incomeAmount || '0')
+          if (ob5Q.incomeFrequency === 'weekly') return a * 52 / 12
+          if (ob5Q.incomeFrequency === 'fortnightly') return a * 26 / 12
+          return a
+        })()
+        const obHousingMonthly = (() => {
+          const a = parseFloat(ob5Q.housingAmount || '0')
+          if (ob5Q.housingFrequency === 'weekly') return a * 52 / 12
+          if (ob5Q.housingFrequency === 'fortnightly') return a * 26 / 12
+          return a
+        })()
+        const obSurplusFortnightly = Math.round((obIncomeMonthly - obHousingMonthly) * 12 / 26)
+        const obDebt = parseFloat(ob5Q.debtAmount || '0')
+        const obEmergency = parseFloat(ob5Q.emergencyAmount || '0')
+        const obStep = obEmergency >= 2000 && obDebt > 0 ? 2 : obEmergency >= 2000 && obDebt === 0 ? 3 : 1
+        const wealthStepNames = ['', 'Build Your Starter Emergency Fund', 'Kill Bad Debt', 'Build Full Emergency Fund', 'Grow Long-Term Wealth']
+
+        const handleReveal = async () => {
+          setObRevealLoading(true)
+
+          // Save the quick data into app state immediately
+          if (ob5Q.name) setUserName(ob5Q.name)
+          if (ob5Q.incomeAmount) {
+            setIncomeStreams([{ id: Date.now(), name: 'Income', amount: ob5Q.incomeAmount, frequency: ob5Q.incomeFrequency, startDate: new Date().toISOString().split('T')[0] }])
+          }
+          if (ob5Q.housingAmount && ob5Q.housingType !== 'neither') {
+            setExpenses(prev => [...prev, { id: Date.now(), name: ob5Q.housingType === 'mortgage' ? 'Mortgage' : 'Rent', amount: ob5Q.housingAmount, frequency: ob5Q.housingFrequency, category: 'housing', dueDate: '' }])
+          }
+          if (ob5Q.hasDebt && ob5Q.debtAmount) {
+            const debtNames: Record<string, string> = { credit_card: 'Credit Card', personal_loan: 'Personal Loan', afterpay: 'BNPL / Afterpay', car_loan: 'Car Loan', other: 'Other Debt' }
+            setDebts(prev => [...prev, { id: Date.now(), name: debtNames[ob5Q.debtType] || 'Debt', balance: ob5Q.debtAmount, interestRate: '', minimum: '', payment: '', frequency: 'monthly', paymentDate: '' }])
+          }
+
+          // Generate The Reveal via AI
+          try {
+            const res = await fetch('/api/budget-coach', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                mode: 'question',
+                question: `[FIRST SESSION REVEAL — conversational onboarding]
+
+You are Aureus. A new user just answered 5 quick questions. Give them The Reveal — a short, warm, specific paragraph that makes them feel SEEN.
+
+Their answers:
+- Name: ${ob5Q.name}
+- Take-home income: $${ob5Q.incomeAmount} ${ob5Q.incomeFrequency}
+- Housing cost: ${ob5Q.housingAmount ? '$' + ob5Q.housingAmount + ' ' + ob5Q.housingFrequency + ' (' + ob5Q.housingType + ')' : 'not entered'}
+- Debt: ${ob5Q.hasDebt ? '$' + ob5Q.debtAmount + ' (' + ob5Q.debtType + ')' : 'no debt'}
+- Emergency savings: $${ob5Q.emergencyAmount}
+- Their #1 money goal: "${ob5Q.goal}"
+
+Calculated: ~$${obSurplusFortnightly}/fortnight available after housing. Wealth Step ${obStep}: ${wealthStepNames[obStep]}.
+
+Write The Reveal in this shape (2-3 short paragraphs, coach voice, plain Australian English):
+1. "Alright ${ob5Q.name || 'there'}, here's what I see." then their fortnightly surplus and what that means
+2. Their Wealth Step with a one-sentence reason WHY they're there based on their specific numbers
+3. One concrete, dated milestone — "At your current pace, you could [specific thing] in about [X weeks/months]" — computed from their actual numbers. This must be about budgeting/saving/debt only. Never mention super, salary sacrifice, or investments.
+
+RULES:
+- 3 short paragraphs max. No bullet points. Warm and direct.
+- Use their actual numbers — $${obSurplusFortnightly}/fortnight, $${obDebt} debt, $${obEmergency} savings
+- If surplus is negative or tiny, be honest but steady: "tight right now, but here's where we start"
+- Never mention products, super funds, or investing strategies
+- End with: "That's your next move, and I'll walk it with you."`,
+                financialData: {},
+                memory: { name: ob5Q.name }
+              })
+            })
+            const data = await res.json()
+            setObReveal(data.message || data.advice || '')
+          } catch {
+            setObReveal(`Alright ${ob5Q.name || 'there'}, here's what I see. You've got roughly $${obSurplusFortnightly} a fortnight to work with after the big stuff. You're on Wealth Step ${obStep}: ${wealthStepNames[obStep]}. At your current pace, ${obStep === 1 ? `you could have your $2,000 starter emergency fund in about ${obEmergency > 0 ? Math.ceil((2000 - obEmergency) / (obSurplusFortnightly / 2)) : Math.ceil(2000 / (obSurplusFortnightly / 2))} weeks` : obStep === 2 ? `you could clear that debt in about ${obDebt > 0 ? Math.ceil(obDebt / obSurplusFortnightly) : 0} fortnights at this pace` : 'your foundations are solid — now it is about growing'}. That's your next move, and I'll walk it with you.`)
+          }
+          setObRevealLoading(false)
+          setObStep(6)
+        }
+
+        const handleAction = () => {
+          // Set up the one small action based on their situation
+          if (ob5Q.hasDebt && ob5Q.debtAmount) {
+            // Already saved debt above — just confirm
+          } else if (obEmergency < 2000) {
+            // Create emergency fund goal
+            setGoals(prev => [...prev, { id: Date.now(), name: 'Starter Emergency Fund', targetAmount: '2000', savedAmount: ob5Q.emergencyAmount || '0', currentAmount: ob5Q.emergencyAmount || '0', paymentAmount: String(Math.round(obSurplusFortnightly * 0.5)), savingsFrequency: 'fortnightly', startDate: '', addedToCalendar: false }])
+          } else if (ob5Q.goal) {
+            setGoals(prev => [...prev, { id: Date.now(), name: ob5Q.goal, targetAmount: '0', savedAmount: '0', currentAmount: '0', paymentAmount: '', savingsFrequency: 'fortnightly', startDate: '', addedToCalendar: false }])
+          }
+          // Log first win
+          setWins(prev => [...prev, { id: Date.now(), title: 'Set up my first goal with Aureus', desc: 'First step taken — this is how momentum starts.', icon: '🏛️', date: new Date().toISOString(), auto: true, amount: 0 }])
+          setStreak(1)
+          setObActionDone(true)
+        }
+
+        const handleFinish = () => {
+          setMissionComplete(true)
+          setOnboardingComplete(true)
+          setMissionNavLocked(false)
+          setMissionPhase(0)
+          setActiveTab('home')
+          if (authUser) setTimeout(() => saveToCloud(), 1000)
+        }
+
+        // ── UI ──
+        return (
+          <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: theme.bg, zIndex: 3000, display: 'flex', flexDirection: 'column' as const, overflow: 'auto' }}>
+
+            {/* Header */}
+            <div style={{ padding: '14px 20px', background: theme.cardBg, borderBottom: '1px solid ' + theme.border, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+                  <img src="/logo.svg" alt="Aureus" style={{ width: '28px', height: '28px', objectFit: 'contain' }}/>
                 </div>
-              )
-            })()}
-          </div>
+                <div style={{ color: theme.text, fontWeight: 700, fontSize: '14px' }}>Aureus</div>
+              </div>
+              {obStep >= 1 && obStep <= 5 && (
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {[1,2,3,4,5].map(i => (
+                    <div key={i} style={{ width: '20px', height: '3px', borderRadius: '2px', background: i <= obStep ? theme.accent : theme.border }} />
+                  ))}
+                </div>
+              )}
+              {obStep < 6 && (
+                <button onClick={() => { setMissionNavLocked(false); setMissionPhase(0); setOnboardingComplete(true); setMissionComplete(true); setActiveTab('home') }}
+                  style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '11px', opacity: 0.5 }}>
+                  skip
+                </button>
+              )}
+            </div>
 
-          {/* STEP 0 — Welcome */}
-          {missionStep === 0 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '40px 24px', maxWidth: '520px', margin: '0 auto', width: '100%', textAlign: 'center' as const }}>
-              <div style={{ width: '90px', height: '90px', borderRadius: '50%', overflow: 'hidden', margin: '0 auto 24px', boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}><img src="/logo.svg" alt="Aureus" style={{ width: '90px', height: '90px', objectFit: 'contain' }}/></div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px 40px', maxWidth: '520px', margin: '0 auto', width: '100%' }}>
 
-              {!nameSubmitted ? (
-                // ── Phase A: Name first ──
-                <>
-                  <h1 style={{ color: theme.text, fontSize: '30px', fontWeight: 800, margin: '0 0 10px 0', fontFamily: 'Cinzel, serif' }}>G'day, I'm Aureus.</h1>
-                  <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 28px 0', maxWidth: '380px' }}>
-                    Your personal budgeting assistant and money coach — built for Australians who want to pay off debt faster and build real wealth.
+              {/* ── Step 0: Name ── */}
+              {obStep === 0 && (
+                <div style={{ width: '100%', textAlign: 'center' as const }}>
+                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', overflow: 'hidden', margin: '0 auto 20px', boxShadow: '0 0 40px rgba(212,175,55,0.3)' }}>
+                    <img src="/logo.svg" alt="Aureus" style={{ width: '80px', height: '80px', objectFit: 'contain' }}/>
+                  </div>
+                  <h1 style={{ color: theme.text, fontSize: '28px', fontWeight: 800, margin: '0 0 8px 0', fontFamily: 'Cinzel, serif' }}>G'day — I'm Aureus.</h1>
+                  <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 28px 0' }}>
+                    Your money coach, built for Australians. Five quick questions and I'll tell you exactly where you stand and what to do first.
                   </p>
-                  <label style={{ color: theme.accent, fontSize: '18px', fontWeight: 700, display: 'block', marginBottom: '14px', textAlign: 'center' as const }}>
-                      First — what's your name?
-                    </label>
-                  <NameInput onSubmit={(val) => { setUserName(val); setNameSubmitted(true); advanceMission(1) }} />
-                </>
-              ) : (
-                // ── Phase B: Name entered — show what's next ──
-                <>
-                  <h1 style={{ color: theme.text, fontSize: '30px', fontWeight: 800, margin: '0 0 8px 0', fontFamily: 'Cinzel, serif' }}>
-                    Nice to meet you, <span style={{ color: theme.accent }}>{userName.trim()}</span>.
-                  </h1>
-                  <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.7, margin: '0 0 24px 0', maxWidth: '380px' }}>
-                    I'm going to learn how you think about money, map your full financial picture, and build you a personalised roadmap. Takes about 5 minutes.
+                  <p style={{ color: theme.accent, fontSize: '16px', fontWeight: 700, margin: '0 0 16px 0' }}>What should I call you?</p>
+                  <NameInput onSubmit={(val) => { setOb5Q(prev => ({ ...prev, name: val })); setUserName(val); setObStep(1) }} />
+                </div>
+              )}
+
+              {/* ── Step 1: Income ── */}
+              {obStep === 1 && (
+                <div style={{ width: '100%' }}>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '20px', textAlign: 'center' as const }}>1 of 5 — rough estimates are perfect, you can refine anytime</div>
+                  <h2 style={{ color: theme.text, fontSize: '22px', fontWeight: 700, margin: '0 0 6px 0', textAlign: 'center' as const }}>
+                    G'day {ob5Q.name}! 👋
+                  </h2>
+                  <p style={{ color: theme.textMuted, fontSize: '15px', lineHeight: 1.6, margin: '0 0 24px 0', textAlign: 'center' as const }}>
+                    Roughly what lands in your account each pay, after tax?
                   </p>
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px', width: '100%', maxWidth: '380px', marginBottom: '24px' }}>
-                    {[
-                      { icon: '🧠', text: 'Understand your money personality' },
-                      { icon: '💰', text: 'Map income, bills, debts & savings' },
-                      { icon: '🎯', text: 'Set up sinking funds & goals' },
-                      { icon: '🛤️', text: 'Build your personalised roadmap' },
-                    ].map((item, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: theme.cardBg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
-                        <span style={{ fontSize: '18px' }}>{item.icon}</span>
-                        <span style={{ color: theme.text, fontSize: '13px' }}>{item.text}</span>
-                        <span style={{ marginLeft: 'auto', color: theme.success, fontSize: '12px' }}>→</span>
-                      </div>
-                    ))}
-                  </div>
-                  <button onClick={() => advanceMission(1)}
-                    style={{ width: '100%', maxWidth: '380px', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '17px', fontWeight: 800, fontFamily: 'Cinzel, serif' }}>
-                    Let's build your plan, {userName.trim()} →
-                  </button>
-                </>
-              )}
-              <button onClick={() => { setMissionNavLocked(false); setMissionPhase(0); setOnboardingComplete(true); setActiveTab('home' as any) }}
-                style={{ background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', marginTop: '14px', fontSize: '12px', opacity: 0.5 }}>
-                I've used Aureus before — skip setup
-              </button>
-            </div>
-          )}
-          {missionStep === 1 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
-              <div style={{ fontSize: '56px', marginBottom: '16px' }}>🧠</div>
-              <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>First — let me understand you.</h2>
-              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 32px 0' }}>
-                I coach everyone differently. Before I give you a single piece of advice, I need to know how you think about money — your personality, your fears, and what you're really working toward.
-              </p>
-
-              {!moneyPersonality ? (
-                <div style={{ width: '100%' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '20px', marginBottom: '28px' }}>
-                    {personalityQuiz.map((question, qi) => (
-                      <div key={qi} style={{ padding: '18px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
-                        <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px', marginBottom: '12px' }}>{qi + 1}. {question.q}</div>
-                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
-                          {question.options.map((opt, oi) => (
-                            <button key={oi} onClick={() => setPersonalityAnswers(prev => ({ ...prev, [qi]: opt.type }))}
-                              style={{ padding: '10px 14px', background: personalityAnswers[qi] === opt.type ? theme.accent + '30' : theme.bg, border: '2px solid ' + (personalityAnswers[qi] === opt.type ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', color: theme.text, fontSize: '13px', textAlign: 'left' as const }}>
-                              {personalityAnswers[qi] === opt.type ? '● ' : '○ '}{opt.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => { const result = calculatePersonality(); setMoneyPersonality(result) }}
-                    disabled={Object.keys(personalityAnswers).length < 8}
-                    style={{ width: '100%', padding: '16px', background: Object.keys(personalityAnswers).length < 8 ? theme.border : theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: Object.keys(personalityAnswers).length < 8 ? 'default' : 'pointer', fontSize: '16px', fontWeight: 700, opacity: Object.keys(personalityAnswers).length < 8 ? 0.6 : 1 }}>
-                    {Object.keys(personalityAnswers).length < 8 ? `Answer ${8 - Object.keys(personalityAnswers).length} more` : 'See my result →'}
-                  </button>
-                </div>
-              ) : (
-                // Personality result + deep why
-                <div style={{ width: '100%' }}>
-                  <div style={{ padding: '20px', background: personalityProfiles[moneyPersonality].color + '20', borderRadius: '16px', border: '2px solid ' + personalityProfiles[moneyPersonality].color + '40', marginBottom: '24px', textAlign: 'center' as const }}>
-                    <div style={{ fontSize: '48px', marginBottom: '8px' }}>{personalityProfiles[moneyPersonality].emoji}</div>
-                    <div style={{ color: personalityProfiles[moneyPersonality].color, fontWeight: 800, fontSize: '20px', marginBottom: '8px' }}>{personalityProfiles[moneyPersonality].label}</div>
-                    <p style={{ color: theme.textMuted, fontSize: '13px', margin: 0, lineHeight: 1.6 }}>{personalityProfiles[moneyPersonality].aureusFocus}</p>
-                  </div>
-
-                  <div style={{ marginBottom: '24px' }}>
-                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '6px' }}>❤️ Now — tell me why.</div>
-                    <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '14px' }}>What are you actually working toward? This is what I'll remind you of when motivation dips.</p>
-                    <textarea
-                      value={whyStatement}
-                      onChange={e => setWhyStatement(e.target.value)}
-                      placeholder="e.g. I want to be mortgage-free before my kids start high school so I can work less and be more present..."
-                      style={{ ...inputStyle, width: '100%', minHeight: '90px', resize: 'vertical' as const }}
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: '24px' }}>
-                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '6px' }}>⚡ Who are you becoming?</div>
-                    <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>Write one identity statement. Not what you want to have — who you are becoming.</p>
-                    <input
-                      value={identityStatements[0] || ''}
-                      onChange={e => setIdentityStatements([e.target.value])}
-                      placeholder="I am someone who..."
-                      style={{ ...inputStyle, width: '100%' }}
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: '24px' }}>
-                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '6px' }}>🏠 Your housing situation</div>
-                    <p style={{ color: theme.textMuted, fontSize: '13px', marginBottom: '12px' }}>This shapes your entire financial roadmap.</p>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                      {[
-                        { value: 'paid_off', emoji: '🏆', label: 'I\'ve paid off my home', sub: 'Mortgage-free — focused on wealth building & investments' },
-                        { value: 'own', emoji: '🏡', label: 'I own a home with a mortgage', sub: 'I want to pay it off faster' },
-                        { value: 'buying', emoji: '📝', label: 'I\'m in the process of buying', sub: 'Currently going through the purchase process' },
-                        { value: 'planning', emoji: '🎯', label: 'I\'m saving to buy', sub: 'Building my deposit — not quite there yet' },
-                        { value: 'renting', emoji: '🏢', label: 'I\'m renting / not buying yet', sub: 'No property plans right now' },
-                      ].map(opt => (
-                        <button key={opt.value} onClick={() => setHouseStatus(opt.value)}
-                          style={{ padding: '12px 16px', background: houseStatus === opt.value ? theme.accent + '20' : theme.bg, border: '2px solid ' + (houseStatus === opt.value ? theme.accent : theme.border), borderRadius: '10px', cursor: 'pointer', color: theme.text, textAlign: 'left' as const, display: 'flex', gap: '12px', alignItems: 'center' }}>
-                          <span style={{ fontSize: '24px' }}>{opt.emoji}</span>
-                          <div>
-                            <div style={{ fontWeight: 600, color: houseStatus === opt.value ? theme.accent : theme.text }}>{opt.label}</div>
-                            <div style={{ color: theme.textMuted, fontSize: '12px' }}>{opt.sub}</div>
-                          </div>
-                        </button>
-                      ))}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <div style={{ position: 'relative' as const, flex: 1 }}>
+                      <span style={{ position: 'absolute' as const, left: '12px', top: '50%', transform: 'translateY(-50%)', color: theme.textMuted, fontWeight: 700 }}>$</span>
+                      <input type="number" inputMode="decimal" placeholder="e.g. 2400" value={ob5Q.incomeAmount}
+                        onChange={e => setOb5Q(prev => ({ ...prev, incomeAmount: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter' && ob5Q.incomeAmount) setObStep(2) }}
+                        style={{ ...inputStyle, width: '100%', paddingLeft: '28px', fontSize: '20px', fontWeight: 700, boxSizing: 'border-box' as const }}
+                        autoFocus />
                     </div>
-                  </div>
-
-                  <div style={{ marginBottom: '24px', padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
-                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '16px', marginBottom: '16px' }}>🔥 What are you building toward?</div>
-                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
-                      <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', padding: '12px', background: fireGoal ? theme.accent + '15' : theme.bg, borderRadius: '10px', border: '2px solid ' + (fireGoal ? theme.accent : theme.border) }}>
-                        <input type="checkbox" checked={fireGoal} onChange={e => setFireGoal(e.target.checked)} style={{ accentColor: theme.accent, width: '18px', height: '18px', marginTop: '2px', flexShrink: 0 }} />
-                        <div>
-                          <div style={{ color: theme.text, fontWeight: 600 }}>🏝️ Financial Independence / FIRE</div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>I want to calculate my FIRE number and build passive income to cover my expenses</div>
-                        </div>
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', padding: '12px', background: hasAutomatedPayments ? theme.accent + '15' : theme.bg, borderRadius: '10px', border: '2px solid ' + (hasAutomatedPayments ? theme.accent : theme.border) }}>
-                        <input type="checkbox" checked={hasAutomatedPayments} onChange={e => setHasAutomatedPayments(e.target.checked)} style={{ accentColor: theme.accent, width: '18px', height: '18px', marginTop: '2px', flexShrink: 0 }} />
-                        <div>
-                          <div style={{ color: theme.text, fontWeight: 600 }}>⚙️ I have automated payments/savings set up</div>
-                          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Direct debits, auto-transfers or scheduled savings already running</div>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => advanceMission(2)}
-                    style={{ width: '100%', padding: '16px', background: theme.success, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
-                    Perfect. Now let's set up your numbers →
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* STEP 2 — Income */}
-          {missionStep === 2 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '560px', margin: '0 auto', width: '100%' }}>
-              <div style={{ fontSize: '56px', marginBottom: '16px' }}>💰</div>
-              <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>How much do you earn?</h2>
-              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 28px 0' }}>
-                I can't show you your surplus, your mortgage-free date, or your financial health score until I know your income. This is step one.
-              </p>
-
-              {/* Existing income streams */}
-              {incomeStreams.length > 0 && (
-                <div style={{ width: '100%', marginBottom: '16px' }}>
-                  {incomeStreams.map(inc => (
-                    <div key={inc.id} style={{ padding: '12px 16px', background: theme.success + '15', borderRadius: '10px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.success + '30' }}>
-                      <div><div style={{ color: theme.text, fontWeight: 600 }}>{inc.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${inc.amount} {inc.frequency}</div></div>
-                      <button onClick={() => setIncomeStreams(prev => prev.filter(i => i.id !== inc.id))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '16px' }}>×</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Add income form */}
-              <div style={{ width: '100%', padding: '20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border, marginBottom: '20px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Income source (e.g. "Salary — JB Hi-Fi")</label>
-                    <input placeholder="e.g. Salary" value={newIncome.name} onChange={e => setNewIncome({...newIncome, name: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Take-home amount ($)</label>
-                      <input type="number" placeholder="e.g. 2800" value={newIncome.amount} onChange={e => setNewIncome({...newIncome, amount: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Paid</label>
-                      <select value={newIncome.frequency} onChange={e => {
-                        const freq = e.target.value
-                        const defaultDate = freq === 'weekly' || freq === 'fortnightly' ? nextDayOfWeek(1) : nextDayOfMonth(1)
-                        setNewIncome({...newIncome, frequency: freq, startDate: defaultDate})
-                      }} style={{...inputStyle, width: '100%'}}>
-                        <option value="weekly">Weekly</option>
-                        <option value="fortnightly">Fortnightly</option>
-                        <option value="monthly">Monthly</option>
-                      </select>
-                    </div>
-                  </div>
-                  <SmartDatePicker
-                    frequency={newIncome.frequency || 'fortnightly'}
-                    value={newIncome.startDate}
-                    onChange={v => setNewIncome({...newIncome, startDate: v})}
-                    label="When is your next payday?"
-                  />
-                  <button onClick={() => { if (newIncome.name && newIncome.amount) { setIncomeStreams(prev => [...prev, { ...newIncome, id: Date.now(), type: 'active' }]); setNewIncome({ name: '', amount: '', frequency: 'fortnightly', type: 'active', startDate: nextDayOfWeek(1) }) } }} style={{ ...btnSuccess, padding: '12px' }}>
-                    + Add income source
-                  </button>
-                </div>
-              </div>
-
-              {incomeStreams.length > 0 && (
-                <div style={{ width: '100%' }}>
-                  <div style={{ padding: '14px 16px', background: theme.success + '15', borderRadius: '10px', marginBottom: '16px', border: '1px solid ' + theme.success + '30' }}>
-                    <div style={{ color: theme.success, fontWeight: 700 }}>Monthly income: ${monthlyIncome.toFixed(0)}</div>
-                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>Looking good. Add more sources if you have them, or continue.</div>
-                  </div>
-                  <button onClick={() => advanceMission(3)} style={{ width: '100%', padding: '16px', background: theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
-                    That's my income. Next: my bills →
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* STEP 3 — Expenses */}
-          {missionStep === 3 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '560px', margin: '0 auto', width: '100%' }}>
-              <div style={{ fontSize: '56px', marginBottom: '16px' }}>💸</div>
-              <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>What are your regular bills?</h2>
-              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 8px 0' }}>
-                Add your main recurring expenses. You don't need to be perfect — rough numbers get us started.
-              </p>
-              <p style={{ color: theme.textMuted, fontSize: '13px', textAlign: 'center' as const, margin: '0 0 24px 0' }}>
-                Income: <strong style={{ color: theme.success }}>${monthlyIncome.toFixed(0)}/mo</strong>
-              </p>
-
-              {/* Quick presets */}
-              <div style={{ width: '100%', marginBottom: '16px' }}>
-                <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>QUICK ADD</div>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-                  {presetBills.map(p => (
-                    <button key={p.name} onClick={() => {
-                      setPromptValue((p as any).amount || '')
-                      setPromptFrequency(p.frequency)
-                      setPromptDueDate('')
-                      setPromptModal({
-                        title: p.name,
-                        label: 'How much per payment?',
-                        defaultValue: (p as any).amount || '',
-                        showFrequency: true,
-                        defaultFrequency: p.frequency,
-                        showDueDate: true,
-                        onConfirm: (amt, freq, due) => {
-                          if (!amt || isNaN(parseFloat(amt))) return
-                          const usedFreq = freq || p.frequency
-                          const dueDate = due || (usedFreq === 'weekly' || usedFreq === 'fortnightly'
-                            ? (() => { const d = new Date(); d.setHours(0,0,0,0); let diff = 1 - d.getDay(); if (diff <= 0) diff += 7; d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0] })()
-                            : (() => { const d = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (d <= new Date()) d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0] })())
-                          setExpenses(prev => [...prev, { id: Date.now(), name: p.name, amount: amt, frequency: usedFreq, category: p.category, dueDate }])
-                        }
-                      })
-                    }} style={{ padding: '5px 12px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '20px', cursor: 'pointer', fontSize: '12px', color: theme.textMuted }}>
-                      + {p.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Existing expenses */}
-              {expenses.filter(e => !e.targetDebtId && !e.targetGoalId).length > 0 && (
-                <div style={{ width: '100%', marginBottom: '16px' }}>
-                  {expenses.filter(e => !e.targetDebtId && !e.targetGoalId).map(exp => (
-                    <div key={exp.id} style={{ padding: '10px 14px', background: theme.danger + '10', borderRadius: '8px', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.border }}>
-                      <div><div style={{ color: theme.text, fontSize: '14px' }}>{exp.name}</div><div style={{ color: theme.textMuted, fontSize: '12px' }}>${exp.amount} {exp.frequency}</div></div>
-                      <button onClick={() => setExpenses(prev => prev.filter(e => e.id !== exp.id))} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '16px' }}>×</button>
-                    </div>
-                  ))}
-                  <div style={{ padding: '10px 14px', background: theme.cardBg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-                    <span style={{ color: theme.textMuted, fontSize: '13px' }}>Total expenses</span>
-                    <span style={{ color: theme.danger, fontWeight: 700 }}>${monthlyExpenses.toFixed(0)}/mo</span>
-                  </div>
-                  {monthlySurplus > 0 && (
-                    <div style={{ padding: '10px 14px', background: theme.success + '15', borderRadius: '8px', marginTop: '6px', border: '1px solid ' + theme.success + '30', display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: theme.success, fontWeight: 600, fontSize: '13px' }}>Your surplus</span>
-                      <span style={{ color: theme.success, fontWeight: 700 }}>${monthlySurplus.toFixed(0)}/mo</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Custom expense */}
-              <div style={{ width: '100%', padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, marginBottom: '20px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                    <input placeholder="Bill name" value={newExpense.name} onChange={e => setNewExpense({...newExpense, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '100px'}} />
-                    <input type="number" placeholder="$" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} style={{...inputStyle, width: '80px'}} />
-                    <select value={newExpense.frequency} onChange={e => {
-                      const freq = e.target.value
-                      const defaultDate = freq === 'weekly' || freq === 'fortnightly' ? nextDayOfWeek(1) : nextDayOfMonth(1)
-                      setNewExpense({...newExpense, frequency: freq, dueDate: defaultDate})
-                    }} style={inputStyle}>
-                      <option value="weekly">Weekly</option>
-                      <option value="fortnightly">Fortnightly</option>
-                      <option value="monthly">Monthly</option>
+                    <select value={ob5Q.incomeFrequency} onChange={e => setOb5Q(prev => ({ ...prev, incomeFrequency: e.target.value }))}
+                      style={{ ...inputStyle, flexShrink: 0, fontSize: '14px' }}>
+                      <option value="weekly">weekly</option>
+                      <option value="fortnightly">fortnightly</option>
+                      <option value="monthly">monthly</option>
                     </select>
                   </div>
-                  <SmartDatePicker
-                    frequency={newExpense.frequency || 'monthly'}
-                    value={newExpense.dueDate}
-                    onChange={v => setNewExpense({...newExpense, dueDate: v})}
-                    label="When is this bill due?"
-                  />
-                  <button onClick={() => {
-                    if (newExpense.name && newExpense.amount) {
-                      setExpenses(prev => [...prev, { ...newExpense, id: Date.now() }])
-                      setNewExpense({ name: '', amount: '', frequency: 'monthly', category: '', dueDate: nextDayOfMonth(1) })
-                    }
-                  }} style={btnDanger}>+ Add bill</button>
-                </div>
-              </div>
-
-              {/* Meal planner offer — show if they have a food/groceries expense */}
-              {expenses.some(e => e.category === 'food' || e.name?.toLowerCase().includes('grocer') || e.name?.toLowerCase().includes('food')) && (
-                <div style={{ width: '100%', padding: '14px 16px', background: theme.accent + '10', border: '1px solid ' + theme.accent + '30', borderRadius: '12px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <div style={{ fontSize: '28px', flexShrink: 0 }}>🍽️</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: theme.accent, fontWeight: 700, fontSize: '13px', marginBottom: '2px' }}>Save on groceries with Aureus Meal Planner</div>
-                    <div style={{ color: theme.textMuted, fontSize: '12px' }}>Once you're set up, opt into the monthly Aureus meal plan email — we'll build a 7-day budget meal plan each month tailored to your household and grocery budget.</div>
-                  </div>
+                  <button onClick={() => ob5Q.incomeAmount && setObStep(2)} disabled={!ob5Q.incomeAmount}
+                    style={{ width: '100%', padding: '14px', background: ob5Q.incomeAmount ? 'linear-gradient(135deg, #D4AF37, #BC6A1F)' : theme.border, color: ob5Q.incomeAmount ? '#111' : theme.textMuted, border: 'none', borderRadius: '12px', cursor: ob5Q.incomeAmount ? 'pointer' : 'default', fontWeight: 800, fontSize: '16px' }}>
+                    Continue →
+                  </button>
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                <button onClick={() => advanceMission(4)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
-                  Skip for now
-                </button>
-                <button onClick={() => advanceMission(4)} style={{ flex: 1, padding: '16px', background: expenses.length > 0 ? theme.accent : theme.border, color: expenses.length > 0 ? '#111111' : 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
-                  {expenses.length > 0 ? 'Next: my debts →' : 'Continue without expenses →'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 4 — Debts */}
-          {missionStep === 4 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '560px', margin: '0 auto', width: '100%' }}>
-              <div style={{ fontSize: '56px', marginBottom: '16px' }}>💳</div>
-              <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>Any debts to tackle?</h2>
-              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 8px 0' }}>
-                Credit cards, personal loans, BNPL (Afterpay/Zip)? Knowing your debts lets Aureus build the right payoff order. Don't include your mortgage here.
-              </p>
-              <p style={{ color: theme.textMuted, fontSize: '12px', textAlign: 'center' as const, margin: '0 0 24px 0' }}>
-                Don't know the exact figures? Rough numbers are fine — you can update them later.
-              </p>
-
-              {/* Existing debts */}
-              {debts.length > 0 && (
-                <div style={{ width: '100%', marginBottom: '16px' }}>
-                  {debts.map(d => (
-                    <div key={d.id} style={{ padding: '12px 16px', background: theme.warning + '15', borderRadius: '10px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.warning + '30' }}>
-                      <div>
-                        <div style={{ color: theme.text, fontWeight: 600 }}>{d.name}</div>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>${parseFloat(d.balance || '0').toFixed(0)} · {d.interestRate}% p.a. · ${d.minPayment}/{d.frequency}</div>
-                      </div>
-                      <button onClick={() => deleteDebt(d.id)} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '18px' }}>×</button>
-                    </div>
-                  ))}
-                  <div style={{ padding: '10px 14px', background: theme.cardBg, borderRadius: '8px', display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-                    <span style={{ color: theme.textMuted, fontSize: '13px' }}>Total bad debt</span>
-                    <span style={{ color: theme.warning, fontWeight: 700 }}>${totalDebtBalance.toFixed(0)}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Add debt form */}
-              <div style={{ width: '100%', padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, marginBottom: '20px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '10px' }}>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                    <input placeholder="Debt name (e.g. CommBank Visa)" value={newDebt.name} onChange={e => setNewDebt({...newDebt, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '140px'}} />
-                    <input placeholder="Balance $" type="number" value={newDebt.balance} onChange={e => setNewDebt({...newDebt, balance: e.target.value})} style={{...inputStyle, width: '100px'}} />
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '3px' }}>Interest rate %</label>
-                      <input placeholder="e.g. 19.99" type="number" value={newDebt.interestRate} onChange={e => setNewDebt({...newDebt, interestRate: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '3px' }}>Min payment $</label>
-                      <input placeholder="e.g. 150" type="number" value={newDebt.minPayment} onChange={e => setNewDebt({...newDebt, minPayment: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '3px' }}>Frequency</label>
-                      <select value={newDebt.frequency} onChange={e => {
-                        const freq = e.target.value
-                        setNewDebt({...newDebt, frequency: freq, paymentDate: freq === 'weekly' || freq === 'fortnightly' ? nextDayOfWeek(1) : nextDayOfMonth(1)})
-                      }} style={{...inputStyle, width: '100%'}}>
-                        <option value="weekly">Weekly</option>
-                        <option value="fortnightly">Fortnightly</option>
-                        <option value="monthly">Monthly</option>
-                      </select>
-                    </div>
-                  </div>
-                  <SmartDatePicker
-                    frequency={newDebt.frequency || 'monthly'}
-                    value={newDebt.paymentDate}
-                    onChange={v => setNewDebt({...newDebt, paymentDate: v})}
-                    label="When is the payment due?"
-                  />
-                  <button onClick={addDebt} style={{...btnWarning, padding: '10px'}}>+ Add debt</button>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                <button onClick={() => advanceMission(5)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
-                  No debts — skip
-                </button>
-                <button onClick={() => advanceMission(5)} style={{ flex: 1, padding: '16px', background: debts.length > 0 ? theme.accent : theme.border, color: debts.length > 0 ? '#111111' : 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
-                  {debts.length > 0 ? `Next: my savings →` : 'Continue →'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 5 — Assets / Existing Savings */}
-          {missionStep === 5 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '560px', margin: '0 auto', width: '100%' }}>
-              <div style={{ fontSize: '56px', marginBottom: '16px' }}>🏦</div>
-              <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>What savings do you already have?</h2>
-              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 8px 0' }}>
-                This helps Aureus see if you've already hit Wealth Step 1 ($2,000 emergency fund) and build your plan from the right starting point.
-              </p>
-              <p style={{ color: theme.textMuted, fontSize: '12px', textAlign: 'center' as const, margin: '0 0 24px 0' }}>
-                Include savings accounts, term deposits, offset accounts. Not super — that's tracked separately.
-              </p>
-
-              {/* Existing assets */}
-              {assets.filter(a => ['savings', 'investment', 'other'].includes(a.type)).length > 0 && (
-                <div style={{ width: '100%', marginBottom: '16px' }}>
-                  {assets.filter(a => ['savings', 'investment', 'other'].includes(a.type)).map(a => (
-                    <div key={a.id} style={{ padding: '12px 16px', background: theme.success + '15', borderRadius: '10px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid ' + theme.success + '30' }}>
-                      <div>
-                        <div style={{ color: theme.text, fontWeight: 600 }}>{a.name}</div>
-                        <div style={{ color: theme.textMuted, fontSize: '12px' }}>{a.type}</div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ color: theme.success, fontWeight: 700 }}>${parseFloat(a.value || '0').toLocaleString()}</span>
-                        <button onClick={() => deleteAsset(a.id)} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '18px' }}>×</button>
-                      </div>
-                    </div>
-                  ))}
-                  {(() => {
-                    const totalSavings = assets.filter(a => ['savings','investment','other'].includes(a.type)).reduce((s, a) => s + parseFloat(a.value || '0'), 0)
-                    const hasEmergencyFund = totalSavings >= 2000
-                    return (
-                      <div style={{ padding: '12px 16px', background: hasEmergencyFund ? theme.success + '20' : theme.warning + '15', borderRadius: '10px', border: '1px solid ' + (hasEmergencyFund ? theme.success + '40' : theme.warning + '40'), marginTop: '4px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ color: hasEmergencyFund ? theme.success : theme.warning, fontWeight: 700, fontSize: '13px' }}>
-                            {hasEmergencyFund ? '✅ Emergency fund covered!' : `⚡ $${(2000 - totalSavings).toFixed(0)} away from Wealth Step 1`}
-                          </span>
-                          <span style={{ color: theme.success, fontWeight: 700 }}>${totalSavings.toLocaleString()}</span>
-                        </div>
-                        {hasEmergencyFund && <div style={{ color: theme.textMuted, fontSize: '11px', marginTop: '4px' }}>Aureus will skip straight to tackling your debts 💪</div>}
-                      </div>
-                    )
-                  })()}
-                </div>
-              )}
-
-              {/* Quick preset savings types */}
-              <div style={{ width: '100%', marginBottom: '12px' }}>
-                <div style={{ color: theme.textMuted, fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>QUICK ADD</div>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-                  {[
-                    { name: 'Emergency Fund', type: 'savings' },
-                    { name: 'Savings Account', type: 'savings' },
-                    { name: 'Offset Account', type: 'savings' },
-                    { name: 'Term Deposit', type: 'savings' },
-                    { name: 'Shares / ETFs', type: 'investment' },
-                  ].map(p => (
-                    <button key={p.name}
-                      onClick={() => setNewAsset({ name: p.name, value: '', type: p.type })}
-                      style={{ padding: '5px 12px', background: newAsset.name === p.name ? theme.accent + '30' : theme.cardBg, border: '1px solid ' + (newAsset.name === p.name ? theme.accent : theme.border), borderRadius: '20px', cursor: 'pointer', fontSize: '12px', color: newAsset.name === p.name ? theme.accent : theme.textMuted }}>
-                      + {p.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Add asset form */}
-              <div style={{ width: '100%', padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, marginBottom: '20px' }}>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
-                  <input placeholder="Account name" value={newAsset.name} onChange={e => setNewAsset({...newAsset, name: e.target.value})} style={{...inputStyle, flex: 1, minWidth: '130px'}} />
-                  <input placeholder="Balance $" type="number" value={newAsset.value} onChange={e => setNewAsset({...newAsset, value: e.target.value})} style={{...inputStyle, width: '110px'}} />
-                  <select value={newAsset.type} onChange={e => setNewAsset({...newAsset, type: e.target.value})} style={inputStyle}>
-                    <option value="savings">Savings</option>
-                    <option value="investment">Investment</option>
-                    <option value="other">Other</option>
-                  </select>
-                  <button onClick={addAsset} style={{...btnSuccess, padding: '10px 16px'}}>+</button>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                <button onClick={() => advanceMission(6)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
-                  No savings yet — skip
-                </button>
-                <button onClick={() => advanceMission(6)} style={{ flex: 1, padding: '16px', background: theme.accent, color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
-                  {assets.length > 0 ? 'Next: my mortgage →' : 'Continue →'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 6 — Mortgage */}
-          {missionStep === 6 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '560px', margin: '0 auto', width: '100%' }}>
-              <div style={{ fontSize: '56px', marginBottom: '16px' }}>🏠</div>
-              <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>Tell me about your mortgage.</h2>
-              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 8px 0' }}>
-                This is where the magic happens. I'll calculate your exact mortgage-free date and show you how to cut years off it.
-              </p>
-              {monthlySurplus > 0 && (
-                <div style={{ padding: '10px 16px', background: theme.success + '15', borderRadius: '8px', marginBottom: '20px', border: '1px solid ' + theme.success + '30', textAlign: 'center' as const }}>
-                  <span style={{ color: theme.success, fontSize: '13px' }}>You have <strong>${monthlySurplus.toFixed(0)}/month</strong> surplus that could be going onto your mortgage right now.</span>
-                </div>
-              )}
-
-              <div style={{ width: '100%', padding: '20px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border, marginBottom: '20px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '14px' }}>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Repayment frequency</label>
-                    <select value={mortgageAccel.repaymentFrequency} onChange={e => setMortgageAccel({...mortgageAccel, repaymentFrequency: e.target.value})} style={{...inputStyle, width: '100%'}}>
-                      <option value="weekly">Weekly</option>
-                      <option value="fortnightly">Fortnightly (most common in AU)</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Remaining balance ($)</label>
-                    <input type="number" placeholder="e.g. 420000" value={mortgageAccel.balance} onChange={e => setMortgageAccel({...mortgageAccel, balance: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Interest rate (% p.a.)</label>
-                      <input type="number" step="0.01" placeholder="e.g. 6.14" value={mortgageAccel.rate} onChange={e => setMortgageAccel({...mortgageAccel, rate: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '12px', display: 'block', marginBottom: '4px' }}>Years remaining</label>
-                      <input type="number" placeholder="e.g. 25" value={mortgageAccel.remainingYears} onChange={e => setMortgageAccel({...mortgageAccel, remainingYears: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Live mortgage-free date preview */}
-              {mortgageAccel.balance && mortgageAccel.rate && mortgageAccel.remainingYears && (() => {
-                const res = calculateMortgagePayoff()
-                if (!res) return null
-                const freq = mortgageAccel.repaymentFrequency
-                const suggestedExtra = monthlySurplus > 0
-                  ? (freq === 'weekly' ? Math.floor(monthlySurplus * 0.3 / 4.33) : freq === 'fortnightly' ? Math.floor(monthlySurplus * 0.3 / 2) : Math.floor(monthlySurplus * 0.3))
-                  : 0
-                const extraResult = suggestedExtra > 0 ? (() => {
-                  const r2 = parseFloat(mortgageAccel.rate) / 100 / (freq === 'weekly' ? 52 : freq === 'fortnightly' ? 26 : 12)
-                  const pmt2 = res.repaymentUsed + suggestedExtra
-                  const bal2 = parseFloat(mortgageAccel.balance)
-                  if (pmt2 <= bal2 * r2) return null
-                  const periods2 = Math.log(pmt2 / (pmt2 - bal2 * r2)) / Math.log(1 + r2)
-                  const freqN = freq === 'weekly' ? 52 : freq === 'fortnightly' ? 26 : 12
-                  const yrs2 = periods2 / freqN
-                  return { yearsSaved: res.standard.years - yrs2, freeYear: new Date().getFullYear() + Math.ceil(yrs2), interestSaved: res.standard.interest - (pmt2 * periods2 - bal2) }
-                })() : null
-                return (
-                  <div style={{ width: '100%', marginBottom: '20px' }}>
-                    <div style={{ padding: '20px', background: 'linear-gradient(135deg, #0a0a0a, #1a1208)', borderRadius: '14px', textAlign: 'center' as const, border: '1px solid ' + theme.border }}>
-                      <div style={{ color: theme.textMuted, fontSize: '11px', letterSpacing: '2px', marginBottom: '8px' }}>🏠 YOUR MORTGAGE-FREE DATE</div>
-                      <div style={{ color: '#c0392b', fontSize: '40px', fontWeight: 800, marginBottom: '4px' }}>{res.standard.freeYear}</div>
-                      <div style={{ color: '#64748b', fontSize: '12px', marginBottom: suggestedExtra > 0 ? '16px' : '0' }}>at current pace · ${Math.round(res.standard.interest / 1000)}k in interest</div>
-                      {extraResult && suggestedExtra > 0 && (
-                        <div style={{ padding: '12px', background: 'rgba(16,185,129,0.15)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.3)' }}>
-                          <div style={{ color: '#B68B2E', fontSize: '13px', marginBottom: '4px' }}>💡 With just ${suggestedExtra} extra per {freq === 'weekly' ? 'week' : freq === 'fortnightly' ? 'fortnight' : 'month'}:</div>
-                          <div style={{ color: '#B68B2E', fontWeight: 700, fontSize: '18px' }}>Mortgage-free by {extraResult.freeYear} — {extraResult.yearsSaved.toFixed(1)} years earlier, ${Math.round(extraResult.interestSaved / 1000)}k saved</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })()}
-
-              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                <button onClick={() => advanceMission(7)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px' }}>
-                  Skip — I'll add this later
-                </button>
-                <button
-                  onClick={() => advanceMission(7)}
-                  style={{ flex: 1, padding: '16px', background: mortgageAccel.balance ? theme.success : theme.accent, color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 700 }}>
-                  {mortgageAccel.balance ? "I can see my date. Next →" : "Next →"}
-                </button>
-              </div>
-            </div>
-          )}
-          {/* STEP 7 — Schedule & Automation */}
-          {missionStep === 7 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', padding: '32px 20px', maxWidth: '580px', margin: '0 auto', width: '100%' }}>
-              <div style={{ fontSize: '56px', marginBottom: '16px' }}>📅</div>
-              <h2 style={{ color: theme.text, fontSize: '26px', margin: '0 0 8px 0', textAlign: 'center' as const }}>Set up your money rhythm.</h2>
-              <p style={{ color: theme.textMuted, fontSize: '15px', textAlign: 'center' as const, lineHeight: 1.7, margin: '0 0 24px 0' }}>
-                Consistent check-ins are what separate people who build wealth from those who don't. Let's schedule yours now.
-              </p>
-
-              {/* Weekly Money Date */}
-              <div style={{ width: '100%', padding: '18px', background: theme.cardBg, borderRadius: '14px', border: '2px solid ' + theme.accent + '40', marginBottom: '14px' }}>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '14px' }}>
-                  <span style={{ fontSize: '24px' }}>💰</span>
-                  <div>
-                    <div style={{ color: theme.text, fontWeight: 700, fontSize: '15px' }}>Weekly Money Date</div>
-                    <div style={{ color: theme.textMuted, fontSize: '12px', lineHeight: 1.5 }}>15 mins every week — review spending, check bills, celebrate wins. This single habit is worth thousands.</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const }}>
-                  <div style={{ flex: 1, minWidth: '130px' }}>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Day</label>
-                    <select value={checkInSchedule.moneyDateDay} onChange={e => setCheckInSchedule(s => ({ ...s, moneyDateDay: e.target.value }))} style={{ ...inputStyle, width: '100%' }}>
-                      {['sunday','monday','tuesday','wednesday','thursday','friday','saturday'].map(day => (
-                        <option key={day} value={day}>{day.charAt(0).toUpperCase() + day.slice(1)}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div style={{ flex: 1, minWidth: '120px' }}>
-                    <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '4px' }}>Time</label>
-                    <input type="time" value={checkInSchedule.moneyDateTime} onChange={e => setCheckInSchedule(s => ({ ...s, moneyDateTime: e.target.value }))} style={{ ...inputStyle, width: '100%' }} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Daily check-in */}
-              <div style={{ width: '100%', padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, marginBottom: '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: checkInSchedule.dailyEnabled ? '10px' : 0 }}>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '20px' }}>☀️</span>
-                    <div>
-                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Daily check-in</div>
-                      <div style={{ color: theme.textMuted, fontSize: '11px' }}>Quick win log — 2 minutes a day</div>
-                    </div>
-                  </div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={checkInSchedule.dailyEnabled} onChange={e => setCheckInSchedule(s => ({ ...s, dailyEnabled: e.target.checked }))} style={{ accentColor: theme.accent, width: '16px', height: '16px' }} />
-                    <span style={{ color: theme.text, fontSize: '13px' }}>{checkInSchedule.dailyEnabled ? 'On' : 'Off'}</span>
-                  </label>
-                </div>
-                {checkInSchedule.dailyEnabled && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                    <label style={{ color: theme.textMuted, fontSize: '12px' }}>Preferred time</label>
-                    <input type="time" value={checkInSchedule.dailyTime} onChange={e => setCheckInSchedule(s => ({ ...s, dailyTime: e.target.value }))} style={{ ...inputStyle, width: '120px' }} />
-                  </div>
-                )}
-              </div>
-
-              {/* Monthly review */}
-              <div style={{ width: '100%', padding: '16px', background: theme.cardBg, borderRadius: '12px', border: '1px solid ' + theme.border, marginBottom: '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '20px' }}>📊</span>
-                    <div>
-                      <div style={{ color: theme.text, fontWeight: 600, fontSize: '14px' }}>Monthly Review</div>
-                      <div style={{ color: theme.textMuted, fontSize: '11px' }}>Net worth, goal progress, debt update</div>
-                    </div>
-                  </div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={checkInSchedule.monthlyEnabled} onChange={e => setCheckInSchedule(s => ({ ...s, monthlyEnabled: e.target.checked }))} style={{ accentColor: theme.accent, width: '16px', height: '16px' }} />
-                    <span style={{ color: theme.text, fontSize: '13px' }}>{checkInSchedule.monthlyEnabled ? 'On' : 'Off'}</span>
-                  </label>
-                </div>
-                {checkInSchedule.monthlyEnabled && (
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const }}>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '3px' }}>Day of month</label>
-                      <select value={checkInSchedule.monthlyDay} onChange={e => setCheckInSchedule(s => ({ ...s, monthlyDay: e.target.value }))} style={{ ...inputStyle }}>
-                        {Array.from({length: 28}, (_,i) => i+1).map(d => <option key={d} value={d.toString()}>{d}{d===1?'st':d===2?'nd':d===3?'rd':'th'}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ color: theme.textMuted, fontSize: '11px', display: 'block', marginBottom: '3px' }}>Time</label>
-                      <input type="time" value={checkInSchedule.monthlyTime} onChange={e => setCheckInSchedule(s => ({ ...s, monthlyTime: e.target.value }))} style={{ ...inputStyle, width: '120px' }} />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Automated payments */}
-              {!hasAutomatedPayments && (
-                <div style={{ width: '100%', padding: '16px', background: theme.warning + '12', borderRadius: '12px', border: '2px solid ' + theme.warning + '40', marginBottom: '14px' }}>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '22px' }}>⚙️</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ color: theme.warning, fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>Set up automated payments</div>
-                      <div style={{ color: theme.textMuted, fontSize: '12px', lineHeight: 1.6, marginBottom: '12px' }}>
-                        The #1 thing that separates people who build wealth from those who don't — automated transfers. Log in to your bank and set up auto-transfers for each of these before continuing:
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px', marginBottom: '10px' }}>
-                        {[
-                          ...goals.filter((g: any) => g.paymentAmount).map((g: any) => ({ label: `${g.name} — $${g.paymentAmount}/${g.savingsFrequency || 'mo'}`, done: false })),
-                          ...debts.map((d: any) => ({ label: `${d.name} min payment — $${d.minPayment}/${d.frequency || 'mo'}`, done: false })),
-                        ].slice(0, 5).map((item, i) => (
-                          <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '8px 10px', background: theme.bg, borderRadius: '8px' }}>
-                            <span style={{ color: theme.warning, fontSize: '13px' }}>→</span>
-                            <span style={{ color: theme.text, fontSize: '12px' }}>{item.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={hasAutomatedPayments} onChange={e => setHasAutomatedPayments(e.target.checked)} style={{ accentColor: theme.accent, width: '16px', height: '16px' }} />
-                        <span style={{ color: theme.text, fontSize: '13px', fontWeight: 600 }}>I've set up (or will set up) automated transfers ✓</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {hasAutomatedPayments && (
-                <div style={{ width: '100%', padding: '12px 16px', background: theme.success + '15', borderRadius: '10px', border: '1px solid ' + theme.success + '30', marginBottom: '14px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '20px' }}>✅</span>
-                  <span style={{ color: theme.success, fontSize: '13px', fontWeight: 600 }}>Automated payments set up — your money works while you sleep.</span>
-                </div>
-              )}
-
-              <button onClick={() => advanceMission(8)}
-                style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '14px', cursor: 'pointer', fontSize: '16px', fontWeight: 800, fontFamily: 'Cinzel, serif', marginTop: '8px' }}>
-                Next: plan for big expenses →
-              </button>
-            </div>
-          )}
-
-          {/* STEP 8 — Sinking Funds */}
-          {missionStep === 8 && (() => {
-            const SINKING_CATEGORIES = [
-              { id: 'christmas', label: 'Christmas', icon: '🎄' },
-              { id: 'birthday',  label: 'Birthday',  icon: '🎂' },
-              { id: 'holiday',   label: 'Holiday',   icon: '✈️' },
-              { id: 'vehicle',   label: 'Car/Rego',  icon: '🚗' },
-              { id: 'insurance', label: 'Insurance', icon: '🛡️' },
-              { id: 'medical',   label: 'Medical',   icon: '🏥' },
-              { id: 'home',      label: 'Home/Renos',icon: '🏠' },
-              { id: 'education', label: 'Education', icon: '📚' },
-              { id: 'celebration',label:'Celebration',icon:'🎉' },
-              { id: 'other',     label: 'Other',     icon: '📦' },
-            ]
-            const quickSuggestions = [
-              { name: 'Christmas & Gifts', category: 'christmas', target: 1200, weekly: 23, icon: '🎄' },
-              { name: 'Car Rego & Service', category: 'vehicle', target: 1000, weekly: 19, icon: '🚗' },
-              ...(houseStatus === 'own' || houseStatus === 'paid_off' ? [{ name: 'Home Maintenance', category: 'home', target: 2000, weekly: 38, icon: '🏠' }] : []),
-              { name: 'Annual Holiday', category: 'holiday', target: 3000, weekly: 58, icon: '✈️' },
-              { name: 'Health & Medical', category: 'medical', target: 800, weekly: 15, icon: '🏥' },
-            ]
-            const totalWeekly = sinkingFunds.reduce((s, f) => s + parseFloat(f.weeklyAmount || '0'), 0)
-            return (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, padding: '28px 20px', maxWidth: '620px', margin: '0 auto', width: '100%', gap: '16px' }}>
-                <div style={{ textAlign: 'center' as const }}>
-                  <div style={{ fontSize: '48px', marginBottom: '10px' }}>🎯</div>
-                  <h2 style={{ color: theme.text, fontSize: '24px', margin: '0 0 6px 0' }}>Plan for the big expenses.</h2>
-                  <p style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.6, margin: 0 }}>
-                    Every financial blowout was once a predictable expense. Save a little each week — no more surprise bills.
-                  </p>
-                </div>
-
-                {/* Quick-add suggestion chips */}
-                <div>
-                  <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, letterSpacing: '1px', marginBottom: '8px' }}>QUICK ADD</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px' }}>
-                    {quickSuggestions.filter(s => !sinkingFunds.some(f => f.name === s.name)).map((s, i) => (
-                      <button key={i} onClick={() => {
-                        const dec = new Date(); dec.setMonth(11); dec.setDate(15)
-                        setSinkingFunds(prev => [...prev, { id: Date.now() + i, name: s.name, category: s.category, targetAmount: s.target.toString(), weeklyAmount: s.weekly.toString(), savedAmount: '0', targetDate: dec.toISOString().split('T')[0], notes: '', createdAt: new Date().toISOString() }])
-                      }} style={{ padding: '6px 12px', background: theme.accent + '15', border: '1px solid ' + theme.accent + '40', borderRadius: '20px', color: theme.accent, cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                        {s.icon} {s.name} · ${s.weekly}/wk
+              {/* ── Step 2: Housing ── */}
+              {obStep === 2 && (
+                <div style={{ width: '100%' }}>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '20px', textAlign: 'center' as const }}>2 of 5</div>
+                  <p style={{ color: theme.text, fontSize: '20px', fontWeight: 700, margin: '0 0 6px 0', textAlign: 'center' as const }}>What's your rent or mortgage?</p>
+                  <p style={{ color: theme.textMuted, fontSize: '14px', margin: '0 0 20px 0', textAlign: 'center' as const }}>Your biggest fixed cost — ballpark is fine</p>
+                  <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                    {(['rent', 'mortgage', 'neither'] as const).map(t => (
+                      <button key={t} onClick={() => setOb5Q(prev => ({ ...prev, housingType: t }))}
+                        style={{ flex: 1, padding: '10px 6px', background: ob5Q.housingType === t ? theme.accent + '20' : theme.bg, border: '2px solid ' + (ob5Q.housingType === t ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', color: ob5Q.housingType === t ? theme.accent : theme.textMuted, fontSize: '13px', fontWeight: ob5Q.housingType === t ? 700 : 400, textTransform: 'capitalize' as const }}>
+                        {t === 'neither' ? 'No cost' : t}
                       </button>
                     ))}
                   </div>
-                </div>
-
-                {/* Add form — identical to main app */}
-                <div style={{ padding: '14px', background: theme.bg, borderRadius: '12px', border: '1px solid ' + theme.border }}>
-                  <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 600, letterSpacing: '1px', marginBottom: '10px' }}>ADD A FUND</div>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, marginBottom: '8px' }}>
-                    <input placeholder="Fund name (e.g. Christmas 2026)" value={newSinkingFund.name} onChange={e => setNewSinkingFund({...newSinkingFund, name: e.target.value})} style={{...inputStyle, flex: 2, minWidth: '150px'}} />
-                    <input type="number" placeholder="Target $" value={newSinkingFund.targetAmount} onChange={e => {
-                      const target = parseFloat(e.target.value || '0')
-                      const weeksLeft = newSinkingFund.targetDate ? Math.max(1, Math.ceil((new Date(newSinkingFund.targetDate).getTime() - Date.now()) / (7 * 86400000))) : 52
-                      setNewSinkingFund({...newSinkingFund, targetAmount: e.target.value, weeklyAmount: target > 0 ? (target / weeksLeft).toFixed(2) : ''})
-                    }} style={{...inputStyle, width: '100px'}} />
-                    <select value={newSinkingFund.category} onChange={e => setNewSinkingFund({...newSinkingFund, category: e.target.value})} style={inputStyle}>
-                      {SINKING_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const, alignItems: 'flex-end' }}>
-                    <div style={{ flex: 1, minWidth: '130px' }}>
-                      <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>TARGET DATE</label>
-                      <input type="date" value={newSinkingFund.targetDate} onChange={e => {
-                        const date = e.target.value
-                        const target = parseFloat(newSinkingFund.targetAmount || '0')
-                        const weeksLeft = date ? Math.max(1, Math.ceil((new Date(date).getTime() - Date.now()) / (7 * 86400000))) : 52
-                        setNewSinkingFund({...newSinkingFund, targetDate: date, weeklyAmount: target > 0 ? (target / weeksLeft).toFixed(2) : newSinkingFund.weeklyAmount})
-                      }} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: '110px' }}>
-                      <label style={{ color: theme.textMuted, fontSize: '10px', display: 'block', marginBottom: '3px' }}>WEEKLY AMOUNT $</label>
-                      <input type="number" placeholder="auto-calc" value={newSinkingFund.weeklyAmount} onChange={e => setNewSinkingFund({...newSinkingFund, weeklyAmount: e.target.value})} style={{...inputStyle, width: '100%'}} />
-                    </div>
-                    <button onClick={addSinkingFund} style={{...btnPrimary, padding: '10px 20px', flexShrink: 0}}>+ Add Fund</button>
-                  </div>
-                  {newSinkingFund.targetAmount && newSinkingFund.targetDate && (
-                    <div style={{ marginTop: '8px', padding: '8px 12px', background: theme.accent + '12', borderRadius: '8px', color: theme.textMuted, fontSize: '12px' }}>
-                      💡 Save <strong style={{ color: theme.accent }}>${parseFloat(newSinkingFund.weeklyAmount || '0').toFixed(2)}/week</strong> for {Math.max(1, Math.ceil((new Date(newSinkingFund.targetDate).getTime() - Date.now()) / (7 * 86400000)))} weeks → ${parseFloat(newSinkingFund.targetAmount || '0').toFixed(0)} by {new Date(newSinkingFund.targetDate + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {ob5Q.housingType !== 'neither' && (
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                      <div style={{ position: 'relative' as const, flex: 1 }}>
+                        <span style={{ position: 'absolute' as const, left: '12px', top: '50%', transform: 'translateY(-50%)', color: theme.textMuted, fontWeight: 700 }}>$</span>
+                        <input type="number" inputMode="decimal" placeholder="e.g. 1800" value={ob5Q.housingAmount}
+                          onChange={e => setOb5Q(prev => ({ ...prev, housingAmount: e.target.value }))}
+                          style={{ ...inputStyle, width: '100%', paddingLeft: '28px', fontSize: '20px', fontWeight: 700, boxSizing: 'border-box' as const }} autoFocus />
+                      </div>
+                      <select value={ob5Q.housingFrequency} onChange={e => setOb5Q(prev => ({ ...prev, housingFrequency: e.target.value }))}
+                        style={{ ...inputStyle, flexShrink: 0, fontSize: '14px' }}>
+                        <option value="weekly">weekly</option>
+                        <option value="fortnightly">fortnightly</option>
+                        <option value="monthly">monthly</option>
+                      </select>
                     </div>
                   )}
+                  <button onClick={() => (ob5Q.housingType === 'neither' || ob5Q.housingAmount) && setObStep(3)}
+                    disabled={ob5Q.housingType !== 'neither' && !ob5Q.housingAmount}
+                    style={{ width: '100%', padding: '14px', background: (ob5Q.housingType === 'neither' || ob5Q.housingAmount) ? 'linear-gradient(135deg, #D4AF37, #BC6A1F)' : theme.border, color: (ob5Q.housingType === 'neither' || ob5Q.housingAmount) ? '#111' : theme.textMuted, border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '16px' }}>
+                    Continue →
+                  </button>
                 </div>
+              )}
 
-                {/* Fund cards — same as main app */}
-                {sinkingFunds.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
-                    {sinkingFunds.map(fund => {
-                      const target = parseFloat(fund.targetAmount || '0')
-                      const saved = parseFloat(fund.savedAmount || '0')
-                      const pct = target > 0 ? Math.min(100, (saved / target) * 100) : 0
-                      const weeksLeft = fund.targetDate ? Math.max(0, Math.ceil((new Date(fund.targetDate).getTime() - Date.now()) / (7 * 86400000))) : null
-                      const catInfo = SINKING_CATEGORIES.find(c => c.id === fund.category) || SINKING_CATEGORIES[0]
-                      return (
-                        <div key={fund.id} style={{ padding: '12px 14px', background: theme.bg, borderRadius: '10px', border: '1px solid ' + theme.border }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              <span style={{ fontSize: '16px' }}>{catInfo.icon}</span>
-                              <div>
-                                <div style={{ color: theme.text, fontWeight: 700, fontSize: '13px' }}>{fund.name}</div>
-                                <div style={{ color: theme.textMuted, fontSize: '11px' }}>
-                                  ${parseFloat(fund.weeklyAmount || '0').toFixed(0)}/week · ${target.toFixed(0)} target
-                                  {weeksLeft !== null && ` · ${weeksLeft} wks`}
-                                  {fund.targetDate && ` · ${new Date(fund.targetDate + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`}
-                                </div>
-                              </div>
-                            </div>
-                            <button onClick={() => deleteSinkingFund(fund.id)} style={{ padding: '3px 8px', background: theme.danger, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>×</button>
-                          </div>
-                          <div style={{ height: '6px', background: theme.border, borderRadius: '3px', overflow: 'hidden' }}>
-                            <div style={{ width: pct + '%', height: '100%', background: 'linear-gradient(90deg, #D4AF37, #B68B2E)', borderRadius: '3px' }} />
-                          </div>
-                        </div>
-                      )
-                    })}
-                    <div style={{ padding: '10px 14px', background: theme.accent + '10', borderRadius: '8px', border: '1px solid ' + theme.accent + '30', display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: theme.textMuted, fontSize: '13px' }}>{sinkingFunds.length} fund{sinkingFunds.length !== 1 ? 's' : ''} · total weekly</span>
-                      <span style={{ color: theme.accent, fontWeight: 700 }}>${totalWeekly.toFixed(0)}/week · ${(totalWeekly * 52).toFixed(0)}/year</span>
-                    </div>
+              {/* ── Step 3: Debt ── */}
+              {obStep === 3 && (
+                <div style={{ width: '100%' }}>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '20px', textAlign: 'center' as const }}>3 of 5</div>
+                  <p style={{ color: theme.text, fontSize: '20px', fontWeight: 700, margin: '0 0 6px 0', textAlign: 'center' as const }}>Any debts hanging around?</p>
+                  <p style={{ color: theme.textMuted, fontSize: '14px', margin: '0 0 20px 0', textAlign: 'center' as const }}>Credit cards, personal loans, Afterpay, car loan — just the rough total on the worst one</p>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', justifyContent: 'center' }}>
+                    <button onClick={() => setOb5Q(prev => ({ ...prev, hasDebt: true }))}
+                      style={{ flex: 1, padding: '10px', background: ob5Q.hasDebt ? theme.accent + '20' : theme.bg, border: '2px solid ' + (ob5Q.hasDebt ? theme.accent : theme.border), borderRadius: '8px', cursor: 'pointer', color: ob5Q.hasDebt ? theme.accent : theme.textMuted, fontSize: '14px', fontWeight: ob5Q.hasDebt ? 700 : 400 }}>
+                      Yes, I have debt
+                    </button>
+                    <button onClick={() => { setOb5Q(prev => ({ ...prev, hasDebt: false, debtAmount: '0' })); setObStep(4) }}
+                      style={{ flex: 1, padding: '10px', background: !ob5Q.hasDebt ? theme.success + '20' : theme.bg, border: '2px solid ' + (!ob5Q.hasDebt ? theme.success : theme.border), borderRadius: '8px', cursor: 'pointer', color: !ob5Q.hasDebt ? theme.success : theme.textMuted, fontSize: '14px' }}>
+                      No debts 🎉
+                    </button>
                   </div>
-                )}
+                  {ob5Q.hasDebt && (
+                    <>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const, marginBottom: '10px' }}>
+                        {[['credit_card','💳 Credit card'],['personal_loan','🏦 Personal loan'],['afterpay','📱 Afterpay/BNPL'],['car_loan','🚗 Car loan'],['other','📋 Other']].map(([val, label]) => (
+                          <button key={val} onClick={() => setOb5Q(prev => ({ ...prev, debtType: val }))}
+                            style={{ padding: '6px 12px', background: ob5Q.debtType === val ? theme.accent + '20' : theme.bg, border: '1px solid ' + (ob5Q.debtType === val ? theme.accent : theme.border), borderRadius: '20px', cursor: 'pointer', color: ob5Q.debtType === val ? theme.accent : theme.textMuted, fontSize: '12px', fontWeight: ob5Q.debtType === val ? 700 : 400 }}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ position: 'relative' as const, marginBottom: '12px' }}>
+                        <span style={{ position: 'absolute' as const, left: '12px', top: '50%', transform: 'translateY(-50%)', color: theme.textMuted, fontWeight: 700 }}>$</span>
+                        <input type="number" inputMode="decimal" placeholder="e.g. 4500" value={ob5Q.debtAmount}
+                          onChange={e => setOb5Q(prev => ({ ...prev, debtAmount: e.target.value }))}
+                          style={{ ...inputStyle, width: '100%', paddingLeft: '28px', fontSize: '20px', fontWeight: 700, boxSizing: 'border-box' as const }} autoFocus />
+                      </div>
+                      <button onClick={() => ob5Q.debtAmount && setObStep(4)} disabled={!ob5Q.debtAmount}
+                        style={{ width: '100%', padding: '14px', background: ob5Q.debtAmount ? 'linear-gradient(135deg, #D4AF37, #BC6A1F)' : theme.border, color: ob5Q.debtAmount ? '#111' : theme.textMuted, border: 'none', borderRadius: '12px', cursor: ob5Q.debtAmount ? 'pointer' : 'default', fontWeight: 800, fontSize: '16px' }}>
+                        Continue →
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
 
-                <div style={{ display: 'flex', gap: '10px', paddingTop: '4px' }}>
-                  <button onClick={() => advanceMission(null, 2)} style={{ padding: '14px 20px', background: theme.cardBg, border: '1px solid ' + theme.border, borderRadius: '12px', color: theme.textMuted, cursor: 'pointer', fontSize: '14px', flexShrink: 0 }}>
-                    Skip
+              {/* ── Step 4: Emergency fund ── */}
+              {obStep === 4 && (
+                <div style={{ width: '100%' }}>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '20px', textAlign: 'center' as const }}>4 of 5</div>
+                  <p style={{ color: theme.text, fontSize: '20px', fontWeight: 700, margin: '0 0 6px 0', textAlign: 'center' as const }}>If your car died tomorrow...</p>
+                  <p style={{ color: theme.textMuted, fontSize: '14px', margin: '0 0 20px 0', textAlign: 'center' as const }}>How much could you pull together without borrowing? (This is your safety net)</p>
+                  <div style={{ position: 'relative' as const, marginBottom: '12px' }}>
+                    <span style={{ position: 'absolute' as const, left: '12px', top: '50%', transform: 'translateY(-50%)', color: theme.textMuted, fontWeight: 700 }}>$</span>
+                    <input type="number" inputMode="decimal" placeholder="e.g. 500" value={ob5Q.emergencyAmount}
+                      onChange={e => setOb5Q(prev => ({ ...prev, emergencyAmount: e.target.value }))}
+                      onKeyDown={e => { if (e.key === 'Enter' && ob5Q.emergencyAmount) setObStep(5) }}
+                      style={{ ...inputStyle, width: '100%', paddingLeft: '28px', fontSize: '20px', fontWeight: 700, boxSizing: 'border-box' as const }} autoFocus />
+                  </div>
+                  <button onClick={() => { if (!ob5Q.emergencyAmount) setOb5Q(prev => ({ ...prev, emergencyAmount: '0' })); setObStep(5) }}
+                    style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', color: '#111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '16px', marginBottom: '6px' }}>
+                    Continue →
                   </button>
-                  <button onClick={() => { setShowCompellingFuture(true) }} style={{ flex: 1, padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '16px', fontWeight: 800 }}>
-                    {sinkingFunds.length > 0 ? `Save ${sinkingFunds.length} fund${sinkingFunds.length !== 1 ? 's' : ''} & set my vision →` : 'Set my vision →'}
+                  <button onClick={() => { setOb5Q(prev => ({ ...prev, emergencyAmount: '0' })); setObStep(5) }}
+                    style={{ width: '100%', padding: '10px', background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>
+                    Nothing saved yet — that's fine
                   </button>
                 </div>
+              )}
 
-                {/* Override the CompellingFuture modal close to go to roadmap instead */}
-                {showCompellingFuture && (
-                  <div style={{ position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                    <div style={{ background: theme.cardBg, borderRadius: '20px', padding: '32px 28px', maxWidth: '520px', width: '100%' }}>
-                      {futureResponse ? (
-                        <div>
-                          <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '16px' }}>YOUR VISION IS SET</div>
-                          <div style={{ padding: '20px', background: theme.bg, borderRadius: '14px', border: '1px solid ' + theme.accent + '30', marginBottom: '20px' }}>
-                            <p style={{ color: theme.text, fontSize: '14px', lineHeight: 1.8, margin: 0 }}>{futureResponse}</p>
-                          </div>
-                          <button onClick={() => { setShowCompellingFuture(false); setFutureResponse(null); advanceMission(null, 2) }}
-                            style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '16px', fontFamily: 'Cinzel, serif' }}>
-                            Now build my roadmap →
-                          </button>
-                        </div>
+              {/* ── Step 5: Goal ── */}
+              {obStep === 5 && (
+                <div style={{ width: '100%' }}>
+                  <div style={{ color: theme.textMuted, fontSize: '12px', marginBottom: '20px', textAlign: 'center' as const }}>5 of 5 — last one</div>
+                  <p style={{ color: theme.text, fontSize: '20px', fontWeight: 700, margin: '0 0 6px 0', textAlign: 'center' as const }}>What's the one money thing...</p>
+                  <p style={{ color: theme.textMuted, fontSize: '14px', margin: '0 0 20px 0', textAlign: 'center' as const }}>...that if it was sorted, would let you breathe easier? (Keep it short)</p>
+                  <textarea
+                    placeholder="e.g. get rid of my credit card debt, stop living pay to pay, buy a house..."
+                    value={ob5Q.goal}
+                    onChange={e => setOb5Q(prev => ({ ...prev, goal: e.target.value }))}
+                    style={{ ...inputStyle, width: '100%', minHeight: '80px', resize: 'none' as const, fontSize: '15px', lineHeight: 1.6, marginBottom: '12px', boxSizing: 'border-box' as const }}
+                    autoFocus
+                  />
+                  <button onClick={() => ob5Q.goal.trim() && handleReveal()} disabled={!ob5Q.goal.trim() || obRevealLoading}
+                    style={{ width: '100%', padding: '14px', background: ob5Q.goal.trim() ? 'linear-gradient(135deg, #D4AF37, #BC6A1F)' : theme.border, color: ob5Q.goal.trim() ? '#111' : theme.textMuted, border: 'none', borderRadius: '12px', cursor: ob5Q.goal.trim() ? 'pointer' : 'default', fontWeight: 800, fontSize: '16px' }}>
+                    {obRevealLoading ? '✨ Aureus is reading your numbers...' : 'Show me where I stand →'}
+                  </button>
+                  <button onClick={handleReveal} disabled={obRevealLoading}
+                    style={{ width: '100%', padding: '10px', background: 'none', border: 'none', color: theme.textMuted, cursor: 'pointer', fontSize: '13px', marginTop: '4px' }}>
+                    {obRevealLoading ? '' : 'Skip this question →'}
+                  </button>
+                </div>
+              )}
+
+              {/* ── Step 6: The Reveal ── */}
+              {obStep === 6 && (
+                <div style={{ width: '100%' }}>
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+                      <img src="/logo.svg" alt="Aureus" style={{ width: '40px', height: '40px', objectFit: 'contain' }}/>
+                    </div>
+                    <div style={{ flex: 1, padding: '16px 18px', background: theme.cardBg, borderRadius: '0 16px 16px 16px', border: '1px solid ' + theme.border }}>
+                      {obRevealLoading ? (
+                        <div style={{ color: theme.textMuted, fontSize: '14px', lineHeight: 1.7 }}>✨ Reading your numbers...</div>
                       ) : (
-                        <>
-                          <div style={{ fontSize: '40px', textAlign: 'center' as const, marginBottom: '12px' }}>🌅</div>
-                          <h3 style={{ color: theme.accent, fontSize: '22px', fontWeight: 800, margin: '0 0 8px 0', textAlign: 'center' as const, fontFamily: 'Cinzel, serif' }}>One last thing, {userName || 'Builder'}.</h3>
-                          <p style={{ color: theme.textMuted, fontSize: '13px', lineHeight: 1.7, margin: '0 0 6px 0', textAlign: 'center' as const }}>
-                            Before we build your roadmap — describe the life you're building toward.
-                          </p>
-                          <p style={{ color: theme.textMuted, fontSize: '12px', lineHeight: 1.6, margin: '0 0 20px 0', textAlign: 'center' as const, fontStyle: 'italic' }}>
-                            5 years from today, everything worked out. Where are you? What are you doing? How does it feel?
-                          </p>
-                          <textarea
-                            placeholder="Five years from now, I am..."
-                            value={futureVision}
-                            onChange={e => setFutureVision(e.target.value)}
-                            style={{ ...inputStyle, width: '100%', height: '120px', resize: 'none' as const, fontSize: '14px', lineHeight: 1.6, marginBottom: '14px' }}
-                            autoFocus
-                          />
-                          <div style={{ display: 'flex', gap: '10px' }}>
-                            <button onClick={() => { setShowCompellingFuture(false); advanceMission(null, 2) }}
-                              style={{ padding: '14px 16px', background: 'transparent', border: '1px solid ' + theme.border, borderRadius: '10px', color: theme.textMuted, cursor: 'pointer', fontSize: '13px' }}>
-                              Skip
-                            </button>
-                            <button onClick={async () => {
-                              if (!futureVision.trim()) { advanceMission(null, 2); return }
-                              setFutureLoading(true)
-                              try {
-                                const res = await fetch('/api/budget-coach', {
-                                  method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    mode: 'question',
-                                    question: `[ONBOARDING — COMPELLING FUTURE]
-New Aureus user: ${userName || 'Builder'}
-Just finished setting up their budget. Their 5-year vision: "${futureVision}"
-Their numbers: surplus $${monthlySurplus.toFixed(0)}/mo, ${debts.length} debts, ${goals.length} goals.
-
-Write 3 sentences ONLY:
-1. Amplify their vision with one specific vivid detail
-2. Connect it to their actual surplus — what that number enables toward this vision
-3. "Every number you track in Aureus from today is a step toward [something specific from their vision]."
-
-Personal, warm, grounded. No generic motivation. Use their actual words back.`,
-                                    financialData: { income: incomeStreams, expenses, debts, goals },
-                                    memory: budgetMemory, countryConfig: currentCountryConfig
-                                  })
-                                })
-                                const data = await res.json()
-                                setFutureResponse(data.message || data.advice || '')
-                              } catch { setShowCompellingFuture(false); advanceMission(null, 2) }
-                              setFutureLoading(false)
-                            }} disabled={futureLoading}
-                              style={{ flex: 1, padding: '14px', background: 'linear-gradient(135deg, #D4AF37 0%, #BC6A1F 100%)', color: '#111111', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 800, fontSize: '14px' }}>
-                              {futureLoading ? '⏳ Processing...' : futureVision.trim() ? 'Connect this to my plan →' : 'Build my roadmap →'}
-                            </button>
-                          </div>
-                        </>
+                        <div style={{ color: theme.text, fontSize: '15px', lineHeight: 1.75, whiteSpace: 'pre-line' as const }}>{obReveal}</div>
                       )}
                     </div>
                   </div>
-                )}
-              </div>
-            )
-          })()}
-        </div>
-      )}
+
+                  {/* Wealth Steps visual */}
+                  {!obRevealLoading && (
+                    <>
+                      <div style={{ marginBottom: '20px', padding: '16px', background: theme.cardBg, borderRadius: '14px', border: '1px solid ' + theme.border }}>
+                        <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>🏛️ YOUR WEALTH STEPS</div>
+                        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px' }}>
+                          {[
+                            { step: 1, label: 'Starter Emergency Fund', icon: '🛡️' },
+                            { step: 2, label: 'Kill Bad Debt', icon: '💳' },
+                            { step: 3, label: 'Full Emergency Fund', icon: '🏦' },
+                            { step: 4, label: 'Grow Long-Term Wealth', icon: '📈' },
+                          ].map(s => (
+                            <div key={s.step} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: '8px', background: s.step === obStep ? theme.accent + '15' : 'transparent', border: s.step === obStep ? '1px solid ' + theme.accent + '40' : '1px solid transparent' }}>
+                              <span style={{ fontSize: '16px' }}>{s.icon}</span>
+                              <span style={{ color: s.step === obStep ? theme.accent : s.step < obStep ? theme.success : theme.textMuted, fontSize: '13px', fontWeight: s.step === obStep ? 700 : 400 }}>
+                                {s.step < obStep ? '✓ ' : s.step === obStep ? '→ ' : ''}{s.label}
+                              </span>
+                              {s.step === obStep && <span style={{ marginLeft: 'auto', color: theme.accent, fontSize: '11px', fontWeight: 700 }}>YOU ARE HERE</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button onClick={() => setObStep(7)}
+                        style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', color: '#111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '16px' }}>
+                        Let's do one small thing now →
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ── Step 7: One action ── */}
+              {obStep === 7 && (
+                <div style={{ width: '100%' }}>
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+                      <img src="/logo.svg" alt="Aureus" style={{ width: '40px', height: '40px', objectFit: 'contain' }}/>
+                    </div>
+                    <div style={{ flex: 1, padding: '16px 18px', background: theme.cardBg, borderRadius: '0 16px 16px 16px', border: '1px solid ' + theme.border }}>
+                      <div style={{ color: theme.text, fontSize: '15px', lineHeight: 1.7 }}>
+                        {ob5Q.hasDebt && ob5Q.debtAmount
+                          ? `I've saved your ${ob5Q.debtType.replace('_', ' ')} debt ($${ob5Q.debtAmount}) to your tracker. Tap below to confirm it's set up — that's your debt countdown started.`
+                          : obEmergency < 2000
+                            ? `Your starter emergency fund target is $2,000 — you've got $${ob5Q.emergencyAmount || '0'} toward it. Want me to set up the countdown right now?`
+                            : `Let's track "${ob5Q.goal}" as your first goal. Takes 10 seconds.`}
+                      </div>
+                    </div>
+                  </div>
+
+                  {!obActionDone ? (
+                    <button onClick={handleAction}
+                      style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', color: '#111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '16px', marginBottom: '8px' }}>
+                      {ob5Q.hasDebt && ob5Q.debtAmount ? '✅ Debt countdown started →' : obEmergency < 2000 ? '✅ Set up emergency fund goal →' : `✅ Set up "${ob5Q.goal.slice(0,30)}${ob5Q.goal.length > 30 ? '...' : ''}" goal →`}
+                    </button>
+                  ) : (
+                    <div>
+                      <div style={{ padding: '16px', background: 'rgba(107,143,107,0.1)', border: '1px solid rgba(107,143,107,0.3)', borderRadius: '12px', marginBottom: '16px' }}>
+                        <div style={{ color: theme.success, fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>🏆 First win logged!</div>
+                        <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+                            <img src="/logo.svg" alt="Aureus" style={{ width: '36px', height: '36px', objectFit: 'contain' }}/>
+                          </div>
+                          <div style={{ flex: 1, padding: '12px 14px', background: theme.cardBg, borderRadius: '0 12px 12px 12px', border: '1px solid ' + theme.border }}>
+                            <div style={{ color: theme.text, fontSize: '14px', lineHeight: 1.65 }}>
+                              That's it — you're set up, {ob5Q.name}. Tomorrow at 8am I'll send your first morning brief with bills due, your money snapshot, and your next move. Anything you want to ask me while you're here? <strong style={{ color: theme.accent }}>"What should I focus on?"</strong> is a great one.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <button onClick={handleFinish}
+                        style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #D4AF37, #BC6A1F)', color: '#111', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 800, fontSize: '16px', marginBottom: '8px' }}>
+                        Open Aureus →
+                      </button>
+                      <button onClick={() => { setMissionComplete(true); setOnboardingComplete(true); setMissionNavLocked(false); setActiveTab('chat'); }}
+                        style={{ width: '100%', padding: '12px', background: 'none', border: '1px solid ' + theme.border, borderRadius: '12px', cursor: 'pointer', color: theme.textMuted, fontSize: '14px' }}>
+                        💬 Ask Aureus something first →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+          </div>
+        )
+      })()}
+
 
       {/* ═══════════════════════════════════════════════════
           MISSION PHASE 2 — ROADMAP BUILDER
