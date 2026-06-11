@@ -2718,7 +2718,7 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
 APP STRUCTURE — be precise with these directions:
 - TABS (top nav): Home, Aureus (chat), Change, Treasury, Roadmap, Wins, Quick View. Everything else is in the Quick Access grid on the Home tab.
 - INCOME/EXPENSES/DEBTS/GOALS/ASSETS: Treasury tab
-- CHANGE WORK: Change tab — Dickens Process, Values, Compelling Future, Money Mirror, Identity
+- CHANGE WORK: Change tab — Cost of Inaction, Values, Compelling Future, Money Mirror, Identity
 - NOTIFICATIONS + DAILY EMAIL + PARTNER EMAIL + MEAL PLAN: Insights tab (in Quick Access on Home) → scroll down to the notification/email section
 - NAME: Two places — (1) Home tab → gold card "Your setup isn't complete" → Resume setup → first screen asks for name. OR (2) Insights tab → scroll down to "Your Profile" section → type name in the YOUR NAME field. The name updates immediately, no save button needed.
 - QUICK VIEW: Quick View tab (in top nav) — shows money left, bills due, budget vs actual
@@ -3164,7 +3164,7 @@ Be specific, warm, direct. Use their actual numbers. Australia-specific advice. 
         setTimeout(() => {
           setChatMessages(prev => [...prev, {
             role: 'assistant',
-            content: `\n\n---\n💡 **${userName || 'Builder'}, can I ask you something?**\n\nBefore I give you another tip — I've noticed a pattern in what you're describing. The most powerful thing we could do right now isn't another budgeting strategy.\n\nWould you try something different? The **Dickens Process** takes 10 minutes and gets to the *real* reason this keeps happening. It's on your Home tab under Change Work.`,
+            content: `\n\n---\n💡 **${userName || 'Builder'}, can I ask you something?**\n\nBefore I give you another tip — I've noticed a pattern in what you're describing. The most powerful thing we could do right now isn't another budgeting strategy.\n\nWould you try something different? The **Cost of Inaction** exercise takes 10 minutes and gets to the *real* reason this keeps happening. It's in the Change tab.`,
             usedWebSearch: false
           }])
         }, 800)
@@ -5651,8 +5651,8 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
           },
           {
             tab: 'change', icon: '⚡', title: 'Change — Mindset & Guided Visualisation',
-            desc: 'Where the deep work happens. Use the Dickens Process to feel the real cost of inaction, Find Your Values to turn "should" into "must", and access Guided Visualisation sessions to rewire your money mindset. Six sessions including abundance, debt release, confidence, and more — with AI personalisation that uses your real numbers.',
-            highlight: 'Dickens Process · Values · Compelling Future · Money Mirror · Guided Visualisation · AI Personalised'
+            desc: 'Where the deep work happens. Use the Cost of Inaction exercise to feel what staying the same really costs, Find Your Values to turn "should" into "must", and access Guided Visualisation sessions to rewire your money mindset. Six sessions including abundance, debt release, confidence, and more — with AI personalisation that uses your real numbers.',
+            highlight: 'Cost of Inaction · Values · Compelling Future · Money Mirror · Guided Visualisation · AI Personalised'
           },
           {
             tab: 'learn', icon: '🎓', title: 'Learn — Financial Education',
@@ -6729,7 +6729,7 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
                   <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '14px' }}>⚡ CHANGE WORK</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     {[
-                      { icon: '🕯️', title: 'The Dickens Process', desc: 'See the real cost of inaction', action: () => { setDickensStep(0); setDickensAnswers([]); setDickensResponse(null); setDickensInput(''); setShowDickens(true) } },
+                      { icon: '🕯️', title: 'Cost of Inaction', desc: 'Feel the real cost of staying the same', action: () => { setDickensStep(0); setDickensAnswers([]); setDickensResponse(null); setDickensInput(''); setShowDickens(true) } },
                       { icon: '🧭', title: 'Find Your Values', desc: 'Turn "should" into "must"', action: () => { setValuesStep(0); setValuesAnswers({}); setValuesInput(''); setShowValuesElicitation(true) } },
                       { icon: '🌅', title: 'Compelling Future', desc: 'Make your vision visceral', action: () => { setFutureVision(''); setFutureResponse(null); setShowCompellingFuture(true) } },
                       { icon: '🪞', title: 'Money Mirror', desc: 'Rewrite your money story', action: () => { setMirrorStory(''); setMirrorResponse(null); setShowMoneyMirror(true) } },
@@ -10788,13 +10788,13 @@ Personal, warm, grounded. No generic motivation. Use their actual words back.`,
             {
               id: 'dickens',
               icon: '🕯️',
-              title: 'The Dickens Process',
-              subtitle: 'Tony Robbins\' most powerful change tool',
+              title: 'The Cost of Inaction',
+              subtitle: 'Face the real cost of staying where you are',
               desc: 'Explore the full cost of staying the same — then build an emotionally compelling future. Most people change when the pain of staying is greater than the pain of changing. This makes that real.',
               duration: '15–20 min',
               intensity: 'Deep',
               color: '#8B0000',
-              opener: `[DICKENS PROCESS — START] Begin the Dickens Process with ${userName || 'this user'}. Open warmly but powerfully. Ask your first question to explore the cost of their current financial patterns. Make it personal and specific to their situation. One question only.`
+              opener: `[COST OF INACTION — START] Begin the Cost of Inaction exercise with ${userName || 'this user'}. Open warmly but powerfully. Ask your first question to explore the cost of their current financial patterns. Make it personal and specific to their situation. One question only.`
             },
             {
               id: 'values',
@@ -12417,7 +12417,7 @@ Write a powerful, personal synthesis. Your job:
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <div>
-                      <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>THE DICKENS PROCESS · {dickensStep + 1} of {dickensQuestions.length}</div>
+                      <div style={{ color: theme.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '1px' }}>COST OF INACTION · {dickensStep + 1} of {dickensQuestions.length}</div>
                       <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
                         {dickensQuestions.map((_, i) => (
                           <div key={i} style={{ width: '24px', height: '3px', borderRadius: '2px', background: i < dickensStep ? theme.accent : i === dickensStep ? theme.accent + '60' : theme.border }} />
@@ -12925,7 +12925,7 @@ Write as if speaking directly to them. Personal, warm, specific, inspiring but g
             </div>
             <div style={{ padding: '16px 18px', background: theme.bg, borderRadius: '14px', marginBottom: '20px' }}>
               <div style={{ color: theme.textMuted, fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px' }}>EVERYTHING INCLUDED</div>
-              {[['🏛️','Full budget tracking — income, expenses, debts, goals'],['💬','AI budgeting coach with your financial data'],['⚡','Change Work — Dickens Process, Values, Identity sessions'],['🏢','Business Hub — P&L tracking and business coach'],['📧','Daily brief emails, accountability partner, meal plans'],['📅','30-min support calls with the Aureus team']].map(([icon, text]) => (
+              {[['🏛️','Full budget tracking — income, expenses, debts, goals'],['💬','AI budgeting coach with your financial data'],['⚡','Change Work — Cost of Inaction, Values, Identity sessions'],['🏢','Business Hub — P&L tracking and business coach'],['📧','Daily brief emails, accountability partner, meal plans'],['📅','30-min support calls with the Aureus team']].map(([icon, text]) => (
                 <div key={text as string} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '8px' }}>
                   <span style={{ fontSize: '16px', flexShrink: 0 }}>{icon}</span>
                   <span style={{ color: theme.text, fontSize: '13px', lineHeight: 1.5 }}>{text}</span>
@@ -14707,9 +14707,9 @@ Let's begin.
         ]
 
         const SNYDER_SESSIONS = [
-          { id: 'snyder-wealth', icon: '⚡', title: 'Wealth Identity Install', desc: 'NLP rapid wealth identity programming', duration: 7, colour: '#D4AF37',
+          { id: 'snyder-wealth', icon: '⚡', title: 'Wealth Identity Install', desc: 'Rapid wealth identity programming', duration: 7, colour: '#D4AF37',
             script: `STOP. Right now. Take a breath.\n\nNotice how your mind just responded to that command. That is your unconscious mind — and it has been running financial programs that do not serve you. Today we rewrite them. Fast.\n\nSit up straight. Eyes closed. Breathe normally.\n\nNow I want you to think of the person you know — or have seen — who is most naturally, effortlessly comfortable with money. Someone whose relationship with wealth is just... easy. Automatic. Like breathing.\n\nSee them clearly. Notice how they stand. How they speak. How they make decisions. There is no hesitation. No apology. No guilt. Just clarity.\n\nNow — and this is important — step into that person. Not alongside them. INTO them. Feel their posture become your posture. Feel their certainty become your certainty. Their relationship with money is now running through your neurology.\n\nRepeat these commands to your unconscious mind — say them like you mean them:\n\nMy unconscious mind now runs wealth-building programs automatically.\n\nI make money decisions from certainty, not scarcity.\n\nWealth creation is a skill I am installing now.\n\nI am the kind of person who builds financial freedom.\n\nAnchor this feeling. Press your thumb and index finger together RIGHT NOW while you feel this certainty. This is your wealth anchor. Any time you need this state — press those fingers together.\n\nTake a breath. Open your eyes. That install is complete.` },
-          { id: 'snyder-debt', icon: '🧠', title: 'Debt Pattern Interrupt', desc: 'Break the anxiety loop around debt with NLP', duration: 6, colour: '#e74c3c',
+          { id: 'snyder-debt', icon: '🧠', title: 'Debt Pattern Interrupt', desc: 'Break the anxiety loop around debt', duration: 6, colour: '#e74c3c',
             script: `Ready? Good. Pay attention — this is going to move fast.\n\nClose your eyes. Think about your debt. Feel the anxiety that comes up. Notice where you feel it in your body — chest, stomach, shoulders. Good. That is the pattern we are interrupting.\n\nNow — here is something your unconscious mind needs to hear:\n\nAnxiety about debt is not useful information. It is a program. And programs can be updated.\n\nImagine that anxiety as a picture in your mind. Give it a colour, a shape. Now — shrink it. Make it smaller. Push it further away. Drain the colour out of it until it is grey and distant and small.\n\nReplace it with a different picture. A clear spreadsheet. A plan. A number going down month by month. Make THAT image big, bright, and close.\n\nYour brain responds to what you give it attention and emotion. We are redirecting both.\n\nRepeat these pattern-breaking commands:\n\nI see debt as a problem to solve, not a sentence to serve.\n\nEvery time I think about debt, I think about the plan.\n\nMy nervous system is calm when I look at my numbers.\n\nI act from clarity. Not fear.\n\nFire that anchor — press thumb and index finger — lock in this calm, problem-solving state.\n\nOpen your eyes. Pattern interrupted. New program running.` },
           { id: 'snyder-future', icon: '🔮', title: 'Future Self Collapse', desc: 'Collapse the timeline — become your wealthy future self now', duration: 8, colour: '#8e44ad',
             script: `Close your eyes. Breathe once.\n\nI want you to project yourself forward in time. Five years. Your debts are gone. Your savings are real. You wake up without financial anxiety. This is not a fantasy — your brain cannot tell the difference between a vividly imagined future and a real memory.\n\nSee that version of you clearly. What do they look like? How do they carry themselves? What does their morning feel like? Notice every detail.\n\nNow — your future self is going to walk towards you. They are coming back through time to meet you right now, in this moment. They stop in front of you.\n\nThey have a message for you. Listen carefully.\n\n[Pause and listen to whatever comes up.]\n\nNow your future self reaches out and places their hand on your shoulder. And as they do, everything they know about money, everything they feel about wealth, every habit and belief that got them to where they are — transfers to you. Right now. Completely.\n\nYou are not becoming them. You ARE them. The timeline has collapsed.\n\nRepeat these truths from your future self:\n\nI already know how to do this. I have done it.\n\nThe wealth I want already exists in my future. I am walking towards it.\n\nEvery good decision I make today is a memory my future self already has.\n\nI am not working towards my best financial life. I am living it now.\n\nFire your anchor. Lock this in.\n\nTake a breath. Open your eyes. You just collapsed a timeline.` },
