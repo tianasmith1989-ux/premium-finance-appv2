@@ -16,20 +16,65 @@ async function sendEmail(to: string, subject: string, html: string, resendKey: s
   return res.ok
 }
 
+// Recalculate next occurrence from stored dueDate + frequency
+// Prevents stale dayOffsets from crashing the email template
+function getNextOccurrence(startDateStr: string, frequency: string): string | null {
+  if (!startDateStr) return null
+  const parts = startDateStr.split('-')
+  if (parts.length !== 3) return null
+  const start = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+  const today = new Date(); today.setHours(0,0,0,0)
+
+  if (frequency === 'once') return start >= today ? startDateStr : null
+  if (frequency === 'monthly') {
+    const next = new Date(today.getFullYear(), today.getMonth(), start.getDate())
+    if (next < today) next.setMonth(next.getMonth() + 1)
+    return next.toISOString().split('T')[0]
+  }
+  if (frequency === 'quarterly') {
+    const next = new Date(start)
+    while (next < today) next.setMonth(next.getMonth() + 3)
+    return next.toISOString().split('T')[0]
+  }
+  if (frequency === 'yearly' || frequency === 'annual') {
+    const next = new Date(start)
+    while (next < today) next.setFullYear(next.getFullYear() + 1)
+    return next.toISOString().split('T')[0]
+  }
+  const intervalDays = frequency === 'weekly' ? 7 : 14
+  const startMs = start.getTime(); const todayMs = today.getTime()
+  if (startMs >= todayMs) return startDateStr
+  const daysSinceStart = Math.floor((todayMs - startMs) / 86400000)
+  const periodsElapsed = Math.floor(daysSinceStart / intervalDays)
+  const next = new Date(start)
+  if (daysSinceStart % intervalDays === 0) {
+    next.setDate(start.getDate() + periodsElapsed * intervalDays)
+  } else {
+    next.setDate(start.getDate() + (periodsElapsed + 1) * intervalDays)
+  }
+  return next.toISOString().split('T')[0]
+}
+
 function buildDailyBriefHtml(u: any, dayName: string, dateFormatted: string): string {
   const name = u.user_name || 'Builder'
 
-  // Recalculate dayOffset from stored dueDate at send time — prevents stale offsets crashing the template
+  // Recalculate dayOffset using getNextOccurrence — always shows the actual next due date
   const nowMs = Date.now()
   const rawBills: any[] = u.upcoming_bills || []
   const bills = rawBills.map((b: any) => {
-    if (b.dueDate) {
+    if (b.dueDate && b.frequency) {
+      // Use next occurrence from the cycle, not just the stored static date
+      const nextDate = getNextOccurrence(b.dueDate, b.frequency) || b.dueDate
+      const due = new Date(nextDate + 'T12:00:00')
+      const dayOffset = Math.round((due.getTime() - nowMs) / 86400000)
+      return { ...b, dueDate: nextDate, dayOffset }
+    } else if (b.dueDate) {
       const due = new Date(b.dueDate + 'T12:00:00')
       const dayOffset = Math.round((due.getTime() - nowMs) / 86400000)
       return { ...b, dayOffset }
     }
-    return b // keep stored dayOffset if no dueDate
-  }).filter((b: any) => b.dayOffset >= -30 && b.dayOffset <= 30)
+    return b
+  }).filter((b: any) => b.dayOffset >= -7 && b.dayOffset <= 30)
 
   // Categorise bills
   const thisWeekBills = bills.filter((b: any) => b.dayOffset >= 0 && b.dayOffset <= 7)
@@ -158,13 +203,15 @@ function buildDailyBriefHtml(u: any, dayName: string, dateFormatted: string): st
   const buildBillRow = (b: any, highlight: string) => {
     const dueText = b.dayOffset === 0 ? 'DUE TODAY' : b.dayOffset < 0 ? `${Math.abs(b.dayOffset)} DAYS OVERDUE` : `Due in ${b.dayOffset} day${b.dayOffset !== 1 ? 's' : ''}`
     const freqLabel = b.frequency && b.frequency !== 'monthly' ? ` · ${b.frequency}` : ''
+    // Clean up auto-appended suffixes from the name
+    const displayName = b.name.replace(/ \(debt payment\)$/, '').replace(/ \(goal\)$/, '').replace(/ \(sinking fund\)$/, '')
     const isAutomatic = b.automatic
     return `
     <tr>
       <td style="padding:10px 0;border-bottom:1px solid #2e2618;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div>
-            <div style="color:#F5F5F5;font-size:14px;font-weight:600;">${b.name}</div>
+            <div style="color:#F5F5F5;font-size:14px;font-weight:600;">${displayName}</div>
             <div style="color:${highlight};font-size:11px;font-weight:700;margin-top:2px;">${dueText}${freqLabel}</div>
             ${isAutomatic
               ? `<div style="color:#6b8f6b;font-size:10px;margin-top:2px;">✅ Auto-payment set up</div>`
