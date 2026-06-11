@@ -108,7 +108,7 @@ export default function Dashboard() {
     emergencyAmount: '',
     goal: '',
   })
-  const [obStep, setObStep] = useState(0) // 0=name, 1=income, 2=housing, 3=debt, 4=emergency, 5=goal, 6=reveal, 7=action
+  const [obStep, setObStep] = useState<number>(0) // 0=name, 1=income, 2=housing, 3=debt, 4=emergency, 5=goal, 6=reveal, 7=action
   const [obReveal, setObReveal] = useState<string | null>(null)
   const [obRevealLoading, setObRevealLoading] = useState(false)
   const [obActionDone, setObActionDone] = useState(false) // locks nav during phase 1
