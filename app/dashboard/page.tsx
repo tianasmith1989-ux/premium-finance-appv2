@@ -7563,7 +7563,11 @@ RULES:
                             {inc.frequency} · {inc.type}
                             {inc.startDate && (() => {
                               const d = new Date(inc.startDate + 'T12:00:00')
-                              if (inc.frequency === 'weekly' || inc.frequency === 'fortnightly') return ` · every ${DOW_FULL[d.getDay()]}`
+                              if (inc.frequency === 'weekly' || inc.frequency === 'fortnightly') {
+                                const nextDate = getNextOccurrence(inc.startDate, inc.frequency)
+                                const nextStr = nextDate ? new Date(nextDate + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : ''
+                                return ` · every ${DOW_FULL[d.getDay()]}${nextStr ? ' · next: ' + nextStr : ''}`
+                              }
                               if (inc.frequency === 'monthly') return ` · ${d.getDate()}th of month`
                               return ''
                             })()}
@@ -7710,7 +7714,11 @@ RULES:
                             {exp.frequency}
                             {exp.dueDate && (() => {
                               const d = new Date(exp.dueDate + 'T12:00:00')
-                              if (exp.frequency === 'weekly' || exp.frequency === 'fortnightly') return ` · every ${DOW_FULL[d.getDay()]}`
+                              if (exp.frequency === 'weekly' || exp.frequency === 'fortnightly') {
+                                const nextDate = getNextOccurrence(exp.dueDate, exp.frequency)
+                                const nextStr = nextDate ? new Date(nextDate + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : ''
+                                return ` · every ${DOW_FULL[d.getDay()]}${nextStr ? ' · next: ' + nextStr : ''}`
+                              }
                               if (exp.frequency === 'monthly' || exp.frequency === 'quarterly') return ` · due ${d.getDate()}${d.getDate()===1?'st':d.getDate()===2?'nd':d.getDate()===3?'rd':'th'}`
                               return ''
                             })()}
@@ -7793,7 +7801,11 @@ RULES:
                             {debt.paymentDate && (() => {
                               const d = new Date(debt.paymentDate + 'T12:00:00')
                               const freq = debt.frequency || 'monthly'
-                              if (freq === 'weekly' || freq === 'fortnightly') return ` · every ${DOW_FULL[d.getDay()]}`
+                              if (freq === 'weekly' || freq === 'fortnightly') {
+                                const nextDate = getNextOccurrence(debt.paymentDate, freq)
+                                const nextStr = nextDate ? new Date(nextDate + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : ''
+                                return ` · every ${DOW_FULL[d.getDay()]}${nextStr ? ' · next: ' + nextStr : ''}`
+                              }
                               if (freq === 'monthly') { const dom = d.getDate(); return ` · due ${dom}${dom===1?'st':dom===2?'nd':dom===3?'rd':'th'}` }
                               return ''
                             })()}
