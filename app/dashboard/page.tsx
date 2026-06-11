@@ -4459,7 +4459,7 @@ Rules: Be specific. No generic advice. Keep responses concise unless detail is r
         const obSurplusFortnightly = Math.round((obIncomeMonthly - obHousingMonthly) * 12 / 26)
         const obDebt = parseFloat(ob5Q.debtAmount || '0')
         const obEmergency = parseFloat(ob5Q.emergencyAmount || '0')
-        const obStep = obEmergency >= 2000 && obDebt > 0 ? 2 : obEmergency >= 2000 && obDebt === 0 ? 3 : 1
+        const obWealthStep = obEmergency >= 2000 && obDebt > 0 ? 2 : obEmergency >= 2000 && obDebt === 0 ? 3 : 1
         const wealthStepNames = ['', 'Build Your Starter Emergency Fund', 'Kill Bad Debt', 'Build Full Emergency Fund', 'Grow Long-Term Wealth']
 
         const handleReveal = async () => {
@@ -4497,7 +4497,7 @@ Their answers:
 - Emergency savings: $${ob5Q.emergencyAmount}
 - Their #1 money goal: "${ob5Q.goal}"
 
-Calculated: ~$${obSurplusFortnightly}/fortnight available after housing. Wealth Step ${obStep}: ${wealthStepNames[obStep]}.
+Calculated: ~$${obSurplusFortnightly}/fortnight available after housing. Wealth Step ${obWealthStep}: ${wealthStepNames[obWealthStep]}.
 
 Write The Reveal in this shape (2-3 short paragraphs, coach voice, plain Australian English):
 1. "Alright ${ob5Q.name || 'there'}, here's what I see." then their fortnightly surplus and what that means
@@ -4517,7 +4517,7 @@ RULES:
             const data = await res.json()
             setObReveal(data.message || data.advice || '')
           } catch {
-            setObReveal(`Alright ${ob5Q.name || 'there'}, here's what I see. You've got roughly $${obSurplusFortnightly} a fortnight to work with after the big stuff. You're on Wealth Step ${obStep}: ${wealthStepNames[obStep]}. At your current pace, ${obStep === 1 ? `you could have your $2,000 starter emergency fund in about ${obEmergency > 0 ? Math.ceil((2000 - obEmergency) / (obSurplusFortnightly / 2)) : Math.ceil(2000 / (obSurplusFortnightly / 2))} weeks` : obStep === 2 ? `you could clear that debt in about ${obDebt > 0 ? Math.ceil(obDebt / obSurplusFortnightly) : 0} fortnights at this pace` : 'your foundations are solid — now it is about growing'}. That's your next move, and I'll walk it with you.`)
+            setObReveal(`Alright ${ob5Q.name || 'there'}, here's what I see. You've got roughly $${obSurplusFortnightly} a fortnight to work with after the big stuff. You're on Wealth Step ${obWealthStep}: ${wealthStepNames[obWealthStep]}. At your current pace, ${obStep === 1 ? `you could have your $2,000 starter emergency fund in about ${obEmergency > 0 ? Math.ceil((2000 - obEmergency) / (obSurplusFortnightly / 2)) : Math.ceil(2000 / (obSurplusFortnightly / 2))} weeks` : obWealthStep === 2 ? `you could clear that debt in about ${obDebt > 0 ? Math.ceil(obDebt / obSurplusFortnightly) : 0} fortnights at this pace` : 'your foundations are solid — now it is about growing'}. That's your next move, and I'll walk it with you.`)
           }
           setObRevealLoading(false)
           setObStep(6)
@@ -4563,7 +4563,7 @@ RULES:
               {obStep >= 1 && obStep <= 5 && (
                 <div style={{ display: 'flex', gap: '4px' }}>
                   {[1,2,3,4,5].map(i => (
-                    <div key={i} style={{ width: '20px', height: '3px', borderRadius: '2px', background: i <= obStep ? theme.accent : theme.border }} />
+                    <div key={i} style={{ width: '20px', height: '3px', borderRadius: '2px', background: i <= obWealthStep ? theme.accent : theme.border }} />
                   ))}
                 </div>
               )}
@@ -4780,12 +4780,12 @@ RULES:
                             { step: 3, label: 'Full Emergency Fund', icon: '🏦' },
                             { step: 4, label: 'Grow Long-Term Wealth', icon: '📈' },
                           ].map(s => (
-                            <div key={s.step} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: '8px', background: s.step === obStep ? theme.accent + '15' : 'transparent', border: s.step === obStep ? '1px solid ' + theme.accent + '40' : '1px solid transparent' }}>
+                            <div key={s.step} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: '8px', background: s.step === obWealthStep ? theme.accent + '15' : 'transparent', border: s.step === obWealthStep ? '1px solid ' + theme.accent + '40' : '1px solid transparent' }}>
                               <span style={{ fontSize: '16px' }}>{s.icon}</span>
-                              <span style={{ color: s.step === obStep ? theme.accent : s.step < obStep ? theme.success : theme.textMuted, fontSize: '13px', fontWeight: s.step === obStep ? 700 : 400 }}>
-                                {s.step < obStep ? '✓ ' : s.step === obStep ? '→ ' : ''}{s.label}
+                              <span style={{ color: s.step === obWealthStep ? theme.accent : s.step < obWealthStep ? theme.success : theme.textMuted, fontSize: '13px', fontWeight: s.step === obWealthStep ? 700 : 400 }}>
+                                {s.step < obWealthStep ? '✓ ' : s.step === obWealthStep ? '→ ' : ''}{s.label}
                               </span>
-                              {s.step === obStep && <span style={{ marginLeft: 'auto', color: theme.accent, fontSize: '11px', fontWeight: 700 }}>YOU ARE HERE</span>}
+                              {s.step === obWealthStep && <span style={{ marginLeft: 'auto', color: theme.accent, fontSize: '11px', fontWeight: 700 }}>YOU ARE HERE</span>}
                             </div>
                           ))}
                         </div>
