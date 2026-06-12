@@ -808,6 +808,10 @@ export default function Dashboard() {
       if (data.accountabilityEmail) setAccountabilityEmail(data.accountabilityEmail)
       if (data.accountabilityName) setAccountabilityName(data.accountabilityName)
       if (data.emailNotifEnabled !== undefined) setEmailNotifEnabled(data.emailNotifEnabled)
+      // If they have a notification email saved, treat as enabled even if flag is missing
+      if (data.notificationEmail && data.notificationEmail.includes('@') && data.emailNotifEnabled === undefined) {
+        setEmailNotifEnabled(true)
+      }
       if (data.emailNotifFrequency) setEmailNotifFrequency(data.emailNotifFrequency)
       if (data.notificationEmail) setNotificationEmail(data.notificationEmail)
       // Show onboarding for new users
@@ -2654,10 +2658,19 @@ Rules: Only include categories with non-zero amounts. Classify groceries/superma
     if (onboardingComplete && authUser) saveToCloud()
   }, [onboardingComplete])
 
+  // Force emailNotifEnabled true for anyone with a saved email — catches existing subscribers
+  useEffect(() => {
+    if (notificationEmail?.includes('@') && !emailNotifEnabled && onboardingComplete) {
+      setEmailNotifEnabled(true)
+    }
+  }, [notificationEmail, onboardingComplete])
+
   // ── Auto-sync notification prefs whenever financial data changes ──
   // Runs with a 5-second debounce so it doesn't hammer the API on every keystroke
   useEffect(() => {
-    if (!emailNotifEnabled && !notificationsEnabled) return
+    // Sync if explicitly enabled OR if they have an email address (covers existing subscribers)
+    const shouldSync = emailNotifEnabled || notificationsEnabled || (notificationEmail?.includes('@') && onboardingComplete)
+    if (!shouldSync) return
     if (!notificationEmail?.includes('@')) return
     if (!onboardingComplete) return
     const timer = setTimeout(async () => {
