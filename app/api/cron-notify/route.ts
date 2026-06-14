@@ -467,6 +467,26 @@ export async function GET(request: NextRequest) {
     if (error) throw new Error(error.message)
     if (!users?.length) return NextResponse.json({ ...results, message: 'No subscribers yet' })
 
+    // Fetch all active/trialing subscriptions to cross-reference
+    const { data: activeSubs } = await supabase
+      .from('subscriptions')
+      .select('user_token, email, status, trial_end')
+      .in('status', ['active', 'trialing'])
+
+    // Build a set of authorised emails and user tokens
+    const activeEmails = new Set((activeSubs || []).map((s: any) => s.email?.toLowerCase()).filter(Boolean))
+    const activeTokens = new Set((activeSubs || []).map((s: any) => s.user_token).filter(Boolean))
+
+    // Also check trial_end — skip expired trials
+    const now2 = new Date()
+    const validSubs = (activeSubs || []).filter((s: any) => {
+      if (s.status === 'active') return true
+      if (s.status === 'trialing' && s.trial_end) return new Date(s.trial_end) > now2
+      return false
+    })
+    const validEmails = new Set(validSubs.map((s: any) => s.email?.toLowerCase()).filter(Boolean))
+    const validTokens = new Set(validSubs.map((s: any) => s.user_token).filter(Boolean))
+
     results.users = users.length
 
     for (const u of users) {
@@ -474,6 +494,14 @@ export async function GET(request: NextRequest) {
         // Skip if already sent today (AEST) — prevents double-sending
         const lastSent = u.last_weekly_sent || ''
         if (lastSent === todayStr) { results.skipped++; continue }
+
+        // Skip if no active subscription — cancelled users don't get emails
+        const hasValidSub = validTokens.has(u.user_token) || validEmails.has(u.email?.toLowerCase())
+        if (!hasValidSub) {
+          console.log(`Skipping ${u.email} — no active subscription`)
+          results.skipped++
+          continue
+        }
 
         const overdue = (u.upcoming_bills || []).filter((b: any) => b.dayOffset < 0)
         const thisWeek = (u.upcoming_bills || []).filter((b: any) => b.dayOffset >= 0 && b.dayOffset <= 7)
